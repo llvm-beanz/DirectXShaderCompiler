@@ -48,7 +48,7 @@ namespace {
   };
 }
 
-MachineCodeEmitter *VM::createEmitter(VM &V) {
+MachineCodeEmitter *VM::createX86Emitter(VM &V) {
   return new Emitter(V);
 }
 
