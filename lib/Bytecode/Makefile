@@ -7,7 +7,7 @@
 # 
 ##===----------------------------------------------------------------------===##
 LEVEL = ../..
-DIRS = Reader Writer
+DIRS = Analyzer Reader Writer
 
 include $(LEVEL)/Makefile.common
 
