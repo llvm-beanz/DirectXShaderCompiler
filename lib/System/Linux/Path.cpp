@@ -13,8 +13,26 @@
 
 //===----------------------------------------------------------------------===//
 //=== WARNING: Implementation here must contain only Linux specific code 
-//===          and must not be generic UNIX code (see ../Unix)
+//===          and must not be generic UNIX code (see ../Unix/Path.cpp)
 //===----------------------------------------------------------------------===//
 
-// Th..Th..Th..Tha's All Folks!
+// Include the generic Unix implementation
 #include "../Unix/Path.cpp"
+
+namespace llvm {
+using namespace sys;
+
+bool 
+Path::is_valid() const {
+  if (path.empty()) 
+    return false;
+  char pathname[MAXPATHLEN];
+  if (0 == realpath(path.c_str(), pathname))
+    if (errno != EACCES && errno != EIO && errno != ENOENT && errno != ENOTDIR)
+      return false;
+  return true;
+}
+
+}
+
+// vim: sw=2 smartindent smarttab tw=80 autoindent expandtab
