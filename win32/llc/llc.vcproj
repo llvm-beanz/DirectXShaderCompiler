@@ -36,7 +36,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(SolutionDir)X86\$(IntDir)\X86TargetMachine.obj"
+				AdditionalDependencies="$(SolutionDir)X86\$(IntDir)\X86TargetMachine.obj $(SolutionDir)\CBackend\$(IntDir)\Writer.obj"
 				OutputFile="$(OutDir)/llc.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
@@ -87,7 +87,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(SolutionDir)X86\$(IntDir)\X86TargetMachine.obj"
+				AdditionalDependencies="$(SolutionDir)X86\$(IntDir)\X86TargetMachine.obj $(SolutionDir)\CBackend\$(IntDir)\Writer.obj"
 				OutputFile="$(OutDir)/llc.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="TRUE"
