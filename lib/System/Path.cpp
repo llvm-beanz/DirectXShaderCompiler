@@ -21,16 +21,6 @@ using namespace sys;
 //===          independent code. 
 //===----------------------------------------------------------------------===//
 
-bool
-Path::is_file() const {
-  return (is_valid() && path[path.length()-1] != '/');
-}
-
-bool
-Path::is_directory() const {
-  return (is_valid() && path[path.length()-1] == '/');
-}
-
 }
 
 // Include the truly platform-specific parts of this class.
