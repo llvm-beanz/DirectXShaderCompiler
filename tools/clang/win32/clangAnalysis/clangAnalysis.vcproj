@@ -160,6 +160,10 @@
 				RelativePath="..\..\Analysis\LiveVariables.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\..\Analysis\UnintializedValues.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -167,11 +171,35 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath="..\..\include\clang\Analysis\CFGStmtVisitor.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\include\clang\Analysis\CFGVarDeclVisitor.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Analysis\DataflowSolver.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\include\clang\Analysis\DataflowStmtVisitor.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\include\clang\Analysis\DataflowValues.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\include\clang\Analysis\LiveVariables.h"
 				>
 			</File>
 			<File
 				RelativePath="..\..\include\clang\Analysis\LocalCheckers.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\include\clang\Analysis\UninitializedValues.h"
 				>
 			</File>
 		</Filter>
