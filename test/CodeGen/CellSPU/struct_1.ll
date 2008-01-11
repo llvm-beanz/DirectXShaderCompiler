@@ -1,14 +1,27 @@
 ; RUN: llvm-as -o - %s | llc -march=cellspu > %t1.s
+; RUN: llvm-as -o - %s | llc -march=cellspu -mattr=large_mem > %t2.s
 ; RUN: grep lqa     %t1.s | count 10 &&
-; RUN: grep lqd     %t1.s | count 2 &&
+; RUN: grep lqd     %t1.s | count 4 &&
 ; RUN: grep rotqbyi %t1.s | count 5 &&
 ; RUN: grep xshw    %t1.s | count 1 &&
 ; RUN: grep andi    %t1.s | count 4 &&
 ; RUN: grep cbd     %t1.s | count 3 &&
 ; RUN: grep chd     %t1.s | count 1 &&
-; RUN: grep cwd     %t1.s | count 1 &&
-; RUN: grep shufb   %t1.s | count 5 &&
+; RUN: grep cwd     %t1.s | count 3 &&
+; RUN: grep shufb   %t1.s | count 7 &&
 ; RUN: grep stqa    %t1.s | count 5
+; RUN: grep iohl    %t2.s | count 14 &&
+; RUN: grep ilhu    %t2.s | count 14 &&
+; RUN: grep lqx     %t2.s | count 14 &&
+; RUN: grep rotqbyi %t2.s | count 5 &&
+; RUN: grep xshw    %t2.s | count 1 &&
+; RUN: grep andi    %t2.s | count 4 &&
+; RUN: grep cbd     %t2.s | count 3 &&
+; RUN: grep chd     %t2.s | count 1 &&
+; RUN: grep cwd     %t2.s | count 3 &&
+; RUN: grep shufb   %t2.s | count 7 &&
+; RUN: grep stqx    %t2.s | count 7
+
 ; ModuleID = 'struct_1.bc'
 target datalayout = "E-p:32:32:128-f64:64:128-f32:32:128-i64:32:128-i32:32:128-i16:16:128-i8:8:128-i1:8:128-a0:0:128-v128:128:128-s0:128:128"
 target triple = "spu"
@@ -105,3 +118,17 @@ entry:
         store i16 %s, i16* getelementptr (%struct.hackstate* @state, i32 0, i32 4), align 16
         ret void
 }
+
+define void @set_hackstate_i3(i32 %i) {
+entry:
+        store i32 %i, i32* getelementptr (%struct.hackstate* @state, i32 0, i32 11), align 16
+        ret void
+}
+
+
+define void @set_hackstate_i6(i32 %i) {
+entry:
+        store i32 %i, i32* getelementptr (%struct.hackstate* @state, i32 0, i32 13), align 16
+        ret void
+}
+
