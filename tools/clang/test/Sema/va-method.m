@@ -8,7 +8,7 @@
 @implementation XX
 - (void)encodeValuesOfObjCTypes:(const char *)types, ... {
    va_list ap;
-   va_start(ap, types); // expected-warning {{second parameter of 'va_start' not last named argument}}
+   va_start(ap, types); 
    while (*types) ;
    va_end(ap);
 }
