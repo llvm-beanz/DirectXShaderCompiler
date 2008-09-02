@@ -8,7 +8,8 @@
 
 // Currently this is implemented only for Alpha, X86, PowerPC.
 // Add your target here if it doesn't work.
-// XFAIL: sparc|arm|ia64
+// PPC32 does not translate the long long variants, so fails this test.
+// XFAIL: sparc|arm|ia64|powerpc
 
 signed char sc;
 unsigned char uc;
