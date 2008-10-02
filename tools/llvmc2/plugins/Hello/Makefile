@@ -1,4 +1,4 @@
-##===- lib/Transforms/Hello/Makefile -----------------------*- Makefile -*-===##
+##===- tools/llvmc2/plugins/Hello/Makefile -----------------*- Makefile -*-===##
 #
 #                     The LLVM Compiler Infrastructure
 #
@@ -7,11 +7,6 @@
 #
 ##===----------------------------------------------------------------------===##
 
-LEVEL = ../../../..
-LIBRARYNAME = LLVMCHello
-LOADABLE_MODULE = 1
-REQUIRES_EH = 1
-USEDLIBS =
+LLVMC_PLUGIN = Hello
 
-include $(LEVEL)/Makefile.common
-
+include ../Makefile.common
