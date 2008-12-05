@@ -1,7 +1,8 @@
-; RUN: llvm-as < %s | llc -march=x86 | \
-; RUN:   grep {A(} | count 1
+; RUN: llvm-as < %s | llc -march=x86 -relocation-model=static | \
+; RUN:   grep {A+} | count 2
 ;
-; Make sure the common loop invariant _A(reg) is hoisted up to preheader.
+; Make sure the common loop invariant A is not hoisted up to preheader,
+; since it can be subsumed into the addressing mode in all uses.
 
 @A = internal global [16 x [16 x i32]] zeroinitializer, align 32		; <[16 x [16 x i32]]*> [#uses=2]
 
