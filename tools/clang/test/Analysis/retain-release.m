@@ -1,4 +1,6 @@
-// RUN: clang -analyze -checker-cfref -verify %s
+// RUN: clang -analyze -checker-cfref -verify %s &&
+// RUN: clang -analyze -checker-cfref -analyzer-store-region -verify %s
+
 
 //===----------------------------------------------------------------------===//
 // The following code is reduced using delta-debugging from
@@ -118,26 +120,10 @@ CFAbsoluteTime f3() {
   return t;
 }
 
-// Test to see if we supresss an error when we store the pointer
-// to a struct.
-
-struct foo {
-  NSDate* f;
-};
-
-CFAbsoluteTime f4() {
-  struct foo x;
-  
-  CFAbsoluteTime t = CFAbsoluteTimeGetCurrent();
-  CFDateRef date = CFDateCreate(0, t);  
-  [((NSDate*) date) retain];
-  CFRelease(date);
-  CFDateGetAbsoluteTime(date); // no-warning
-  x.f = (NSDate*) date;  
-  [((NSDate*) date) release];
-  t = CFDateGetAbsoluteTime(date);   // no-warning
-  return t;
-}
+//---------------------------------------------------------------------------
+// Test case 'f4' differs for region store and basic store.  See
+// retain-release-region-store.m and retain-release-basic-store.m.
+//---------------------------------------------------------------------------
 
 // Test a leak.
 
