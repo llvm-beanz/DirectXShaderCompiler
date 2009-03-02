@@ -8,6 +8,6 @@
 ##===----------------------------------------------------------------------===##
 
 LEVEL := ../../..
-DIRS := ccc
+DIRS := ccc driver
 
 include $(LEVEL)/Makefile.common
