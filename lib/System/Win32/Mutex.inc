@@ -22,7 +22,7 @@
 namespace llvm {
 using namespace sys;
 
-Mutex::Mutex(bool /*recursive*/)
+Mutex::Mutex()
 {
   data_ = new CRITICAL_SECTION;
   InitializeCriticalSection((LPCRITICAL_SECTION)data_);
