@@ -1,11 +1,10 @@
 ; RUN: llvm-as %s -o %t1
-; RUN: opt %t1 -insert-edge-profiling -o %t2
+; RUN: opt %t1 -insert-optimal-edge-profiling -o %t2
 ; RUN: llvm-dis < %t2 | FileCheck --check-prefix=INST %s
 ; RUN: rm -f llvmprof.out
 ; RUN: lli -load %llvmlibsdir/profile_rt%shlibext %t2
 ; RUN: lli -load %llvmlibsdir/profile_rt%shlibext %t2 1 2
 ; RUN: llvm-prof -print-all-code %t1 | FileCheck --check-prefix=PROF %s
-; RUN: rm llvmprof.out
 
 ; PROF:  1.     2/4 oneblock
 ; PROF:  2.     2/4 main
@@ -32,9 +31,29 @@
 @.str3 = private constant [9 x i8] c"argc = 1\00", align 1 ; <[9 x i8]*> [#uses=1]
 @.str4 = private constant [6 x i8] c"fritz\00", align 1 ; <[6 x i8]*> [#uses=1]
 @.str5 = private constant [10 x i8] c"argc <= 1\00", align 1 ; <[10 x i8]*> [#uses=1]
-; INST:@EdgeProfCounters
-; INST:[19 x i32] 
-; INST:zeroinitializer
+; INST:@OptEdgeProfCounters
+; INST:[21 x i32]
+; INST:[i32 0,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 0,
+; INST:i32 0,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 0,
+; INST:i32 0,
+; INST:i32 -1,
+; INST:i32 -1,
+; INST:i32 0,
+; INST:i32 -1,
+; INST:i32 -1]
 
 ; PROF:;;; %oneblock called 2 times.
 ; PROF:;;;
@@ -61,8 +80,8 @@ entry:
   %i = alloca i32                                 ; <i32*> [#uses=4]
   %0 = alloca i32                                 ; <i32*> [#uses=2]
 ; INST:call 
-; INST:@llvm_start_edge_profiling
-; INST:@EdgeProfCounters
+; INST:@llvm_start_opt_edge_profiling
+; INST:@OptEdgeProfCounters
   %"alloca point" = bitcast i32 0 to i32          ; <i32> [#uses=0]
   store i32 %argc, i32* %argc_addr
   store i8** %argv, i8*** %argv_addr
