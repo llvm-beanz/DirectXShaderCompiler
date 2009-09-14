@@ -10,8 +10,5 @@
 #include "llvm/MC/MCDisassembler.h"
 using namespace llvm;
 
-MCDisassembler::MCDisassembler() {
-}
-  
 MCDisassembler::~MCDisassembler() {
 }
