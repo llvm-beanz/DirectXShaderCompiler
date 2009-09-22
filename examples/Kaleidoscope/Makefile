@@ -6,10 +6,10 @@
 # License. See LICENSE.TXT for details.
 # 
 ##===----------------------------------------------------------------------===##
-LEVEL = ../..
-TOOLNAME = Kaleidoscope
-EXAMPLE_TOOL = 1
+LEVEL=../..
 
-LINK_COMPONENTS := core jit interpreter native
+include $(LEVEL)/Makefile.config
+
+PARALLEL_DIRS:= Chapter7
 
 include $(LEVEL)/Makefile.common
