@@ -1,4 +1,4 @@
-##===- examples/Kaleidoscope-Ch7/Makefile ------------------*- Makefile -*-===##
+##===- examples/Kaleidoscope/Chapter7/Makefile -------------*- Makefile -*-===##
 # 
 #                     The LLVM Compiler Infrastructure
 #
@@ -6,7 +6,7 @@
 # License. See LICENSE.TXT for details.
 # 
 ##===----------------------------------------------------------------------===##
-LEVEL = ../..
+LEVEL = ../../..
 TOOLNAME = Kaleidoscope-Ch7
 EXAMPLE_TOOL = 1
 
