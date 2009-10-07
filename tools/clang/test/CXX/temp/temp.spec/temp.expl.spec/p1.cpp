@@ -1,8 +1,10 @@
-// RUN: clang-cc -fsyntax-only %s
+// RUN: clang-cc -fsyntax-only -verify %s
 
 // This test creates cases where implicit instantiations of various entities
 // would cause a diagnostic, but provides expliict specializations for those
 // entities that avoid the diagnostic. The intent is to verify that 
+// implicit instantiations do not occur (because the explicit specialization 
+// is used instead).
 struct NonDefaultConstructible {
   NonDefaultConstructible(int);
 };
