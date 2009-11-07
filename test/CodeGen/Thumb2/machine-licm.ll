@@ -1,5 +1,6 @@
 ; RUN: llc < %s -mtriple=thumbv7-apple-darwin -relocation-model=pic -disable-fp-elim | FileCheck %s
 ; rdar://7353541
+; rdar://7354376
 
 ; The generated code is no where near ideal. It's not recognizing the two
 ; constantpool entries being loaded can be merged into one.
