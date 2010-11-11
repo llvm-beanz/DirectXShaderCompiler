@@ -1,7 +1,5 @@
 // RUN: %clang_cc1 -fblocks -fobjc-gc -triple x86_64-apple-darwin -O0 -S %s -o %t-64.s
 // RUN: FileCheck -check-prefix LP64 --input-file=%t-64.s %s
-// RUN: %clang_cc1 -x objective-c++ -fblocks -fobjc-gc -triple x86_64-apple-darwin -O0 -S %s -o %t-64.s
-// RUN: FileCheck -check-prefix LP64 --input-file=%t-64.s %s
 
 struct S {
     int i1;
