@@ -13,6 +13,7 @@
 
 CLANG_LEVEL := ../..
 LIBRARYNAME := clangGRCore
+PARALLEL_DIRS := Checkers
 
 include $(CLANG_LEVEL)/Makefile
 
