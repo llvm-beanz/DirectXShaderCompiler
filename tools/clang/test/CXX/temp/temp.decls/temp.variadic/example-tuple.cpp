@@ -206,9 +206,6 @@ get(const tuple<Values...>& t) {
   return get_impl<I, tuple<Values...> >::get(t);
 }
 
-#if 0
-// FIXME: Not yet functional, because we aren't currently able to
-// extend a partially-explicitly-specified parameter pack.
 void test_element_access(tuple<int*, float*, double*&> t3) {
   int i;
   float f;
@@ -217,7 +214,6 @@ void test_element_access(tuple<int*, float*, double*&> t3) {
   get<1>(t3) = &f;
   get<2>(t3) = &d;
 }
-#endif
 
 // Relational operators
 inline bool operator==(const tuple<>&, const tuple<>&) { return true; }
