@@ -1,4 +1,4 @@
-##===- clang/lib/Checker/Makefile --------------------------*- Makefile -*-===##
+##===- clang/lib/StaticAnalyzer/Makefile -------------------*- Makefile -*-===##
 # 
 #                     The LLVM Compiler Infrastructure
 #
@@ -12,8 +12,6 @@
 ##===----------------------------------------------------------------------===##
 
 CLANG_LEVEL := ../..
-LIBRARYNAME := clangStaticAnalyzerCore
-PARALLEL_DIRS := Checkers
+PARALLEL_DIRS := Core Checkers
 
 include $(CLANG_LEVEL)/Makefile
-
