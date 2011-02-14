@@ -12,6 +12,6 @@
 ##===----------------------------------------------------------------------===##
 
 CLANG_LEVEL := ../..
-PARALLEL_DIRS := Core Checkers
+PARALLEL_DIRS := Core Checkers Frontend
 
 include $(CLANG_LEVEL)/Makefile
