@@ -1,12 +1,11 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -std=c++0x -fsyntax-only -verify %s
 
 // PR10034
 struct X {};
 
 void exx(X) {}
 
-int main(int argc, char **argv)
+int test_ptr10034(int argc, char **argv)
 {
  if (argc > 3)
    goto end;
@@ -23,4 +22,26 @@ int main(int argc, char **argv)
    }
    }
    return 0;
+}
+
+struct Y {
+  ~Y();
+};
+
+void test_Y() {
+  goto end; // expected-error{{goto into protected scope}}
+  Y y; // expected-note{{jump bypasses variable initialization}}
+ end:
+  return;
+}
+
+struct Z {
+  Z operator=(const Z&);
+};
+
+void test_Z() {
+  goto end; // expected-error{{goto into protected scope}}
+  Z z; // expected-note{{jump bypasses variable initialization}}
+ end:
+  return;
 }
