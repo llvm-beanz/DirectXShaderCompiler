@@ -17,8 +17,10 @@ TOOL_NO_EXPORTS = 1
 
 LINK_COMPONENTS := support mc
 USEDLIBS = clangFrontend.a clangSerialization.a clangDriver.a \
-           clangTooling.a clangSema.a clangAnalysis.a \
-           clangAST.a clangParse.a clangLex.a clangBasic.a
+           clangTooling.a clangParse.a clangSema.a clangAnalysis.a \
+           clangAST.a clangLex.a clangBasic.a
+
+PARALLEL_DIRS := RemoveCStrCalls
 
 include $(CLANG_LEVEL)/Makefile
 
