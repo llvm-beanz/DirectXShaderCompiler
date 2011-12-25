@@ -60,4 +60,12 @@
 #include <avx2intrin.h>
 #endif
 
+#ifdef __BMI__
+#include <bmiintrin.h>
+#endif
+
+#ifdef __LZCNT__
+#include <lzcntintrin.h>
+#endif
+
 #endif /* __IMMINTRIN_H */
