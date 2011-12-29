@@ -38,6 +38,10 @@
 #include <lzcntintrin.h>
 #endif
 
-// FIXME: SSE4A, 3dNOW, FMA4, XOP, LWP, ABM, POPCNT
+#ifdef __POPCNT__
+#include <popcntintrin.h>
+#endif
+
+// FIXME: SSE4A, 3dNOW, FMA4, XOP, LWP, ABM
 
 #endif /* __X86INTRIN_H */
