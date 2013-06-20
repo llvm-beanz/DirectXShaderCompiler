@@ -1,5 +1,5 @@
 // RUN: %clang_cc1 -triple x86_64-unk-unk -fno-limit-debug-info -o - -emit-llvm -g %s | FileCheck %s
-// Check that we emit debug info for a struct even if it is typedef'd before using.
+// Check that we emit debug info for a struct even if it is typedef'd.
 // rdar://problem/14101097
 //
 // FIXME: This should work with -flimit-debug-info, too.
