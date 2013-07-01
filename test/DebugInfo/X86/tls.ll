@@ -1,5 +1,5 @@
-; RUN: llc -mtriple=x86_64-unknown-unknown -O0 -filetype=asm < %s | FileCheck %s
-; RUN: llc -mtriple=i386-unknown-unknown -O0 -filetype=asm < %s | FileCheck --check-prefix=CHECK-32 %s
+; RUN: llc -mtriple=x86_64-linux -O0 -filetype=asm < %s | FileCheck %s
+; RUN: llc -mtriple=i386-linux -O0 -filetype=asm < %s | FileCheck --check-prefix=CHECK-32 %s
 
 ; FIXME: add relocation and DWARF expression support to llvm-dwarfdump & use
 ; that here instead of raw assembly printing
