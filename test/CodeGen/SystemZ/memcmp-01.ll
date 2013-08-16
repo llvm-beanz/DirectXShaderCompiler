@@ -1,4 +1,4 @@
-; Test memcmp using CLC.
+; Test memcmp using CLC, with i32 results.
 ;
 ; RUN: llc < %s -mtriple=s390x-linux-gnu | FileCheck %s
 
