@@ -22,8 +22,8 @@ define void @const_v16i8() nounwind {
   store volatile <16 x i8> <i8 1, i8 2, i8 3, i8 4, i8 5, i8 6, i8 7, i8 8, i8 9, i8 0, i8 1, i8 2, i8 3, i8 4, i8 5, i8 6>, <16 x i8>*@v16i8
   ; MIPS32: ld.b  [[R1:\$w[0-9]+]], %lo(
 
-  store volatile <16 x i8> <i8 1, i8 2, i8 1, i8 2, i8 1, i8 2, i8 1, i8 2, i8 1, i8 2, i8 1, i8 2, i8 1, i8 2, i8 1, i8 2>, <16 x i8>*@v16i8
-  ; MIPS32: ldi.h [[R1:\$w[0-9]+]], 258
+  store volatile <16 x i8> <i8 1, i8 0, i8 1, i8 0, i8 1, i8 0, i8 1, i8 0, i8 1, i8 0, i8 1, i8 0, i8 1, i8 0, i8 1, i8 0>, <16 x i8>*@v16i8
+  ; MIPS32: ldi.h [[R1:\$w[0-9]+]], 256
 
   store volatile <16 x i8> <i8 1, i8 2, i8 3, i8 4, i8 1, i8 2, i8 3, i8 4, i8 1, i8 2, i8 3, i8 4, i8 1, i8 2, i8 3, i8 4>, <16 x i8>*@v16i8
   ; MIPS32-DAG: lui [[R2:\$[0-9]+]], 258
