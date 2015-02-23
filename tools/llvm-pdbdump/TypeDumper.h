@@ -16,7 +16,7 @@ namespace llvm {
 
 class TypeDumper : public PDBSymDumper {
 public:
-  TypeDumper();
+  TypeDumper(bool Inline, bool ClassDefs);
 
   void start(const PDBSymbolExe &Exe, raw_ostream &OS, int Indent);
 
@@ -26,6 +26,12 @@ public:
             int Indent) override;
   void dump(const PDBSymbolTypeTypedef &Symbol, raw_ostream &OS,
             int Indent) override;
+  void dump(const PDBSymbolTypeUDT &Symbol, raw_ostream &OS,
+            int Indent) override;
+
+private:
+  bool InlineDump;
+  bool FullClassDefs;
 };
 }
 
