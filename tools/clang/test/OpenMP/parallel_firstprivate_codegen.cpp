@@ -70,7 +70,7 @@ int main() {
     // LAMBDA: [[G_REF_ADDR:%.+]] = getelementptr inbounds %{{.+}}, %{{.+}}* [[ARG]], i{{[0-9]+}} 0, i{{[0-9]+}} 0
     // LAMBDA: [[G_REF:%.+]] = load i{{[0-9]+}}*, i{{[0-9]+}}** [[G_REF_ADDR]]
     // LAMBDA: [[G_VAL:%.+]] = load volatile i{{[0-9]+}}, i{{[0-9]+}}* [[G_REF]]
-    // LAMBDA: store volatile i{{[0-9]+}} [[G_VAL]], i{{[0-9]+}}* [[G_PRIVATE_ADDR]]
+    // LAMBDA: store i{{[0-9]+}} [[G_VAL]], i{{[0-9]+}}* [[G_PRIVATE_ADDR]]
     // LAMBDA: call i32 @__kmpc_cancel_barrier(
     g = 1;
     // LAMBDA: store volatile i{{[0-9]+}} 1, i{{[0-9]+}}* [[G_PRIVATE_ADDR]],
@@ -108,7 +108,7 @@ int main() {
     // BLOCKS: [[G_REF_ADDR:%.+]] = getelementptr inbounds %{{.+}}, %{{.+}}* [[ARG]], i{{[0-9]+}} 0, i{{[0-9]+}} 0
     // BLOCKS: [[G_REF:%.+]] = load i{{[0-9]+}}*, i{{[0-9]+}}** [[G_REF_ADDR]]
     // BLOCKS: [[G_VAL:%.+]] = load volatile i{{[0-9]+}}, i{{[0-9]+}}* [[G_REF]]
-    // BLOCKS: store volatile i{{[0-9]+}} [[G_VAL]], i{{[0-9]+}}* [[G_PRIVATE_ADDR]]
+    // BLOCKS: store i{{[0-9]+}} [[G_VAL]], i{{[0-9]+}}* [[G_PRIVATE_ADDR]]
     // BLOCKS: call i32 @__kmpc_cancel_barrier(
     g = 1;
     // BLOCKS: store volatile i{{[0-9]+}} 1, i{{[0-9]+}}* [[G_PRIVATE_ADDR]],
