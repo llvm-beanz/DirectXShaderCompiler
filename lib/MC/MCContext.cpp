@@ -1,11 +1,12 @@
 //===- lib/MC/MCContext.cpp - Machine Code Context ------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MCContext.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/MC/MCContext.h"
 #include "llvm/ADT/SmallString.h"
@@ -472,6 +473,7 @@ void MCContext::finalizeDwarfSections(MCStreamer &MCOS) {
 }
 
 void MCContext::reportFatalError(SMLoc Loc, const Twine &Msg) const {
+#if 0 // HLSL Change - analysis shows this isn't called on corruption but on paths with no recovery; unwind instead of terminating
   // If we have a source manager and a location, use it. Otherwise just
   // use the generic report_fatal_error().
   if (!SrcMgr || Loc == SMLoc())
@@ -485,4 +487,7 @@ void MCContext::reportFatalError(SMLoc Loc, const Twine &Msg) const {
   // files registered with RemoveFileOnSignal.
   sys::RunInterruptHandlers();
   exit(1);
+#else
+  throw std::exception();
+#endif
 }

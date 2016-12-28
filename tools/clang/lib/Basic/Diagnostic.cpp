@@ -1,15 +1,14 @@
 //===--- Diagnostic.cpp - C Language Family Diagnostic Handling -----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the Diagnostic-related interfaces.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Diagnostic.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the Diagnostic-related interfaces.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Diagnostic.h"
@@ -204,6 +203,7 @@ void DiagnosticsEngine::setSeverity(diag::kind Diag, diag::Severity Map,
     return;
   }
 
+  _Analysis_assume_(SourceMgr != nullptr); // SourceMgr==nullptr is only valid for invalid locations, which cause an earlier exit
   // Another common case; modifying diagnostic state in a source location
   // after the previous one.
   if ((Loc.isValid() && LastStateChangePos.isInvalid()) ||
@@ -468,7 +468,7 @@ static void HandleSelectModifier(const Diagnostic &DInfo, unsigned ValNo,
 
 /// HandleIntegerSModifier - Handle the integer 's' modifier.  This adds the
 /// letter 's' to the string if the value is not 1.  This is used in cases like
-/// this:  "you idiot, you have %4 parameter%s4!".
+/// this:  "you have %4 parameter%s4!". // HLSL Change - remove minor profanity
 static void HandleIntegerSModifier(unsigned ValNo,
                                    SmallVectorImpl<char> &OutStr) {
   if (ValNo != 1)

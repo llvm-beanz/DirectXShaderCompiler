@@ -1,18 +1,12 @@
 /*===-- clang-c/Index.h - Indexing Public C Interface -------------*- C -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header provides a public inferface to a Clang library for extracting  *|
-|* high-level symbol information from source files without exposing the full  *|
-|* Clang C++ API.                                                             *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Index.h                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_C_INDEX_H
 #define LLVM_CLANG_C_INDEX_H
 
@@ -208,6 +202,11 @@ typedef struct CXVersion {
  */
 CINDEX_LINKAGE CXIndex clang_createIndex(int excludeDeclarationsFromPCH,
                                          int displayDiagnostics);
+
+// HLSL Change Starts
+// void* should be a hlsl::DxcLangExtensionsHelperApply* object.
+CINDEX_LINKAGE void LIBCLANG_CC clang_index_setLangHelper(CXIndex index, void*);
+// HLSL Change Ends
 
 /**
  * \brief Destroy the given index.
@@ -863,6 +862,7 @@ enum CXDiagnosticDisplayOptions {
    * \c -fdiagnostics-show-category=name.
    */
   CXDiagnostic_DisplayCategoryName = 0x20
+  , CXDiagnostic_DisplaySeverity = 0x200 // HLSL Change: new flag to control severity  
 };
 
 /**
@@ -1202,7 +1202,8 @@ enum CXTranslationUnit_Flags {
    * included into the set of code completions returned from this translation
    * unit.
    */
-  CXTranslationUnit_IncludeBriefCommentsInCodeCompletion = 0x80
+  CXTranslationUnit_IncludeBriefCommentsInCodeCompletion = 0x80,
+  CXTranslationUnit_UseCallerThread = 0x800, // HLSL Change - add a flag
 };
 
 /**
@@ -3625,6 +3626,17 @@ CINDEX_LINKAGE CXString clang_constructUSR_ObjCProperty(const char *property,
  */
 CINDEX_LINKAGE CXString clang_getCursorSpelling(CXCursor);
 
+// HLSL Change Starts
+enum CXCursorFormatting {
+  CXCursorFormatting_Default = 0x0,             // Default rules, language-insensitive formatting.
+  CXCursorFormatting_UseLanguageOptions = 0x1,  // Language-sensitive formatting.
+  CXCursorFormatting_SuppressSpecifiers = 0x2,  // Supresses type specifiers.
+  CXCursorFormatting_SuppressTagKeyword = 0x4,  // Suppressed tag keyword (eg, 'class').
+  CXCursorFormatting_IncludeNamespaceKeyword = 0x8,    // Include namespace keyword.
+};
+CINDEX_LINKAGE CXString LIBCLANG_CC clang_getCursorSpellingWithFormatting(CXCursor, unsigned);
+// HLSL Change Stops
+
 /**
  * \brief Retrieve a range for a piece that forms the cursors spelling name.
  * Most of the times there is only one range for the complete spelling but for
@@ -4111,6 +4123,8 @@ typedef enum CXTokenKind {
    * \brief A comment.
    */
   CXToken_Comment
+  
+  , CXToken_BuiltInType // HLSL Change
 } CXTokenKind;
 
 /**
@@ -5747,6 +5761,11 @@ CINDEX_LINKAGE unsigned clang_Type_visitFields(CXType T,
 /**
  * @}
  */
+
+// HLSL Change Starts
+unsigned clang_ms_countSkippedRanges(CXTranslationUnit TU, CXFile file);
+void     clang_ms_getSkippedRanges(CXTranslationUnit TU, CXFile file, CXSourceRange* ranges, unsigned len);
+// HLSL Change Ends
 
 #ifdef __cplusplus
 }

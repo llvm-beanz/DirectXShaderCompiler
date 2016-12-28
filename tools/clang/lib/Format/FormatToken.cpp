@@ -1,17 +1,18 @@
 //===--- FormatToken.cpp - Format C++ code --------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FormatToken.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file implements specific functions of \c FormatTokens and their
-/// roles.
+/// \file                                                                    //
+/// \brief This file implements specific functions of \c FormatTokens and their//
+/// roles.                                                                   //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "FormatToken.h"
 #include "ContinuationIndenter.h"

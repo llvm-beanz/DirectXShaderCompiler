@@ -1,15 +1,14 @@
 //===- Binary.cpp - A generic binary file -----------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the Binary class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Binary.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the Binary class.                                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Object/Binary.h"
 #include "llvm/ADT/StringRef.h"
@@ -65,7 +64,7 @@ ErrorOr<std::unique_ptr<Binary>> object::createBinary(MemoryBufferRef Buffer,
     case sys::fs::file_magic::bitcode:
       return ObjectFile::createSymbolicFile(Buffer, Type, Context);
     case sys::fs::file_magic::macho_universal_binary:
-      return MachOUniversalBinary::create(Buffer);
+      // return MachOUniversalBinary::create(Buffer); // HLSL Change - remove support for MachO files
     case sys::fs::file_magic::unknown:
     case sys::fs::file_magic::windows_resource:
       // Unrecognized object file format.

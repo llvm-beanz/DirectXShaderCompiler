@@ -1,15 +1,14 @@
 //===--- StringMap.cpp - String Hash table map implementation -------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the StringMap class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// StringMap.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the StringMap class.                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringExtras.h"
@@ -43,6 +42,7 @@ void StringMapImpl::init(unsigned InitSize) {
   TheTable = (StringMapEntryBase **)calloc(NumBuckets+1,
                                            sizeof(StringMapEntryBase **) +
                                            sizeof(unsigned));
+  if (TheTable == nullptr) throw std::bad_alloc(); // HLSL Change
 
   // Allocate one extra bucket, set it to look filled so the iterators stop at
   // end.
@@ -203,6 +203,7 @@ unsigned StringMapImpl::RehashTable(unsigned BucketNo) {
   StringMapEntryBase **NewTableArray =
     (StringMapEntryBase **)calloc(NewSize+1, sizeof(StringMapEntryBase *) +
                                              sizeof(unsigned));
+  if (NewTableArray == nullptr) throw std::bad_alloc(); // HLSL Change
   unsigned *NewHashArray = (unsigned *)(NewTableArray + NewSize + 1);
   NewTableArray[NewSize] = (StringMapEntryBase*)2;
 

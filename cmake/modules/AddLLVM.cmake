@@ -37,6 +37,16 @@ function(llvm_update_compile_flags name)
       list(APPEND LLVM_COMPILE_FLAGS "/GR-")
     endif ()
   endif()
+  
+  # HLSL Changes Start
+  if (LLVM_ENABLE_EH)
+    if (MSVC)
+      list(APPEND LLVM_COMPILE_FLAGS "/EHsc")
+    else (MSVC)
+      message(ERROR "Unimplemented")
+    endif (MSVC)
+  endif (LLVM_ENABLE_EH)
+  # HLSL Changes End
 
   # Assume that;
   #   - LLVM_COMPILE_FLAGS is list.

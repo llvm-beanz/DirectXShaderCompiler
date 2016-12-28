@@ -1,14 +1,13 @@
 //===- llvm/Transforms/IPO.h - Interprocedural Transformations --*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This header file defines prototypes for accessor functions that expose passes
-// in the IPO transformations library.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IPO.h                                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header file defines prototypes for accessor functions that expose passes//
+// in the IPO transformations library.                                       //
 //
 //===----------------------------------------------------------------------===//
 
@@ -199,8 +198,8 @@ ModulePass *createPartialInliningPass();
 // createMetaRenamerPass - Rename everything with metasyntatic names.
 //
 ModulePass *createMetaRenamerPass();
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// createBarrierNoopPass - This pass is purely a module pass barrier in a pass
 /// manager.
 ModulePass *createBarrierNoopPass();

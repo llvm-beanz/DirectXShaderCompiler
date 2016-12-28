@@ -1,17 +1,16 @@
 //===-- llvm/CodeGen/MachinePassRegistry.h ----------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains the mechanics for machine function pass registries.  A
-// function pass registry (MachinePassRegistry) is auto filled by the static
-// constructors of MachinePassRegistryNode.  Further there is a command line
-// parser (RegisterPassParser) which listens to each registry for additions
-// and deletions, so that the appropriate command option is updated.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MachinePassRegistry.h                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains the mechanics for machine function pass registries.  A //
+// function pass registry (MachinePassRegistry) is auto filled by the static //
+// constructors of MachinePassRegistryNode.  Further there is a command line //
+// parser (RegisterPassParser) which listens to each registry for additions  //
+// and deletions, so that the appropriate command option is updated.         //
 //
 //===----------------------------------------------------------------------===//
 
@@ -117,7 +116,8 @@ public:
 ///
 /// RegisterPassParser class - Handle the addition of new machine passes.
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 template<class RegistryClass>
 class RegisterPassParser : public MachinePassRegistryListener,
                    public cl::parser<typename RegistryClass::FunctionPassCtor> {

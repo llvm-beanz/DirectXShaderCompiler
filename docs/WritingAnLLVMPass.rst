@@ -8,6 +8,10 @@ Writing an LLVM Pass
 Introduction --- What is a pass?
 ================================
 
+NOTE: this document describes the instructions for LLVM, not the DirectX
+Compiler. There are a few additional requirements to have a pass behave
+properly with other compiler components.
+
 The LLVM Pass Framework is an important part of the LLVM system, because LLVM
 passes are where most of the interesting parts of the compiler exist.  Passes
 perform the transformations and optimizations that make up the compiler, they
@@ -216,82 +220,8 @@ can have them) to be useful.
 Running a pass with ``opt``
 ---------------------------
 
-Now that you have a brand new shiny shared object file, we can use the
-:program:`opt` command to run an LLVM program through your pass.  Because you
-registered your pass with ``RegisterPass``, you will be able to use the
-:program:`opt` tool to access it, once loaded.
-
-To test it, follow the example at the end of the :doc:`GettingStarted` to
-compile "Hello World" to LLVM.  We can now run the bitcode file (hello.bc) for
-the program through our transformation like this (or course, any bitcode file
-will work):
-
-.. code-block:: console
-
-  $ opt -load ../../../Debug+Asserts/lib/Hello.so -hello < hello.bc > /dev/null
-  Hello: __main
-  Hello: puts
-  Hello: main
-
-The :option:`-load` option specifies that :program:`opt` should load your pass
-as a shared object, which makes "``-hello``" a valid command line argument
-(which is one reason you need to :ref:`register your pass
-<writing-an-llvm-pass-registration>`).  Because the Hello pass does not modify
-the program in any interesting way, we just throw away the result of
-:program:`opt` (sending it to ``/dev/null``).
-
-To see what happened to the other string you registered, try running
-:program:`opt` with the :option:`-help` option:
-
-.. code-block:: console
-
-  $ opt -load ../../../Debug+Asserts/lib/Hello.so -help
-  OVERVIEW: llvm .bc -> .bc modular optimizer
-
-  USAGE: opt [options] <input bitcode>
-
-  OPTIONS:
-    Optimizations available:
-  ...
-      -globalopt                - Global Variable Optimizer
-      -globalsmodref-aa         - Simple mod/ref analysis for globals
-      -gvn                      - Global Value Numbering
-      -hello                    - Hello World Pass
-      -indvars                  - Induction Variable Simplification
-      -inline                   - Function Integration/Inlining
-  ...
-
-The pass name gets added as the information string for your pass, giving some
-documentation to users of :program:`opt`.  Now that you have a working pass,
-you would go ahead and make it do the cool transformations you want.  Once you
-get it all working and tested, it may become useful to find out how fast your
-pass is.  The :ref:`PassManager <writing-an-llvm-pass-passmanager>` provides a
-nice command line option (:option:`--time-passes`) that allows you to get
-information about the execution time of your pass along with the other passes
-you queue up.  For example:
-
-.. code-block:: console
-
-  $ opt -load ../../../Debug+Asserts/lib/Hello.so -hello -time-passes < hello.bc > /dev/null
-  Hello: __main
-  Hello: puts
-  Hello: main
-  ===============================================================================
-                        ... Pass execution timing report ...
-  ===============================================================================
-    Total Execution Time: 0.02 seconds (0.0479059 wall clock)
-
-     ---User Time---   --System Time--   --User+System--   ---Wall Time---  --- Pass Name ---
-     0.0100 (100.0%)   0.0000 (  0.0%)   0.0100 ( 50.0%)   0.0402 ( 84.0%)  Bitcode Writer
-     0.0000 (  0.0%)   0.0100 (100.0%)   0.0100 ( 50.0%)   0.0031 (  6.4%)  Dominator Set Construction
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0013 (  2.7%)  Module Verifier
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0033 (  6.9%)  Hello World Pass
-     0.0100 (100.0%)   0.0100 (100.0%)   0.0200 (100.0%)   0.0479 (100.0%)  TOTAL
-
-As you can see, our implementation above is pretty fast.  The additional
-passes listed are automatically inserted by the :program:`opt` tool to verify
-that the LLVM emitted by your pass is still valid and well formed LLVM, which
-hasn't been broken somehow.
+NOTE: this section should be updated with instructions on how to run with
+dxcopt.
 
 Now that you have seen the basics of the mechanics behind passes, we can talk
 about some more details of how they work and how to use them.

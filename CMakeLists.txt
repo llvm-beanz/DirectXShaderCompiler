@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 # See docs/CMake.html for instructions about how to build LLVM with CMake.
 
 cmake_minimum_required(VERSION 2.8.12.2)
@@ -27,6 +29,9 @@ else()
 endif()
 
 project(LLVM)
+
+# This requires a more recent version than CMake 3.4 but is a noop in prior versions. # HLSL Change
+set(VS_STARTUP_PROJECT "dndxc" CACHE STRING "VS startup project in solution")         # HLSL Change
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(LLVM_PARALLEL_COMPILE_JOBS "" CACHE STRING
@@ -77,6 +82,10 @@ if ( LLVM_USE_FOLDERS )
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endif()
 
+option(HLSL_ENABLE_FIXED_VER "Sets up fixed version information." OFF) # HLSL Change
+option(HLSL_ENABLE_ANALYZE "Enables compiler analysis during compilation." OFF) # HLSL Change
+option(HLSL_OPTIONAL_PROJS_IN_DEFAULT "Include optional projects in default build target." OFF) # HLSL Change
+
 include(VersionFromVCS)
 
 option(LLVM_APPEND_VC_REV
@@ -94,6 +103,7 @@ set(BUG_REPORT_URL "${PACKAGE_BUGREPORT}" CACHE STRING
   "Default URL where bug reports are to be submitted.")
 
 # Configure CPack.
+if(0) # HLSL Change - disable CPack
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "LLVM")
 set(CPACK_PACKAGE_VENDOR "LLVM")
 set(CPACK_PACKAGE_VERSION_MAJOR ${LLVM_VERSION_MAJOR})
@@ -118,6 +128,7 @@ if(WIN32 AND NOT UNIX)
   endif()
 endif()
 include(CPack)
+endif(0) # HLSL Change - disable CPack
 
 # Sanity check our source directory to make sure that we are not trying to
 # generate an in-tree build (unless on MSVC_IDE, where it is ok), and to make
@@ -140,7 +151,8 @@ if( NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR )
     tablegenned_files_on_lib_dir
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/Target/*.inc")
   if( tablegenned_files_on_include_dir OR tablegenned_files_on_lib_dir)
-    message(FATAL_ERROR "Apparently there is a previous in-source build,
+    # HLSL Change - change FATAL_ERROR to WARNING to avoid problems with extraneous files
+    message(WARNING "Apparently there is a previous in-source build,
 probably as the result of running `configure' and `make' on
 ${CMAKE_CURRENT_SOURCE_DIR}.
 This may cause problems. The suspicious files are:
@@ -174,21 +186,10 @@ set(LLVM_BINARY_DIR       ${CMAKE_CURRENT_BINARY_DIR}  ) # --prefix
 set(LLVM_EXAMPLES_BINARY_DIR ${LLVM_BINARY_DIR}/examples)
 set(LLVM_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
 
+# HLSL removed targets AArch64, ARM, BPF, CppBackend, Hexagon, Mips, MSP430, PowerPC, Sparc, SystemZ, X86, XCore
 set(LLVM_ALL_TARGETS
-  AArch64
   AMDGPU
-  ARM
-  BPF
-  CppBackend
-  Hexagon
-  Mips
-  MSP430
   NVPTX
-  PowerPC
-  Sparc
-  SystemZ
-  X86
-  XCore
   )
 
 # List of targets with JIT support:
@@ -411,10 +412,11 @@ if (LLVM_USE_OPROFILE)
   set(LLVMOPTIONALCOMPONENTS ${LLVMOPTIONALCOMPONENTS} OProfileJIT)
 endif (LLVM_USE_OPROFILE)
 
+# HLSL Change: use 'Unknown' in place of "${LLVM_NATIVE_ARCH}"
 message(STATUS "Constructing LLVMBuild project information")
 execute_process(
   COMMAND ${PYTHON_EXECUTABLE} ${LLVMBUILDTOOL}
-            --native-target "${LLVM_NATIVE_ARCH}"
+            --native-target Unknown
             --enable-targets "${LLVM_TARGETS_TO_BUILD}"
             --enable-optional-components "${LLVMOPTIONALCOMPONENTS}"
             --write-library-table ${LLVMCONFIGLIBRARYDEPENDENCIESINC}
@@ -450,6 +452,8 @@ set(LLVM_ENUM_ASM_PRINTERS "")
 set(LLVM_ENUM_ASM_PARSERS "")
 set(LLVM_ENUM_DISASSEMBLERS "")
 foreach(t ${LLVM_TARGETS_TO_BUILD})
+  if(NOT t STREQUAL "None") # HLSL Change - support for no target, but no continue() in CMake 2.8
+
   set( td ${LLVM_MAIN_SRC_DIR}/lib/Target/${t} )
 
   list(FIND LLVM_ALL_TARGETS ${t} idx)
@@ -474,6 +478,8 @@ foreach(t ${LLVM_TARGETS_TO_BUILD})
     set(LLVM_ENUM_DISASSEMBLERS
       "${LLVM_ENUM_DISASSEMBLERS}LLVM_DISASSEMBLER(${t})\n")
   endif()
+
+  endif() # HLSL Change - support for no target
 endforeach(t)
 
 # Produce the target definition files, which provide a way for clients to easily
@@ -537,7 +543,16 @@ endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+# HLSL Change Starts - override assert to RaiseException instead of abort
+# for better test behavior
+if(WIN32 AND NOT UNIX)
+  include_directories(BEFORE "${LLVM_MAIN_INCLUDE_DIR}/llvm/llvm_assert")
+endif()
+# HLSL Change Ends
+
 include_directories( ${LLVM_INCLUDE_DIR} ${LLVM_MAIN_INCLUDE_DIR})
+
+include_directories( ${LLVM_INCLUDE_DIR}/dxc/Tracing) # HLSL Change
 
 # when crosscompiling import the executable targets from a file
 if(LLVM_USE_HOST_TOOLS)
@@ -559,6 +574,9 @@ endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
 # use export_executable_symbols(target).
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
+# enable warnings as errors for debug build
+SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} /WX")
+
 include(AddLLVM)
 include(TableGen)
 
@@ -570,21 +588,24 @@ endif()
 
 # Put this before tblgen. Else we have a circular dependence.
 add_subdirectory(lib/Support)
+add_subdirectory(lib/MSSupport) # HLSL Change
 add_subdirectory(lib/TableGen)
 
 add_subdirectory(utils/TableGen)
 
 add_subdirectory(include/llvm)
+add_subdirectory(include/dxc/Support) # HLSL Change
+add_subdirectory(include/dxc/Tracing) # HLSL Change
 
 add_subdirectory(lib)
 
 if( LLVM_INCLUDE_UTILS )
-  add_subdirectory(utils/FileCheck)
-  add_subdirectory(utils/PerfectShuffle)
-  add_subdirectory(utils/count)
-  add_subdirectory(utils/not)
-  add_subdirectory(utils/llvm-lit)
-  add_subdirectory(utils/yaml-bench)
+  # add_subdirectory(utils/FileCheck) # HLSL Change
+  # add_subdirectory(utils/FileUpdate) # HLSL Change
+  # add_subdirectory(utils/count) # HLSL Change
+  # add_subdirectory(utils/not) # HLSL Change
+  # add_subdirectory(utils/llvm-lit) # HLSL Change
+  # add_subdirectory(utils/yaml-bench) # HLSL Change
 else()
   if ( LLVM_INCLUDE_TESTS )
     message(FATAL_ERROR "Including tests when not building utils will not work.
@@ -614,11 +635,12 @@ if( LLVM_INCLUDE_TOOLS )
   add_subdirectory(tools)
 endif()
 
-if( LLVM_INCLUDE_EXAMPLES )
+
+if( LLVM_INCLUDE_EXAMPLES AND 0 ) # HLSL Change - never build examples
   add_subdirectory(examples)
 endif()
 
-if( LLVM_INCLUDE_TESTS )
+if( LLVM_INCLUDE_TESTS AND 0 ) # HLSL Change - never build tests/unittests
   add_subdirectory(test)
   add_subdirectory(unittests)
   if (MSVC)

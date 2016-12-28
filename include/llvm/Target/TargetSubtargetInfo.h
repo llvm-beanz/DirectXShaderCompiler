@@ -1,13 +1,12 @@
 //==-- llvm/Target/TargetSubtargetInfo.h - Target Information ----*- C++ -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file describes the subtarget options of a Target machine.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetSubtargetInfo.h                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file describes the subtarget options of a Target machine.            //
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,8 +33,8 @@ class TargetSchedModel;
 class TargetSelectionDAGInfo;
 struct MachineSchedPolicy;
 template <typename T> class SmallVectorImpl;
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 ///
 /// TargetSubtargetInfo - Generic base class for all target subtargets.  All
 /// Target-specific options that control code generation and printing should

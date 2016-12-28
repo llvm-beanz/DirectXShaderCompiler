@@ -1,15 +1,14 @@
 //===-- Program.cpp - Implement OS Program Concept --------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the operating system Program concept.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Program.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the operating system Program concept.               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/Program.h"
 #include "llvm/ADT/StringRef.h"
@@ -22,6 +21,8 @@ using namespace sys;
 //=== WARNING: Implementation here must contain only TRULY operating system
 //===          independent code.
 //===----------------------------------------------------------------------===//
+
+#ifdef MSFT_SUPPORTS_CHILD_PROCESSES
 
 static bool Execute(ProcessInfo &PI, StringRef Program, const char **args,
                     const char **env, const StringRef **Redirects,
@@ -59,6 +60,8 @@ ProcessInfo sys::ExecuteNoWait(StringRef Program, const char **args,
 
   return PI;
 }
+
+#endif // MSFT_SUPPORTS_CHILD_PROCESSES
 
 // Include the platform-specific parts of this class.
 #ifdef LLVM_ON_UNIX

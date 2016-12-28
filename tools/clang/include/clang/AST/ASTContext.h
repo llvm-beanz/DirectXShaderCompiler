@@ -1,16 +1,17 @@
 //===--- ASTContext.h - Context to hold long-lived AST nodes ----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTContext.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines the clang::ASTContext interface.
+/// \file                                                                    //
+/// \brief Defines the clang::ASTContext interface.                          //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_AST_ASTCONTEXT_H
 #define LLVM_CLANG_AST_ASTCONTEXT_H
@@ -838,6 +839,8 @@ public:
   CanQualType OCLImage2dTy, OCLImage2dArrayTy;
   CanQualType OCLImage3dTy;
   CanQualType OCLSamplerTy, OCLEventTy;
+  CanQualType Min12IntTy, Min10FloatTy; // HLSL Change - HLSL-specific types
+  CanQualType LitIntTy, LitFloatTy; // HLSL Change - HLSL-specific types
 
   // Types for deductions in C++0x [stmt.ranged]'s desugaring. Built on demand.
   mutable QualType AutoDeductTy;     // Deduction against 'auto'.
@@ -1107,7 +1110,8 @@ public:
 
   /// \brief Return a normal function type with a typed argument list.
   QualType getFunctionType(QualType ResultTy, ArrayRef<QualType> Args,
-                           const FunctionProtoType::ExtProtoInfo &EPI) const;
+                           const FunctionProtoType::ExtProtoInfo &EPI,
+                           ArrayRef<hlsl::ParameterModifier> ParamMods) const; // HLSL Change
 
   /// \brief Return the unique reference to the type for the specified type
   /// declaration.
@@ -1439,7 +1443,10 @@ public:
 
   /// \brief The result type of logical operations, '<', '>', '!=', etc.
   QualType getLogicalOperationType() const {
+#pragma warning(push)
+#pragma warning(suppress: 6319) // HLSL Change - suppress constant conditional warning
     return getLangOpts().CPlusPlus ? BoolTy : IntTy;
+#pragma warning(pop)
   }
 
   /// \brief Emit the Objective-CC type encoding for the given type \p T into

@@ -1,15 +1,14 @@
 //===--- ParseExprCXX.cpp - C++ Expression Parsing ------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Expression parsing implementation for C++.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseExprCXX.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Expression parsing implementation for C++.       //
+//                                                                           //
+
 #include "clang/AST/ASTContext.h"
 #include "RAIIObjectsForParser.h"
 #include "clang/AST/DeclTemplate.h"
@@ -21,7 +20,8 @@
 #include "clang/Sema/ParsedTemplate.h"
 #include "clang/Sema/Scope.h"
 #include "llvm/Support/ErrorHandling.h"
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 using namespace clang;
 
@@ -80,6 +80,7 @@ static void FixDigraph(Parser &P, Preprocessor &PP, Token &DigraphToken,
 void Parser::CheckForTemplateAndDigraph(Token &Next, ParsedType ObjectType,
                                         bool EnteringContext,
                                         IdentifierInfo &II, CXXScopeSpec &SS) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   if (!Next.is(tok::l_square) || Next.getLength() != 2)
     return;
 
@@ -305,6 +306,14 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
     // Parse the optional 'template' keyword, then make sure we have
     // 'identifier <' after it.
     if (Tok.is(tok::kw_template)) {
+      // HLSL Change Starts - template is reserved
+      if (getLangOpts().HLSL) {
+        Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+        ConsumeToken();
+        return true;
+      }
+      // HLSL Change Ends
+
       // If we don't have a scope specifier or an object type, this isn't a
       // nested-name-specifier, since they aren't allowed to start with
       // 'template'.
@@ -320,6 +329,14 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
         TemplateName.setIdentifier(Tok.getIdentifierInfo(), Tok.getLocation());
         ConsumeToken();
       } else if (Tok.is(tok::kw_operator)) {
+        // HLSL Change Starts
+        if (getLangOpts().HLSL) {
+          Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+          TPA.Commit();
+          return true;
+        }
+        // HLSL Change Ends
+
         // We don't need to actually parse the unqualified-id in this case,
         // because a simple-template-id cannot start with 'operator', but
         // go ahead and parse it anyway for consistency with the case where
@@ -430,7 +447,10 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
     
     // If we get foo:bar, this is almost certainly a typo for foo::bar.  Recover
     // and emit a fixit hint for it.
-    if (Next.is(tok::colon) && !ColonIsSacred) {
+    if (Next.is(tok::colon) && !ColonIsSacred &&
+        !getLangOpts().HLSL) {    // HLSL Change - in HLSL ':' is used for binding, etc...
+                                  // much more frequently than people use '::' for
+                                  // nested-name-specifier.
       if (Actions.IsInvalidUnlessNestedName(getCurScope(), SS, II, 
                                             Tok.getLocation(), 
                                             Next.getLocation(), ObjectType,
@@ -514,11 +534,14 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
       continue;
     }
 
+    if (!getLangOpts().HLSL) { // HLSL Change - ignore digraph/trigraph processing
     CheckForTemplateAndDigraph(Next, ObjectType, EnteringContext, II, SS);
+    }
 
     // nested-name-specifier:
     //   type-name '<'
-    if (Next.is(tok::less)) {
+    bool nextIsLess = Next.is(tok::less);
+    if (nextIsLess || getLangOpts().HLSL) { // HLSL Change
       TemplateTy Template;
       UnqualifiedId TemplateName;
       TemplateName.setIdentifier(&II, Tok.getLocation());
@@ -536,14 +559,24 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
         // because some clients (e.g., the parsing of class template
         // specializations) still want to see the original template-id
         // token.
+        if (nextIsLess) { // HLSL Change
         ConsumeToken();
+        }
         if (AnnotateTemplateIdToken(Template, TNK, SS, SourceLocation(),
                                     TemplateName, false))
           return true;
         continue;
       }
 
-      if (MemberOfUnknownSpecialization && (ObjectType || SS.isSet()) && 
+      // HLSL Change: templates aren't really supported in HLSL, so avoid
+      // handling other cases and emitting incorrect diagnostics if
+      // the template lookup fails.
+      if (!nextIsLess && getLangOpts().HLSL) {
+        break;
+      }
+
+      if (!getLangOpts().HLSL && // HLSL Change - no template fixup available
+          MemberOfUnknownSpecialization && (ObjectType || SS.isSet()) && 
           (IsTypename || IsTemplateArgumentList(1))) {
         // We have something like t::getAs<T>, where getAs is a 
         // member of an unknown specialization. However, this will only
@@ -715,6 +748,7 @@ ExprResult Parser::ParseCXXIdExpression(bool isAddressOfOperand) {
 ///           trailing-return-type[opt]
 ///
 ExprResult Parser::ParseLambdaExpression() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   // Parse lambda-introducer.
   LambdaIntroducer Intro;
   Optional<unsigned> DiagID = ParseLambdaIntroducer(Intro);
@@ -735,6 +769,7 @@ ExprResult Parser::ParseLambdaExpression() {
 ///
 /// If we are not looking at a lambda expression, returns ExprError().
 ExprResult Parser::TryParseLambdaExpression() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(getLangOpts().CPlusPlus11
          && Tok.is(tok::l_square)
          && "Not at the start of a possible lambda expression.");
@@ -782,6 +817,7 @@ ExprResult Parser::TryParseLambdaExpression() {
 ///         for the diagnostic is that of the current token.
 Optional<unsigned> Parser::ParseLambdaIntroducer(LambdaIntroducer &Intro,
                                                  bool *SkippedInits) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   typedef Optional<unsigned> DiagResult;
 
   assert(Tok.is(tok::l_square) && "Lambda expressions begin with '['.");
@@ -1017,6 +1053,7 @@ Optional<unsigned> Parser::ParseLambdaIntroducer(LambdaIntroducer &Intro,
 ///
 /// Returns true if it hit something unexpected.
 bool Parser::TryParseLambdaIntroducer(LambdaIntroducer &Intro) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   TentativeParsingAction PA(*this);
 
   bool SkippedInits = false;
@@ -1044,6 +1081,7 @@ bool Parser::TryParseLambdaIntroducer(LambdaIntroducer &Intro) {
 /// expression.
 ExprResult Parser::ParseLambdaExpressionAfterIntroducer(
                      LambdaIntroducer &Intro) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation LambdaBeginLoc = Intro.Range.getBegin();
   Diag(LambdaBeginLoc, diag::warn_cxx98_compat_lambda);
 
@@ -1122,6 +1160,7 @@ ExprResult Parser::ParseLambdaExpressionAfterIntroducer(
 
     // Parse attribute-specifier[opt].
     MaybeParseCXX11Attributes(Attr, &DeclEndLoc);
+    assert(!getLangOpts().HLSL); // HLSL Change: in lieu of MaybeParseHLSLAttributes - lambdas not allowed
 
     SourceLocation FunLocalRangeEnd = DeclEndLoc;
 
@@ -1263,6 +1302,7 @@ ExprResult Parser::ParseLambdaExpressionAfterIntroducer(
 ///         'const_cast' '<' type-name '>' '(' expression ')'
 ///
 ExprResult Parser::ParseCXXCasts() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   tok::TokenKind Kind = Tok.getKind();
   const char *CastName = nullptr; // For error messages
 
@@ -1329,6 +1369,7 @@ ExprResult Parser::ParseCXXCasts() {
 ///         'typeid' '(' type-id ')'
 ///
 ExprResult Parser::ParseCXXTypeid() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::kw_typeid) && "Not 'typeid'!");
 
   SourceLocation OpLoc = ConsumeToken();
@@ -1395,6 +1436,7 @@ ExprResult Parser::ParseCXXTypeid() {
 ///         '__uuidof' '(' type-id ')'
 ///
 ExprResult Parser::ParseCXXUuidof() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::kw___uuidof) && "Not '__uuidof'!");
 
   SourceLocation OpLoc = ConsumeToken();
@@ -1536,6 +1578,7 @@ ExprResult Parser::ParseCXXBoolLiteral() {
 ///       throw-expression: [C++ 15]
 ///         'throw' assignment-expression[opt]
 ExprResult Parser::ParseThrowExpression() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::kw_throw) && "Not throw!");
   SourceLocation ThrowLoc = ConsumeToken();           // Eat the throw token.
 
@@ -1590,7 +1633,7 @@ Parser::ParseCXXTypeConstructExpression(const DeclSpec &DS) {
           (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)))
          && "Expected '(' or '{'!");
 
-  if (Tok.is(tok::l_brace)) {
+  if (Tok.is(tok::l_brace) && !getLangOpts().HLSL) { // HLSL Change - covered by assertion, but this helps compiler remove brace initialization code
     ExprResult Init = ParseBraceInitializer();
     if (Init.isInvalid())
       return Init;
@@ -1666,6 +1709,7 @@ bool Parser::ParseCXXCondition(ExprResult &ExprOut,
 
   ParsedAttributesWithRange attrs(AttrFactory);
   MaybeParseCXX11Attributes(attrs);
+  MaybeParseHLSLAttributes(attrs); // HLSL Change
 
   if (!isCXXConditionDeclaration()) {
     ProhibitAttributes(attrs);
@@ -1694,10 +1738,17 @@ bool Parser::ParseCXXCondition(ExprResult &ExprOut,
 
   // simple-asm-expr[opt]
   if (Tok.is(tok::kw_asm)) {
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      SkipUntil(tok::semi, StopAtSemi | StopBeforeMatch);
+      return true;
+    }
+    // HLSL Change Ends
     SourceLocation Loc;
     ExprResult AsmLabel(ParseSimpleAsm(&Loc));
     if (AsmLabel.isInvalid()) {
-      SkipUntil(tok::semi, StopAtSemi);
+      SkipUntil(tok::semi, StopAtSemi | StopBeforeMatch);
       return true;
     }
     DeclaratorInfo.setAsmLabel(AsmLabel.get());
@@ -1811,15 +1862,28 @@ void Parser::ParseCXXSimpleTypeSpecifier(DeclSpec &DS) {
 
   // builtin types
   case tok::kw_short:
+    // HLSL Change Starts - handle certain types as reserved keywords
+HLSLReservedKeyword:
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      ConsumeToken();
+      DS.SetTypeSpecError();
+      DS.Finish(Diags, PP, Policy);
+      return;
+    }
+    // HLSL Change Ends
     DS.SetTypeSpecWidth(DeclSpec::TSW_short, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_long:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecWidth(DeclSpec::TSW_long, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw___int64:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecWidth(DeclSpec::TSW_longlong, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_signed:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecSign(DeclSpec::TSS_signed, Loc, PrevSpec, DiagID);
     break;
   case tok::kw_unsigned:
@@ -1829,14 +1893,26 @@ void Parser::ParseCXXSimpleTypeSpecifier(DeclSpec &DS) {
     DS.SetTypeSpecType(DeclSpec::TST_void, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_char:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecType(DeclSpec::TST_char, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_int:
     DS.SetTypeSpecType(DeclSpec::TST_int, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw___int128:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecType(DeclSpec::TST_int128, Loc, PrevSpec, DiagID, Policy);
     break;
+    // HLSL Change Starts
+  case tok::kw_min10float:
+    DS.SetTypeSpecType(DeclSpec::TST_min10float, Loc, PrevSpec, DiagID, Policy);
+    Diag(Tok, diag::warn_hlsl_minprecision_promotion) << "min10float" << "min16float";
+    break;
+  case tok::kw_min12int:
+    DS.SetTypeSpecType(DeclSpec::TST_min12int, Loc, PrevSpec, DiagID, Policy);
+    Diag(Tok, diag::warn_hlsl_minprecision_promotion) << "min12int" << "min16int";
+    break;
+    // HLSL Change Ends
   case tok::kw_half:
     DS.SetTypeSpecType(DeclSpec::TST_half, Loc, PrevSpec, DiagID, Policy);
     break;
@@ -1847,12 +1923,15 @@ void Parser::ParseCXXSimpleTypeSpecifier(DeclSpec &DS) {
     DS.SetTypeSpecType(DeclSpec::TST_double, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_wchar_t:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecType(DeclSpec::TST_wchar, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_char16_t:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecType(DeclSpec::TST_char16, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_char32_t:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     DS.SetTypeSpecType(DeclSpec::TST_char32, Loc, PrevSpec, DiagID, Policy);
     break;
   case tok::kw_bool:
@@ -1865,6 +1944,7 @@ void Parser::ParseCXXSimpleTypeSpecifier(DeclSpec &DS) {
 
   // GNU typeof support.
   case tok::kw_typeof:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
     ParseTypeofSpecifier(DS);
     DS.Finish(Diags, PP, Policy);
     return;
@@ -2136,6 +2216,7 @@ bool Parser::ParseUnqualifiedIdTemplateId(CXXScopeSpec &SS,
 bool Parser::ParseUnqualifiedIdOperator(CXXScopeSpec &SS, bool EnteringContext,
                                         ParsedType ObjectType,
                                         UnqualifiedId &Result) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::kw_operator) && "Expected 'operator' keyword");
   
   // Consume the 'operator' keyword.
@@ -2464,6 +2545,13 @@ bool Parser::ParseUnqualifiedId(CXXScopeSpec &SS, bool EnteringContext,
   //   operator-function-id
   //   conversion-function-id
   if (Tok.is(tok::kw_operator)) {
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      ConsumeToken();
+      return true;
+    }
+    // HLSL Change Ends
     if (ParseUnqualifiedIdOperator(SS, EnteringContext, ObjectType, Result))
       return true;
     
@@ -2600,6 +2688,7 @@ bool Parser::ParseUnqualifiedId(CXXScopeSpec &SS, bool EnteringContext,
 ///
 ExprResult
 Parser::ParseCXXNewExpression(bool UseGlobal, SourceLocation Start) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::kw_new) && "expected 'new' token");
   ConsumeToken();   // Consume 'new'
 
@@ -2724,6 +2813,7 @@ Parser::ParseCXXNewExpression(bool UseGlobal, SourceLocation Start) {
 ///                   direct-new-declarator '[' constant-expression ']'
 ///
 void Parser::ParseDirectNewDeclarator(Declarator &D) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   // Parse the array dimensions.
   bool first = true;
   while (Tok.is(tok::l_square)) {
@@ -2748,6 +2838,7 @@ void Parser::ParseDirectNewDeclarator(Declarator &D) {
     // Attributes here appertain to the array type. C++11 [expr.new]p5.
     ParsedAttributes Attrs(AttrFactory);
     MaybeParseCXX11Attributes(Attrs);
+    // HLSL Change: comment only - MaybeParseHLSLAttributes would go here if allowed at this point
 
     D.AddTypeInfo(DeclaratorChunk::getArray(0,
                                             /*static=*/false, /*star=*/false,
@@ -2774,6 +2865,7 @@ void Parser::ParseDirectNewDeclarator(Declarator &D) {
 bool Parser::ParseExpressionListOrTypeId(
                                    SmallVectorImpl<Expr*> &PlacementArgs,
                                          Declarator &D) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   // The '(' was already consumed.
   if (isTypeIdInParens()) {
     ParseSpecifierQualifierList(D.getMutableDeclSpec());
@@ -2801,6 +2893,7 @@ bool Parser::ParseExpressionListOrTypeId(
 ///                   '::'[opt] 'delete' '[' ']' cast-expression
 ExprResult
 Parser::ParseCXXDeleteExpression(bool UseGlobal, SourceLocation Start) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::kw_delete) && "Expected 'delete' keyword");
   ConsumeToken(); // Consume 'delete'
 
@@ -2881,6 +2974,16 @@ static unsigned TypeTraitArity(tok::TokenKind kind) {
 ///          type-id ...[opt] type-id-seq[opt]
 ///
 ExprResult Parser::ParseTypeTrait() {
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    Diag(Tok, diag::err_hlsl_unsupported_construct) << Tok.getName();
+    ConsumeToken();
+    BalancedDelimiterTracker p(*this, tok::l_paren);
+    if (!p.expectAndConsume())
+      p.skipToEnd();
+    return ExprError();
+  }
+  // HLSL Change Ends
   tok::TokenKind Kind = Tok.getKind();
   unsigned Arity = TypeTraitArity(Kind);
 
@@ -2940,6 +3043,16 @@ ExprResult Parser::ParseTypeTrait() {
 /// [Embarcadero]     '__array_extent' '(' type-id ',' expression ')'
 ///
 ExprResult Parser::ParseArrayTypeTrait() {
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    Diag(Tok, diag::err_hlsl_unsupported_construct) << Tok.getName();
+    ConsumeToken();
+    BalancedDelimiterTracker p(*this, tok::l_paren);
+    if (!p.expectAndConsume())
+      p.skipToEnd();
+    return ExprError();
+  }
+  // HLSL Change Ends
   ArrayTypeTrait ATT = ArrayTypeTraitFromTokKind(Tok.getKind());
   SourceLocation Loc = ConsumeToken();
 
@@ -2983,6 +3096,16 @@ ExprResult Parser::ParseArrayTypeTrait() {
 /// [Embarcadero]     expression-trait '(' expression ')'
 ///
 ExprResult Parser::ParseExpressionTrait() {
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    Diag(Tok, diag::err_hlsl_unsupported_construct) << Tok.getName();
+    ConsumeToken();
+    BalancedDelimiterTracker p(*this, tok::l_paren);
+    if (!p.expectAndConsume())
+      p.skipToEnd();
+    return ExprError();
+  }
+  // HLSL Change Ends
   ExpressionTrait ET = ExpressionTraitFromTokKind(Tok.getKind());
   SourceLocation Loc = ConsumeToken();
 
@@ -3092,6 +3215,13 @@ Parser::ParseCXXAmbiguousParenExpression(ParenParseOption &ExprType,
     ColonProt.restore();
 
     if (ParseAs == CompoundLiteral) {
+      // HLSL Change Starts
+      if (getLangOpts().HLSL) {
+        // (type-name) { initializer-list }
+        Diag(Tok, diag::err_hlsl_unsupported_construct) << "compound literal";
+        return ExprError();
+      }
+      // HLSL Change Ends
       ExprType = CompoundLiteral;
       if (DeclaratorInfo.isInvalidType())
         return ExprError();

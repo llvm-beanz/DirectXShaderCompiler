@@ -5,6 +5,9 @@ Precompiled Header and Modules Internals
 .. contents::
    :local:
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 This document describes the design and implementation of Clang's precompiled
 headers (PCH) and modules.  If you are interested in the end-user view, please
 see the :ref:`User's Manual <usersmanual-precompiled-headers>`.

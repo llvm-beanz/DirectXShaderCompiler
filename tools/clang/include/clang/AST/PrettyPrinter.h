@@ -1,15 +1,14 @@
 //===--- PrettyPrinter.h - Classes for aiding with AST printing -*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PrettyPrinter.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the PrinterHelper interface.                           //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the PrinterHelper interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_AST_PRETTYPRINTER_H
 #define LLVM_CLANG_AST_PRETTYPRINTER_H
@@ -36,7 +35,7 @@ struct PrintingPolicy {
   /// \brief Create a default printing policy for C.
   PrintingPolicy(const LangOptions &LO)
     : LangOpts(LO), Indentation(2), SuppressSpecifiers(false),
-      SuppressTagKeyword(false), SuppressTag(false), SuppressScope(false),
+      SuppressTagKeyword(true), SuppressTag(false), SuppressScope(false), // HLSL Change - default SuppressTagKeyword to true (C++ default behavior)
       SuppressUnwrittenScope(false), SuppressInitializers(false),
       ConstantArraySizeAsWritten(false), AnonymousTagLocations(true),
       SuppressStrongLifetime(false), SuppressLifetimeQualifiers(false),

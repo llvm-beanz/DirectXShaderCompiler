@@ -1,16 +1,15 @@
 //===--- ASTReaderStmt.cpp - Stmt/Expr Deserialization ----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Statement/expression deserialization.  This implements the
-// ASTReader::ReadStmt method.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTReaderStmt.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Statement/expression deserialization.  This implements the                //
+// ASTReader::ReadStmt method.                                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Serialization/ASTReader.h"
 #include "clang/AST/ASTContext.h"
@@ -127,6 +126,13 @@ void ASTStmtReader::VisitNullStmt(NullStmt *S) {
   S->setSemiLoc(ReadSourceLocation(Record, Idx));
   S->HasLeadingEmptyMacro = Record[Idx++];
 }
+
+// HLSL Change Starts - adding support for HLSL discard stmt.
+void ASTStmtReader::VisitDiscardStmt(DiscardStmt *S) {
+  VisitStmt(S);
+  S->setLoc(ReadSourceLocation(Record, Idx));
+}
+// HLSL Change Ends
 
 void ASTStmtReader::VisitCompoundStmt(CompoundStmt *S) {
   VisitStmt(S);
@@ -709,6 +715,21 @@ void ASTStmtReader::VisitExtVectorElementExpr(ExtVectorElementExpr *E) {
   E->setAccessor(Reader.GetIdentifierInfo(F, Record, Idx));
   E->setAccessorLoc(ReadSourceLocation(Record, Idx));
 }
+
+// HLSL Change Starts
+void ASTStmtReader::VisitExtMatrixElementExpr(ExtMatrixElementExpr *E) {
+  VisitExpr(E);
+  E->setBase(Reader.ReadSubExpr());
+  E->setAccessor(Reader.GetIdentifierInfo(F, Record, Idx));
+  E->setAccessorLoc(ReadSourceLocation(Record, Idx));
+}
+void ASTStmtReader::VisitHLSLVectorElementExpr(HLSLVectorElementExpr *E) {
+  VisitExpr(E);
+  E->setBase(Reader.ReadSubExpr());
+  E->setAccessor(Reader.GetIdentifierInfo(F, Record, Idx));
+  E->setAccessorLoc(ReadSourceLocation(Record, Idx));
+}
+// HLSL Change Ends
 
 void ASTStmtReader::VisitInitListExpr(InitListExpr *E) {
   VisitExpr(E);
@@ -2584,6 +2605,14 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
     case EXPR_EXT_VECTOR_ELEMENT:
       S = new (Context) ExtVectorElementExpr(Empty);
       break;
+
+    // HLSL Change Starts
+    // Note that we do not support serialization of matrix elements, as it's a breaking
+    // change for the format. We might when we get scenarios for this.
+    //case EXPR_EXT_MATRIX_ELEMENT:
+    //  S = new (Context)ExtMatrixElementExpr(Empty);
+    //  break;
+    // HLSL Change Ends
 
     case EXPR_INIT_LIST:
       S = new (Context) InitListExpr(Empty);

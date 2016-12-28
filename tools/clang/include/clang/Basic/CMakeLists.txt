@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 macro(clang_diag_gen component)
   clang_tablegen(Diagnostic${component}Kinds.inc
     -gen-clang-diags-defs -clang-component=${component}
@@ -34,8 +36,10 @@ clang_tablegen(AttrHasAttributeImpl.inc -gen-clang-attr-has-attribute-impl
   TARGET ClangAttrHasAttributeImpl
   )
 
+# HLSL Change Start - remove unsupported builtins
 # ARM NEON
-clang_tablegen(arm_neon.inc -gen-arm-neon-sema
-  -I ${CMAKE_CURRENT_SOURCE_DIR}/../../
-  SOURCE arm_neon.td
-  TARGET ClangARMNeon)
+#clang_tablegen(arm_neon.inc -gen-arm-neon-sema
+#  -I ${CMAKE_CURRENT_SOURCE_DIR}/../../
+#  SOURCE arm_neon.td
+#  TARGET ClangARMNeon)
+# HLSL Change Ends - remove unsupported builtins

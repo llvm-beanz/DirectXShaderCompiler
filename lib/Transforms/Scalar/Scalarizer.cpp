@@ -1,18 +1,17 @@
 //===--- Scalarizer.cpp - Scalarize vector operations ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This pass converts vector operations into scalar operations, in order
-// to expose optimization opportunities on the individual scalar operations.
-// It is mainly intended for targets that do not have vector units, but it
-// may also be useful for revectorizing code to different vector widths.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Scalarizer.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This pass converts vector operations into scalar operations, in order     //
+// to expose optimization opportunities on the individual scalar operations. //
+// It is mainly intended for targets that do not have vector units, but it   //
+// may also be useful for revectorizing code to different vector widths.     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/IRBuilder.h"
@@ -341,6 +340,13 @@ void Scalarizer::transferMetadata(Instruction *Op, const ValueVector &CV) {
         if (canTransferMetadata(MI->first))
           New->setMetadata(MI->first, MI->second);
       New->setDebugLoc(Op->getDebugLoc());
+      // HLSL Change Begins
+      // Transfer FPMath flag.
+      if (FPMathOperator *FPMath = dyn_cast<FPMathOperator>(New)) {
+        FPMathOperator *FPMathOp = dyn_cast<FPMathOperator>(Op);
+        New->copyFastMathFlags(FPMathOp->getFastMathFlags());
+      }
+      // HLSL Change Ends
     }
   }
 }
@@ -644,11 +650,46 @@ bool Scalarizer::visitStoreInst(StoreInst &SI) {
 bool Scalarizer::finish() {
   if (Gathered.empty())
     return false;
+  // HLSL Change Begins.
+  // Map from an extract element inst to a Value which replaced it.
+  DenseMap<Instruction *, Value*> EltMap;
+  // HLSL Change Ends.
   for (GatherList::iterator GMI = Gathered.begin(), GME = Gathered.end();
        GMI != GME; ++GMI) {
     Instruction *Op = GMI->first;
     ValueVector &CV = *GMI->second;
     if (!Op->use_empty()) {
+      // HLSL Change Begins.
+      // Remove the extract element users if possible.
+      for (auto UI = Op->user_begin(); UI != Op->user_end(); ) {
+        if (ExtractElementInst *EEI = dyn_cast<ExtractElementInst>(*(UI++))) {
+          Value *Idx = EEI->getIndexOperand();
+          if (!isa<ConstantInt>(Idx))
+            continue;
+
+          unsigned immIdx = cast<ConstantInt>(Idx)->getLimitedValue();
+          if (immIdx >= CV.size())
+            continue;
+
+          Value *Elt = CV[immIdx];
+          // Try to find a map for Elt,if it's in EltMap.
+          while (Instruction *EltI = dyn_cast<Instruction>(Elt)) {
+            if (EltMap.count(EltI)) {
+              Elt = EltMap[EltI];
+            } else
+              break;
+          }
+          EEI->replaceAllUsesWith(Elt);
+
+          EltMap[EEI] = Elt;
+        }
+      }
+      if (Op->use_empty()) {
+        Op->eraseFromParent();
+        continue;
+      }
+      // HLSL Change Ends.
+
       // The value is still needed, so recreate it using a series of
       // InsertElements.
       Type *Ty = Op->getType();
@@ -666,6 +707,15 @@ bool Scalarizer::finish() {
     }
     Op->eraseFromParent();
   }
+
+  // HLSL Change Begins.
+  for (auto It: EltMap) {
+    Instruction *I = It.first;
+    if (I->user_empty())
+      I->eraseFromParent();
+  }
+  // HLSL Change Ends.
+
   Gathered.clear();
   Scattered.clear();
   return true;

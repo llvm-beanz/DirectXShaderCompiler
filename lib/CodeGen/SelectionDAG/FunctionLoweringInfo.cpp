@@ -1,16 +1,15 @@
 //===-- FunctionLoweringInfo.cpp ------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This implements routines for translating functions from LLVM IR into
-// Machine IR.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FunctionLoweringInfo.cpp                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This implements routines for translating functions from LLVM IR into      //
+// Machine IR.                                                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/ADT/PostOrderIterator.h"

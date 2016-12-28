@@ -1,15 +1,14 @@
 //===--- InitPreprocessor.cpp - PP initialization code. ---------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the clang::InitializePreprocessor function.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InitPreprocessor.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the clang::InitializePreprocessor function.          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/Utils.h"
 #include "clang/Basic/FileManager.h"
@@ -94,6 +93,7 @@ static void AddImplicitIncludePTH(MacroBuilder &Builder, Preprocessor &PP,
   AddImplicitInclude(Builder, OriginalFile);
 }
 
+#if 0 // HLSL Change Starts - no support for AST serialization
 /// \brief Add an implicit \#include using the original file used to generate
 /// a PCH file.
 static void AddImplicitIncludePCH(MacroBuilder &Builder, Preprocessor &PP,
@@ -107,6 +107,7 @@ static void AddImplicitIncludePCH(MacroBuilder &Builder, Preprocessor &PP,
 
   AddImplicitInclude(Builder, OriginalFile);
 }
+#endif // HLSL Change End - no support for AST serialization
 
 /// PickFP - This is used to pick a value based on the FP semantics of the
 /// specified FP model.
@@ -357,6 +358,11 @@ static void InitializeStandardPredefinedMacros(const TargetInfo &TI,
                                                const LangOptions &LangOpts,
                                                const FrontendOptions &FEOpts,
                                                MacroBuilder &Builder) {
+#if 1 // HLSL Change Starts
+  if (LangOpts.HLSL)
+    Builder.defineMacro("__hlsl_dx_compiler");
+  return;
+#else
   if (!LangOpts.MSVCCompat && !LangOpts.TraditionalCPP)
     Builder.defineMacro("__STDC__");
   if (LangOpts.Freestanding)
@@ -406,6 +412,7 @@ static void InitializeStandardPredefinedMacros(const TargetInfo &TI,
   // Not "standard" per se, but available even with the -undef flag.
   if (LangOpts.AsmPreprocessor)
     Builder.defineMacro("__ASSEMBLER__");
+#endif // HLSL Change Ends
 }
 
 /// Initialize the predefined C++ language feature test macros defined in
@@ -489,6 +496,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   }
 
   // Define macros for the C11 / C++11 memory orderings
+  if (!LangOpts.HLSL) { // HLSL Change - don't include for HLSL  
   Builder.defineMacro("__ATOMIC_RELAXED", "0");
   Builder.defineMacro("__ATOMIC_CONSUME", "1");
   Builder.defineMacro("__ATOMIC_ACQUIRE", "2");
@@ -498,6 +506,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
 
   // Support for #pragma redefine_extname (Sun compatibility)
   Builder.defineMacro("__PRAGMA_REDEFINE_EXTNAME", "1");
+  } // HLSL Change - don't include for HLSL
 
   // As sad as it is, enough software depends on the __VERSION__ for version
   // checks that it is necessary to report 4.2.1 (the base GCC version we claim
@@ -508,6 +517,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   // Initialize language-specific preprocessor defines.
 
   // Standard conforming mode?
+  if (!LangOpts.HLSL) { // HLSL Change - don't include for HLSL
   if (!LangOpts.GNUMode && !LangOpts.MSVCCompat)
     Builder.defineMacro("__STRICT_ANSI__");
 
@@ -599,6 +609,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("__OPTIMIZE__");
   if (LangOpts.OptimizeSize)
     Builder.defineMacro("__OPTIMIZE_SIZE__");
+  } // HLSL Change - don't include for HLSL
 
   if (LangOpts.FastMath)
     Builder.defineMacro("__FAST_MATH__");
@@ -621,6 +632,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("__LITTLE_ENDIAN__");
   }
 
+  if (!LangOpts.HLSL) { // HLSL Change - don't include for HLSL
   if (TI.getPointerWidth(0) == 64 && TI.getLongWidth() == 64
       && TI.getIntWidth() == 32) {
     Builder.defineMacro("_LP64");
@@ -701,9 +713,11 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   DefineType("__UINTPTR_TYPE__", TI.getUIntPtrType(), Builder);
   DefineFmt("__UINTPTR", TI.getUIntPtrType(), TI, Builder);
   DefineTypeWidth("__UINTPTR_WIDTH__", TI.getUIntPtrType(), TI, Builder);
+  } // HLSL Change - don't include for HLSL
 
   DefineFloatMacros(Builder, "FLT", &TI.getFloatFormat(), "F");
   DefineFloatMacros(Builder, "DBL", &TI.getDoubleFormat(), "");
+  if (!LangOpts.HLSL) { // HLSL Change - don't include for HLSL
   DefineFloatMacros(Builder, "LDBL", &TI.getLongDoubleFormat(), "L");
 
   // Define a __POINTER_WIDTH__ macro for stdint.h.
@@ -839,9 +853,11 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
 
   // Macros to control C99 numerics and <float.h>
   Builder.defineMacro("__FLT_EVAL_METHOD__", Twine(TI.getFloatEvalMethod()));
+  } // HLSL Change - don't include for HLSL
   Builder.defineMacro("__FLT_RADIX__", "2");
   Builder.defineMacro("__DECIMAL_DIG__", "__LDBL_DECIMAL_DIG__");
 
+  if (!LangOpts.HLSL) { // HLSL Change - don't include for HLSL
   if (LangOpts.getStackProtector() == LangOptions::SSPOn)
     Builder.defineMacro("__SSP__");
   else if (LangOpts.getStackProtector() == LangOptions::SSPStrong)
@@ -895,6 +911,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
 
   // Get other target #defines.
   TI.getTargetDefines(LangOpts, Builder);
+  } // HLSL Change - don't include for HLSL
 }
 
 /// InitializePreprocessor - Initialize the preprocessor getting it and the
@@ -913,7 +930,7 @@ void clang::InitializePreprocessor(
   // Emit line markers for various builtin sections of the file.  We don't do
   // this in asm preprocessor mode, because "# 4" is not a line marker directive
   // in this mode.
-  if (!PP.getLangOpts().AsmPreprocessor)
+  if (!PP.getLangOpts().AsmPreprocessor && !PP.getLangOpts().HLSL) // HLSL Change - don't print built-ins
     Builder.append("# 1 \"<built-in>\" 3");
 
   // Install things like __POWERPC__, __GNUC__, etc into the macro table.
@@ -943,7 +960,7 @@ void clang::InitializePreprocessor(
 
   // Add on the predefines from the driver.  Wrap in a #line directive to report
   // that they come from the command line.
-  if (!PP.getLangOpts().AsmPreprocessor)
+  if (!PP.getLangOpts().AsmPreprocessor && !PP.getLangOpts().HLSL) // HLSL Change - don't print built-ins
     Builder.append("# 1 \"<command line>\" 1");
 
   // Process #define's and #undef's in the order they are given.
@@ -961,9 +978,11 @@ void clang::InitializePreprocessor(
     AddImplicitIncludeMacros(Builder, InitOpts.MacroIncludes[i]);
 
   // Process -include-pch/-include-pth directives.
+#if 0 // HLSL Change Starts - no support for AST serialization
   if (!InitOpts.ImplicitPCHInclude.empty())
     AddImplicitIncludePCH(Builder, PP, PCHContainerRdr,
                           InitOpts.ImplicitPCHInclude);
+#endif // HLSL Change Ends - no support for AST serialization
   if (!InitOpts.ImplicitPTHInclude.empty())
     AddImplicitIncludePTH(Builder, PP, InitOpts.ImplicitPTHInclude);
 
@@ -974,7 +993,7 @@ void clang::InitializePreprocessor(
   }
 
   // Exit the command line and go back to <built-in> (2 is LC_LEAVE).
-  if (!PP.getLangOpts().AsmPreprocessor)
+  if (!PP.getLangOpts().AsmPreprocessor && !PP.getLangOpts().HLSL) // HLSL Change - don't print built-ins
     Builder.append("# 1 \"<built-in>\" 2");
 
   // Instruct the preprocessor to skip the preamble.

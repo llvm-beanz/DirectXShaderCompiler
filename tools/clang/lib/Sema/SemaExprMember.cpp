@@ -1,15 +1,15 @@
 //===--- SemaExprMember.cpp - Semantic Analysis for Expressions -----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis member access expressions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaExprMember.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis member access expressions.        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 #include "clang/Sema/Overload.h"
 #include "clang/AST/ASTLambda.h"
 #include "clang/AST/DeclCXX.h"
@@ -22,7 +22,7 @@
 #include "clang/Sema/Scope.h"
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaInternal.h"
-
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 using namespace clang;
 using namespace sema;
 
@@ -308,12 +308,21 @@ CheckExtVectorComponent(Sema &S, QualType baseType, ExprValueKind &VK,
     HalvingSwizzle = true;
   } else if (!HexSwizzle &&
              (Idx = vecType->getPointAccessorIdx(*compStr)) != -1) {
+    ExtVectorType::AccessorSet currentSet = vecType->getPointAccessorSet(*compStr);  // HLSL Change
     do {
       if (HasIndex[Idx]) HasRepeated = true;
+      // HLSL Change Starts
+      if (currentSet != vecType->getPointAccessorSet(*compStr)) {
+        S.Diag(OpLoc, diag::err_ext_vector_component_name_mixedsets)
+          << SourceRange(CompLoc);
+        return QualType();
+      }
+      // HLSL Change Ends
       HasIndex[Idx] = true;
       compStr++;
     } while (*compStr && (Idx = vecType->getPointAccessorIdx(*compStr)) != -1);
   } else {
+    // HLSL Note - is this parsing digits?
     if (HexSwizzle) compStr++;
     while ((Idx = vecType->getNumericAccessorIdx(*compStr)) != -1) {
       if (HasIndex[Idx]) HasRepeated = true;
@@ -1223,6 +1232,23 @@ static ExprResult LookupMemberExpr(Sema &S, LookupResult &R,
     }
   }
 
+  // HLSL Change Starts
+  {
+    ExprResult matrixResult;
+    if (S.getLangOpts().HLSL &&
+      hlsl::LookupMatrixMemberExprForHLSL(&S, *BaseExpr.get(), MemberName, IsArrow, OpLoc, MemberLoc, &matrixResult)) {
+      return matrixResult;
+    }
+  }
+  {
+    ExprResult vectorResult;
+    if (S.getLangOpts().HLSL &&
+      hlsl::LookupVectorMemberExprForHLSL(&S, *BaseExpr.get(), MemberName, IsArrow, OpLoc, MemberLoc, &vectorResult)) {
+      return vectorResult;
+    }
+  }
+  // HLSL Change Ends
+
   // Handle field access to simple records.
   if (const RecordType *RTy = BaseType->getAs<RecordType>()) {
     TypoExpr *TE = nullptr;
@@ -1634,6 +1660,14 @@ ExprResult Sema::ActOnMemberAccessExpr(Scope *S, Expr *Base,
   ExprResult Result = MaybeConvertParenListExprToParenExpr(S, Base);
   if (Result.isInvalid()) return ExprError();
   Base = Result.get();
+
+  // HLSL Changes Start
+  if (getLangOpts().HLSL) {
+    Result = hlsl::MaybeConvertScalarToVector(this, Base);
+    if (Result.isInvalid()) return ExprError();
+    Base = Result.get();
+  }
+  // HLSL Changes End
 
   if (Base->getType()->isDependentType() || Name.isDependentName() ||
       isDependentScopeSpecifier(SS)) {

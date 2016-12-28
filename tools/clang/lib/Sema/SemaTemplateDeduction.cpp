@@ -1,14 +1,12 @@
 //===------- SemaTemplateDeduction.cpp - Template Argument Deduction ------===/
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//===----------------------------------------------------------------------===/
-//
-//  This file implements C++ template argument deduction.
-//
-//===----------------------------------------------------------------------===/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaTemplateDeduction.cpp                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/TemplateDeduction.h"
 #include "TreeTransform.h"
@@ -22,6 +20,7 @@
 #include "clang/Sema/DeclSpec.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/Template.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 #include "llvm/ADT/SmallBitVector.h"
 #include <algorithm>
 
@@ -3306,6 +3305,16 @@ Sema::TemplateDeductionResult Sema::DeduceTemplateArguments(
       return TDK_TooManyArguments;
   }
 
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    Sema::TemplateDeductionResult hlslResult = hlsl::DeduceTemplateArgumentsForHLSL(
+      this, FunctionTemplate, ExplicitTemplateArgs, Args, Specialization, Info);
+    if (hlslResult != TDK_Invalid) {
+      return hlslResult;
+    }
+  }
+  // HLSL Change Ends
+
   // The types of the parameters from which we will perform template argument
   // deduction.
   LocalInstantiationScope InstScope(*this);
@@ -3630,7 +3639,11 @@ SpecializeCorrespondingLambdaCallOperatorAndInvoker(
     QualType ReturnTypeOfDestFunctionPtr,
     TemplateDeductionInfo &TDInfo,
     Sema &S) {
-  
+  // HLSL Change Start
+  // No support for lambdas.
+  return Sema::TDK_Invalid;
+#if 0
+  // HLSL Change Ends
   CXXRecordDecl *LambdaClass = ConversionSpecialized->getParent();
   assert(LambdaClass && LambdaClass->isGenericLambda()); 
   
@@ -3711,6 +3724,7 @@ SpecializeCorrespondingLambdaCallOperatorAndInvoker(
   InvokerSpecialized->setType(S.Context.getFunctionType(
       InvokerFPT->getReturnType(), InvokerFPT->getParamTypes(), EPI));
   return Sema::TDK_Success;
+#endif // HLSL Change
 }
 /// \brief Deduce template arguments for a templated conversion
 /// function (C++ [temp.deduct.conv]) and, if successful, produce a

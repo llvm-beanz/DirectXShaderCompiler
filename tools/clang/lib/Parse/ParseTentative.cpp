@@ -1,16 +1,15 @@
 //===--- ParseTentative.cpp - Ambiguity Resolution Parsing ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the tentative parsing portions of the Parser
-//  interfaces, for ambiguity resolution.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseTentative.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the tentative parsing portions of the Parser        //
+//  interfaces, for ambiguity resolution.                                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/ParseDiagnostic.h"
@@ -498,6 +497,12 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
 Parser::CXX11AttributeKind
 Parser::isCXX11AttributeSpecifier(bool Disambiguate,
                                   bool OuterMightBeMessageSend) {
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    return CAK_NotAttributeSpecifier;
+  }
+  // HLSL Change Ends
+
   if (Tok.is(tok::kw_alignas))
     return CAK_AttributeSpecifier;
 
@@ -953,6 +958,14 @@ Parser::isExpressionOrTypeSpecifierSimple(tok::TokenKind Kind) {
   case tok::kw_long:
   case tok::kw___int64:
   case tok::kw___int128:
+  // HLSL Change Starts
+  case tok::kw_min10float:
+  case tok::kw_min12int:
+  case tok::kw_column_major:
+  case tok::kw_row_major:
+  case tok::kw_snorm:
+  case tok::kw_unorm:
+  // HLSL Change Ends
   case tok::kw_restrict:
   case tok::kw_short:
   case tok::kw_signed:
@@ -1264,6 +1277,31 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
   case tok::kw___attribute:
     return TPResult::True;
 
+  // HLSL Change Starts
+  case tok::kw_in:
+  case tok::kw_inout:
+  case tok::kw_out:
+  case tok::kw_linear:
+  case tok::kw_centroid:
+  case tok::kw_nointerpolation:
+  case tok::kw_noperspective:
+  case tok::kw_sample:
+  case tok::kw_precise:
+  case tok::kw_shared:
+  case tok::kw_groupshared:
+  case tok::kw_uniform:
+  case tok::kw_row_major:
+  case tok::kw_column_major:
+  case tok::kw_snorm:
+  case tok::kw_unorm:
+  case tok::kw_point:
+  case tok::kw_line:
+  case tok::kw_lineadj:
+  case tok::kw_triangle:
+  case tok::kw_triangleadj:
+    return TPResult::True;
+  // HLSL Change Ends
+
     // Microsoft
   case tok::kw___declspec:
   case tok::kw___cdecl:
@@ -1417,6 +1455,10 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
   case tok::kw_long:
   case tok::kw___int64:
   case tok::kw___int128:
+  // HLSL Change Starts
+  case tok::kw_min10float:
+  case tok::kw_min12int:
+  // HLSL Change Ends
   case tok::kw_signed:
   case tok::kw_unsigned:
   case tok::kw_half:
@@ -1516,6 +1558,12 @@ bool Parser::isCXXDeclarationSpecifierAType() {
   case tok::kw_void:
   case tok::kw___unknown_anytype:
     return true;
+
+  // HLSL Change Starts
+  case tok::kw_min10float:
+  case tok::kw_min12int:
+    return true;
+  // HLSL Change Ends
 
   case tok::kw_auto:
     return getLangOpts().CPlusPlus11;

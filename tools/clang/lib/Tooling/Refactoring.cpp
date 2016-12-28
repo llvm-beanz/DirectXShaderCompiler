@@ -1,15 +1,14 @@
 //===--- Refactoring.cpp - Framework for clang refactoring tools ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  Implements tools to support refactorings.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Refactoring.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  Implements tools to support refactorings.                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileManager.h"

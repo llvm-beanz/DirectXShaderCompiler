@@ -1,20 +1,16 @@
 //===- llvm/Support/Windows/Path.inc - Windows Path Impl --------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Windows specific implementation of the Path API.
-//
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-//=== WARNING: Implementation here must contain only generic Windows code that
-//===          is guaranteed to work on *all* Windows variants.
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Path.inc                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Windows specific implementation of the Path API. //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+//=== WARNING: Implementation here must contain only generic Windows code that//
+//===          is guaranteed to work on *all* Windows variants.              //
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/WindowsError.h"
@@ -26,7 +22,7 @@
 // These two headers must be included last, and make sure shlobj is required
 // after Windows.h to make sure it picks up our definition of _WIN32_WINNT
 #include "WindowsSupport.h"
-#include <shlobj.h>
+// #include <shlobj.h> // HLSL Change - no support for writing to home directory
 
 #undef max
 
@@ -36,9 +32,11 @@
 typedef int errno_t;
 #endif
 
+#if 0 // HLSL Change Starts
 #ifdef _MSC_VER
 # pragma comment(lib, "advapi32.lib")  // This provides CryptAcquireContextW.
 #endif
+#endif // HLSL Change Ends
 
 using namespace llvm;
 
@@ -730,6 +728,7 @@ std::error_code openFileForWrite(const Twine &Name, int &ResultFD,
 namespace path {
 
 bool home_directory(SmallVectorImpl<char> &result) {
+#if 0 // HLSL Change Starts
   wchar_t Path[MAX_PATH];
   if (::SHGetFolderPathW(0, CSIDL_APPDATA | CSIDL_FLAG_CREATE, 0,
                          /*SHGFP_TYPE_CURRENT*/0, Path) != S_OK)
@@ -739,6 +738,9 @@ bool home_directory(SmallVectorImpl<char> &result) {
     return false;
 
   return true;
+#else
+  return false;
+#endif // HLSL Change Ends
 }
 
 static bool getTempDirEnvVar(const char *Var, SmallVectorImpl<char> &Res) {

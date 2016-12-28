@@ -1,16 +1,15 @@
 //===-- llvm/Module.h - C++ class to represent a VM module ------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Module.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+/// @file                                                                    //
+/// Module.h This file contains the declarations for the Module class.       //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-/// @file
-/// Module.h This file contains the declarations for the Module class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_IR_MODULE_H
 #define LLVM_IR_MODULE_H
@@ -26,6 +25,13 @@
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/DataTypes.h"
 #include <system_error>
+
+// HLSL Change start
+namespace hlsl {
+class DxilModule;
+class HLModule;
+}
+// HLSL Change end
 
 namespace llvm {
 class FunctionType;
@@ -222,6 +228,11 @@ private:
   DataLayout DL;                  ///< DataLayout associated with the module
 
   friend class Constant;
+
+  // HLSL Change start
+  hlsl::HLModule *TheHLModule = nullptr;
+  hlsl::DxilModule *TheDxilModule = nullptr;
+  // HLSL Change end
 
 /// @}
 /// @name Constructors
@@ -676,6 +687,19 @@ public:
   /// \brief Set the PIC level (small or large model)
   void setPICLevel(PICLevel::Level PL);
 /// @}
+
+  // HLSL Change start
+  bool HasHLModule() const { return TheHLModule != nullptr; }
+  void SetHLModule(hlsl::HLModule *pValue) { TheHLModule = pValue; }
+  hlsl::HLModule &GetHLModule() { return *TheHLModule; }
+  hlsl::HLModule &GetOrCreateHLModule(bool skipInit = false);
+  void ResetHLModule();
+  bool HasDxilModule() const { return TheDxilModule != nullptr; }
+  void SetDxilModule(hlsl::DxilModule *pValue) { TheDxilModule = pValue; }
+  hlsl::DxilModule &GetDxilModule() { return *TheDxilModule; }
+  hlsl::DxilModule &GetOrCreateDxilModule(bool skipInit = false);
+  void ResetDxilModule();
+  // HLSL Change end
 };
 
 /// An raw_ostream inserter for modules.

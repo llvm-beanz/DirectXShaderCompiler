@@ -1,15 +1,14 @@
 //===-- llvm/MC/WinCOFFObjectWriter.cpp -------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains an implementation of a Win32 COFF object file writer.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// WinCOFFObjectWriter.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains an implementation of a Win32 COFF object file writer.  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/MC/MCWinCOFFObjectWriter.h"
 #include "llvm/ADT/DenseMap.h"
@@ -491,12 +490,14 @@ void WinCOFFObjectWriter::SetSectionName(COFFSection &S) {
     uint64_t StringTableEntry = Strings.getOffset(S.Name);
 
     if (StringTableEntry <= Max6DecimalOffset) {
-      std::sprintf(S.Header.Name, "/%d", unsigned(StringTableEntry));
+      //std::sprintf(S.Header.Name, "/%d", unsigned(StringTableEntry));  // HLSL Change - use sprintf_s
+      sprintf_s(S.Header.Name, _countof(S.Header.Name), "/%d", unsigned(StringTableEntry));
     } else if (StringTableEntry <= Max7DecimalOffset) {
       // With seven digits, we have to skip the terminating null. Because
       // sprintf always appends it, we use a larger temporary buffer.
-      char buffer[9] = {};
-      std::sprintf(buffer, "/%d", unsigned(StringTableEntry));
+      char buffer[9] = { 0 };  // HLSL Change - initialize first element with 0
+      //std::sprintf(buffer, "/%d", unsigned(StringTableEntry));  // HLSL Change - use sprintf_s instead
+      sprintf_s(buffer, _countof(buffer), "/%d", unsigned(StringTableEntry));
       std::memcpy(S.Header.Name, buffer, 8);
     } else if (StringTableEntry <= MaxBase64Offset) {
       // Starting with 10,000,000, offsets are encoded as base64.

@@ -1,14 +1,13 @@
 //===-- llvm/CodeGen/RegAllocRegistry.h -------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains the implementation for register allocator function
-// pass registry (RegisterRegAlloc).
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RegAllocRegistry.h                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains the implementation for register allocator function     //
+// pass registry (RegisterRegAlloc).                                         //
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,7 +22,8 @@ namespace llvm {
 ///
 /// RegisterRegAlloc class - Track the registration of register allocators.
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 class RegisterRegAlloc : public MachinePassRegistryNode {
 
 public:

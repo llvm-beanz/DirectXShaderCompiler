@@ -1,15 +1,14 @@
 //===--- Scope.h - Scope interface ------------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Scope.h                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Scope interface.                                   //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Scope interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_SEMA_SCOPE_H
 #define LLVM_CLANG_SEMA_SCOPE_H
@@ -87,6 +86,11 @@ public:
     /// \brief This is a scope that corresponds to the Objective-C
     /// \@catch statement.
     AtCatchScope = 0x400,
+    
+    // HLSL Change Starts
+    // Overloaded with AtCatchScope because this is HLSL-specific.
+    ForDeclScope = 0x400,
+    // HLSL Change Ends
     
     /// \brief This scope corresponds to an Objective-C method body.
     /// It always has FnScope and DeclScope set as well.
@@ -209,6 +213,8 @@ public:
 
   /// isBlockScope - Return true if this scope correspond to a closure.
   bool isBlockScope() const { return Flags & BlockScope; }
+
+  bool isForDeclScope() const { return Flags & ForDeclScope; } // HLSL Change
 
   /// getParent - Return the scope that this is nested in.
   ///

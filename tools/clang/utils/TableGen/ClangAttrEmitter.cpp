@@ -1,15 +1,14 @@
 //===- ClangAttrEmitter.cpp - Generate Clang attribute handling =-*- C++ -*--=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// These tablegen backends emit Clang attribute processing code
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ClangAttrEmitter.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// These tablegen backends emit Clang attribute processing code              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
@@ -2314,6 +2313,14 @@ static std::string CalculateDiagnostic(const Record &S) {
     case ObjCProtocol | ObjCInterface:
       return "ExpectedObjectiveCInterfaceOrProtocol";
     case Field | Var: return "ExpectedFieldOrGlobalVar";
+    // HLSL Changes Start
+    case Var | Param:
+      return "ExpectedVariableOrParam";
+    case Func | Var | Param | Field | Type:
+      return "ExpectedFunctionOrVariableOrParamOrFieldOrType";
+    case Func | Param | Field:
+      return "ExpectedFunctionOrParamOrField";
+    // HLSL Changes End
   }
 
   PrintFatalError(S.getLoc(),

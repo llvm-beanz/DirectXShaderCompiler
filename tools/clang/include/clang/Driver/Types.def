@@ -1,16 +1,15 @@
 //===--- Types.def - Driver Type info ---------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the driver type information. Users of this file
-// must define the TYPE macro to make use of this information.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Types.def                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the driver type information. Users of this file         //
+// must define the TYPE macro to make use of this information.               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef TYPE
 #error "Define TYPE prior to including this file!"
@@ -72,6 +71,7 @@ TYPE("assembler-with-cpp",       Asm,          PP_Asm,          "S",     "au")
 TYPE("f95",                      PP_Fortran,   INVALID,         nullptr, "u")
 TYPE("f95-cpp-input",            Fortran,      PP_Fortran,      nullptr, "u")
 TYPE("java",                     Java,         INVALID,         nullptr, "u")
+TYPE("hlsl",                     HLSL,         PP_CXX,          "hlsl",  "u")
 
 // LLVM IR/LTO types. We define separate types for IR and LTO because LTO
 // outputs should use the standard suffixes.

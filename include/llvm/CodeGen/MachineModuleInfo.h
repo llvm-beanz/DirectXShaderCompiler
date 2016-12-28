@@ -1,30 +1,29 @@
 //===-- llvm/CodeGen/MachineModuleInfo.h ------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MachineModuleInfo.h                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Collect meta information for a module.  This information should be in a   //
+// neutral form that can be used by different debugging and exception handling//
+// schemes.                                                                  //
 //
-//                     The LLVM Compiler Infrastructure
+// The organization of information is primarily clustered around the source  //
+// compile units.  The main exception is source line correspondence where    //
+// inlining may interleave code from various compile units.                  //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// The following information can be retrieved from the MachineModuleInfo.    //
 //
-//===----------------------------------------------------------------------===//
-//
-// Collect meta information for a module.  This information should be in a
-// neutral form that can be used by different debugging and exception handling
-// schemes.
-//
-// The organization of information is primarily clustered around the source
-// compile units.  The main exception is source line correspondence where
-// inlining may interleave code from various compile units.
-//
-// The following information can be retrieved from the MachineModuleInfo.
-//
-//  -- Source directories - Directories are uniqued based on their canonical
-//     string and assigned a sequential numeric ID (base 1.)
-//  -- Source files - Files are also uniqued based on their name and directory
-//     ID.  A file ID is sequential number (base 1.)
-//  -- Source line correspondence - A vector of file ID, line#, column# triples.
-//     A DEBUG_LOCATION instruction is generated  by the DAG Legalizer
-//     corresponding to each entry in the source line list.  This allows a debug
-//     emitter to generate labels referenced by debug information tables.
+//  -- Source directories - Directories are uniqued based on their canonical //
+//     string and assigned a sequential numeric ID (base 1.)                 //
+//  -- Source files - Files are also uniqued based on their name and directory//
+//     ID.  A file ID is sequential number (base 1.)                         //
+//  -- Source line correspondence - A vector of file ID, line#, column# triples.//
+//     A DEBUG_LOCATION instruction is generated  by the DAG Legalizer       //
+//     corresponding to each entry in the source line list.  This allows a debug//
+//     emitter to generate labels referenced by debug information tables.    //
 //
 //===----------------------------------------------------------------------===//
 
@@ -105,8 +104,8 @@ protected:
   /// Clears the map.
   static SymbolListTy getSortedStubs(DenseMap<MCSymbol*, StubValueTy>&);
 };
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// MachineModuleInfo - This class contains meta information specific to a
 /// module.  Queries can be made by different debugging and exception handling
 /// schemes and reformated for specific use.

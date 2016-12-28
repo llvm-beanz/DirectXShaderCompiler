@@ -1,3 +1,13 @@
+//===- explicit_symbols.inc -------------------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// explicit_symbols.inc                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 /* in libgcc.a */
 
 #ifdef HAVE__ALLOCA

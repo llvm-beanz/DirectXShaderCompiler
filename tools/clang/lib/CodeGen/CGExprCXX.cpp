@@ -1,18 +1,18 @@
 //===--- CGExprCXX.cpp - Emit LLVM Code for C++ expressions ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code dealing with code generation of C++ expressions
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGExprCXX.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code dealing with code generation of C++ expressions        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCUDARuntime.h"
+#include "CGHLSLRuntime.h"     // HLSL Change
 #include "CGCXXABI.h"
 #include "CGDebugInfo.h"
 #include "CGObjCRuntime.h"
@@ -27,7 +27,9 @@ using namespace CodeGen;
 static RequiredArgs commonEmitCXXMemberOrOperatorCall(
     CodeGenFunction &CGF, const CXXMethodDecl *MD, llvm::Value *Callee,
     ReturnValueSlot ReturnValue, llvm::Value *This, llvm::Value *ImplicitParam,
-    QualType ImplicitParamTy, const CallExpr *CE, CallArgList &Args) {
+    QualType ImplicitParamTy, const CallExpr *CE, CallArgList &Args, 
+    ArrayRef<const Stmt *> argList// HLSL Change  - use updated argList for out parameter.
+    ) {
   assert(CE == nullptr || isa<CXXMemberCallExpr>(CE) ||
          isa<CXXOperatorCallExpr>(CE));
   assert(MD->isInstance() &&
@@ -59,7 +61,9 @@ static RequiredArgs commonEmitCXXMemberOrOperatorCall(
   if (CE) {
     // Special case: skip first argument of CXXOperatorCall (it is "this").
     unsigned ArgsToSkip = isa<CXXOperatorCallExpr>(CE) ? 1 : 0;
-    CGF.EmitCallArgs(Args, FPT, CE->arg_begin() + ArgsToSkip, CE->arg_end(),
+    CGF.EmitCallArgs(Args, FPT, 
+        argList.begin() + ArgsToSkip, // HLSL Change  - use updated argList for out parameter.
+        argList.end(),                // HLSL Change  - use updated argList for out parameter.
                      CE->getDirectCallee());
   } else {
     assert(
@@ -75,11 +79,37 @@ RValue CodeGenFunction::EmitCXXMemberOrOperatorCall(
     const CallExpr *CE) {
   const FunctionProtoType *FPT = MD->getType()->castAs<FunctionProtoType>();
   CallArgList Args;
+
+  // HLSL Change Begins
+  llvm::SmallVector<LValue, 8> castArgList;
+  // The argList of the CallExpr, may be update for out parameter
+  llvm::SmallVector<const Stmt *, 8> argList(CE->arg_begin(), CE->arg_end());
+  ConstExprIterator argBegin = argList.data();
+  ConstExprIterator argEnd = argList.data() + CE->getNumArgs();
+  // out param conversion
+  CodeGenFunction::HLSLOutParamScope OutParamScope(*this);
+  auto MapTemp = [&](const VarDecl *LocalVD, llvm::Value *TmpArg) {
+      OutParamScope.addTemp(LocalVD, TmpArg);
+  };
+  if (getLangOpts().HLSL) {
+    if (const FunctionDecl *FD = CE->getDirectCallee())
+      CGM.getHLSLRuntime().EmitHLSLOutParamConversionInit(*this, FD, CE,
+                                                          castArgList, argList, MapTemp);
+  }
+  // HLSL Change Ends
+
   RequiredArgs required = commonEmitCXXMemberOrOperatorCall(
       *this, MD, Callee, ReturnValue, This, ImplicitParam, ImplicitParamTy, CE,
-      Args);
-  return EmitCall(CGM.getTypes().arrangeCXXMethodCall(Args, FPT, required),
+      Args, argList); // HLSL Change - use updated argList.
+  RValue CallVal = EmitCall(CGM.getTypes().arrangeCXXMethodCall(Args, FPT, required),
                   Callee, ReturnValue, Args, MD);
+  // HLSL Change Begins
+  // out param conversion
+  // conversion and copy back after the call
+  if (getLangOpts().HLSL)
+    CGM.getHLSLRuntime().EmitHLSLOutParamConversionCopyBack(*this, castArgList);
+  // HLSL Change Ends
+  return CallVal;
 }
 
 RValue CodeGenFunction::EmitCXXStructorCall(
@@ -87,10 +117,35 @@ RValue CodeGenFunction::EmitCXXStructorCall(
     llvm::Value *This, llvm::Value *ImplicitParam, QualType ImplicitParamTy,
     const CallExpr *CE, StructorType Type) {
   CallArgList Args;
+  // HLSL Change Begins
+  llvm::SmallVector<LValue, 8> castArgList;
+  // The argList of the CallExpr, may be update for out parameter
+  llvm::SmallVector<const Stmt *, 8> argList(CE->arg_begin(), CE->arg_end());
+  ConstExprIterator argBegin = argList.data();
+  ConstExprIterator argEnd = argList.data() + CE->getNumArgs();
+  // out param conversion
+  CodeGenFunction::HLSLOutParamScope OutParamScope(*this);
+  auto MapTemp = [&](const VarDecl *LocalVD, llvm::Value *TmpArg) {
+      OutParamScope.addTemp(LocalVD, TmpArg);
+  };
+  if (getLangOpts().HLSL) {
+    if (const FunctionDecl *FD = CE->getDirectCallee())
+      CGM.getHLSLRuntime().EmitHLSLOutParamConversionInit(*this, FD, CE,
+                                                          castArgList, argList, MapTemp);
+  }
+  // HLSL Change Ends
   commonEmitCXXMemberOrOperatorCall(*this, MD, Callee, ReturnValue, This,
-                                    ImplicitParam, ImplicitParamTy, CE, Args);
-  return EmitCall(CGM.getTypes().arrangeCXXStructorDeclaration(MD, Type),
+                                    ImplicitParam, ImplicitParamTy, CE, Args,
+      argList); // HLSL Change - use updated argList.
+  RValue CallVal = EmitCall(CGM.getTypes().arrangeCXXStructorDeclaration(MD, Type),
                   Callee, ReturnValue, Args, MD);
+  // HLSL Change Begins
+  // out param conversion
+  // conversion and copy back after the call
+  if (getLangOpts().HLSL)
+    CGM.getHLSLRuntime().EmitHLSLOutParamConversionCopyBack(*this, castArgList);
+  // HLSL Change Ends
+  return CallVal;
 }
 
 static CXXRecordDecl *getCXXRecord(const Expr *E) {
@@ -134,6 +189,82 @@ RValue CodeGenFunction::EmitCXXMemberOrOperatorMemberCallExpr(
     bool HasQualifier, NestedNameSpecifier *Qualifier, bool IsArrow,
     const Expr *Base) {
   assert(isa<CXXMemberCallExpr>(CE) || isa<CXXOperatorCallExpr>(CE));
+
+  // HLSL Change Begins
+  if (hlsl::IsHLSLMatType(Base->getType())) {
+    if (const CXXOperatorCallExpr *opCall = dyn_cast<CXXOperatorCallExpr>(CE)) {
+      assert(opCall->getOperator() == OverloadedOperatorKind::OO_Subscript &&
+             "must be subscript");
+
+      llvm::Value *This = nullptr;
+      if (Base->getValueKind() != ExprValueKind::VK_RValue) {
+        This = EmitLValue(Base).getAddress();
+      } else {
+        llvm::Value *Val = EmitScalarExpr(Base);
+        This = Builder.CreateAlloca(Val->getType());
+        CGM.getHLSLRuntime().EmitHLSLMatrixStore(*this, Val, This, Base->getType());
+      }
+
+      llvm::Value *Idx = EmitScalarExpr(CE->getArg(1));
+      llvm::Type *RetTy =
+          ConvertType(getContext().getLValueReferenceType(CE->getType()));
+      llvm::Value *matSub = CGM.getHLSLRuntime().EmitHLSLMatrixSubscript(
+          *this, RetTy, This, Idx, Base->getType());
+      return RValue::get(matSub);
+    }
+  }
+  if (hlsl::IsHLSLVecType(Base->getType())) {
+    if (const CXXOperatorCallExpr *opCall = dyn_cast<CXXOperatorCallExpr>(CE)) {
+      assert(opCall->getOperator() == OverloadedOperatorKind::OO_Subscript &&
+             "must be subscript");
+
+      llvm::Value *This = nullptr;
+      if (Base->getValueKind() != ExprValueKind::VK_RValue) {
+        This = EmitLValue(Base).getAddress();
+      } else {
+        llvm::Value *Val = EmitScalarExpr(Base);
+        This = Builder.CreateAlloca(Val->getType());
+        Builder.CreateStore(Val, This);
+      }
+      bool isBool = false;
+      if (llvm::IntegerType *IT =
+              dyn_cast<llvm::IntegerType>(This->getType()
+                                              ->getPointerElementType()
+                                              ->getVectorElementType())) {
+        if (IT->getBitWidth() == 1) {
+          isBool = true;
+        }
+      }
+
+      llvm::Value *Idx = EmitScalarExpr(CE->getArg(1));
+      llvm::Constant *zero = llvm::ConstantInt::get(Idx->getType(), 0);
+      llvm::Value *Elt = Builder.CreateGEP(This, {zero, Idx});
+
+      if (isBool) {
+        // bool pointer is not i1 *.
+        llvm::Type *BoolTy = llvm::IntegerType::get(
+            getLLVMContext(), getContext().getTypeSize(CE->getType()));
+        Elt = Builder.CreateBitCast(
+            Elt, llvm::PointerType::get(
+                      BoolTy, Elt->getType()->getPointerAddressSpace()));
+      }
+
+      return RValue::get(Elt);
+    }
+  }
+  if (hlsl::IsHLSLOutputPatchType(Base->getType()) ||
+      hlsl::IsHLSLInputPatchType(Base->getType())) {
+    if (const CXXOperatorCallExpr *opCall = dyn_cast<CXXOperatorCallExpr>(CE)) {
+      assert(opCall->getOperator() == OverloadedOperatorKind::OO_Subscript &&
+             "must be subscript");
+      llvm::Value *This = EmitLValue(Base).getAddress();
+      llvm::Value *Idx = EmitScalarExpr(CE->getArg(1));
+      llvm::Constant *zero = llvm::ConstantInt::get(Idx->getType(), 0);
+      llvm::Value *Elt = Builder.CreateGEP(This, { zero, Idx });
+      return RValue::get(Elt);
+    }
+  }
+  // HLSL Change Ends
 
   // Compute the object pointer.
   bool CanUseVirtualCall = MD->isVirtual() && !HasQualifier;
@@ -346,6 +477,15 @@ RValue CodeGenFunction::EmitCUDAKernelCallExpr(const CUDAKernelCallExpr *E,
                                                ReturnValueSlot ReturnValue) {
   return CGM.getCUDARuntime().EmitCUDAKernelCallExpr(*this, E, ReturnValue);
 }
+
+// HLSL Change Begins
+RValue CodeGenFunction::EmitHLSLBuiltinCallExpr(const FunctionDecl *FD,
+                                                const CallExpr *E,
+                                                ReturnValueSlot ReturnValue) {
+  return CGM.getHLSLRuntime().EmitHLSLBuiltinCallExpr(*this, FD, E,
+                                                      ReturnValue);
+}
+// HLSL Change Ends
 
 static void EmitNullBaseClassInitialization(CodeGenFunction &CGF,
                                             llvm::Value *DestPtr,

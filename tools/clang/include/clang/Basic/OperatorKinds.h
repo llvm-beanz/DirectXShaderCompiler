@@ -1,16 +1,17 @@
 //===--- OperatorKinds.h - C++ Overloaded Operators -------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// OperatorKinds.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines an enumeration for C++ overloaded operators.
+/// \file                                                                    //
+/// \brief Defines an enumeration for C++ overloaded operators.              //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_BASIC_OPERATORKINDS_H
 #define LLVM_CLANG_BASIC_OPERATORKINDS_H

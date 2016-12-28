@@ -1,18 +1,19 @@
 //===- llvm/ADT/APFloat.h - Arbitrary Precision Floating Point ---*- C++ -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// APFloat.h                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief
-/// This file declares a class to represent arbitrary precision floating point
-/// values and provide a variety of arithmetic operations on them.
+/// \file                                                                    //
+/// \brief                                                                   //
+/// This file declares a class to represent arbitrary precision floating point//
+/// values and provide a variety of arithmetic operations on them.           //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ADT_APFLOAT_H
 #define LLVM_ADT_APFLOAT_H
@@ -383,11 +384,13 @@ public:
   /// Bitwise comparison for equality (QNaNs compare equal, 0!=-0).
   bool bitwiseIsEqual(const APFloat &) const;
 
+#if 0 // HLSL Change - dst should be _Out_writes_(constant), but this turns out to be unused in any case
   /// Write out a hexadecimal representation of the floating point value to DST,
   /// which must be of sufficient size, in the C99 form [-]0xh.hhhhp[+-]d.
   /// Return the number of characters written, excluding the terminating NUL.
-  unsigned int convertToHexString(char *dst, unsigned int hexDigits,
+  unsigned int convertToHexString(_In_ char *dst, unsigned int hexDigits,
                                   bool upperCase, roundingMode) const;
+#endif // HLSL Change
 
   /// \name IEEE-754R 5.7.2 General operations.
   /// @{
@@ -591,8 +594,14 @@ private:
                                     roundingMode);
   opStatus convertFromHexadecimalString(StringRef, roundingMode);
   opStatus convertFromDecimalString(StringRef, roundingMode);
-  char *convertNormalToHexString(char *, unsigned int, bool,
-                                 roundingMode) const;
+#if 0 // HLSL Change - dst should be _Out_writes_(constant), but this turns out to be unused in any case
+  char *convertNormalToHexString(
+	  _In_ char *dst, 
+	  unsigned int hexDigits,
+	  bool upperCase,
+	  roundingMode rounding_mode) const;
+#endif
+
   opStatus roundSignificandWithExponent(const integerPart *, unsigned int, int,
                                         roundingMode);
 

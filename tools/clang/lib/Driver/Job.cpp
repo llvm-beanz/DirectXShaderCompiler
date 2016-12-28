@@ -1,11 +1,12 @@
 //===--- Job.cpp - Command to Execute -------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Job.cpp                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/DriverDiagnostic.h"
@@ -212,6 +213,7 @@ void Command::setResponseFile(const char *FileName) {
 
 int Command::Execute(const StringRef **Redirects, std::string *ErrMsg,
                      bool *ExecutionFailed) const {
+#ifdef MSFT_SUPPORTS_CHILD_PROCESSES
   SmallVector<const char*, 128> Argv;
 
   if (ResponseFile == nullptr) {
@@ -249,6 +251,10 @@ int Command::Execute(const StringRef **Redirects, std::string *ErrMsg,
   return llvm::sys::ExecuteAndWait(Executable, Argv.data(), /*env*/ nullptr,
                                    Redirects, /*secondsToWait*/ 0,
                                    /*memoryLimit*/ 0, ErrMsg, ExecutionFailed);
+#else
+  assert(false && "support for spawning processes should be removed from public paths");
+  return 1;
+#endif
 }
 
 FallbackCommand::FallbackCommand(const Action &Source_, const Tool &Creator_,

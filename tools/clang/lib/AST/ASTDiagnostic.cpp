@@ -1,15 +1,14 @@
 //===--- ASTDiagnostic.cpp - Diagnostic Printing Hooks for AST Nodes ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements a diagnostic formatting hook for AST elements.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTDiagnostic.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements a diagnostic formatting hook for AST elements.       //
+//                                                                           //
+
 #include "clang/AST/ASTDiagnostic.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTLambda.h"
@@ -21,7 +20,8 @@
 #include "clang/AST/Type.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 
 // Returns a desugared version of the QualType, and marks ShouldAKA as true
@@ -82,6 +82,14 @@ static QualType Desugar(ASTContext &Context, QualType QT, bool &ShouldAKA) {
     // Don't desugar va_list.
     if (QualType(Ty,0) == Context.getBuiltinVaListType())
       break;
+
+    // HLSL Change: don't desugar typedefs that were injected into AST.
+    if (Ty->getTypeClass() == Type::TypeClass::Typedef) {
+      const TypedefType* tt = cast<TypedefType>(Ty);
+      if (tt->getDecl()->getLocation() == SourceLocation()) {
+        break;
+      }
+    }
 
     // Otherwise, do a single-step desugar.
     QualType Underlying;

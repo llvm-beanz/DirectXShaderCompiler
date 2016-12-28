@@ -1,37 +1,36 @@
 //==-- llvm/ADT/ilist.h - Intrusive Linked List Template ---------*- C++ -*-==//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ilist.h                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines classes to implement an intrusive doubly linked list class//
+// (i.e. each node of the list must contain a next and previous field for the//
+// list.                                                                     //
 //
-//                     The LLVM Compiler Infrastructure
+// The ilist_traits trait class is used to gain access to the next and previous//
+// fields of the node type that the list is instantiated with.  If it is not //
+// specialized, the list defaults to using the getPrev(), getNext() method calls//
+// to get the next and previous pointers.                                    //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// The ilist class itself, should be a plug in replacement for list, assuming//
+// that the nodes contain next/prev pointers.  This list replacement does not//
+// provide a constant time size() method, so be careful to use empty() when you//
+// really want to know if it's empty.                                        //
 //
-//===----------------------------------------------------------------------===//
+// The ilist class is implemented by allocating a 'tail' node when the list is//
+// created (using ilist_traits<>::createSentinel()).  This tail node is      //
+// absolutely required because the user must be able to compute end()-1. Because//
+// of this, users of the direct next/prev links will see an extra link on the//
+// end of the list, which should be ignored.                                 //
 //
-// This file defines classes to implement an intrusive doubly linked list class
-// (i.e. each node of the list must contain a next and previous field for the
-// list.
+// Requirements for a user of this list:                                     //
 //
-// The ilist_traits trait class is used to gain access to the next and previous
-// fields of the node type that the list is instantiated with.  If it is not
-// specialized, the list defaults to using the getPrev(), getNext() method calls
-// to get the next and previous pointers.
-//
-// The ilist class itself, should be a plug in replacement for list, assuming
-// that the nodes contain next/prev pointers.  This list replacement does not
-// provide a constant time size() method, so be careful to use empty() when you
-// really want to know if it's empty.
-//
-// The ilist class is implemented by allocating a 'tail' node when the list is
-// created (using ilist_traits<>::createSentinel()).  This tail node is
-// absolutely required because the user must be able to compute end()-1. Because
-// of this, users of the direct next/prev links will see an extra link on the
-// end of the list, which should be ignored.
-//
-// Requirements for a user of this list:
-//
-//   1. The user must provide {g|s}et{Next|Prev} methods, or specialize
-//      ilist_traits to provide an alternate way of getting and setting next and
-//      prev links.
+//   1. The user must provide {g|s}et{Next|Prev} methods, or specialize      //
+//      ilist_traits to provide an alternate way of getting and setting next and//
+//      prev links.                                                          //
 //
 //===----------------------------------------------------------------------===//
 
@@ -285,9 +284,8 @@ template<typename NodeTy> struct simplify_type<const ilist_iterator<NodeTy> > {
     return &*Node;
   }
 };
-
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 //
 /// iplist - The subset of list functionality that can safely be used on nodes
 /// of polymorphic types, i.e. a heterogeneous list with a common base class that

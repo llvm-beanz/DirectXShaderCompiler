@@ -1,29 +1,26 @@
 //===--- Preprocess.cpp - C Language Family Preprocessor Implementation ---===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the Preprocessor interface.
-//
-//===----------------------------------------------------------------------===//
-//
-// Options to support:
-//   -H       - Print the name of each header file used.
-//   -d[DNI] - Dump various things.
-//   -fworking-directory - #line's with preprocessor's working dir.
-//   -fpreprocessed
-//   -dependency-file,-M,-MM,-MF,-MG,-MP,-MT,-MQ,-MD,-MMD
-//   -W*
-//   -w
-//
-// Messages to emit:
-//   "Multiple include guards may be useful for:\n"
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Preprocessor.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the Preprocessor interface.                         //
+//                                                                           //
+// Options to support:                                                       //
+//   -H       - Print the name of each header file used.                     //
+//   -d[DNI] - Dump various things.                                          //
+//   -fworking-directory - #line's with preprocessor's working dir.          //
+//   -fpreprocessed                                                          //
+//   -dependency-file,-M,-MM,-MF,-MG,-MP,-MT,-MQ,-MD,-MMD                    //
+//   -W*                                                                     //
+//   -w                                                                      //
+//                                                                           //
+// Messages to emit:                                                         //
+//   "Multiple include guards may be useful for:\n"                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Basic/FileManager.h"
@@ -729,7 +726,8 @@ void Preprocessor::Lex(Token &Result) {
       CachingLex(Result);
       ReturnedToken = true;
       break;
-    case CLK_LexAfterModuleImport:
+    // case CLK_LexAfterModuleImport: // HLSL Change - there is no other value
+    default: assert(CurLexerKind == CLK_LexAfterModuleImport);
       LexAfterModuleImport(Result);
       ReturnedToken = true;
       break;

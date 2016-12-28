@@ -1,55 +1,54 @@
 //===-- DependenceAnalysis.cpp - DA Implementation --------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// DependenceAnalysis is an LLVM pass that analyses dependences between memory
-// accesses. Currently, it is an (incomplete) implementation of the approach
-// described in
-//
-//            Practical Dependence Testing
-//            Goff, Kennedy, Tseng
-//            PLDI 1991
-//
-// There's a single entry point that analyzes the dependence between a pair
-// of memory references in a function, returning either NULL, for no dependence,
-// or a more-or-less detailed description of the dependence between them.
-//
-// Currently, the implementation cannot propagate constraints between
-// coupled RDIV subscripts and lacks a multi-subscript MIV test.
-// Both of these are conservative weaknesses;
-// that is, not a source of correctness problems.
-//
-// The implementation depends on the GEP instruction to differentiate
-// subscripts. Since Clang linearizes some array subscripts, the dependence
-// analysis is using SCEV->delinearize to recover the representation of multiple
-// subscripts, and thus avoid the more expensive and less precise MIV tests. The
-// delinearization is controlled by the flag -da-delinearize.
-//
-// We should pay some careful attention to the possibility of integer overflow
-// in the implementation of the various tests. This could happen with Add,
-// Subtract, or Multiply, with both APInt's and SCEV's.
-//
-// Some non-linear subscript pairs can be handled by the GCD test
-// (and perhaps other tests).
-// Should explore how often these things occur.
-//
-// Finally, it seems like certain test cases expose weaknesses in the SCEV
-// simplification, especially in the handling of sign and zero extensions.
-// It could be useful to spend time exploring these.
-//
-// Please note that this is work in progress and the interface is subject to
-// change.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DependenceAnalysis.cpp                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// DependenceAnalysis is an LLVM pass that analyses dependences between memory//
+// accesses. Currently, it is an (incomplete) implementation of the approach //
+// described in                                                              //
+//                                                                           //
+//            Practical Dependence Testing                                   //
+//            Goff, Kennedy, Tseng                                           //
+//            PLDI 1991                                                      //
+//                                                                           //
+// There's a single entry point that analyzes the dependence between a pair  //
+// of memory references in a function, returning either NULL, for no dependence,//
+// or a more-or-less detailed description of the dependence between them.    //
+//                                                                           //
+// Currently, the implementation cannot propagate constraints between        //
+// coupled RDIV subscripts and lacks a multi-subscript MIV test.             //
+// Both of these are conservative weaknesses;                                //
+// that is, not a source of correctness problems.                            //
+//                                                                           //
+// The implementation depends on the GEP instruction to differentiate        //
+// subscripts. Since Clang linearizes some array subscripts, the dependence  //
+// analysis is using SCEV->delinearize to recover the representation of multiple//
+// subscripts, and thus avoid the more expensive and less precise MIV tests. The//
+// delinearization is controlled by the flag -da-delinearize.                //
+//                                                                           //
+// We should pay some careful attention to the possibility of integer overflow//
+// in the implementation of the various tests. This could happen with Add,   //
+// Subtract, or Multiply, with both APInt's and SCEV's.                      //
+//                                                                           //
+// Some non-linear subscript pairs can be handled by the GCD test            //
+// (and perhaps other tests).                                                //
+// Should explore how often these things occur.                              //
+//                                                                           //
+// Finally, it seems like certain test cases expose weaknesses in the SCEV   //
+// simplification, especially in the handling of sign and zero extensions.   //
+// It could be useful to spend time exploring these.                         //
+//                                                                           //
+// Please note that this is work in progress and the interface is subject to //
+// change.                                                                   //
+//                                                                           //
 //                                                                            //
 //                   In memory of Ken Kennedy, 1945 - 2007                    //
 //                                                                            //
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/DependenceAnalysis.h"
 #include "llvm/ADT/STLExtras.h"
@@ -241,6 +240,7 @@ FullDependence::FullDependence(Instruction *Source, Instruction *Destination,
 // getDirection - Returns the direction associated with a particular level.
 unsigned FullDependence::getDirection(unsigned Level) const {
   assert(0 < Level && Level <= Levels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= Levels);    // HLSL Change - TVS
   return DV[Level - 1].Direction;
 }
 
@@ -248,6 +248,7 @@ unsigned FullDependence::getDirection(unsigned Level) const {
 // Returns the distance (or NULL) associated with a particular level.
 const SCEV *FullDependence::getDistance(unsigned Level) const {
   assert(0 < Level && Level <= Levels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= Levels);    // HLSL Change - TVS
   return DV[Level - 1].Distance;
 }
 
@@ -257,6 +258,7 @@ const SCEV *FullDependence::getDistance(unsigned Level) const {
 // variable associated with the loop at this level.
 bool FullDependence::isScalar(unsigned Level) const {
   assert(0 < Level && Level <= Levels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= Levels);    // HLSL Change - TVS
   return DV[Level - 1].Scalar;
 }
 
@@ -265,6 +267,7 @@ bool FullDependence::isScalar(unsigned Level) const {
 // will break this dependence.
 bool FullDependence::isPeelFirst(unsigned Level) const {
   assert(0 < Level && Level <= Levels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= Levels);    // HLSL Change - TVS
   return DV[Level - 1].PeelFirst;
 }
 
@@ -273,6 +276,7 @@ bool FullDependence::isPeelFirst(unsigned Level) const {
 // will break this dependence.
 bool FullDependence::isPeelLast(unsigned Level) const {
   assert(0 < Level && Level <= Levels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= Levels);    // HLSL Change - TVS
   return DV[Level - 1].PeelLast;
 }
 
@@ -280,6 +284,7 @@ bool FullDependence::isPeelLast(unsigned Level) const {
 // Returns true if splitting this loop will break the dependence.
 bool FullDependence::isSplitable(unsigned Level) const {
   assert(0 < Level && Level <= Levels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= Levels);    // HLSL Change - TVS
   return DV[Level - 1].Splitable;
 }
 
@@ -1089,6 +1094,8 @@ bool DependenceAnalysis::strongSIVtest(const SCEV *Coeff,
   DEBUG(dbgs() << ", " << *DstConst->getType() << "\n");
   ++StrongSIVapplications;
   assert(0 < Level && Level <= CommonLevels && "level out of range");
+  _Analysis_assume_(0 < Level && Level <= CommonLevels);    // HLSL Change - TVS
+  _Analysis_assume_(Result.Levels == CommonLevels);   // HLSL Change - TVS
   Level--;
 
   const SCEV *Delta = SE->getMinusSCEV(SrcConst, DstConst);
@@ -1226,6 +1233,8 @@ bool DependenceAnalysis::weakCrossingSIVtest(const SCEV *Coeff,
   DEBUG(dbgs() << "\t    DstConst = " << *DstConst << "\n");
   ++WeakCrossingSIVapplications;
   assert(0 < Level && Level <= CommonLevels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= CommonLevels);    // HLSL Change - TVS
+  _Analysis_assume_(Result.Levels == CommonLevels);   // HLSL Change - TVS
   Level--;
   Result.Consistent = false;
   const SCEV *Delta = SE->getMinusSCEV(DstConst, SrcConst);
@@ -1449,6 +1458,8 @@ bool DependenceAnalysis::exactSIVtest(const SCEV *SrcCoeff,
   DEBUG(dbgs() << "\t    DstConst = " << *DstConst << "\n");
   ++ExactSIVapplications;
   assert(0 < Level && Level <= CommonLevels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= CommonLevels);    // HLSL Change - TVS
+  _Analysis_assume_(Result.Levels == CommonLevels);   // HLSL Change - TVS
   Level--;
   Result.Consistent = false;
   const SCEV *Delta = SE->getMinusSCEV(DstConst, SrcConst);
@@ -1662,6 +1673,8 @@ bool DependenceAnalysis::weakZeroSrcSIVtest(const SCEV *DstCoeff,
   DEBUG(dbgs() << "\t    DstConst = " << *DstConst << "\n");
   ++WeakZeroSIVapplications;
   assert(0 < Level && Level <= MaxLevels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= MaxLevels);   // HLSL Change - TVS
+  _Analysis_assume_(Result.Levels == CommonLevels);   // HLSL Change - TVS
   Level--;
   Result.Consistent = false;
   const SCEV *Delta = SE->getMinusSCEV(SrcConst, DstConst);
@@ -1772,6 +1785,8 @@ bool DependenceAnalysis::weakZeroDstSIVtest(const SCEV *SrcCoeff,
   DEBUG(dbgs() << "\t    DstConst = " << *DstConst << "\n");
   ++WeakZeroSIVapplications;
   assert(0 < Level && Level <= SrcLevels && "Level out of range");
+  _Analysis_assume_(0 < Level && Level <= SrcLevels);   // HLSL Change - TVS
+  _Analysis_assume_(Result.Levels == CommonLevels);   // HLSL Change - TVS
   Level--;
   Result.Consistent = false;
   const SCEV *Delta = SE->getMinusSCEV(DstConst, SrcConst);
@@ -2453,6 +2468,8 @@ bool DependenceAnalysis::gcdMIVtest(const SCEV *Src,
       DEBUG(dbgs() << "\tRemainder = " << Remainder << "\n");
       if (Remainder != 0) {
         unsigned Level = mapSrcLoop(CurLoop);
+        assert(0 < Level && Level <= Result.Levels && "Level out of range");
+        _Analysis_assume_(0 < Level && Level <= Result.Levels);    // HLSL Change - TVS
         Result.DV[Level - 1].Direction &= unsigned(~Dependence::DVEntry::EQ);
         Improved = true;
       }
@@ -2545,6 +2562,8 @@ bool DependenceAnalysis::banerjeeMIVtest(const SCEV *Src,
       bool Improved = false;
       for (unsigned K = 1; K <= CommonLevels; ++K) {
         if (Loops[K]) {
+          _Analysis_assume_(Result.Levels == CommonLevels);   // HLSL Change - TVS
+          _Analysis_assume_(K <= MaxLevels);    // HLSL Change - TVS
           unsigned Old = Result.DV[K - 1].Direction;
           Result.DV[K - 1].Direction = Old & Bound[K].DirSet;
           Improved |= Old != Result.DV[K - 1].Direction;
@@ -3383,6 +3402,7 @@ DependenceAnalysis::depends(Instruction *Src, Instruction *Dst,
   DEBUG(dbgs() << "    maximum nesting levels = " << MaxLevels << "\n");
 
   FullDependence Result(Src, Dst, PossiblyLoopIndependent, CommonLevels);
+  _Analysis_assume_(Result.Levels == CommonLevels);   // HLSL Change - TVS
   ++TotalArrayPairs;
 
   // See if there are GEPs we can use.

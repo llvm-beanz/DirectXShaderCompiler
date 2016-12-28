@@ -1,16 +1,15 @@
 //=- RPCChannel.inc - LLVM out-of-process JIT execution for Unix --=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Implementation of the Unix-specific parts of the RPCChannel class
-// which executes JITed code in a separate process from where it was built.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RPCChannel.inc                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Implementation of the Unix-specific parts of the RPCChannel class         //
+// which executes JITed code in a separate process from where it was built.  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/Errno.h"
 #include "llvm/Support/raw_ostream.h"

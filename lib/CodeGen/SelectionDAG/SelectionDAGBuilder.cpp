@@ -1,15 +1,14 @@
 //===-- SelectionDAGBuilder.cpp - Selection-DAG building ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This implements routines for translating from LLVM IR into SelectionDAG IR.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SelectionDAGBuilder.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This implements routines for translating from LLVM IR into SelectionDAG IR.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "SelectionDAGBuilder.h"
 #include "SDNodeDbgValue.h"
@@ -4434,6 +4433,7 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
   case Intrinsic::masked_store:
     visitMaskedStore(I);
     return nullptr;
+#if 0 // HLSL Change - remove platform intrinsics
   case Intrinsic::x86_mmx_pslli_w:
   case Intrinsic::x86_mmx_pslli_d:
   case Intrinsic::x86_mmx_pslli_q:
@@ -4493,6 +4493,7 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
     setValue(&I, Res);
     return nullptr;
   }
+#endif // HLSL Change - remove platform intrinsics
   case Intrinsic::convertff:
   case Intrinsic::convertfsi:
   case Intrinsic::convertfui:

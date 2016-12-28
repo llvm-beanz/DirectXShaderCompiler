@@ -1,16 +1,15 @@
 //===- CIndexer.h - Clang-C Source Indexing Library -------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines CIndexer, a subclass of Indexer that provides extra
-// functionality needed by the CIndex library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CIndexer.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines CIndexer, a subclass of Indexer that provides extra     //
+// functionality needed by the CIndex library.                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_TOOLS_LIBCLANG_CINDEXER_H
 #define LLVM_CLANG_TOOLS_LIBCLANG_CINDEXER_H
@@ -21,6 +20,12 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
 #include <vector>
+
+// HLSL Change Starts
+namespace hlsl {
+  class DxcLangExtensionsHelperApply;
+}
+// HLSL Change Ends
 
 namespace llvm {
   class CrashRecoveryContext;
@@ -47,6 +52,8 @@ public:
                std::make_shared<PCHContainerOperations>())
       : OnlyLocalDecls(false), DisplayDiagnostics(false),
         Options(CXGlobalOpt_None), PCHContainerOps(PCHContainerOps) {}
+
+  hlsl::DxcLangExtensionsHelperApply *HlslLangExtensions = nullptr; // HLSL Change
 
   /// \brief Whether we only want to see "local" declarations (that did not
   /// come from a previous precompiled header). If false, we want to see all

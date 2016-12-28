@@ -1,15 +1,14 @@
 //===-- Type.cpp - Implement the Type class -------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Type class for the IR library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Type.cpp                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Type class for the IR library.                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/Type.h"
 #include "LLVMContextImpl.h"
@@ -62,7 +61,7 @@ bool Type::isIntegerTy(unsigned Bitwidth) const {
 // canLosslesslyBitCastTo - Return true if this type can be converted to
 // 'Ty' without any reinterpretation of bits.  For example, i8* to i32*.
 //
-bool Type::canLosslesslyBitCastTo(Type *Ty) const {
+bool Type::canLosslesslyBitCastTo(_In_ Type *Ty) const {
   // Identity cast means no change so return true
   if (this == Ty) 
     return true;

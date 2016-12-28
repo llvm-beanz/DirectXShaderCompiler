@@ -1,22 +1,23 @@
 //===--- Allocator.h - Simple memory allocation abstraction -----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-/// \file
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Allocator.h                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+/// \file                                                                    //
 ///
-/// This file defines the MallocAllocator and BumpPtrAllocator interfaces. Both
-/// of these conform to an LLVM "Allocator" concept which consists of an
-/// Allocate method accepting a size and alignment, and a Deallocate accepting
-/// a pointer and size. Further, the LLVM "Allocator" concept has overloads of
-/// Allocate and Deallocate for setting size and alignment based on the final
-/// type. These overloads are typically provided by a base class template \c
-/// AllocatorBase.
+/// This file defines the MallocAllocator and BumpPtrAllocator interfaces. Both//
+/// of these conform to an LLVM "Allocator" concept which consists of an     //
+/// Allocate method accepting a size and alignment, and a Deallocate accepting//
+/// a pointer and size. Further, the LLVM "Allocator" concept has overloads of//
+/// Allocate and Deallocate for setting size and alignment based on the final//
+/// type. These overloads are typically provided by a base class template \c //
+/// AllocatorBase.                                                           //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_ALLOCATOR_H
 #define LLVM_SUPPORT_ALLOCATOR_H
@@ -90,9 +91,14 @@ class MallocAllocator : public AllocatorBase<MallocAllocator> {
 public:
   void Reset() {}
 
+  _Ret_notnull_   // HLSL Change - SAL
   LLVM_ATTRIBUTE_RETURNS_NONNULL void *Allocate(size_t Size,
                                                 size_t /*Alignment*/) {
-    return malloc(Size);
+    // HLSL Change Starts - throw on OOM
+    void* result = malloc(Size);
+    if (result == nullptr) throw std::bad_alloc();
+    return result;
+    // HLSL Change Ends - throw on OOM
   }
 
   // Pull in base class overloads.
@@ -395,6 +401,12 @@ public:
 };
 
 }  // end namespace llvm
+
+// HLSL Change Starts - undef min due to conflict with std::min
+#ifdef min
+#undef min
+#endif
+// HLSL Change Ends
 
 template <typename AllocatorT, size_t SlabSize, size_t SizeThreshold>
 void *operator new(size_t Size,

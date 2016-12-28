@@ -9,13 +9,14 @@ Clang Language Extensions
 .. toctree::
    :hidden:
 
-   ObjectiveCLiterals
    BlockLanguageSpec
    Block-ABI-Apple
-   AutomaticReferenceCounting
 
 Introduction
 ============
+
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
 
 This document describes the language extensions provided by Clang.  In addition
 to the language extensions listed here, Clang aims to support a broad range of
@@ -1107,20 +1108,6 @@ type is treated the same way as method that returns ``id``.
 Use ``__has_feature(objc_instancetype)`` to determine whether the
 ``instancetype`` contextual keyword is available.
 
-Automatic reference counting
-----------------------------
-
-Clang provides support for :doc:`automated reference counting
-<AutomaticReferenceCounting>` in Objective-C, which eliminates the need
-for manual ``retain``/``release``/``autorelease`` message sends.  There are two
-feature macros associated with automatic reference counting:
-``__has_feature(objc_arc)`` indicates the availability of automated reference
-counting in general, while ``__has_feature(objc_arc_weak)`` indicates that
-automated reference counting also includes support for ``__weak`` pointers to
-Objective-C objects.
-
-.. _objc-fixed-enum:
-
 Enumerations with a fixed underlying type
 -----------------------------------------
 
@@ -1193,99 +1180,6 @@ of copying a block to the heap in the common case.
 The conversion from a lambda to a block pointer is only available in
 Objective-C++, and not in C++ with blocks, due to its use of Objective-C memory
 management (autorelease).
-
-Object Literals and Subscripting
---------------------------------
-
-Clang provides support for :doc:`Object Literals and Subscripting
-<ObjectiveCLiterals>` in Objective-C, which simplifies common Objective-C
-programming patterns, makes programs more concise, and improves the safety of
-container creation.  There are several feature macros associated with object
-literals and subscripting: ``__has_feature(objc_array_literals)`` tests the
-availability of array literals; ``__has_feature(objc_dictionary_literals)``
-tests the availability of dictionary literals;
-``__has_feature(objc_subscripting)`` tests the availability of object
-subscripting.
-
-Objective-C Autosynthesis of Properties
----------------------------------------
-
-Clang provides support for autosynthesis of declared properties.  Using this
-feature, clang provides default synthesis of those properties not declared
-@dynamic and not having user provided backing getter and setter methods.
-``__has_feature(objc_default_synthesize_properties)`` checks for availability
-of this feature in version of clang being used.
-
-.. _langext-objc-retain-release:
-
-Objective-C retaining behavior attributes
------------------------------------------
-
-In Objective-C, functions and methods are generally assumed to follow the
-`Cocoa Memory Management 
-<http://developer.apple.com/library/mac/#documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html>`_
-conventions for ownership of object arguments and
-return values. However, there are exceptions, and so Clang provides attributes
-to allow these exceptions to be documented. This are used by ARC and the
-`static analyzer <http://clang-analyzer.llvm.org>`_ Some exceptions may be
-better described using the ``objc_method_family`` attribute instead.
-
-**Usage**: The ``ns_returns_retained``, ``ns_returns_not_retained``,
-``ns_returns_autoreleased``, ``cf_returns_retained``, and
-``cf_returns_not_retained`` attributes can be placed on methods and functions
-that return Objective-C or CoreFoundation objects. They are commonly placed at
-the end of a function prototype or method declaration:
-
-.. code-block:: objc
-
-  id foo() __attribute__((ns_returns_retained));
-
-  - (NSString *)bar:(int)x __attribute__((ns_returns_retained));
-
-The ``*_returns_retained`` attributes specify that the returned object has a +1
-retain count.  The ``*_returns_not_retained`` attributes specify that the return
-object has a +0 retain count, even if the normal convention for its selector
-would be +1.  ``ns_returns_autoreleased`` specifies that the returned object is
-+0, but is guaranteed to live at least as long as the next flush of an
-autorelease pool.
-
-**Usage**: The ``ns_consumed`` and ``cf_consumed`` attributes can be placed on
-an parameter declaration; they specify that the argument is expected to have a
-+1 retain count, which will be balanced in some way by the function or method.
-The ``ns_consumes_self`` attribute can only be placed on an Objective-C
-method; it specifies that the method expects its ``self`` parameter to have a
-+1 retain count, which it will balance in some way.
-
-.. code-block:: objc
-
-  void foo(__attribute__((ns_consumed)) NSString *string);
-
-  - (void) bar __attribute__((ns_consumes_self));
-  - (void) baz:(id) __attribute__((ns_consumed)) x;
-
-Further examples of these attributes are available in the static analyzer's `list of annotations for analysis
-<http://clang-analyzer.llvm.org/annotations.html#cocoa_mem>`_.
-
-Query for these features with ``__has_attribute(ns_consumed)``,
-``__has_attribute(ns_returns_retained)``, etc.
-
-
-Objective-C++ ABI: protocol-qualifier mangling of parameters
-------------------------------------------------------------
-
-Starting with LLVM 3.4, Clang produces a new mangling for parameters whose
-type is a qualified-``id`` (e.g., ``id<Foo>``).  This mangling allows such
-parameters to be differentiated from those with the regular unqualified ``id``
-type.
-
-This was a non-backward compatible mangling change to the ABI.  This change
-allows proper overloading, and also prevents mangling conflicts with template
-parameters of protocol-qualified type.
-
-Query the presence of this new mangling with
-``__has_feature(objc_protocol_qualifier_mangling)``.
-
-.. _langext-overloading:
 
 Initializer lists for complex numbers in C
 ==========================================

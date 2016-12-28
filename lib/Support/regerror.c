@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// regerror.c                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 /*-
  * This code is derived from OpenBSD's libc/regex, original license follows:
  *
@@ -49,7 +58,11 @@
 #define snprintf _snprintf
 #endif
 
-static const char *regatoi(const llvm_regex_t *, char *, int);
+static const char *regatoi(
+	const llvm_regex_t *preg,
+	_Out_writes_all_(localbufsize) char *localbuf,
+	int localbufsize
+	);
 
 static struct rerr {
 	int code;
@@ -81,13 +94,14 @@ static struct rerr {
  */
 /* ARGSUSED */
 size_t
-llvm_regerror(int errcode, const llvm_regex_t *preg, char *errbuf, size_t errbuf_size)
+llvm_regerror(int errcode, const llvm_regex_t *preg, _Out_writes_all_(errbuf_size) char *errbuf, size_t errbuf_size)
 {
 	struct rerr *r;
 	size_t len;
 	int target = errcode &~ REG_ITOA;
 	const char *s;
 	char convbuf[50];
+	_Analysis_assume_nullterminated_(convbuf);
 
 	if (errcode == REG_ATOI)
 		s = regatoi(preg, convbuf, sizeof convbuf);
@@ -95,13 +109,14 @@ llvm_regerror(int errcode, const llvm_regex_t *preg, char *errbuf, size_t errbuf
 		for (r = rerrs; r->code != 0; r++)
 			if (r->code == target)
 				break;
-	
+
 		if (errcode&REG_ITOA) {
 			if (r->code != 0) {
 				assert(strlen(r->name) < sizeof(convbuf));
 				(void) llvm_strlcpy(convbuf, r->name, sizeof convbuf);
 			} else
-				(void)snprintf(convbuf, sizeof convbuf,
+				//(void)snprintf(convbuf, sizeof convbuf,
+				(void)_snprintf_s(convbuf, _countof(convbuf), _countof(convbuf),
 				    "REG_0x%x", target);
 			s = convbuf;
 		} else
@@ -120,7 +135,10 @@ llvm_regerror(int errcode, const llvm_regex_t *preg, char *errbuf, size_t errbuf
  - regatoi - internal routine to implement REG_ATOI
  */
 static const char *
-regatoi(const llvm_regex_t *preg, char *localbuf, int localbufsize)
+regatoi(
+	const llvm_regex_t *preg, 
+	_Out_writes_all_(localbufsize) char *localbuf,
+	int localbufsize)
 {
 	struct rerr *r;
 
@@ -130,6 +148,7 @@ regatoi(const llvm_regex_t *preg, char *localbuf, int localbufsize)
 	if (r->code == 0)
 		return("0");
 
-	(void)snprintf(localbuf, localbufsize, "%d", r->code);
+	//(void)snprintf(localbuf, localbufsize, "%d", r->code);
+	(void)_snprintf_s(localbuf, localbufsize, localbufsize, "%d", r->code);
 	return(localbuf);
 }

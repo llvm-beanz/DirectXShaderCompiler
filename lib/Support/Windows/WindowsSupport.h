@@ -1,23 +1,23 @@
 //===- WindowsSupport.h - Common Windows Include File -----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines things specific to Windows implementations.  In addition to
-// providing some helpers for working with win32 APIs, this header wraps
-// <windows.h> with some portability macros.  Always include WindowsSupport.h
-// instead of including <windows.h> directly.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// WindowsSupport.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines things specific to Windows implementations.  In addition to//
+// providing some helpers for working with win32 APIs, this header wraps     //
+// <windows.h> with some portability macros.  Always include WindowsSupport.h//
+// instead of including <windows.h> directly.                                //
 //
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 //=== WARNING: Implementation here must contain only generic Win32 code that
 //===          is guaranteed to work on *all* Win32 variants.
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_WINDOWSSUPPORT_H
 #define LLVM_SUPPORT_WINDOWSSUPPORT_H
@@ -43,11 +43,14 @@
 #include <string>
 #include <vector>
 
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MSFileSystem.h"
+
 inline bool MakeErrMsg(std::string* ErrMsg, const std::string& prefix) {
   if (!ErrMsg)
     return true;
   char *buffer = NULL;
-  DWORD R = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+  DWORD R = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
                           FORMAT_MESSAGE_FROM_SYSTEM,
                           NULL, GetLastError(), 0, (LPSTR)&buffer, 1, NULL);
   if (R)
@@ -109,7 +112,7 @@ struct CommonHandleTraits {
   }
 
   static void Close(handle_type h) {
-    ::CloseHandle(h);
+    ::llvm::sys::fs::GetCurrentThreadFileSystem()->CloseHandle(h);
   }
 
   static bool IsValid(handle_type h) {
@@ -141,7 +144,7 @@ struct CryptContextTraits : CommonHandleTraits {
 
 struct FindHandleTraits : CommonHandleTraits {
   static void Close(handle_type h) {
-    ::FindClose(h);
+    ::llvm::sys::fs::GetCurrentThreadFileSystem()->FindClose(h);
   }
 };
 
@@ -178,6 +181,8 @@ std::error_code UTF16ToUTF8(const wchar_t *utf16, size_t utf16_len,
 /// Convert from UTF16 to the current code page used in the system
 std::error_code UTF16ToCurCP(const wchar_t *utf16, size_t utf16_len,
                              SmallVectorImpl<char> &utf8);
+std::error_code ACPToUTF8(const char *acp, size_t acp_len,
+                       SmallVectorImpl<char> &utf8);
 } // end namespace windows
 } // end namespace sys
 } // end namespace llvm.

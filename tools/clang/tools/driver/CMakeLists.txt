@@ -1,20 +1,24 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set( LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   Analysis
-  CodeGen
+#  CodeGen # HLSL Change
   Core
   IPA
   IPO
   InstCombine
-  Instrumentation
-  MC
-  MCParser
-  ObjCARCOpts
+#  Instrumentation # HLSL Change
+#  MC # HLSL Change
+#  MCParser # HLSL Change
+#  ObjCARCOpts # HLSL Change
   Option
   ScalarOpts
   Support
   TransformUtils
   Vectorize
+  mssupport # HLSL Change
+  hlsl  # HLSL Change
   )
 
 option(CLANG_PLUGIN_SUPPORT "Build clang with plugin support" ON)
@@ -44,6 +48,12 @@ if(WIN32 AND NOT CYGWIN)
 else()
   set_target_properties(clang PROPERTIES VERSION ${CLANG_EXECUTABLE_VERSION})
 endif()
+
+# HLSL Change Start
+if (NOT HLSL_OPTIONAL_PROJS_IN_DEFAULT)
+  set_target_properties(clang PROPERTIES EXCLUDE_FROM_ALL ON EXCLUDE_FROM_DEFAULT_BUILD ON) # HLSL Change
+endif ()
+# HLSL Change Ends
 
 # Support plugins.
 if(CLANG_PLUGIN_SUPPORT)
@@ -79,11 +89,15 @@ add_custom_command(TARGET clang POST_BUILD
 set_property(DIRECTORY APPEND
   PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${clang_cl})
 
+# HLSL Changes Start - do not install clang.exe unless we build it by default
+if (HLSL_OPTIONAL_PROJS_IN_DEFAULT)
 install(TARGETS clang
   RUNTIME DESTINATION bin)
 
 # Create the clang++ and clang-cl symlinks at installation time.
 install(SCRIPT clang_symlink.cmake -DCMAKE_INSTALL_PREFIX=\"${CMAKE_INSTALL_PREFIX}\")
+endif (HLSL_OPTIONAL_PROJS_IN_DEFAULT)
+# HLSL Change Ends
 
 # Configure plist creation for OS X.
 set (TOOL_INFO_PLIST "Info.plist" CACHE STRING "Plist name")

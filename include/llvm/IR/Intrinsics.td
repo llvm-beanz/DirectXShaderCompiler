@@ -1,15 +1,14 @@
 //===- Intrinsics.td - Defines all LLVM intrinsics ---------*- tablegen -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines properties of all LLVM intrinsics.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Intrinsics.td                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines properties of all LLVM intrinsics.                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 include "llvm/CodeGen/ValueTypes.td"
 
@@ -637,15 +636,18 @@ def int_bitset_test : Intrinsic<[llvm_i1_ty], [llvm_ptr_ty, llvm_metadata_ty],
 // Target-specific intrinsics
 //===----------------------------------------------------------------------===//
 
-include "llvm/IR/IntrinsicsPowerPC.td"
-include "llvm/IR/IntrinsicsX86.td"
-include "llvm/IR/IntrinsicsARM.td"
-include "llvm/IR/IntrinsicsAArch64.td"
-include "llvm/IR/IntrinsicsXCore.td"
-include "llvm/IR/IntrinsicsHexagon.td"
-include "llvm/IR/IntrinsicsNVVM.td"
-include "llvm/IR/IntrinsicsMips.td"
-include "llvm/IR/IntrinsicsAMDGPU.td"
-include "llvm/IR/IntrinsicsBPF.td"
-include "llvm/IR/IntrinsicsSystemZ.td"
-include "llvm/IR/IntrinsicsWebAssembly.td"
+// HLSL Change Starts - remove platform intrinsics
+// include "llvm/IR/IntrinsicsPowerPC.td"
+// include "llvm/IR/IntrinsicsX86.td"
+// include "llvm/IR/IntrinsicsARM.td"
+// include "llvm/IR/IntrinsicsAArch64.td"
+// include "llvm/IR/IntrinsicsXCore.td"
+// include "llvm/IR/IntrinsicsHexagon.td"
+// include "llvm/IR/IntrinsicsNVVM.td"
+// include "llvm/IR/IntrinsicsMips.td"
+// include "llvm/IR/IntrinsicsAMDGPU.td"
+// include "llvm/IR/IntrinsicsBPF.td"
+// include "llvm/IR/IntrinsicsSystemZ.td"
+// include "llvm/IR/IntrinsicsWebAssembly.td"
+// include "llvm/IR/IntrinsicsHLSL.td"
+// HLSL Change Ends - remove platform intrinsics

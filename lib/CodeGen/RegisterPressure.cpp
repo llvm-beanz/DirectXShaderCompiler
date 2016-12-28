@@ -1,16 +1,15 @@
 //===-- RegisterPressure.cpp - Dynamic Register Pressure ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the RegisterPressure class which can be used to track
-// MachineInstr level register pressure.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RegisterPressure.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the RegisterPressure class which can be used to track//
+// MachineInstr level register pressure.                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/LiveInterval.h"
@@ -390,6 +389,7 @@ void PressureDiffs::init(unsigned N) {
   Max = Size;
   free(PDiffArray);
   PDiffArray = reinterpret_cast<PressureDiff*>(calloc(N, sizeof(PressureDiff)));
+  if (PDiffArray == nullptr) throw std::bad_alloc(); // HLSL Change
 }
 
 /// Add a change in pressure to the pressure diff of a given instruction.

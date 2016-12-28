@@ -13,6 +13,10 @@ Writing an LLVM Backend
 Introduction
 ============
 
+NOTE: this document describes the instructions for LLVM, not the DirectX
+Compiler. It's available only for informational purposes. The design of a
+back-end is typically built as a standalone component for consumers of DXIL.
+
 This document describes techniques for writing compiler backends that convert
 the LLVM Intermediate Representation (IR) to code for a specified machine or
 other languages.  Code intended for a specific machine can take the form of

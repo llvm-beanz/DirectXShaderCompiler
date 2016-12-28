@@ -1,9 +1,16 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set(LLVM_LINK_COMPONENTS support)
+
+set (HLSL_IGNORE_SOURCES
+  NSAPI.cpp
+  )
 
 add_clang_library(clangAST
   APValue.cpp
   ASTConsumer.cpp
   ASTContext.cpp
+  ASTContextHLSL.cpp # HLSL Change
   ASTDiagnostic.cpp
   ASTDumper.cpp
   ASTImporter.cpp
@@ -31,6 +38,7 @@ add_clang_library(clangAST
   ExprConstant.cpp
   ExprCXX.cpp
   ExternalASTSource.cpp
+  HlslTypes.cpp
   InheritViz.cpp
   ItaniumCXXABI.cpp
   ItaniumMangle.cpp
@@ -38,7 +46,6 @@ add_clang_library(clangAST
   MicrosoftCXXABI.cpp
   MicrosoftMangle.cpp
   NestedNameSpecifier.cpp
-  NSAPI.cpp
   ParentMap.cpp
   RawCommentList.cpp
   RecordLayout.cpp
@@ -61,3 +68,8 @@ add_clang_library(clangAST
   clangBasic
   clangLex
   )
+
+# MERGE REVIEW:
+#  ClangAttrParsedAttrList  # MS Change - AST will refer to Sema headers
+#  ClangAttrParsedAttrKinds # MS Change - AST will refer to Sema headers
+#  ClangAttrParsedAttrImpl  # MS Change - AST will refer to Sema headers

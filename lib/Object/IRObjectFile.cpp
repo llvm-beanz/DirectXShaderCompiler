@@ -1,15 +1,14 @@
 //===- IRObjectFile.cpp - IR object file implementation ---------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Part of the IRObjectFile class implementation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IRObjectFile.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Part of the IRObjectFile class implementation.                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Object/IRObjectFile.h"
 #include "RecordStreamer.h"
@@ -38,7 +37,9 @@ using namespace object;
 IRObjectFile::IRObjectFile(MemoryBufferRef Object, std::unique_ptr<Module> Mod)
     : SymbolicFile(Binary::ID_IR, Object), M(std::move(Mod)) {
   Mang.reset(new Mangler());
-
+#if 1 // HLSL Change - remove dependency on machine-specific concepts here
+  return;
+#else
   const std::string &InlineAsm = M->getModuleInlineAsm();
   if (InlineAsm.empty())
     return;
@@ -109,6 +110,7 @@ IRObjectFile::IRObjectFile(MemoryBufferRef Object, std::unique_ptr<Module> Mod)
     AsmSymbols.push_back(
         std::make_pair<std::string, uint32_t>(Key, std::move(Res)));
   }
+#endif // HLSL Change - remove dependency on machine-specific concepts here
 }
 
 IRObjectFile::~IRObjectFile() {

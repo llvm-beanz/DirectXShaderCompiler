@@ -1,15 +1,14 @@
 //===--- ASTUnit.cpp - ASTUnit utility ------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// ASTUnit Implementation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTUnit.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// ASTUnit Implementation.                                                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/AST/ASTConsumer.h"
@@ -47,6 +46,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include "clang/Frontend/VerifyDiagnosticConsumer.h"  // HLSL Change
 using namespace clang;
 
 using llvm::TimeRecord;
@@ -103,7 +103,7 @@ static llvm::sys::SmartMutex<false> &getOnDiskMutex() {
   return M;
 }
 
-static void cleanupOnDiskMapAtExit();
+static void __cdecl cleanupOnDiskMapAtExit(); // HLSL Change - __cdecl
 
 typedef llvm::DenseMap<const ASTUnit *,
                        std::unique_ptr<OnDiskData>> OnDiskDataMap;
@@ -117,7 +117,7 @@ static OnDiskDataMap &getOnDiskDataMap() {
   return M;
 }
 
-static void cleanupOnDiskMapAtExit() {
+static void __cdecl cleanupOnDiskMapAtExit() {  // HLSL Change - __cdecl
   // Use the mutex because there can be an alive thread destroying an ASTUnit.
   llvm::MutexGuard Guard(getOnDiskMutex());
   for (const auto &I : getOnDiskDataMap()) {
@@ -180,6 +180,7 @@ void OnDiskData::Cleanup() {
   CleanPreambleFile();
 }
 
+#if 0  // HLSL Change Starts - no support for serialization
 struct ASTUnit::ASTWriterData {
   SmallString<128> Buffer;
   llvm::BitstreamWriter Stream;
@@ -187,6 +188,7 @@ struct ASTUnit::ASTWriterData {
 
   ASTWriterData() : Stream(Buffer), Writer(Stream) { }
 };
+#endif // HLSL Change Ends - no support for serialization
 
 void ASTUnit::clearFileLevelDecls() {
   llvm::DeleteContainerSeconds(FileDecls);
@@ -225,6 +227,7 @@ ASTUnit::ASTUnit(bool _MainFileIsAST)
     CompletionCacheTopLevelHashValue(0),
     PreambleTopLevelHashValue(0),
     CurrentTopLevelHashValue(0),
+    HlslLangExtensions(nullptr),    // HLSL Change
     UnsafeToFree(false) { 
   if (getenv("LIBCLANG_OBJTRACKING"))
     fprintf(stderr, "+++ %u translation units\n", ++ActiveASTUnitObjects);
@@ -484,6 +487,8 @@ void ASTUnit::ClearCachedCompletionResults() {
 
 namespace {
 
+#if 0 // HLSL Change Starts - no support for AST serialization
+
 /// \brief Gathers information from ASTReader that will be used to initialize
 /// a Preprocessor.
 class ASTInfoCollector : public ASTReaderListener {
@@ -557,6 +562,8 @@ private:
   }
 };
 
+#endif // HLSL Change Ends - no support for AST serialization
+
   /// \brief Diagnostic consumer that saves each diagnostic it is given.
 class StoredDiagnosticConsumer : public DiagnosticConsumer {
   SmallVectorImpl<StoredDiagnostic> &StoredDiags;
@@ -617,6 +624,14 @@ void StoredDiagnosticConsumer::HandleDiagnostic(DiagnosticsEngine::Level Level,
     StoredDiags.emplace_back(Level, Info);
 }
 
+#if 1 // HLSL Change Starts - no support for AST serialization
+
+ASTMutationListener *ASTUnit::getASTMutationListener() {
+  return nullptr;
+}
+
+#else
+
 ASTMutationListener *ASTUnit::getASTMutationListener() {
   if (WriterData)
     return &WriterData->Writer;
@@ -628,6 +643,8 @@ ASTDeserializationListener *ASTUnit::getDeserializationListener() {
     return &WriterData->Writer;
   return nullptr;
 }
+
+#endif // HLSL Change Ends - no support for AST serialization
 
 std::unique_ptr<llvm::MemoryBuffer>
 ASTUnit::getBufferForFile(StringRef Filename, std::string *ErrorStr) {
@@ -642,11 +659,19 @@ ASTUnit::getBufferForFile(StringRef Filename, std::string *ErrorStr) {
 
 /// \brief Configure the diagnostics object for use with ASTUnit.
 void ASTUnit::ConfigureDiags(IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
-                             ASTUnit &AST, bool CaptureDiagnostics) {
+                             ASTUnit &AST, bool CaptureDiagnostics, bool VerifyDiagnostics) {
   assert(Diags.get() && "no DiagnosticsEngine was provided");
-  if (CaptureDiagnostics)
+  if (CaptureDiagnostics) {
     Diags->setClient(new StoredDiagnosticConsumer(AST.StoredDiagnostics));
+    // HLSL Change Starts
+    if (VerifyDiagnostics) {
+      Diags->setClient(new VerifyDiagnosticConsumer(*Diags));
+    }
+    // HLSL Change Ends
+  }
 }
+
+#if 0 // HLSL Change Starts - no support for AST serialization
 
 std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
     const std::string &Filename,
@@ -756,6 +781,8 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
 
   return AST;
 }
+
+#endif // HLSL Change Ends - no support for AST serialization
 
 namespace {
 
@@ -869,7 +896,7 @@ public:
   }
 
   ASTDeserializationListener *GetASTDeserializationListener() override {
-    return Unit.getDeserializationListener();
+    return nullptr; // return Unit.getDeserializationListener(); // HLSL Change - no support for serialization
   }
 };
 
@@ -894,6 +921,8 @@ public:
     return Unit.getTranslationUnitKind(); 
   }
 };
+
+#if 0 // HLSL Change Starts - no support for PCH
 
 class PrecompilePreambleAction : public ASTFrontendAction {
   ASTUnit &Unit;
@@ -973,8 +1002,11 @@ public:
   }
 };
 
+#endif // HLSL Change Ends - no support for PCH
+
 }
 
+#if 0 // HLSL Change Starts - no support for PCH
 std::unique_ptr<ASTConsumer>
 PrecompilePreambleAction::CreateASTConsumer(CompilerInstance &CI,
                                             StringRef InFile) {
@@ -994,6 +1026,8 @@ PrecompilePreambleAction::CreateASTConsumer(CompilerInstance &CI,
   return llvm::make_unique<PrecompilePreambleConsumer>(
       Unit, this, CI.getPreprocessor(), Sysroot, OS);
 }
+
+#endif // HLSL Change Ends - no support for PCH
 
 static bool isNonDriverDiag(const StoredDiagnostic &StoredDiag) {
   return StoredDiag.getLocation().isValid();
@@ -1046,6 +1080,8 @@ bool ASTUnit::Parse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
 
   IntrusiveRefCntPtr<CompilerInvocation>
     CCInvocation(new CompilerInvocation(*Invocation));
+
+  Clang->HlslLangExtensions = HlslLangExtensions; // HLSL Change
 
   Clang->setInvocation(CCInvocation.get());
   OriginalSourceFile = Clang->getFrontendOpts().Inputs[0].getFile();
@@ -1342,7 +1378,9 @@ ASTUnit::getMainBufferWithPrecompiledPreamble(
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     const CompilerInvocation &PreambleInvocationIn, bool AllowRebuild,
     unsigned MaxLines) {
-
+#if 1 // HLSL Change Starts - no support for PCH
+  return std::unique_ptr<llvm::MemoryBuffer>();
+#else
   IntrusiveRefCntPtr<CompilerInvocation>
     PreambleInvocation(new CompilerInvocation(PreambleInvocationIn));
   FrontendOptions &FrontendOpts = PreambleInvocation->getFrontendOpts();
@@ -1635,6 +1673,7 @@ ASTUnit::getMainBufferWithPrecompiledPreamble(
 
   return llvm::MemoryBuffer::getMemBufferCopy(NewPreamble.Buffer->getBuffer(),
                                               MainFilename);
+#endif // HLSL Change Ends - no support for PCH
 }
 
 void ASTUnit::RealizeTopLevelDeclsFromPreamble() {
@@ -1666,7 +1705,7 @@ void ASTUnit::transferASTDataFromCompilerInstance(CompilerInstance &CI) {
   CI.setFileManager(nullptr);
   if (CI.hasTarget())
     Target = &CI.getTarget();
-  Reader = CI.getModuleManager();
+  // Reader = CI.getModuleManager(); // HLSL Change - no support for AST serialization
   HadModuleLoaderFatalFailure = CI.hadModuleLoaderFatalFailure();
 }
 
@@ -1689,12 +1728,16 @@ StringRef ASTUnit::getMainFileName() const {
 }
 
 StringRef ASTUnit::getASTFileName() const {
+#if 1 // HLSL Change Starts - no support for modules
+  return StringRef();
+#else
   if (!isMainFileAST())
     return StringRef();
 
   serialization::ModuleFile &
     Mod = Reader->getModuleManager().getPrimaryModule();
   return Mod.FileName;
+#endif // HLSL Change Ends - no support for modules
 }
 
 ASTUnit *ASTUnit::create(CompilerInvocation *CI,
@@ -1937,7 +1980,8 @@ ASTUnit *ASTUnit::LoadFromCommandLine(
     bool CacheCodeCompletionResults, bool IncludeBriefCommentsInCodeCompletion,
     bool AllowPCHWithCompilerErrors, bool SkipFunctionBodies,
     bool UserFilesAreVolatile, bool ForSerialization,
-    std::unique_ptr<ASTUnit> *ErrAST) {
+    std::unique_ptr<ASTUnit> *ErrAST,
+    hlsl::DxcLangExtensionsHelperApply *HlslLangExtensions) { // HLSL Change
   assert(Diags.get() && "no DiagnosticsEngine was provided");
 
   SmallVector<StoredDiagnostic, 4> StoredDiagnostics;
@@ -1956,6 +2000,32 @@ ASTUnit *ASTUnit::LoadFromCommandLine(
       return nullptr;
   }
 
+  // HLSL Change Starts
+  // Add extensions.
+  // Override diagnostics to avoid reporting on extensions that may differ in other languages.
+  if (CI->getLangOpts()->HLSL) {
+    CI->getDiagnosticOpts().Pedantic = 0;
+    CI->getDiagnosticOpts().PedanticErrors = 0;
+    const char* groupNames[] = {
+      "c++98-compat",           // CXX98Compat
+      "c++98-compat-pedantic",  // CXX98CompatPedantic
+      "c++11-compat",           // CXX11Compat
+      "c++-compat",             // CXXCompat
+      "c++11-extensions",       // CXX11
+      "c++1y-extensions",       // CXX1y
+      "extern-c-compat",        // ExternCCompat
+      "unicode"                 // Unicode
+    };
+    // CXXPre1yCompat is included by CXX98Compat
+    // CXXPre1yCompatPedantic is included by CXX98Compat
+    // CXX11CompatReservedUserDefinedLiteral
+    for (size_t i = 0; i < _countof(groupNames); ++i) {
+      Diags->setSeverityForGroup(diag::Flavor::WarningOrError, StringRef(groupNames[i]), diag::Severity::Ignored);
+    }
+    Diags->setExtensionHandlingBehavior(diag::Severity::Ignored);
+  }
+  // HLSL Change Stops
+
   // Override any files that need remapping
   for (const auto &RemappedFile : RemappedFiles) {
     CI->getPreprocessorOpts().addRemappedFile(RemappedFile.first,
@@ -1973,7 +2043,18 @@ ASTUnit *ASTUnit::LoadFromCommandLine(
   // Create the AST unit.
   std::unique_ptr<ASTUnit> AST;
   AST.reset(new ASTUnit(false));
-  ConfigureDiags(Diags, *AST, CaptureDiagnostics);
+  // HLSL Change Starts
+  AST->HlslLangExtensions = HlslLangExtensions;
+  // Enable -verify on the libclang initialization path.
+  bool VerifyDiagnostics = false;
+  for (const char** Arg = ArgBegin; Arg != ArgEnd; ++Arg) {
+    if (strcmp(*Arg, "-verify") == 0) {
+      VerifyDiagnostics = true;
+      break;
+    }
+  }
+  // HLSL Change Ends
+  ConfigureDiags(Diags, *AST, CaptureDiagnostics, VerifyDiagnostics); // HLSL Change
   AST->Diagnostics = Diags;
   AST->FileSystemOpts = CI->getFileSystemOpts();
   IntrusiveRefCntPtr<vfs::FileSystem> VFS =
@@ -1991,8 +2072,10 @@ ASTUnit *ASTUnit::LoadFromCommandLine(
   AST->NumStoredDiagnosticsFromDriver = StoredDiagnostics.size();
   AST->StoredDiagnostics.swap(StoredDiagnostics);
   AST->Invocation = CI;
+#if 0  // HLSL Change - no support for serialization
   if (ForSerialization)
     AST->WriterData.reset(new ASTWriterData());
+#endif // HLSL Change - no support for serialization
   // Zero out now to ease cleanup during crash recovery.
   CI = nullptr;
   Diags = nullptr;
@@ -2340,7 +2423,9 @@ void ASTUnit::CodeComplete(
   LangOpts = *CCInvocation->getLangOpts();
 
   // Spell-checking and warnings are wasteful during code-completion.
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS // HLSL Change
   LangOpts.SpellChecking = false;
+#endif
   CCInvocation->getDiagnosticOpts().IgnoreWarnings = true;
 
   std::unique_ptr<CompilerInstance> Clang(
@@ -2481,6 +2566,9 @@ bool ASTUnit::Save(StringRef File) {
   return false;
 }
 
+#if 1 // HLSL Change Starts - no support for serialization
+bool ASTUnit::serialize(raw_ostream &) { return false; }
+#else
 static bool serializeUnit(ASTWriter &Writer,
                           SmallVectorImpl<char> &Buffer,
                           Sema &S,
@@ -2507,6 +2595,7 @@ bool ASTUnit::serialize(raw_ostream &OS) {
   ASTWriter Writer(Stream);
   return serializeUnit(Writer, Buffer, getSema(), hasErrors, OS);
 }
+#endif // HLSL Change Ends - no support for serialization
 
 typedef ContinuousRangeMap<unsigned, int, 2> SLocRemap;
 
@@ -2747,11 +2836,13 @@ SourceLocation ASTUnit::getStartOfMainFileID() {
 
 llvm::iterator_range<PreprocessingRecord::iterator>
 ASTUnit::getLocalPreprocessingEntities() const {
+#if 0 // HLSL Change Starts - no support for modules
   if (isMainFileAST()) {
     serialization::ModuleFile &
       Mod = Reader->getModuleManager().getPrimaryModule();
     return Reader->getModulePreprocessedEntities(Mod);
   }
+#endif // HLSL Change Ends - no support for modules
 
   if (PreprocessingRecord *PPRec = PP->getPreprocessingRecord())
     return llvm::make_range(PPRec->local_begin(), PPRec->local_end());
@@ -2761,6 +2852,7 @@ ASTUnit::getLocalPreprocessingEntities() const {
 }
 
 bool ASTUnit::visitLocalTopLevelDecls(void *context, DeclVisitorFn Fn) {
+#if 0 // HLSL Change Starts - no support for modules
   if (isMainFileAST()) {
     serialization::ModuleFile &
       Mod = Reader->getModuleManager().getPrimaryModule();
@@ -2771,6 +2863,7 @@ bool ASTUnit::visitLocalTopLevelDecls(void *context, DeclVisitorFn Fn) {
 
     return true;
   }
+#endif // HLSL Change Ends - no support for modules
 
   for (ASTUnit::top_level_iterator TL = top_level_begin(),
                                 TLEnd = top_level_end();
@@ -2808,6 +2901,9 @@ static bool PCHLocator(serialization::ModuleFile &M, void *UserData) {
 }
 
 const FileEntry *ASTUnit::getPCHFile() {
+#if 1 // HLSL Change Starts - no support for modules or PCH
+  return nullptr;
+#else
   if (!Reader)
     return nullptr;
 
@@ -2817,10 +2913,11 @@ const FileEntry *ASTUnit::getPCHFile() {
     return Info.Mod->File;
 
   return nullptr;
+#endif // HLSL Change Ends - no support for modules or PCH
 }
 
 bool ASTUnit::isModuleFile() {
-  return isMainFileAST() && !ASTFileLangOpts.CurrentModule.empty();
+  return false; // return isMainFileAST() && !ASTFileLangOpts.CurrentModule.empty(); // HLSL Change - no support for modules
 }
 
 void ASTUnit::PreambleData::countLines() const {

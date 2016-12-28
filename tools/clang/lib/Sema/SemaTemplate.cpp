@@ -1,13 +1,12 @@
 //===------- SemaTemplate.cpp - Semantic Analysis for C++ Templates -------===/
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//===----------------------------------------------------------------------===/
-//
-//  This file implements semantic analysis for C++ templates.
-//===----------------------------------------------------------------------===/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaTemplate.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "TreeTransform.h"
 #include "clang/AST/ASTConsumer.h"
@@ -28,6 +27,7 @@
 #include "clang/Sema/SemaInternal.h"
 #include "clang/Sema/Template.h"
 #include "clang/Sema/TemplateDeduction.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -313,7 +313,11 @@ void Sema::LookupTemplateName(LookupResult &Found,
       AllowFunctionTemplatesInLookup = false;
   }
 
-  if (Found.empty() && !isDependent) {
+  // HLSL Change: do not try to save template name lookups with auto-correct,
+  // otherwise identifiers like variable-names might match and fail;
+  // ideally we would still do this if 'nextIsLess' was known to be true,
+  // but this is a more localized change.
+  if (Found.empty() && !isDependent && !getLangOpts().HLSL) {
     // If we did not find any names, attempt to correct any typos.
     DeclarationName Name = Found.getLookupName();
     Found.clear();
@@ -2053,6 +2057,12 @@ QualType Sema::CheckTemplateIdType(TemplateName Name,
                                 false, Converted))
     return QualType();
 
+  // HLSL Change Starts - check template values for HLSL object/matrix/vector signatures
+  if (getLangOpts().HLSL && hlsl::CheckTemplateArgumentListForHLSL(*this, Template, TemplateLoc, TemplateArgs)) {
+    return QualType();
+  }
+  // HLSL Change Ends
+
   QualType CanonType;
 
   bool InstantiationDependent = false;
@@ -3046,8 +3056,11 @@ bool Sema::CheckTemplateTypeArgument(TemplateTypeParmDecl *Param,
     TemplateName Name = Arg.getAsTemplate();
     Diag(SR.getBegin(), diag::err_template_missing_args)
       << Name << SR;
-    if (TemplateDecl *Decl = Name.getAsTemplateDecl())
+    if (TemplateDecl *Decl = Name.getAsTemplateDecl()) {
+      if (Decl->getLocation().isValid()) { // HLSL Change - ellide location notes for built-ins
       Diag(Decl->getLocation(), diag::note_template_decl_here);
+      }
+    }
 
     return true;
   }
@@ -3637,8 +3650,10 @@ static bool diagnoseArityMismatch(Sema &S, TemplateDecl *Template,
         isa<FunctionTemplateDecl>(Template)? 1 :
         isa<TemplateTemplateParmDecl>(Template)? 2 : 3)
     << Template << Range;
+  if (Template->getLocation().isValid()) { // HLSL Change - ellide location notes for built-ins
   S.Diag(Template->getLocation(), diag::note_template_decl_here)
     << Params->getSourceRange();
+  }
   return true;
 }
 
@@ -3749,8 +3764,10 @@ bool Sema::CheckTemplateArgumentList(TemplateDecl *Template,
               isa<FunctionTemplateDecl>(Template)? 1 :
               isa<TemplateTemplateParmDecl>(Template)? 2 : 3)
           << Template;
+        if (Template->getLocation().isValid()) { // HLSL Change - ellide location notes for built-ins
         Diag(Template->getLocation(), diag::note_template_decl_here)
           << Params->getSourceRange();
+        }
         return true;
       }
     }
@@ -6822,7 +6839,8 @@ bool Sema::CheckFunctionTemplateSpecialization(
           FunctionProtoType::ExtProtoInfo EPI = FPT->getExtProtoInfo();
           EPI.TypeQuals |= Qualifiers::Const;
           FT = Context.getFunctionType(FPT->getReturnType(),
-                                       FPT->getParamTypes(), EPI);
+                                       FPT->getParamTypes(), EPI,
+                                       None); // HLSL - assume in (although constexpr not enabled yet)
         }
       }
 

@@ -1,16 +1,15 @@
 //===-- CGValue.h - LLVM CodeGen wrappers for llvm::Value* ------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGValue.h                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// These classes implement wrappers around llvm::Value in order to           //
+// fully represent the range of values for C L- and R- values.               //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// These classes implement wrappers around llvm::Value in order to
-// fully represent the range of values for C L- and R- values.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LIB_CODEGEN_CGVALUE_H
 #define LLVM_CLANG_LIB_CODEGEN_CGVALUE_H
@@ -112,6 +111,7 @@ class LValue {
     VectorElt,    // This is a vector element l-value (V[i]), use getVector*
     BitField,     // This is a bitfield l-value, use getBitfield*.
     ExtVectorElt, // This is an extended vector subset, use getExtVectorComp
+    ExtMatrixElt, // This is an extended matrix subset, use getExtMatrixComp - HLSL Change
     GlobalReg     // This is a register l-value, use getGlobalReg()
   } LVType;
 
@@ -195,6 +195,7 @@ public:
   bool isBitField() const { return LVType == BitField; }
   bool isExtVectorElt() const { return LVType == ExtVectorElt; }
   bool isGlobalReg() const { return LVType == GlobalReg; }
+  bool isExtMatrixElt() const { return LVType == ExtMatrixElt; }  // HLSL Change
 
   bool isVolatileQualified() const { return Quals.hasVolatile(); }
   bool isRestrictQualified() const { return Quals.hasRestrict(); }

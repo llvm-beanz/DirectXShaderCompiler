@@ -73,15 +73,25 @@ function(llvm_check_source_file_list)
   foreach(g ${globbed})
     get_filename_component(fn ${g} NAME)
 
+    # HLSL Change - case insensitive
+    string(TOLOWER "${fn}" fn_lower)
+    string(TOLOWER "${listed}" listed_lower)
+
     # Don't reject hidden files. Some editors create backups in the
     # same directory as the file.
     if (NOT "${fn}" MATCHES "^\\.")
       list(FIND LLVM_OPTIONAL_SOURCES ${fn} idx)
       if( idx LESS 0 )
-        list(FIND listed ${fn} idx)
+        list(FIND listed_lower ${fn_lower} idx) # HLSL Change - case insensitive
         if( idx LESS 0 )
-          message(SEND_ERROR "Found unknown source file ${g}
-Please update ${CMAKE_CURRENT_LIST_FILE}\n")
+# HLSL Change - support HLSL_IGNORE_SOURCES
+          if( idx LESS 0 )
+            list(FIND HLSL_IGNORE_SOURCES ${fn} idx)
+            if( idx LESS 0 )
+              message(SEND_ERROR "Found unknown source file ${g}
+Please update ${CMAKE_CURRENT_LIST_FILE} or HLSL_IGNORE_SOURCES\n")
+            endif()
+          endif()
         endif()
       endif()
     endif()

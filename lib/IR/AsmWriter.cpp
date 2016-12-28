@@ -1,18 +1,17 @@
 //===-- AsmWriter.cpp - Printing LLVM as an assembly file -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This library implements the functionality defined in llvm/IR/Writer.h
-//
-// Note that these routines must be extremely tolerant of various errors in the
-// LLVM code, because it can be used for debugging transformations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// AsmWriter.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This library implements the functionality defined in llvm/IR/Writer.h     //
+//                                                                           //
+// Note that these routines must be extremely tolerant of various errors in the//
+// LLVM code, because it can be used for debugging transformations.          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1037,18 +1036,18 @@ static void writeAtomicRMWOperation(raw_ostream &Out,
 }
 
 static void WriteOptimizationInfo(raw_ostream &Out, const User *U) {
-  if (const FPMathOperator *FPO = dyn_cast<const FPMathOperator>(U)) {
+  if (const FPMathOperator *FPOp = dyn_cast<const FPMathOperator>(U)) {
     // Unsafe algebra implies all the others, no need to write them all out
-    if (FPO->hasUnsafeAlgebra())
+    if (FPOp->hasUnsafeAlgebra())
       Out << " fast";
     else {
-      if (FPO->hasNoNaNs())
+      if (FPOp->hasNoNaNs())
         Out << " nnan";
-      if (FPO->hasNoInfs())
+      if (FPOp->hasNoInfs())
         Out << " ninf";
-      if (FPO->hasNoSignedZeros())
+      if (FPOp->hasNoSignedZeros())
         Out << " nsz";
-      if (FPO->hasAllowReciprocal())
+      if (FPOp->hasAllowReciprocal())
         Out << " arcp";
     }
   }

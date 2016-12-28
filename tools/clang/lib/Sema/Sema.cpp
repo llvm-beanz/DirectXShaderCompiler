@@ -1,16 +1,15 @@
 //===--- Sema.cpp - AST Builder and Semantic Analysis Implementation ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the actions class which performs semantic analysis and
-// builds an AST out of a parse stream.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Sema.cpp                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the actions class which performs semantic analysis and//
+// builds an AST out of a parse stream.                                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTContext.h"
@@ -111,11 +110,13 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
   TUScope = nullptr;
 
   LoadedExternalKnownNamespaces = false;
+#if 0  // HLSL Change Starts
   for (unsigned I = 0; I != NSAPI::NumNSNumberLiteralMethods; ++I)
     NSNumberLiteralMethods[I] = nullptr;
 
   if (getLangOpts().ObjC1)
     NSAPIObj.reset(new NSAPI(Context));
+#endif  // HLSL Change Ends
 
   if (getLangOpts().CPlusPlus)
     FieldCollector.reset(new CXXFieldCollector());
@@ -129,7 +130,7 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
   FunctionScopes.push_back(new FunctionScopeInfo(Diags));
 
   // Initilization of data sharing attributes stack for OpenMP
-  InitDataSharingAttributesStack();
+  // InitDataSharingAttributesStack(); // HLSL Change - no support for OpenMP
 }
 
 void Sema::addImplicitTypedef(StringRef Name, QualType T) {
@@ -270,7 +271,7 @@ Sema::~Sema() {
   threadSafety::threadSafetyCleanup(ThreadSafetyDeclCache);
 
   // Destroys data sharing attributes stack for OpenMP
-  DestroyDataSharingAttributesStack();
+  // DestroyDataSharingAttributesStack(); // HLSL Change - no support for OpenMP
 
   assert(DelayedTypos.empty() && "Uncorrected typos!");
 }
@@ -1390,6 +1391,7 @@ static void noteOverloads(Sema &S, const UnresolvedSetImpl &Overloads,
     }
 
     NamedDecl *Fn = (*It)->getUnderlyingDecl();
+    if (!Fn->getLocation().isValid()) continue; // HLSL Change: skip built-in locations
     S.Diag(Fn->getLocation(), diag::note_possible_target_of_call);
     ++ShownOverloads;
   }

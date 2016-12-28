@@ -1,15 +1,14 @@
 //===-- llvm/ADT/FoldingSet.h - Uniquing Hash Set ---------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines a hash set that can be used to remove duplication of nodes
-// in a graph.  This code was originally created by Chris Lattner for use with
-// SelectionDAGCSEMap, but was isolated to provide use across the llvm code set.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FoldingSet.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines a hash set that can be used to remove duplication of nodes//
+// in a graph.  This code was originally created by Chris Lattner for use with//
+// SelectionDAGCSEMap, but was isolated to provide use across the llvm code set.//
 //
 //===----------------------------------------------------------------------===//
 
@@ -357,7 +356,7 @@ template<class T> class FoldingSetBucketIterator;
 // require the definition of FoldingSetNodeID.
 template<typename T>
 inline bool
-DefaultFoldingSetTrait<T>::Equals(T &X, const FoldingSetNodeID &ID,
+DefaultFoldingSetTrait<T>::Equals(_In_ T &X, const FoldingSetNodeID &ID,
                                   unsigned /*IDHash*/,
                                   FoldingSetNodeID &TempID) {
   FoldingSetTrait<T>::Profile(X, TempID);
@@ -527,7 +526,7 @@ public:
   /// FindNodeOrInsertPos - Look up the node specified by ID.  If it
   /// exists, return it.  If not, return the insertion token that will
   /// make insertion faster.
-  T *FindNodeOrInsertPos(const FoldingSetNodeID &ID, void *&InsertPos) {
+  T *FindNodeOrInsertPos(_In_ const FoldingSetNodeID &ID, void *&InsertPos) {
     return static_cast<T *>(FoldingSetImpl::FindNodeOrInsertPos(ID, InsertPos));
   }
 };
@@ -723,8 +722,8 @@ public:
     ID.AddNodeID(FastID); 
   }
 };
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 // Partial specializations of FoldingSetTrait.
 
 template<typename T> struct FoldingSetTrait<T*> {

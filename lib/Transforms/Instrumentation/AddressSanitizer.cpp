@@ -1,17 +1,16 @@
 //===-- AddressSanitizer.cpp - memory error detector ------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file is a part of AddressSanitizer, an address sanity checker.
-// Details of the algorithm:
-//  http://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// AddressSanitizer.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file is a part of AddressSanitizer, an address sanity checker.       //
+// Details of the algorithm:                                                 //
+//  http://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -1397,7 +1396,7 @@ void AddressSanitizer::initializeCallbacks(Module &M) {
               IRB.getVoidTy(), IntptrTy, IntptrTy, ExpType, nullptr));
       for (size_t AccessSizeIndex = 0; AccessSizeIndex < kNumberOfAccessSizes;
            AccessSizeIndex++) {
-        const std::string Suffix = TypeStr + itostr(1 << AccessSizeIndex);
+        const std::string Suffix = TypeStr + itostr((int64_t)(1) << AccessSizeIndex); // HLSL Change - keep as 64-bit operation
         AsanErrorCallback[AccessIsWrite][Exp][AccessSizeIndex] =
             checkSanitizerInterfaceFunction(M.getOrInsertFunction(
                 kAsanReportErrorTemplate + ExpStr + Suffix,
@@ -1646,7 +1645,8 @@ void FunctionStackPoisoner::poisonRedZones(ArrayRef<uint8_t> ShadowBytes,
 
 // Fake stack allocator (asan_fake_stack.h) has 11 size classes
 // for every power of 2 from kMinStackMallocSize to kMaxAsanStackMallocSizeClass
-static int StackMallocSizeClass(uint64_t LocalStackSize) {
+_Ret_range_(0, kMaxAsanStackMallocSizeClass)
+static int StackMallocSizeClass(_In_range_(0, kMaxAsanStackMallocSizeClass) uint64_t LocalStackSize) {
   assert(LocalStackSize <= kMaxStackMallocSize);
   uint64_t MaxSize = kMinStackMallocSize;
   for (int i = 0;; i++, MaxSize *= 2)

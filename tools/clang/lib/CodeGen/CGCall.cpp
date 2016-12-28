@@ -1,22 +1,22 @@
 //===--- CGCall.cpp - Encapsulate calling convention details --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// These classes wrap the information about a call or function
-// definition used to handle ABI compliancy.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGCall.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// These classes wrap the information about a call or function               //
+// definition used to handle ABI compliancy.                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGCall.h"
 #include "ABIInfo.h"
 #include "CGCXXABI.h"
 #include "CodeGenFunction.h"
 #include "CodeGenModule.h"
+#include "CGHLSLRuntime.h"    // HLSL Change
 #include "TargetInfo.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -488,8 +488,16 @@ CodeGenTypes::arrangeLLVMFunctionInfo(CanQualType resultType,
                                       ArrayRef<CanQualType> argTypes,
                                       FunctionType::ExtInfo info,
                                       RequiredArgs required) {
+  // HLSL Change Starts
+  ASTContext &context = getContext();
+  auto isCanonicalAsParam = [&context](const CanQualType &Ty) {
+    return Ty.isCanonicalAsParam() ||
+           (context.getLangOpts().HLSL && Ty->isArrayType());
+  };
+  // HLSL Change Ends
   assert(std::all_of(argTypes.begin(), argTypes.end(),
-                     std::mem_fun_ref(&CanQualType::isCanonicalAsParam)));
+                     isCanonicalAsParam)); // HLSL Change - skip array when
+                                           // check isCanonicalAsParam
 
   unsigned CC = ClangCallConvToLLVMCallConv(info.getCC());
 
@@ -978,10 +986,18 @@ static llvm::Value *CreateCoercedLoad(llvm::Value *SrcPtr,
 // FIXME: Do we need to recurse here?
 static void BuildAggStore(CodeGenFunction &CGF, llvm::Value *Val,
                           llvm::Value *DestPtr, bool DestIsVolatile,
-                          CharUnits DestAlign) {
+                          CharUnits DestAlign,
+                          QualType QTy // HLSL Change
+                          ) {
   // Prefer scalar stores to first-class aggregate stores.
   if (llvm::StructType *STy =
         dyn_cast<llvm::StructType>(Val->getType())) {
+    // HLSL Change Begins
+    if (CGF.getLangOpts().HLSL) {
+      CGF.CGM.getHLSLRuntime().EmitHLSLAggregateStore(CGF, Val, DestPtr, QTy);
+      return;
+    }
+    // HLSL Change Ends
     const llvm::StructLayout *Layout =
       CGF.CGM.getDataLayout().getStructLayout(STy);
 
@@ -1010,7 +1026,9 @@ static void CreateCoercedStore(llvm::Value *Src,
                                llvm::Value *DstPtr,
                                bool DstIsVolatile,
                                CharUnits DstAlign,
-                               CodeGenFunction &CGF) {
+                               CodeGenFunction &CGF,
+                               QualType QTy // HLSL Change
+                               ) {
   llvm::Type *SrcTy = Src->getType();
   llvm::Type *DstTy =
     cast<llvm::PointerType>(DstPtr->getType())->getElementType();
@@ -1043,7 +1061,7 @@ static void CreateCoercedStore(llvm::Value *Src,
   if (SrcSize <= DstSize) {
     llvm::Value *Casted =
       CGF.Builder.CreateBitCast(DstPtr, llvm::PointerType::getUnqual(SrcTy));
-    BuildAggStore(CGF, Src, Casted, DstIsVolatile, DstAlign);
+    BuildAggStore(CGF, Src, Casted, DstIsVolatile, DstAlign, QTy);  // HLSL Change - Add QTy
   } else {
     // Otherwise do coercion through memory. This is stupid, but
     // simple.
@@ -1829,7 +1847,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
     QualType Ty = info_it->type;
     const ABIArgInfo &ArgI = info_it->info;
 
-    bool isPromoted =
+    bool isPromoted = !getLangOpts().HLSL && // HLSL Change - no knr promotion in HLSL
       isa<ParmVarDecl>(Arg) && cast<ParmVarDecl>(Arg)->isKNRPromoted();
 
     unsigned FirstIRArg, NumIRArgs;
@@ -1887,7 +1905,15 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
 
     case ABIArgInfo::Extend:
     case ABIArgInfo::Direct: {
-
+      // HLSL Change Begins
+      if (hlsl::IsHLSLMatType(Ty)) {
+        assert(NumIRArgs == 1);
+        auto AI = FnArgs[FirstIRArg];
+        llvm::Value *V = AI;
+        ArgVals.push_back(ValueAndIsPtr(V, HaveValue));
+        break;
+      }
+      // HLSL Change Ends
       // If we have the trivial case, handle it with no muss and fuss.
       if (!isa<llvm::StructType>(ArgI.getCoerceToType()) &&
           ArgI.getCoerceToType() == ConvertType(Ty) &&
@@ -2054,7 +2080,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         assert(NumIRArgs == 1);
         auto AI = FnArgs[FirstIRArg];
         AI->setName(Arg->getName() + ".coerce");
-        CreateCoercedStore(AI, Ptr, /*DestIsVolatile=*/false, PtrAlign, *this);
+        CreateCoercedStore(AI, Ptr, /*DestIsVolatile=*/false, PtrAlign, *this, Ty); // HLSL Change - Add Ty.
       }
 
 
@@ -2112,6 +2138,14 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
       EmitParmDecl(*Args[I], ArgVals[I].getPointer(), ArgVals[I].getInt(),
                    I + 1);
   }
+
+  // HLSL Change Begins.
+  if (getLangOpts().HLSL) {
+    if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CurCodeDecl)) {
+      CGM.getHLSLRuntime().EmitHLSLFunctionProlog(Fn, FD);
+    }
+  }
+  // HLSL Change Ends.
 }
 
 static void eraseUnusedBitCasts(llvm::Instruction *insn) {
@@ -2418,7 +2452,13 @@ void CodeGenFunction::EmitFunctionEpilog(const CGFunctionInfo &FI,
 
       // Otherwise, we have to do a simple load.
       } else {
-        RV = Builder.CreateLoad(ReturnValue);
+        // HLSL Change Begins
+        if (hlsl::IsHLSLMatType(RetTy))
+          RV = CGM.getHLSLRuntime().EmitHLSLMatrixLoad(*this, ReturnValue,
+                                                       RetTy);
+        else
+          // HLSL Change Ends
+          RV = Builder.CreateLoad(ReturnValue);
       }
     } else {
       llvm::Value *V = ReturnValue;
@@ -2437,13 +2477,16 @@ void CodeGenFunction::EmitFunctionEpilog(const CGFunctionInfo &FI,
 
     // In ARC, end functions that return a retainable type with a call
     // to objc_autoreleaseReturnValue.
+#if 0 // HLSL Change - no ObjC support
     if (AutoreleaseResult) {
       assert(getLangOpts().ObjCAutoRefCount &&
              !FI.isReturnsRetained() &&
              RetTy->isObjCRetainableType());
       RV = emitAutoreleaseOfResult(*this, RV);
     }
-
+#else
+    assert(!AutoreleaseResult && "autorelease not supported in HLSL");
+#endif // HLSL Change - no ObjC support
     break;
 
   case ABIArgInfo::Ignore:
@@ -2533,6 +2576,7 @@ static bool isProvablyNonNull(llvm::Value *addr) {
   return isa<llvm::AllocaInst>(addr);
 }
 
+#if 0 // HLSL Change - no ObjC support
 /// Emit the actual writing-back of a writeback.
 static void emitWriteback(CodeGenFunction &CGF,
                           const CallArgList::Writeback &writeback) {
@@ -2604,6 +2648,7 @@ static void emitWritebacks(CodeGenFunction &CGF,
   for (const auto &I : args.writebacks())
     emitWriteback(CGF, I);
 }
+#endif // HLSL Change - no ObjC support
 
 static void deactivateArgCleanupsBeforeCall(CodeGenFunction &CGF,
                                             const CallArgList &CallArgs) {
@@ -2624,6 +2669,8 @@ static const Expr *maybeGetUnaryAddrOfOperand(const Expr *E) {
       return uop->getSubExpr();
   return nullptr;
 }
+
+#if 0 // HLSL Change - no ObjC support
 
 /// Emit an argument that's being passed call-by-writeback.  That is,
 /// we are passing the address of 
@@ -2751,6 +2798,8 @@ static void emitWritebackArg(CodeGenFunction &CGF, CallArgList &args,
   args.addWriteback(srcLV, temp, valueToUse);
   args.add(RValue::get(finalArgument), CRE->getType());
 }
+
+#endif // HLSL Change - no ObjC support
 
 void CallArgList::allocateArgumentMemory(CodeGenFunction &CGF) {
   assert(!StackBase && !StackCleanup.isValid());
@@ -2883,17 +2932,42 @@ struct DisableDebugLocationUpdates {
 void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
                                   QualType type) {
   DisableDebugLocationUpdates Dis(*this, E);
+#if 0 // HLSL Change - no ObjC support
   if (const ObjCIndirectCopyRestoreExpr *CRE
         = dyn_cast<ObjCIndirectCopyRestoreExpr>(E)) {
     assert(getLangOpts().ObjCAutoRefCount);
     assert(getContext().hasSameType(E->getType(), type));
     return emitWritebackArg(*this, args, CRE);
   }
+#endif // HLSL Change - no ObjC support
 
   assert(type->isReferenceType() == E->isGLValue() &&
          "reference binding to unmaterialized r-value!");
 
   if (E->isGLValue()) {
+    // HLSL Change Begins.
+    if (E->getObjectKind() == OK_VectorComponent) {
+      if (const HLSLVectorElementExpr *VecElt = dyn_cast<HLSLVectorElementExpr>(E)) {
+        LValue LV = EmitHLSLVectorElementExpr(VecElt);
+        llvm::Value *V = LV.getExtVectorAddr();
+        llvm::Constant *Elts = LV.getExtVectorElts();
+        // Only support scalar for atomic operations.
+        assert(Elts->getType()->getVectorNumElements() == 1);
+        llvm::Value *ch = Builder.CreateExtractElement(Elts, (uint64_t)0);
+        llvm::Value *Ptr = Builder.CreateGEP(V, {Builder.getInt32(0), ch});
+        RValue RV = RValue::get(Ptr);
+        return args.add(RV, type);
+      } else {
+        LValue LV = EmitExtMatrixElementExpr(cast<ExtMatrixElementExpr>(E));
+        llvm::Value *Ptr = LV.getAddress();
+        // Only support scalar for atomic operations.
+        assert(Ptr->getType()->getPointerElementType() == Ptr->getType()->getPointerElementType()->getScalarType());
+
+        RValue RV = RValue::get(Ptr);
+        return args.add(RV, type);
+      }
+    }
+    // HLSL Change Ends.
     assert(E->getObjectKind() == OK_Ordinary);
     return args.add(EmitReferenceBindingToExpr(E), type);
   }
@@ -2903,7 +2977,8 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
   // In the Microsoft C++ ABI, aggregate arguments are destructed by the callee.
   // However, we still have to push an EH-only cleanup in case we unwind before
   // we make it to the call.
-  if (HasAggregateEvalKind &&
+  if (HasAggregateEvalKind && 
+      !LangOptions().HLSL && // HLSL Change : Do not generate agg.tmp for HLSL
       CGM.getTarget().getCXXABI().areArgsDestroyedLeftToRightInCallee()) {
     // If we're using inalloca, use the argument memory.  Otherwise, use a
     // temporary.
@@ -2952,6 +3027,17 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     }
     return;
   }
+
+  // HLSL Change Begins.
+  // For DeclRefExpr of aggregate type, don't create temp.
+  if (HasAggregateEvalKind && LangOptions().HLSL &&
+      isa<DeclRefExpr>(E)) {
+    LValue LV = EmitDeclRefLValue(cast<DeclRefExpr>(E));
+    RValue RV = RValue::getAggregate(LV.getAddress());
+    args.add(RV, type);
+    return;
+  }
+  // HLSL Change Ends.
 
   args.add(EmitAnyExprToTemp(E), type);
 }
@@ -3288,10 +3374,25 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         // can happen due to trivial type mismatches.
         if (FirstIRArg < IRFuncTy->getNumParams() &&
             V->getType() != IRFuncTy->getParamType(FirstIRArg))
-          V = Builder.CreateBitCast(V, IRFuncTy->getParamType(FirstIRArg));
+          // HLSL Change Starts
+          // Generate AddrSpaceCast for shared memory.
+          if (V->getType()->isPointerTy())
+            V = Builder.CreatePointerBitCastOrAddrSpaceCast(
+                V, IRFuncTy->getParamType(FirstIRArg));
+          else
+            // HLSL Change Ends
+            V = Builder.CreateBitCast(V, IRFuncTy->getParamType(FirstIRArg));
         IRCallArgs[FirstIRArg] = V;
         break;
       }
+
+      // HLSL Change Begins
+      if (hlsl::IsHLSLMatType(I->Ty)) {
+        // For matrix, just use the val directly
+        IRCallArgs[FirstIRArg] = RV.getScalarVal();
+        continue;
+      }
+      // HLSL Change Ends
 
       // FIXME: Avoid the conversion through memory if possible.
       llvm::Value *SrcPtr;
@@ -3512,10 +3613,14 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   if (Builder.isNamePreserving() && !CI->getType()->isVoidTy())
     CI->setName("call");
 
+#if 0 // HLSL Change - no ObjC support
   // Emit any writebacks immediately.  Arguably this should happen
   // after any return-value munging.
   if (CallArgs.hasWritebacks())
     emitWritebacks(*this, CallArgs);
+#else
+  assert(!CallArgs.hasWritebacks() && "writebacks are unavailable in HLSL");
+#endif // HLSL Change - no ObjC support
 
   // The stack cleanup for inalloca arguments has to run out of the normal
   // lexical order, so deactivate it and run it manually here.
@@ -3556,7 +3661,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
             DestPtr = CreateMemTemp(RetTy, "agg.tmp");
             DestIsVolatile = false;
           }
-          BuildAggStore(*this, CI, DestPtr, DestIsVolatile, DestAlign);
+          BuildAggStore(*this, CI, DestPtr, DestIsVolatile, DestAlign, RetTy); // HLSL Change - Add QualTy.
           return RValue::getAggregate(DestPtr);
         }
         case TEK_Scalar: {
@@ -3592,7 +3697,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         StoreAlign =
           StoreAlign.alignmentAtOffset(CharUnits::fromQuantity(Offs));
       }
-      CreateCoercedStore(CI, StorePtr, DestIsVolatile, StoreAlign, *this);
+      CreateCoercedStore(CI, StorePtr, DestIsVolatile, StoreAlign, *this, RetTy); // HLSL Change - Add QTy.
 
       return convertTempToRValue(DestPtr, RetTy, SourceLocation());
     }

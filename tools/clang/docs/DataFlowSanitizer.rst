@@ -13,6 +13,9 @@ DataFlowSanitizer
 Introduction
 ============
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 DataFlowSanitizer is a generalised dynamic data flow analysis.
 
 Unlike other Sanitizer tools, this tool is not designed to detect a

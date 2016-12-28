@@ -1,13 +1,12 @@
 //== ProgramState.h - Path-sensitive "State" for tracking values -*- C++ -*--=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the state of the program along the analysisa path.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ProgramState.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the state of the program along the analysisa path.      //
 //
 //===----------------------------------------------------------------------===//
 
@@ -620,7 +619,8 @@ public:
 
 //===----------------------------------------------------------------------===//
 // Out-of-line method definitions for ProgramState.
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 inline ConstraintManager &ProgramState::getConstraintManager() const {
   return stateMgr->getConstraintManager();

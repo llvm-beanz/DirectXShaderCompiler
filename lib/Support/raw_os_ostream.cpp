@@ -1,15 +1,14 @@
 //===--- raw_os_ostream.cpp - Implement the raw_os_ostream class ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This implements support adapting raw_ostream to std::ostream.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// raw_os_ostream.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This implements support adapting raw_ostream to std::ostream.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/raw_os_ostream.h"
 #include <ostream>

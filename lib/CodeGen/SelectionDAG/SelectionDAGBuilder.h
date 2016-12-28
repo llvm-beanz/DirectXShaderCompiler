@@ -1,13 +1,12 @@
 //===-- SelectionDAGBuilder.h - Selection-DAG building --------*- C++ -*---===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This implements routines for translating from LLVM IR into SelectionDAG IR.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SelectionDAGBuilder.h                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This implements routines for translating from LLVM IR into SelectionDAG IR.//
 //
 //===----------------------------------------------------------------------===//
 
@@ -79,8 +78,8 @@ class UIToFPInst;
 class UnreachableInst;
 class VAArgInst;
 class ZExtInst;
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// SelectionDAGBuilder - This is the common target-independent lowering
 /// implementation that is parameterized by a TargetLowering object.
 ///

@@ -1,4 +1,6 @@
-add_llvm_tool_subdirectory(llvm-config)
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
+# add_llvm_tool_subdirectory(llvm-config) # HLSL Change
 
 # Build polly before the tools: the tools link against polly when
 # LINK_POLLY_INTO_TOOLS is set.
@@ -14,72 +16,69 @@ else()
   ignore_llvm_tool_subdirectory(llvm-shlib)
 endif()
 
-add_llvm_tool_subdirectory(opt)
-add_llvm_tool_subdirectory(llvm-as)
-add_llvm_tool_subdirectory(llvm-dis)
-add_llvm_tool_subdirectory(llvm-mc)
+# add_llvm_tool_subdirectory(opt) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-as) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-dis) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-mc) # HLSL Change
+add_llvm_tool_subdirectory(dxexp) # HLSL Change
 
-add_llvm_tool_subdirectory(llc)
-add_llvm_tool_subdirectory(llvm-ar)
-add_llvm_tool_subdirectory(llvm-nm)
-add_llvm_tool_subdirectory(llvm-size)
+# add_llvm_tool_subdirectory(llc) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-ar) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-nm) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-size) # HLSL Change
 
-add_llvm_tool_subdirectory(llvm-cov)
-add_llvm_tool_subdirectory(llvm-profdata)
-add_llvm_tool_subdirectory(llvm-link)
-add_llvm_tool_subdirectory(lli)
+# add_llvm_tool_subdirectory(llvm-cov) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-profdata) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-link) # HLSL Change
+# add_llvm_tool_subdirectory(lli) # HLSL Change
 
-add_llvm_tool_subdirectory(llvm-extract)
-add_llvm_tool_subdirectory(llvm-diff)
-add_llvm_tool_subdirectory(macho-dump)
-add_llvm_tool_subdirectory(llvm-objdump)
-add_llvm_tool_subdirectory(llvm-readobj)
-add_llvm_tool_subdirectory(llvm-rtdyld)
-add_llvm_tool_subdirectory(llvm-dwarfdump)
-add_llvm_tool_subdirectory(dsymutil)
-add_llvm_tool_subdirectory(llvm-cxxdump)
-if( LLVM_USE_INTEL_JITEVENTS )
-  add_llvm_tool_subdirectory(llvm-jitlistener)
-else()
-  ignore_llvm_tool_subdirectory(llvm-jitlistener)
-endif( LLVM_USE_INTEL_JITEVENTS )
+# add_llvm_tool_subdirectory(llvm-extract) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-diff) # HLSL Change
+# add_llvm_tool_subdirectory(macho-dump) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-objdump) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-readobj) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-rtdyld) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-dwarfdump) # HLSL Change
+# add_llvm_tool_subdirectory(dsymutil) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-cxxdump) # HLSL Change
+# HLSL Change - remove llvm-jitlistener conditional on LLVM_USE_INTEL_JITEVENTS
 
-add_llvm_tool_subdirectory(bugpoint)
-add_llvm_tool_subdirectory(bugpoint-passes)
-add_llvm_tool_subdirectory(llvm-bcanalyzer)
-add_llvm_tool_subdirectory(llvm-stress)
-add_llvm_tool_subdirectory(llvm-mcmarkup)
+# add_llvm_tool_subdirectory(bugpoint) # HLSL Change
+# add_llvm_tool_subdirectory(bugpoint-passes) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-bcanalyzer) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-stress) # HLSL Change
+# add_llvm_tool_subdirectory(llvm-mcmarkup) # HLSL Change
 
-add_llvm_tool_subdirectory(verify-uselistorder)
+# add_llvm_tool_subdirectory(verify-uselistorder) # HLSL Change
 
-add_llvm_tool_subdirectory(llvm-symbolizer)
+# add_llvm_tool_subdirectory(llvm-symbolizer) # HLSL Change
 
-add_llvm_tool_subdirectory(llvm-c-test)
+# add_llvm_tool_subdirectory(llvm-c-test) # HLSL Change
 
-add_llvm_tool_subdirectory(obj2yaml)
-add_llvm_tool_subdirectory(yaml2obj)
+# add_llvm_tool_subdirectory(obj2yaml) # HLSL Change
+# add_llvm_tool_subdirectory(yaml2obj) # HLSL Change
 
-add_llvm_tool_subdirectory(llvm-go)
+# add_llvm_tool_subdirectory(llvm-go) # HLSL Change
 
-add_llvm_tool_subdirectory(llvm-pdbdump)
+# add_llvm_tool_subdirectory(llvm-pdbdump) # HLSL Change
 
 if(NOT CYGWIN AND LLVM_ENABLE_PIC)
-  add_llvm_tool_subdirectory(lto)
-  add_llvm_tool_subdirectory(llvm-lto)
+#   add_llvm_tool_subdirectory(lto) # HLSL Change
+#   add_llvm_tool_subdirectory(llvm-lto) # HLSL Change
 else()
   ignore_llvm_tool_subdirectory(lto)
   ignore_llvm_tool_subdirectory(llvm-lto)
 endif()
 
-add_llvm_tool_subdirectory(gold)
+# add_llvm_tool_subdirectory(gold) # HLSL Change
 
 add_llvm_external_project(clang)
-add_llvm_external_project(llgo)
-add_llvm_external_project(lld)
-add_llvm_external_project(lldb)
+# add_llvm_external_project(llgo) # HLSL Change
+# add_llvm_external_project(lld) # HLSL Change
+# add_llvm_external_project(lldb) # HLSL Change
 
 # Automatically add remaining sub-directories containing a 'CMakeLists.txt'
 # file as external projects.
-add_llvm_implicit_external_projects()
+# add_llvm_implicit_external_projects() # HLSL Change
 
 set(LLVM_COMMON_DEPENDS ${LLVM_COMMON_DEPENDS} PARENT_SCOPE)

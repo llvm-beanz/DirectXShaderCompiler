@@ -1,16 +1,15 @@
 //===-- DeclarationName.cpp - Declaration names implementation --*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the DeclarationName and DeclarationNameTable
-// classes.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclarationName.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the DeclarationName and DeclarationNameTable         //
+// classes.                                                                  //
+//                                                                           //
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclarationName.h"
@@ -23,7 +22,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace clang;
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 namespace clang {
 /// CXXSpecialName - Records the type associated with one of the
 /// "special" kinds of declaration names in C++, e.g., constructors,
@@ -151,7 +151,9 @@ raw_ostream &operator<<(raw_ostream &OS, DeclarationName N) {
     if (const RecordType *ClassRec = ClassType->getAs<RecordType>())
       return OS << *ClassRec->getDecl();
     LangOptions LO;
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS // HLSL Change
     LO.CPlusPlus = true;
+#endif
     return OS << ClassType.getAsString(PrintingPolicy(LO));
   }
 
@@ -161,7 +163,9 @@ raw_ostream &operator<<(raw_ostream &OS, DeclarationName N) {
     if (const RecordType *Rec = Type->getAs<RecordType>())
       return OS << *Rec->getDecl();
     LangOptions LO;
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS // HLSL Change
     LO.CPlusPlus = true;
+#endif
     return OS << Type.getAsString(PrintingPolicy(LO));
   }
 
@@ -190,8 +194,10 @@ raw_ostream &operator<<(raw_ostream &OS, DeclarationName N) {
     if (const RecordType *Rec = Type->getAs<RecordType>())
       return OS << *Rec->getDecl();
     LangOptions LO;
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS // HLSL Change
     LO.CPlusPlus = true;
     LO.Bool = true;
+#endif
     return OS << Type.getAsString(PrintingPolicy(LO));
   }
   case DeclarationName::CXXUsingDirective:
@@ -546,8 +552,10 @@ void DeclarationNameInfo::printName(raw_ostream &OS) const {
       else if (Name.getNameKind() == DeclarationName::CXXConversionFunctionName)
         OS << "operator ";
       LangOptions LO;
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS // HLSL Change
       LO.CPlusPlus = true;
       LO.Bool = true;
+#endif
       OS << TInfo->getType().getAsString(PrintingPolicy(LO));
     } else
       OS << Name;

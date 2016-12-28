@@ -1,14 +1,13 @@
 //===-- Scalar.h - Scalar Transformations -----------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This header file defines prototypes for accessor functions that expose passes
-// in the Scalar transformations library.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Scalar.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header file defines prototypes for accessor functions that expose passes//
+// in the Scalar transformations library.                                    //
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,6 +29,7 @@ class PassInfo;
 class TerminatorInst;
 class TargetLowering;
 class TargetMachine;
+class PassRegistry; // HLSL Change - need this for registrations
 
 //===----------------------------------------------------------------------===//
 //
@@ -105,6 +105,35 @@ FunctionPass *createScalarReplAggregatesPass(signed Threshold = -1,
                                              signed StructMemberThreshold = -1,
                                              signed ArrayElementThreshold = -1,
                                              signed ScalarLoadThreshold = -1);
+// HLSL Change Begins
+//===----------------------------------------------------------------------===//
+//
+// ScalarReplAggregatesHLSL - Break up alloca's of aggregates into multiple allocas
+// for hlsl. Array will not change, all structures will be broken up.
+//
+FunctionPass *createScalarReplAggregatesHLSLPass(bool UseDomTree = true,
+                                                 bool Promote = false);
+void initializeSROA_DT_HLSLPass(PassRegistry&);
+//===----------------------------------------------------------------------===//
+//
+// ScalarReplAggregatesHLSL - Break up argument's of aggregates into multiple arguments
+// for hlsl. Array will not change, all structures will be broken up.
+//
+ModulePass *createSROA_Parameter_HLSL();
+void initializeSROA_Parameter_HLSLPass(PassRegistry&);
+//===----------------------------------------------------------------------===//
+//
+// DynamicIndexingVectorToArray 
+// Replace vector with array if it has dynamic indexing.
+//
+ModulePass *createDynamicIndexingVectorToArrayPass(bool ReplaceAllVector = false);
+void initializeDynamicIndexingVectorToArrayPass(PassRegistry&);
+//===----------------------------------------------------------------------===//
+// Flatten multi dim array into 1 dim.
+//
+ModulePass *createMultiDimArrayToOneDimArrayPass();
+void initializeMultiDimArrayToOneDimArrayPass(PassRegistry&);
+// HLSL Change Ends
 
 //===----------------------------------------------------------------------===//
 //
@@ -224,6 +253,12 @@ FunctionPass *createPromoteMemoryToRegisterPass();
 //
 FunctionPass *createDemoteRegisterToMemoryPass();
 extern char &DemoteRegisterToMemoryID;
+
+// HLSL Change start
+// Relaxed version (for HLSL usage).
+FunctionPass *createDemoteRegisterToMemoryHlslPass();
+extern char &DemoteRegisterToMemoryHlslID;
+// HLSL Change end
 
 //===----------------------------------------------------------------------===//
 //
@@ -479,8 +514,8 @@ FunctionPass *createFloat2IntPass();
 // NaryReassociate - Simplify n-ary operations by reassociation.
 //
 FunctionPass *createNaryReassociatePass();
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 //
 // LoopDistribute - Distribute loops.
 //

@@ -1,20 +1,19 @@
 //===-- llvm-nm.cpp - Symbol table dumping utility for llvm ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This program is a utility that works like traditional Unix "nm", that is, it
-// prints out the names of symbols in a bitcode or object file, along with some
-// information about each symbol.
-//
-// This "nm" supports many of the features of GNU "nm", including its different
-// output formats.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-nm.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This program is a utility that works like traditional Unix "nm", that is, it//
+// prints out the names of symbols in a bitcode or object file, along with some//
+// information about each symbol.                                            //
+//                                                                           //
+// This "nm" supports many of the features of GNU "nm", including its different//
+// output formats.                                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"
@@ -1153,7 +1152,8 @@ static void dumpSymbolNamesFromFile(std::string &Filename) {
   return;
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl  main(int argc, char **argv) {
   // Print a stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);

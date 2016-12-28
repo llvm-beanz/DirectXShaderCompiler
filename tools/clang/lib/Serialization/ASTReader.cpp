@@ -1,15 +1,14 @@
 //===-- ASTReader.cpp - AST File Reader ----------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the ASTReader class, which reads AST files.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTReader.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the ASTReader class, which reads AST files.            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Serialization/ASTReader.h"
 #include "ASTCommon.h"
@@ -207,7 +206,7 @@ static bool checkLanguageOptions(const LangOptions &LangOpts,
 
 #define BENIGN_LANGOPT(Name, Bits, Default, Description)
 #define BENIGN_ENUM_LANGOPT(Name, Type, Bits, Default, Description)
-#include "clang/Basic/LangOptions.def"
+#include "clang/Basic/LangOptions.fixed.def"
 
   if (ExistingLangOpts.ModuleFeatures != LangOpts.ModuleFeatures) {
     if (Diags)
@@ -4437,11 +4436,24 @@ bool ASTReader::ParseLanguageOptions(const RecordData &Record,
                                      bool AllowCompatibleDifferences) {
   LangOptions LangOpts;
   unsigned Idx = 0;
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
+
 #define LANGOPT(Name, Bits, Default, Description) \
   LangOpts.Name = Record[Idx++];
 #define ENUM_LANGOPT(Name, Type, Bits, Default, Description) \
   LangOpts.set##Name(static_cast<LangOptions::Type>(Record[Idx++]));
 #include "clang/Basic/LangOptions.def"
+
+#else
+
+#define LANGOPT(Name, Bits, Default, Description) \
+  Idx++;
+#define ENUM_LANGOPT(Name, Type, Bits, Default, Description) \
+  Idx++;
+#include "clang/Basic/LangOptions.fixed.def"
+
+#endif
+
 #define SANITIZER(NAME, ID)                                                    \
   LangOpts.Sanitize.set(SanitizerKind::ID, Record[Idx++]);
 #include "clang/Basic/Sanitizers.def"
@@ -5133,7 +5145,7 @@ QualType ASTReader::readTypeRecord(unsigned Index) {
     for (unsigned I = 0; I != NumParams; ++I)
       ParamTypes.push_back(readType(*Loc.F, Record, Idx));
 
-    return Context.getFunctionType(ResultType, ParamTypes, EPI);
+    return Context.getFunctionType(ResultType, ParamTypes, EPI, None); // HLSL Change
   }
 
   case TYPE_UNRESOLVED_USING: {

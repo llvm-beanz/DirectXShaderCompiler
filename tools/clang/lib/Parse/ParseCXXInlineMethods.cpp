@@ -1,15 +1,14 @@
 //===--- ParseCXXInlineMethods.cpp - C++ class inline methods parsing------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements parsing for C++ class inline methods.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseCXXInlineMethods.cpp                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements parsing for C++ class inline methods.               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "RAIIObjectsForParser.h"
@@ -61,6 +60,15 @@ NamedDecl *Parser::ParseCXXInlineMethodDef(AccessSpecifier AS,
       SkipUntil(tok::semi);
       return nullptr;
     }
+
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct)
+        << "function deletion and defaulting";
+      SkipUntil(tok::semi);
+      return FnD;
+    }
+    // HLSL Change Ends
 
     bool Delete = false;
     SourceLocation KWLoc;
@@ -515,6 +523,20 @@ void Parser::ParseLexedMethodDef(LexedMethod &LM) {
   Actions.ActOnStartOfFunctionDef(getCurScope(), LM.D);
 
   if (Tok.is(tok::kw_try)) {
+    // HLSL Change Starts - remove support for function try
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_expected_fn_body);
+      FnScope.Exit();
+      Actions.ActOnFinishFunctionBody(LM.D, nullptr);
+
+      while (Tok.isNot(tok::eof))
+        ConsumeAnyToken();
+
+      if (Tok.is(tok::eof) && Tok.getEofData() == LM.D)
+        ConsumeAnyToken();
+      return;
+    }
+    // HLSL Change Ends
     ParseFunctionTryBlock(LM.D, FnScope);
 
     while (Tok.isNot(tok::eof))
@@ -528,7 +550,7 @@ void Parser::ParseLexedMethodDef(LexedMethod &LM) {
     ParseConstructorInitializer(LM.D);
 
     // Error recovery.
-    if (!Tok.is(tok::l_brace)) {
+    if (!Tok.is(tok::l_brace) || getLangOpts().HLSL) { // HLSL Change
       FnScope.Exit();
       Actions.ActOnFinishFunctionBody(LM.D, nullptr);
 

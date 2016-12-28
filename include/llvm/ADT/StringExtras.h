@@ -1,15 +1,14 @@
 //===-- llvm/ADT/StringExtras.h - Useful string functions -------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// StringExtras.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains some functions that are useful when dealing with strings.//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains some functions that are useful when dealing with strings.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ADT_STRINGEXTRAS_H
 #define LLVM_ADT_STRINGEXTRAS_H
@@ -57,12 +56,14 @@ static inline char *utohex_buffer(IntTy X, char *BufferEnd, bool LowerCase = fal
   char *BufPtr = BufferEnd;
   *--BufPtr = 0;      // Null terminate buffer.
   if (X == 0) {
+#pragma prefast(suppress: 22102, "buffer for BufferEnd always has room for one char")
     *--BufPtr = '0';  // Handle special case.
     return BufPtr;
   }
 
   while (X) {
     unsigned char Mod = static_cast<unsigned char>(X) & 15;
+#pragma prefast(suppress: 22103, "X runs down to zero before end of buffer depending on type - cannot express for template in SAL")
     *--BufPtr = hexdigit(Mod, LowerCase);
     X >>= 4;
   }
@@ -81,6 +82,7 @@ static inline std::string utostr_32(uint32_t X, bool isNeg = false) {
   if (X == 0) *--BufPtr = '0';  // Handle special case...
 
   while (X) {
+#pragma prefast(suppress: 22102, "X runs down to zero before end of buffer")
     *--BufPtr = '0' + char(X % 10);
     X /= 10;
   }
@@ -97,6 +99,7 @@ static inline std::string utostr(uint64_t X, bool isNeg = false) {
   if (X == 0) *--BufPtr = '0';  // Handle special case...
 
   while (X) {
+#pragma prefast(suppress: 22102, "X runs down to zero before end of buffer")
     *--BufPtr = '0' + char(X % 10);
     X /= 10;
   }

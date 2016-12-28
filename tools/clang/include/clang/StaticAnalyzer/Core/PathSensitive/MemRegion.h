@@ -1,15 +1,14 @@
 //== MemRegion.h - Abstract memory regions for static analysis --*- C++ -*--==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines MemRegion and its subclasses.  MemRegion defines a
-//  partially-typed abstraction of memory useful for path-sensitive dataflow
-//  analyses.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MemRegion.h                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines MemRegion and its subclasses.  MemRegion defines a     //
+//  partially-typed abstraction of memory useful for path-sensitive dataflow //
+//  analyses.                                                                //
 //
 //===----------------------------------------------------------------------===//
 
@@ -1351,7 +1350,8 @@ public:
 
 //===----------------------------------------------------------------------===//
 // Pretty-printing regions.
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 namespace llvm {
 static inline raw_ostream &operator<<(raw_ostream &os,

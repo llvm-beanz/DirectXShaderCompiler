@@ -1,15 +1,14 @@
 //===--- InitHeaderSearch.cpp - Initialize header search paths ------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the InitHeaderSearch class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InitHeaderSearch.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the InitHeaderSearch class.                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/Utils.h"
 #include "clang/Basic/FileManager.h"
@@ -136,6 +135,17 @@ void InitHeaderSearch::AddUnmappedPath(const Twine &Path, IncludeDirGroup Group,
   SmallString<256> MappedPathStorage;
   StringRef MappedPathStr = Path.toStringRef(MappedPathStorage);
 
+#if 1 // HLSL Change Starts - simplify mapping based on actual usage
+  assert(Group == Angled);
+  assert(!isFramework);
+
+  // If the directory exists, add it.
+  if (const DirectoryEntry *DE = FM.getDirectory(MappedPathStr)) {
+    IncludePath.push_back(
+      std::make_pair(Angled, DirectoryLookup(DE, SrcMgr::C_User, false)));
+    return;
+  }
+#else
   // Compute the DirectoryLookup type.
   SrcMgr::CharacteristicKind Type;
   if (Group == Quoted || Group == Angled || Group == IndexHeaderMap) {
@@ -170,6 +180,7 @@ void InitHeaderSearch::AddUnmappedPath(const Twine &Path, IncludeDirGroup Group,
   if (Verbose)
     llvm::errs() << "ignoring nonexistent directory \""
                  << MappedPathStr << "\"\n";
+#endif // HLSL Change Ends - simplify mapping based on actual usage
 }
 
 void InitHeaderSearch::AddGnuCPlusPlusIncludePaths(StringRef Base,
@@ -205,6 +216,10 @@ void InitHeaderSearch::AddMinGWCPlusPlusIncludePaths(StringRef Base,
 
 void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
                                             const HeaderSearchOptions &HSOpts) {
+  // HLSL Change Starts - no standard include files for the HLSL/DXIL
+#if 1
+  return;
+#else
   llvm::Triple::OSType os = triple.getOS();
 
   if (HSOpts.UseStandardSystemIncludes) {
@@ -324,10 +339,15 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
     AddPath("/usr/include", ExternCSystem, false);
     break;
   }
+#endif // HLSL Change Ends
 }
 
 void InitHeaderSearch::
 AddDefaultCPlusPlusIncludePaths(const llvm::Triple &triple, const HeaderSearchOptions &HSOpts) {
+  // HLSL Change Starts - no standard include files for the HLSL/DXIL
+#if 1
+  return;
+#else
   llvm::Triple::OSType os = triple.getOS();
   // FIXME: temporary hack: hard-coded paths.
 
@@ -411,11 +431,15 @@ AddDefaultCPlusPlusIncludePaths(const llvm::Triple &triple, const HeaderSearchOp
   default:
     break;
   }
+#endif // HLSL Change Ends
 }
 
 void InitHeaderSearch::AddDefaultIncludePaths(const LangOptions &Lang,
                                               const llvm::Triple &triple,
                                             const HeaderSearchOptions &HSOpts) {
+#if 1 // HLSL Change Starts
+  return;
+#else
   // NB: This code path is going away. All of the logic is moving into the
   // driver which has the information necessary to do target-specific
   // selections of default include paths. Each target which moves there will be
@@ -473,6 +497,7 @@ void InitHeaderSearch::AddDefaultIncludePaths(const LangOptions &Lang,
       AddPath("/Library/Frameworks", System, true);
     }
   }
+#endif // HLSL Change Ends
 }
 
 /// RemoveDuplicates - If there are duplicate directory entries in the specified

@@ -1,11 +1,12 @@
 //===- MCTargetOptions.h - MC Target Options -------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MCTargetOptions.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_MC_MCTARGETOPTIONS_H
 #define LLVM_MC_MCTARGETOPTIONS_H
@@ -38,9 +39,15 @@ public:
   /// getABIName - If this returns a non-empty string this represents the
   /// textual name of the ABI that we want the backend to use, e.g. o32, or
   /// aapcs-linux.
-  StringRef getABIName() const;
-  std::string ABIName;
-  MCTargetOptions();
+  StringRef getABIName() const { // HLSL Change - inline implementation
+    return ABIName;
+  }
+  ::std::string ABIName;
+  MCTargetOptions()   // HLSL Change - inline implementation
+      : SanitizeAddress(false), MCRelaxAll(false), MCNoExecStack(false),
+      MCFatalWarnings(false), MCSaveTempLabels(false),
+      MCUseDwarfDirectory(false), ShowMCEncoding(false), ShowMCInst(false),
+      AsmVerbose(false), DwarfVersion(0), ABIName() {}
 };
 
 inline bool operator==(const MCTargetOptions &LHS, const MCTargetOptions &RHS) {

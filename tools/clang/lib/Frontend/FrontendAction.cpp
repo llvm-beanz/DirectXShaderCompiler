@@ -1,11 +1,12 @@
 //===--- FrontendAction.cpp -----------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FrontendAction.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/AST/ASTConsumer.h"
@@ -33,6 +34,8 @@
 using namespace clang;
 
 template class llvm::Registry<clang::PluginASTAction>;
+
+#if 0 // HLSL Change Starts - no support for AST serialization
 
 namespace {
 
@@ -124,6 +127,8 @@ public:
 
 } // end anonymous namespace
 
+#endif // HLSL Change Starts - no support for AST serialization
+
 FrontendAction::FrontendAction() : Instance(nullptr) {}
 
 FrontendAction::~FrontendAction() {}
@@ -183,6 +188,9 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   // AST files follow a very different path, since they share objects via the
   // AST unit.
   if (Input.getKind() == IK_AST) {
+#if 1 // HLSL Change Starts - no support for AST serialization
+    goto failure;
+#else
     assert(!usesPreprocessorOnly() &&
            "Attempt to pass AST file to preprocessor only action!");
     assert(hasASTFileSupport() &&
@@ -220,6 +228,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
       goto failure;
 
     return true;
+#endif // HLSL Change Ends - no support for AST serialization
   }
 
   if (!CI.hasVirtualFileSystem()) {
@@ -257,6 +266,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     return true;
   }
 
+#if 0 // HLSL Change Starts - no support for AST serialization
   // If the implicit PCH include is actually a directory, rather than
   // a single file, search for a suitable PCH file in that directory.
   if (!CI.getPreprocessorOpts().ImplicitPCHInclude.empty()) {
@@ -288,6 +298,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
       }
     }
   }
+#endif // HLSL Change Ends - no support for AST serialization
 
   // Set up the preprocessor if needed. When parsing model files the
   // preprocessor of the original source is reused.
@@ -324,6 +335,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     if (!isModelParsingAction())
       CI.getASTContext().setASTMutationListener(Consumer->GetASTMutationListener());
 
+#if 0 // HLSL Change Starts - no support for AST serialization
     if (!CI.getPreprocessorOpts().ChainedIncludes.empty()) {
       // Convert headers to PCH and chain them.
       IntrusiveRefCntPtr<ExternalSemaSource> source, FinalReader;
@@ -358,6 +370,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
       if (!CI.getASTContext().getExternalSource())
         goto failure;
     }
+#endif 0 // HLSL Change Ends - no support for AST serialization
 
     CI.setASTConsumer(std::move(Consumer));
     if (!CI.hasASTConsumer())
@@ -380,9 +393,11 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   } else {
     // FIXME: If this is a problem, recover from it by creating a multiplex
     // source.
+#if 0 // HLSL Change Starts - no support for AST serialization
     assert((!CI.getLangOpts().Modules || CI.getModuleManager()) &&
            "modules enabled but created an external source that "
            "doesn't support modules");
+#endif // HLSL Change End - no support for AST serialization
   }
 
   // If we were asked to load any module map files, do so now.
@@ -399,6 +414,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     if (!CI.loadModuleFile(ModuleFile))
       goto failure;
 
+#if 0 // HLSL Change Starts - removes support for overriding layout source from external file specification
   // If there is a layout overrides file, attach an external AST source that
   // provides the layouts from that file.
   if (!CI.getFrontendOpts().OverrideRecordLayoutsFile.empty() && 
@@ -408,6 +424,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
                      CI.getFrontendOpts().OverrideRecordLayoutsFile));
     CI.getASTContext().setExternalSource(Override);
   }
+#endif
 
   return true;
 
@@ -438,6 +455,7 @@ bool FrontendAction::Execute() {
   }
   else ExecuteAction();
 
+#if 0 // HLSL Change Starts - no support for AST serialization
   // If we are supposed to rebuild the global module index, do so now unless
   // there were any module-build failures.
   if (CI.shouldBuildGlobalModuleIndex() && CI.hasFileManager() &&
@@ -446,6 +464,7 @@ bool FrontendAction::Execute() {
         CI.getFileManager(), CI.getPCHContainerReader(),
         CI.getPreprocessor().getHeaderSearchInfo().getModuleCachePath());
   }
+#endif // HLSL Change Ends - no support for AST serialization
 
   return true;
 }

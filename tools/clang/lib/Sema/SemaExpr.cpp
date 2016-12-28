@@ -1,15 +1,14 @@
 //===--- SemaExpr.cpp - Semantic Analysis for Expressions -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for expressions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaExpr.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for expressions.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "TreeTransform.h"
@@ -43,6 +42,7 @@
 #include "clang/Sema/SemaFixItUtils.h"
 #include "clang/Sema/Template.h"
 #include "llvm/Support/ConvertUTF.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 using namespace clang;
 using namespace sema;
 
@@ -513,7 +513,7 @@ ExprResult Sema::DefaultFunctionArrayConversion(Expr *E) {
     }
     E = ImpCastExprToType(E, Context.getPointerType(Ty),
                           CK_FunctionToPointerDecay).get();
-  } else if (Ty->isArrayType()) {
+  } else if (Ty->isArrayType() && !getLangOpts().HLSL) { // HLSL Change - HLSL does not have pointers; do not decay arrays
     // In C90 mode, arrays only promote to pointers if the array expression is
     // an lvalue.  The relevant legalese is C90 6.2.2.1p3: "an lvalue that has
     // type 'array of type' is converted to an expression that has type 'pointer
@@ -626,6 +626,7 @@ ExprResult Sema::DefaultLvalueConversion(Expr *E) {
   // We don't want to throw lvalue-to-rvalue casts on top of
   // expressions of certain types in C++.
   if (getLangOpts().CPlusPlus &&
+      !getLangOpts().HLSL && // HLSL Change - matrices and object types should turn into lvalues
       (E->getType() == Context.OverloadTy ||
        T->isDependentType() ||
        T->isRecordType()))
@@ -769,7 +770,7 @@ ExprResult Sema::UsualUnaryConversions(Expr *E) {
       E = ImpCastExprToType(E, PTy, CK_IntegralCast).get();
       return E;
     }
-    if (Ty->isPromotableIntegerType()) {
+    if (Ty->isPromotableIntegerType() && !getLangOpts().HLSL) {   // HLSL Change: leave low-precision integrals as such for intermediate operations
       QualType PT = Context.getPromotedIntegerType(Ty);
       E = ImpCastExprToType(E, PT, CK_IntegralCast).get();
       return E;
@@ -1535,6 +1536,22 @@ Sema::ActOnStringLiteral(ArrayRef<Token> StringToks, Scope *UDLScope) {
   SmallVector<SourceLocation, 4> StringTokLocs;
   for (unsigned i = 0; i != StringToks.size(); ++i)
     StringTokLocs.push_back(StringToks[i].getLocation());
+
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    assert(!Literal.isWide() && !Literal.isUTF16() && !Literal.isUTF32() && !Literal.isPascal()
+      && "HLSL parser always produces simple string literals");
+    QualType CharTyConst = Context.CharTy;
+    CharTyConst.addConst();
+    QualType StrTy = Context.getConstantArrayType(CharTyConst,
+                                 llvm::APInt(32, Literal.GetNumStringChars()+1),
+                                 ArrayType::Normal, 0);
+
+    StringLiteral *Result = StringLiteral::Create(Context, Literal.GetString(), StringLiteral::StringKind::Ascii,
+      false, StrTy, &StringTokLocs[0], StringTokLocs.size());
+    return Result;
+  }
+  // HLSL Change Ends
 
   QualType CharTy = Context.CharTy;
   StringLiteral::StringKind Kind = StringLiteral::Ascii;
@@ -2810,7 +2827,9 @@ ExprResult Sema::BuildDeclarationNameExpr(
     // a template argument list.
     Diag(Loc, diag::err_template_decl_ref) << (isa<VarTemplateDecl>(D) ? 1 : 0)
                                            << Template << SS.getRange();
-    Diag(Template->getLocation(), diag::note_template_decl_here);
+    if (Template->getLocation().isValid()) { // HLSL Change - ellide location notes for built-ins
+      Diag(Template->getLocation(), diag::note_template_decl_here);
+    }
     return ExprError();
   }
 
@@ -3092,6 +3111,20 @@ ExprResult Sema::ActOnCharacterConstant(const Token &Tok, Scope *UDLScope) {
   if (Literal.hadError())
     return ExprError();
 
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    if (Literal.isWide() || Literal.isUTF16() || Literal.isUTF32() || Literal.isMultiChar()) {
+      Diag(Tok.getLocation(), diag::err_hlsl_unsupported_char_literal);
+      return ExprError();
+    }
+    Expr *CharLit = new (Context)CharacterLiteral(Literal.getValue(), CharacterLiteral::Ascii, Context.CharTy,
+      Tok.getLocation());
+    Expr* Result = ImplicitCastExpr::Create(Context, 
+      Context.UnsignedIntTy, CK_IntegralCast, CharLit, nullptr, VK_RValue);
+    return Result;
+  }
+  // HLSL Change Ends
+
   QualType Ty;
   if (Literal.isWide())
     Ty = Context.WideCharTy; // L'x' -> wchar_t in C and C++.
@@ -3135,8 +3168,16 @@ ExprResult Sema::ActOnCharacterConstant(const Token &Tok, Scope *UDLScope) {
 
 ExprResult Sema::ActOnIntegerConstant(SourceLocation Loc, uint64_t Val) {
   unsigned IntSize = Context.getTargetInfo().getIntWidth();
+  // HLSL Change Starts - HLSL literal int
+  QualType Ty;
+  if (getLangOpts().HLSL) {
+    IntSize = 64;
+    Ty = Context.LitIntTy;
+  } else
+    Ty = Context.IntTy;
+  // HLSL Change Ends
   return IntegerLiteral::Create(Context, llvm::APInt(IntSize, Val),
-                                Context.IntTy, Loc);
+                                Ty, Loc);    // HLSL Change
 }
 
 static Expr *BuildFloatingLiteral(Sema &S, NumericLiteralParser &Literal,
@@ -3321,6 +3362,12 @@ ExprResult Sema::ActOnNumericConstant(const Token &Tok, Scope *UDLScope) {
     QualType Ty;
     if (Literal.isFloat)
       Ty = Context.FloatTy;
+    // HLSL Change Starts
+    else if (getLangOpts().HLSL && !Literal.isLong)
+      Ty = Context.LitFloatTy;
+    else if (getLangOpts().HLSL && Literal.isLong)
+      Ty = Context.DoubleTy;
+    // HLSL Change Ends
     else if (!Literal.isLong)
       Ty = Context.DoubleTy;
     else
@@ -3340,6 +3387,45 @@ ExprResult Sema::ActOnNumericConstant(const Token &Tok, Scope *UDLScope) {
     }
   } else if (!Literal.isIntegerLiteral()) {
     return ExprError();
+
+  // HLSL Change Starts
+  } else if (getLangOpts().HLSL) {
+    QualType Ty;
+    unsigned Width = 64;
+    llvm::APInt ResultVal(Width, 0);
+    if (!Literal.isLong && !Literal.isLongLong &&
+        !Literal.isUnsigned && Literal.getRadix() == 10) {
+      // in HLSL, unspecific literal ints are LitIntTy, using 64-bit
+      Ty = Context.LitIntTy;
+      if (Literal.GetIntegerValue(ResultVal)) {
+        // If this value didn't fit into 64-bit literal int, report error.
+        Diag(Tok.getLocation(), diag::err_integer_literal_too_large);
+      }
+    } else {
+
+      if (Literal.GetIntegerValue(ResultVal)) {
+        Diag(Tok.getLocation(), diag::err_integer_literal_too_large);
+      }
+      if (Literal.isLongLong) {
+        if (Literal.isUnsigned)
+          Ty = Context.UnsignedLongLongTy;
+        else
+          Ty = Context.LongLongTy;
+      }
+      else {
+        // long is the same as int for HLSL, so ignore isLong here
+        Width = 32;
+
+        ResultVal = ResultVal.trunc(Width);
+        if (Literal.isUnsigned || Literal.getRadix() != 10)
+          Ty = Context.UnsignedIntTy;
+        else
+          Ty = Context.IntTy;
+      }
+    }
+    return IntegerLiteral::Create(Context, ResultVal, Ty, Tok.getLocation());
+  // HLSL Change Ends
+
   } else {
     QualType Ty;
 
@@ -4070,15 +4156,23 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
     // wasn't promoted because of the C90 rule that doesn't
     // allow promoting non-lvalue arrays.  Warn, then
     // force the promotion here.
-    Diag(LHSExp->getLocStart(), diag::ext_subscript_non_lvalue) <<
-        LHSExp->getSourceRange();
-    LHSExp = ImpCastExprToType(LHSExp, Context.getArrayDecayedType(LHSTy),
-                               CK_ArrayToPointerDecay).get();
-    LHSTy = LHSExp->getType();
+    // HLSL Change Starts - arrays won't decay
+    if (getLangOpts().HLSL) {
+      BaseExpr = LHSExp;
+      IndexExpr = RHSExp;
+      ResultType = LHSTy->getAsArrayTypeUnsafe()->getElementType();
+    } else {
+    // HLSL Change Ends
+      Diag(LHSExp->getLocStart(), diag::ext_subscript_non_lvalue) <<
+          LHSExp->getSourceRange();
+      LHSExp = ImpCastExprToType(LHSExp, Context.getArrayDecayedType(LHSTy),
+                                 CK_ArrayToPointerDecay).get();
+      LHSTy = LHSExp->getType();
 
-    BaseExpr = LHSExp;
-    IndexExpr = RHSExp;
-    ResultType = LHSTy->getAs<PointerType>()->getPointeeType();
+      BaseExpr = LHSExp;
+      IndexExpr = RHSExp;
+      ResultType = LHSTy->getAs<PointerType>()->getPointeeType();
+    } // HLSL Change - end else block
   } else if (RHSTy->isArrayType()) {
     // Same as previous, except for 123[f().a] case
     Diag(RHSExp->getLocStart(), diag::ext_subscript_non_lvalue) <<
@@ -4091,9 +4185,22 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
     IndexExpr = LHSExp;
     ResultType = RHSTy->getAs<PointerType>()->getPointeeType();
   } else {
-    return ExprError(Diag(LLoc, diag::err_typecheck_subscript_value)
+    // HLSL Change: use HLSL variation of error message
+    return ExprError(Diag(LLoc, getLangOpts().HLSL ? diag::err_hlsl_typecheck_subscript_value : diag::err_typecheck_subscript_value)
        << LHSExp->getSourceRange() << RHSExp->getSourceRange());
   }
+
+  // HLSL Change Starts
+  if (getLangOpts().HLSL && BaseExpr != LHSExp) {
+    Diag(RHSExp->getLocStart(), diag::err_hlsl_unsupported_subscript_base_rhs);
+  }
+  if (!IndexExpr->getType()->isIntegerType() && !IndexExpr->isTypeDependent() &&
+       IndexExpr->getType()->isFloatingType()) {
+    IndexExpr = ImpCastExprToType(IndexExpr, Context.UnsignedIntTy,
+      CK_FloatingToIntegral).get();
+  }
+  // HLSL Change Ends
+
   // C99 6.5.2.1p1
   if (!IndexExpr->getType()->isIntegerType() && !IndexExpr->isTypeDependent())
     return ExprError(Diag(LLoc, diag::err_typecheck_subscript_not_integer)
@@ -4130,6 +4237,7 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
   assert(VK == VK_RValue || LangOpts.CPlusPlus ||
          !ResultType.isCForbiddenLValueType());
 
+  if (getLangOpts().HLSL) RHSExp = IndexExpr; // HLSL Change - refer to right-hands side as indexer
   return new (Context)
       ArraySubscriptExpr(LHSExp, RHSExp, ResultType, VK, OK, RLoc);
 }
@@ -4698,7 +4806,8 @@ static FunctionDecl *rewriteBuiltinFunctionDecl(Sema *Sema, ASTContext &Context,
 
   FunctionProtoType::ExtProtoInfo EPI;
   QualType OverloadTy = Context.getFunctionType(FT->getReturnType(),
-                                                OverloadParams, EPI);
+                                                OverloadParams, EPI,
+                                                FT->getParamMods()); // HLSL Change
   DeclContext *Parent = Context.getTranslationUnitDecl();
   FunctionDecl *OverloadDecl = FunctionDecl::Create(Context, Parent,
                                                     FDecl->getLocation(),
@@ -5551,10 +5660,11 @@ Sema::ActOnCastExpr(Scope *S, SourceLocation LParenLoc,
   if (getLangOpts().CPlusPlus && !castType->isVoidType() &&
       !getSourceManager().isInSystemMacro(LParenLoc))
     Diag(LParenLoc, diag::warn_old_style_cast) << CastExpr->getSourceRange();
-  
+#if 0  // HLSL Change - no support for ObjC constructs
   CheckTollFreeBridgeCast(castType, CastExpr);
   
   CheckObjCBridgeRelatedCast(castType, CastExpr);
+#endif // HLSL Change
   
   return BuildCStyleCastExpr(LParenLoc, castTInfo, RParenLoc, CastExpr);
 }
@@ -6106,6 +6216,12 @@ QualType Sema::CheckConditionalOperands(ExprResult &Cond, ExprResult &LHS,
   ExprResult RHSResult = CheckPlaceholderExpr(RHS.get());
   if (!RHSResult.isUsable()) return QualType();
   RHS = RHSResult;
+
+  // HLSL Change Starts: HLSL supports a vector condition and is
+  // sufficiently different to merit its own checker.
+  if (getLangOpts().HLSL)
+    return hlsl::CheckVectorConditional(this, Cond, LHS, RHS, QuestionLoc);
+  // HLSL Change Ends
 
   // C++ is sufficiently different to merit its own checker.
   if (getLangOpts().CPlusPlus)
@@ -7114,6 +7230,13 @@ Sema::AssignConvertType
 Sema::CheckSingleAssignmentConstraints(QualType LHSType, ExprResult &RHS,
                                        bool Diagnose,
                                        bool DiagnoseCFAudited) {
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    // DiagnoseAssignmentResultForHLSL will take care of diagnostics.
+    return Compatible;
+  }
+  // HLSL Change Ends
+
   if (getLangOpts().CPlusPlus) {
     if (!LHSType->isRecordType() && !LHSType->isAtomicType()) {
       // C++ 5.17p3: If the left operand is not of class type, the
@@ -8239,6 +8362,11 @@ static bool isObjCObjectLiteral(ExprResult &E) {
   }
 }
 
+#if 1 // HLSL Change Starts
+Sema::ObjCLiteralKind Sema::CheckLiteralKind(Expr *FromE) {
+  return LK_None;
+}
+#else
 static bool hasIsEqualMethod(Sema &S, const Expr *LHS, const Expr *RHS) {
   const ObjCObjectPointerType *Type =
     LHS->getType()->getAs<ObjCObjectPointerType>();
@@ -8375,6 +8503,8 @@ static void diagnoseObjCLiteralComparison(Sema &S, SourceLocation Loc,
       << FixItHint::CreateInsertion(End, "]");
   }
 }
+
+#endif // HLSL Change Ends
 
 static void diagnoseLogicalNotOnLHSofComparison(Sema &S, ExprResult &LHS,
                                                 ExprResult &RHS,
@@ -8747,21 +8877,26 @@ QualType Sema::CheckCompareOperands(ExprResult &LHS, ExprResult &RHS,
       }
       if (LHSIsNull && !RHSIsNull) {
         Expr *E = LHS.get();
+#if 0 // HLSL Change - no ObjC support
         if (getLangOpts().ObjCAutoRefCount)
           CheckObjCARCConversion(SourceRange(), RHSType, E, CCK_ImplicitConversion);
+#endif // HLSL Change
         LHS = ImpCastExprToType(E, RHSType,
                                 RPT ? CK_BitCast :CK_CPointerToObjCPointerCast);
       }
       else {
         Expr *E = RHS.get();
+#if 0 // HLSL Change - no ObjC support
         if (getLangOpts().ObjCAutoRefCount)
           CheckObjCARCConversion(SourceRange(), LHSType, E, CCK_ImplicitConversion, false,
                                  Opc);
+#endif // HLSL Change
         RHS = ImpCastExprToType(E, LHSType,
                                 LPT ? CK_BitCast :CK_CPointerToObjCPointerCast);
       }
       return ResultTy;
     }
+#if 0 // HLSL Change - no ObjC support
     if (LHSType->isObjCObjectPointerType() &&
         RHSType->isObjCObjectPointerType()) {
       if (!Context.areComparableObjCPointerTypes(LHSType, RHSType))
@@ -8776,6 +8911,7 @@ QualType Sema::CheckCompareOperands(ExprResult &LHS, ExprResult &RHS,
         RHS = ImpCastExprToType(RHS.get(), LHSType, CK_BitCast);
       return ResultTy;
     }
+#endif // HLSL Change
   }
   if ((LHSType->isAnyPointerType() && RHSType->isIntegerType()) ||
       (LHSType->isIntegerType() && RHSType->isAnyPointerType())) {
@@ -9210,7 +9346,7 @@ static void DiagnoseConstAssignment(Sema &S, const Expr *E,
 
 /// CheckForModifiableLvalue - Verify that E is a modifiable lvalue.  If not,
 /// emit an error and return true.  If so, return false.
-static bool CheckForModifiableLvalue(Expr *E, SourceLocation Loc, Sema &S) {
+bool CheckForModifiableLvalue(Expr *E, SourceLocation Loc, Sema &S) { // HLSL Change: export this function
   assert(!E->hasPlaceholderType(BuiltinType::PseudoObject));
   SourceLocation OrigLoc = Loc;
   Expr::isModifiableLvalueResult IsLV = E->isModifiableLvalue(S.Context,
@@ -9306,6 +9442,11 @@ static bool CheckForModifiableLvalue(Expr *E, SourceLocation Loc, Sema &S) {
   case Expr::MLV_DuplicateVectorComponents:
     DiagID = diag::err_typecheck_duplicate_vector_components_not_mlvalue;
     break;
+    // HLSL Change Starts
+  case Expr::MLV_DuplicateMatrixComponents:
+    DiagID = diag::err_hlsl_typecheck_duplicate_matrix_components_not_mlvalue;
+    break;
+    // HLSL Change Ends
   case Expr::MLV_NoSetterProperty:
     llvm_unreachable("readonly properties should be processed differently");
   case Expr::MLV_InvalidMessageExpression:
@@ -9405,6 +9546,7 @@ QualType Sema::CheckAssignmentOperands(Expr *LHSExpr, ExprResult &RHS,
       }
     }
 
+#if 0 // HLSL Change Starts
     if (ConvTy == Compatible) {
       if (LHSType.getObjCLifetime() == Qualifiers::OCL_Strong) {
         // Warn about retain cycles where a block captures the LHS, but
@@ -9430,6 +9572,7 @@ QualType Sema::CheckAssignmentOperands(Expr *LHSExpr, ExprResult &RHS,
         checkUnsafeExprAssigns(Loc, LHSExpr, RHS.get());
       }
     }
+#endif // HLSL Change Ends
   } else {
     // Compound assignment "x += y"
     ConvTy = CheckAssignmentConstraints(Loc, LHSType, RHSType);
@@ -10105,6 +10248,19 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
   ExprValueKind VK = VK_RValue;
   ExprObjectKind OK = OK_Ordinary;
 
+  // HLSL Change Starts
+  // Handle HLSL binary operands differently
+  if (getLangOpts().HLSL) {
+    hlsl::CheckBinOpForHLSL(*this, OpLoc, Opc, LHS, RHS, ResultTy, CompLHSTy, CompResultTy);
+    if (!ResultTy.isNull() && Opc == BO_Comma) {
+      // In C/C++, the RHS value kind should propagate. In HLSL, it should yield an r-value.
+      // VK = RHS.get()->getValueKind();
+      OK = RHS.get()->getObjectKind();
+    }
+    goto CasesHandled;
+  }
+  // HLSL Change Ends
+
   if (!getLangOpts().CPlusPlus) {
     // C cannot handle TypoExpr nodes on either side of a binop because it
     // doesn't handle dependent types properly, so make sure any TypoExprs have
@@ -10226,6 +10382,7 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
     }
     break;
   }
+CasesHandled: // HLSL Change: minimize code changes by avoiding a branch above
   if (ResultTy.isNull() || LHS.isInvalid() || RHS.isInvalid())
     return ExprError();
 
@@ -10569,7 +10726,10 @@ ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
     RHSExpr = resolvedRHS.get();
   }
 
-  if (getLangOpts().CPlusPlus) {
+  // HLSL Change: bypass binary operator overload work, which isn't supported in any case;
+  // otherwise more extensive changes need to be done to add HLSL-specific behavior to
+  // be considered when building overload candidate sets
+  if (getLangOpts().CPlusPlus && !getLangOpts().HLSL) {
     // If either expression is type-dependent, always build an
     // overloaded op.
     if (LHSExpr->isTypeDependent() || RHSExpr->isTypeDependent())
@@ -10593,6 +10753,14 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
   ExprValueKind VK = VK_RValue;
   ExprObjectKind OK = OK_Ordinary;
   QualType resultType;
+
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    resultType = hlsl::CheckUnaryOpForHLSL(*this, OpLoc, Opc, Input, VK, OK);
+    goto CasesHandled;
+  }
+  // HLSL Change Ends
+
   switch (Opc) {
   case UO_PreInc:
   case UO_PreDec:
@@ -10740,6 +10908,7 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
     OK = Input.get()->getObjectKind();
     break;
   }
+CasesHandled: // HLSL Change: add label to skip C/C++ unary operator processing
   if (resultType.isNull() || Input.isInvalid())
     return ExprError();
 
@@ -10798,6 +10967,11 @@ static bool isQualifiedMemberAccess(Expr *E) {
 
 ExprResult Sema::BuildUnaryOp(Scope *S, SourceLocation OpLoc,
                               UnaryOperatorKind Opc, Expr *Input) {
+  // HLSL Change Starts - placeholders and overloaded operators not supported
+  if (getLangOpts().HLSL)
+    return CreateBuiltinUnaryOp(OpLoc, Opc, Input);
+  // HLSL Change Ends
+
   // First things first: handle placeholders so that the
   // overloaded-operator check considers the right type.
   if (const BuiltinType *pty = Input->getType()->getAsPlaceholderType()) {
@@ -11252,7 +11426,7 @@ void Sema::ActOnBlockArguments(SourceLocation CaretLoc, Declarator &ParamInfo,
     FunctionProtoType::ExtProtoInfo EPI;
     EPI.HasTrailingReturn = false;
     EPI.TypeQuals |= DeclSpec::TQ_const;
-    T = Context.getFunctionType(Context.DependentTy, None, EPI);
+    T = Context.getFunctionType(Context.DependentTy, None, EPI, None); // HLSL Change - add param mods
     Sig = Context.getTrivialTypeSourceInfo(T);
   }
   
@@ -11367,6 +11541,10 @@ void Sema::ActOnBlockError(SourceLocation CaretLoc, Scope *CurScope) {
 /// literal was successfully completed.  ^(int x){...}
 ExprResult Sema::ActOnBlockStmtExpr(SourceLocation CaretLoc,
                                     Stmt *Body, Scope *CurScope) {
+  // HLSL Changes Start
+  llvm_unreachable("block statements unsupported and unreachable in HLSL");
+#if 0
+  // HLSL Changes End
   // If blocks are disabled, emit an error.
   if (!LangOpts.Blocks)
     Diag(CaretLoc, diag::err_blocks_disable);
@@ -11376,6 +11554,10 @@ ExprResult Sema::ActOnBlockStmtExpr(SourceLocation CaretLoc,
     DiscardCleanupsInEvaluationContext();
   assert(!ExprNeedsCleanups && "cleanups within block not correctly bound!");
   PopExpressionEvaluationContext();
+
+  if (getLangOpts().HLSL) {
+    return ExprError();
+  }
 
   BlockScopeInfo *BSI = cast<BlockScopeInfo>(FunctionScopes.back());
 
@@ -11481,6 +11663,7 @@ ExprResult Sema::ActOnBlockStmtExpr(SourceLocation CaretLoc,
   }
 
   return Result;
+#endif // HLSL Change
 }
 
 ExprResult Sema::ActOnVAArg(SourceLocation BuiltinLoc,
@@ -11645,6 +11828,12 @@ bool Sema::DiagnoseAssignmentResult(AssignConvertType ConvTy,
   bool MayHaveFunctionDiff = false;
   const ObjCInterfaceDecl *IFace = nullptr;
   const ObjCProtocolDecl *PDecl = nullptr;
+
+  // HLSL Change Starts
+  if (LangOpts.HLSL) {
+    hlsl::DiagnoseAssignmentResultForHLSL(this, ConvTy, Loc, DstType, SrcType, SrcExpr, Action, Complained);
+  }
+  // HLSL Change Ends
 
   switch (ConvTy) {
   case Compatible:
@@ -13962,7 +14151,8 @@ ExprResult RebuildUnknownAnyExpr::VisitCallExpr(CallExpr *E) {
       ParamTypes = ArgTypes;
     }
     DestType = S.Context.getFunctionType(DestType, ParamTypes,
-                                         Proto->getExtProtoInfo());
+                                         Proto->getExtProtoInfo(),
+                                         Proto->getParamMods()); // HLSL Change - assume args are preserved
   } else {
     DestType = S.Context.getFunctionNoProtoType(DestType,
                                                 FnType->getExtInfo());

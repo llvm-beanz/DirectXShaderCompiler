@@ -1,16 +1,17 @@
 //===--- PPDirectives.cpp - Directive Handling for Preprocessor -----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PPDirectives.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Implements # directive processing for the Preprocessor.
+/// \file                                                                    //
+/// \brief Implements # directive processing for the Preprocessor.           //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Basic/FileManager.h"
@@ -150,7 +151,7 @@ bool Preprocessor::CheckMacroName(Token &MacroNameTok, MacroUse isDefineUndef,
       return Diag(MacroNameTok, diag::err_pp_macro_not_identifier);
     II = getIdentifierInfo(Spelling);
 
-    if (!II->isCPlusPlusOperatorKeyword())
+    if (!II->isCPlusPlusOperatorKeyword() || getLangOpts().HLSL) // HLSL Change: guard against HLSL
       return Diag(MacroNameTok, diag::err_pp_macro_not_identifier);
 
     // C++ 2.5p2: Alternative tokens behave the same as its primary token
@@ -644,7 +645,7 @@ const FileEntry *Preprocessor::LookupFile(
     // MSVC searches the current include stack from top to bottom for
     // headers included by quoted include directives.
     // See: http://msdn.microsoft.com/en-us/library/36k2cdd4.aspx
-    if (LangOpts.MSVCCompat && !isAngled) {
+    if ((LangOpts.MSVCCompat || LangOpts.HLSL) && !isAngled) { // HLSL Change - use MSVC compat behavior
       for (unsigned i = 0, e = IncludeMacroStack.size(); i != e; ++i) {
         IncludeStackInfo &ISEntry = IncludeMacroStack[e - i - 1];
         if (IsFileLexer(ISEntry))
@@ -870,16 +871,20 @@ void Preprocessor::HandleDirective(Token &Result) {
 
     // GNU Extensions.
     case tok::pp_import:
+      if (getLangOpts().HLSL) break; // HLSL Change - disable #import
       return HandleImportDirective(SavedHash.getLocation(), Result);
     case tok::pp_include_next:
+      if (getLangOpts().HLSL) break; // HLSL Change - disable #include_next
       return HandleIncludeNextDirective(SavedHash.getLocation(), Result);
 
     case tok::pp_warning:
       Diag(Result, diag::ext_pp_warning_directive);
       return HandleUserDiagnosticDirective(Result, true);
     case tok::pp_ident:
+      if (getLangOpts().HLSL) break; // HLSL Change - disable #ident
       return HandleIdentSCCSDirective(Result);
     case tok::pp_sccs:
+      if (getLangOpts().HLSL) break; // HLSL Change - disable #sccs
       return HandleIdentSCCSDirective(Result);
     case tok::pp_assert:
       //isExtension = true;  // FIXME: implement #assert
@@ -1602,14 +1607,14 @@ void Preprocessor::HandleIncludeDirective(SourceLocation HashLoc,
   ModuleMap::KnownHeader SuggestedModule;
   SourceLocation FilenameLoc = FilenameTok.getLocation();
   SmallString<128> NormalizedPath;
-  if (LangOpts.MSVCCompat) {
+  if (LangOpts.MSVCCompat || LangOpts.HLSL) { // HLSL Change: use MSVC compat behavior
     NormalizedPath = Filename.str();
 #ifndef LLVM_ON_WIN32
     llvm::sys::path::native(NormalizedPath);
 #endif
   }
   const FileEntry *File = LookupFile(
-      FilenameLoc, LangOpts.MSVCCompat ? NormalizedPath.c_str() : Filename,
+      FilenameLoc, (LangOpts.MSVCCompat || LangOpts.HLSL) ? NormalizedPath.c_str() : Filename, // HLSL Change: use MSVC compat behavior
       isAngled, LookupFrom, LookupFromFile, CurDir,
       Callbacks ? &SearchPath : nullptr, Callbacks ? &RelativePath : nullptr,
       &SuggestedModule);
@@ -1627,7 +1632,7 @@ void Preprocessor::HandleIncludeDirective(SourceLocation HashLoc,
           // Try the lookup again, skipping the cache.
           File = LookupFile(
               FilenameLoc,
-              LangOpts.MSVCCompat ? NormalizedPath.c_str() : Filename, isAngled,
+             (LangOpts.MSVCCompat || LangOpts.HLSL) ? NormalizedPath.c_str() : Filename, isAngled, // HLSL Change: use MSVC compat behavior
               LookupFrom, LookupFromFile, CurDir, nullptr, nullptr,
               &SuggestedModule, /*SkipCache*/ true);
         }
@@ -1641,7 +1646,7 @@ void Preprocessor::HandleIncludeDirective(SourceLocation HashLoc,
       if (isAngled) {
         File = LookupFile(
             FilenameLoc,
-            LangOpts.MSVCCompat ? NormalizedPath.c_str() : Filename, false,
+            (LangOpts.MSVCCompat || LangOpts.HLSL) ? NormalizedPath.c_str() : Filename, false, // HLSL Change: use MSVC compat behavior
             LookupFrom, LookupFromFile, CurDir,
             Callbacks ? &SearchPath : nullptr,
             Callbacks ? &RelativePath : nullptr,
@@ -1728,7 +1733,7 @@ void Preprocessor::HandleIncludeDirective(SourceLocation HashLoc,
     // Notify the callback object that we've seen an inclusion directive.
     Callbacks->InclusionDirective(
         HashLoc, IncludeTok,
-        LangOpts.MSVCCompat ? NormalizedPath.c_str() : Filename, isAngled,
+        (LangOpts.MSVCCompat || LangOpts.HLSL) ? NormalizedPath.c_str() : Filename, isAngled, // HLSL Change: use MSVC compat behavior
         FilenameRange, File, SearchPath, RelativePath,
         ShouldEnter ? nullptr : SuggestedModule.getModule());
   }

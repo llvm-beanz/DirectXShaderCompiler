@@ -1,13 +1,12 @@
 //===--- Expr.h - Classes for representing expressions ----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Expr interface and subclasses.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Expr.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Expr interface and subclasses.                     //
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,6 +21,7 @@
 #include "clang/AST/Stmt.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/HlslTypes.h" // HLSL Change
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TypeTraits.h"
 #include "llvm/ADT/APFloat.h"
@@ -257,6 +257,7 @@ public:
     LV_NotObjectType,
     LV_IncompleteVoidType,
     LV_DuplicateVectorComponents,
+    LV_DuplicateMatrixComponents, // HLSL Change
     LV_InvalidExpression,
     LV_InvalidMessageExpression,
     LV_MemberFunction,
@@ -272,6 +273,7 @@ public:
     MLV_NotObjectType,
     MLV_IncompleteVoidType,
     MLV_DuplicateVectorComponents,
+    MLV_DuplicateMatrixComponents, // HLSL Change
     MLV_InvalidExpression,
     MLV_LValueCast,           // Specialized form of MLV_InvalidExpression.
     MLV_IncompleteType,
@@ -309,6 +311,7 @@ public:
       CL_Void, // Void cannot be an lvalue in C.
       CL_AddressableVoid, // Void expression whose address can be taken in C.
       CL_DuplicateVectorComponents, // A vector shuffle with dupes.
+      CL_DuplicateMatrixComponents, // HLSL Change: a matrix shuffle with dupes.
       CL_MemberFunction, // An expression referring to a member function
       CL_SubObjCPropertySetting,
       CL_ClassTemporary, // A temporary of class type, or subobject thereof.
@@ -4530,7 +4533,8 @@ public:
 
 //===----------------------------------------------------------------------===//
 // Clang Extensions
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 
 /// ExtVectorElementExpr - This represents access to specific elements of a
@@ -4596,6 +4600,151 @@ public:
   child_range children() { return child_range(&Base, &Base+1); }
 };
 
+// HLSL Change Starts
+/// ExtMatrixElementExpr - This represents access to specific elements of a
+/// matrix, and may occur on the left hand side or right hand side.
+///
+/// Note that the base may have either matrix or pointer to matrix type, just
+/// like a struct field reference.
+///
+class ExtMatrixElementExpr : public Expr {
+  Stmt *Base;
+  IdentifierInfo *Accessor;
+  SourceLocation AccessorLoc;
+  hlsl::MatrixMemberAccessPositions Positions;
+public:
+  ExtMatrixElementExpr(QualType ty, ExprValueKind VK, Expr *base,
+    IdentifierInfo &accessor, SourceLocation loc, hlsl::MatrixMemberAccessPositions positions)
+    : Expr(ExtMatrixElementExprClass, ty, VK,
+    (VK == VK_RValue ? OK_Ordinary : OK_VectorComponent),
+    base->isTypeDependent(), base->isValueDependent(),
+    base->isInstantiationDependent(),
+    base->containsUnexpandedParameterPack()),
+    Base(base), Accessor(&accessor), AccessorLoc(loc), Positions(positions) {}
+
+  /// \brief Build an empty vector element expression.
+  explicit ExtMatrixElementExpr(EmptyShell Empty)
+    : Expr(ExtMatrixElementExprClass, Empty) { }
+
+  const Expr *getBase() const { return cast<Expr>(Base); }
+  Expr *getBase() { return cast<Expr>(Base); }
+  void setBase(Expr *E) { Base = E; }
+
+  IdentifierInfo &getAccessor() const { return *Accessor; }
+  void setAccessor(IdentifierInfo *II) { Accessor = II; }
+
+  SourceLocation getAccessorLoc() const { return AccessorLoc; }
+  void setAccessorLoc(SourceLocation L) { AccessorLoc = L; }
+
+  /// getNumElements - Get the number of components being selected.
+  unsigned getNumElements() const { return Positions.Count; }
+
+  /// containsDuplicateElements - Return true if any element access is
+  /// repeated.
+  bool containsDuplicateElements() const { return Positions.ContainsDuplicateElements(); }
+
+  /// getEncodedElementAccess - Encode the elements accessed
+  hlsl::MatrixMemberAccessPositions getEncodedElementAccess() const { return Positions; }
+  /// getEncodedElementAccess - Encode the elements accessed
+  void getEncodedElementAccess(SmallVectorImpl<unsigned> &Elts) const {
+    for (uint32_t i = 0; i < Positions.Count; i++) {
+      uint32_t row, col;
+      // Save both row and col.
+      Positions.GetPosition(i, &row, &col);
+      Elts.push_back(row);
+      Elts.push_back(col);
+    }
+  }
+  SourceLocation getLocStart() const LLVM_READONLY{
+    return getBase()->getLocStart();
+  }
+  SourceLocation getLocEnd() const LLVM_READONLY{ return AccessorLoc; }
+
+  /// isArrow - Return true if the base expression is a pointer to vector,
+  /// return false if the base expression is a vector.
+  bool isArrow() const { return getBase()->getType()->isPointerType(); }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ExtMatrixElementExprClass;
+  }
+
+  // Iterators
+  child_range children() { return child_range(&Base, &Base + 1); }
+};
+/// HLSLVectorElementExpr - This represents access to specific elements of a
+/// vector, and may occur on the left hand side or right hand side.
+///
+/// Note that the base may have either vector or pointer to vector type, just
+/// like a struct field reference.
+///
+class HLSLVectorElementExpr : public Expr {
+  Stmt *Base;
+  IdentifierInfo *Accessor;
+  SourceLocation AccessorLoc;
+  hlsl::VectorMemberAccessPositions Positions;
+public:
+  HLSLVectorElementExpr(QualType ty, ExprValueKind VK, Expr *base,
+    IdentifierInfo &accessor, SourceLocation loc, hlsl::VectorMemberAccessPositions positions)
+    : Expr(HLSLVectorElementExprClass, ty, VK,
+    (VK == VK_RValue ? OK_Ordinary : OK_VectorComponent),
+    base->isTypeDependent(), base->isValueDependent(),
+    base->isInstantiationDependent(),
+    base->containsUnexpandedParameterPack()),
+    Base(base), Accessor(&accessor), AccessorLoc(loc), Positions(positions) {}
+
+  /// \brief Build an empty vector element expression.
+  explicit HLSLVectorElementExpr(EmptyShell Empty)
+    : Expr(HLSLVectorElementExprClass, Empty) { }
+
+  const Expr *getBase() const { return cast<Expr>(Base); }
+  Expr *getBase() { return cast<Expr>(Base); }
+  void setBase(Expr *E) { Base = E; }
+
+  IdentifierInfo &getAccessor() const { return *Accessor; }
+  void setAccessor(IdentifierInfo *II) { Accessor = II; }
+
+  SourceLocation getAccessorLoc() const { return AccessorLoc; }
+  void setAccessorLoc(SourceLocation L) { AccessorLoc = L; }
+
+  /// getNumElements - Get the number of components being selected.
+  unsigned getNumElements() const { return Positions.Count; }
+
+  /// containsDuplicateElements - Return true if any element access is
+  /// repeated.
+  bool containsDuplicateElements() const { return Positions.ContainsDuplicateElements(); }
+
+  /// getEncodedElementAccess - Encode the elements accessed
+  hlsl::VectorMemberAccessPositions getEncodedElementAccess() const { return Positions; }
+
+  /// getEncodedElementAccess - Encode the elements accessed
+  void getEncodedElementAccess(SmallVectorImpl<unsigned> &Elts) const {
+    StringRef Comp = Accessor->getName();
+    if (Comp[0] == 's' || Comp[0] == 'S')
+      Comp = Comp.substr(1);
+
+    for (unsigned i = 0, e = getNumElements(); i != e; ++i) {
+      uint64_t Index = ExtVectorType::getPointAccessorIdx(Comp[i]);
+      Elts.push_back(Index);
+    }
+  }
+
+  SourceLocation getLocStart() const LLVM_READONLY{
+    return getBase()->getLocStart();
+  }
+  SourceLocation getLocEnd() const LLVM_READONLY{ return AccessorLoc; }
+
+  /// isArrow - Return true if the base expression is a pointer to vector,
+  /// return false if the base expression is a vector.
+  bool isArrow() const { return getBase()->getType()->isPointerType(); }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == HLSLVectorElementExprClass;
+  }
+
+  // Iterators
+  child_range children() { return child_range(&Base, &Base + 1); }
+};
+// HLSL Change Ends
 
 /// BlockExpr - Adaptor class for mixing a BlockDecl with expressions.
 /// ^{ statement-body }   or   ^(int arg1, float arg2){ statement-body }

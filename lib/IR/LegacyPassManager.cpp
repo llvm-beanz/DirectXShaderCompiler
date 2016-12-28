@@ -1,16 +1,14 @@
 //===- LegacyPassManager.cpp - LLVM Pass Infrastructure Implementation ----===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the legacy LLVM Pass Manager infrastructure.
-//
-//===----------------------------------------------------------------------===//
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LegacyPassManager.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the legacy LLVM Pass Manager infrastructure.         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -1380,6 +1378,12 @@ FunctionPassManager::~FunctionPassManager() {
 }
 
 void FunctionPassManager::add(Pass *P) {
+  // HLSL Change Starts
+  if (TrackPassOS) {
+    P->dumpConfig(*TrackPassOS);
+    (*TrackPassOS) << '\n';
+  }
+  // HLSL Change Ends
   FPM->add(P);
 }
 
@@ -1720,6 +1724,12 @@ PassManager::~PassManager() {
 }
 
 void PassManager::add(Pass *P) {
+  // HLSL Change Starts
+  if (TrackPassOS) {
+    P->dumpConfig(*TrackPassOS);
+    (*TrackPassOS) << '\n';
+  }
+  // HLSL Change Ends
   PM->add(P);
 }
 

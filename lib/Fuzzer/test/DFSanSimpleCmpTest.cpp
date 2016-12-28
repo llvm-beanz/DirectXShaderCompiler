@@ -1,3 +1,13 @@
+//===- DFSanSimpleCmpTest.cpp -----------------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DFSanSimpleCmpTest.cpp                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 // Simple test for a fuzzer. The fuzzer must find several narrow ranges.
 #include <cstdint>
 #include <cstdlib>

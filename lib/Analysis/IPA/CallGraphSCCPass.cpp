@@ -1,19 +1,18 @@
 //===- CallGraphSCCPass.cpp - Pass that operates BU on call graph ---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the CallGraphSCCPass class, which is used for passes
-// which are implemented as bottom-up traversals on the call graph.  Because
-// there may be cycles in the call graph, passes of this type operate on the
-// call-graph in SCC order: that is, they process function bottom-up, except for
-// recursive functions, which they process all at once.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CallGraphSCCPass.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the CallGraphSCCPass class, which is used for passes //
+// which are implemented as bottom-up traversals on the call graph.  Because //
+// there may be cycles in the call graph, passes of this type operate on the //
+// call-graph in SCC order: that is, they process function bottom-up, except for//
+// recursive functions, which they process all at once.                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/CallGraphSCCPass.h"
 #include "llvm/ADT/SCCIterator.h"

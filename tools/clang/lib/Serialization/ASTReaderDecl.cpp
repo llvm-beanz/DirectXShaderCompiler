@@ -1,16 +1,15 @@
 //===--- ASTReaderDecl.cpp - Decl Deserialization ---------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the ASTReader::ReadDeclRecord method, which is the
-// entrypoint for loading a decl.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTReaderDecl.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the ASTReader::ReadDeclRecord method, which is the   //
+// entrypoint for loading a decl.                                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Serialization/ASTReader.h"
 #include "ASTCommon.h"
@@ -3870,7 +3869,8 @@ void ASTDeclReader::UpdateDecl(Decl *D, ModuleFile &ModuleFile,
       if (isUnresolvedExceptionSpec(FPT->getExceptionSpecType())) {
         FD->setType(Reader.Context.getFunctionType(
             FPT->getReturnType(), FPT->getParamTypes(),
-            FPT->getExtProtoInfo().withExceptionSpec(ESI)));
+            FPT->getExtProtoInfo().withExceptionSpec(ESI),
+            FPT->getParamMods())); // HLSL Change
 
         // When we get to the end of deserializing, see if there are other decls
         // that we need to propagate this exception specification onto.

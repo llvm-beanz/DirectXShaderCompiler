@@ -1,20 +1,19 @@
 //===-- llvm-objdump.cpp - Object file dumping utility for llvm -----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This program is a utility that works like binutils "objdump", that is, it
-// dumps out a plethora of information about an object file depending on the
-// flags.
-//
-// The flags and output of this program should be near identical to those of
-// binutils objdump.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-objdump.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This program is a utility that works like binutils "objdump", that is, it //
+// dumps out a plethora of information about an object file depending on the //
+// flags.                                                                    //
+//                                                                           //
+// The flags and output of this program should be near identical to those of //
+// binutils objdump.                                                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm-objdump.h"
 #include "llvm/ADT/Optional.h"
@@ -1490,7 +1489,8 @@ static void DumpInput(StringRef file) {
     report_error(file, object_error::invalid_file_type);
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   // Print a stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);

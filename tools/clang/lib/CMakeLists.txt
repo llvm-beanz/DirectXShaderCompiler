@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 add_subdirectory(Headers)
 add_subdirectory(Basic)
 add_subdirectory(Lex)
@@ -13,7 +15,7 @@ if(CLANG_ENABLE_ARCMT)
   add_subdirectory(ARCMigrate)
 endif()
 add_subdirectory(Driver)
-add_subdirectory(Serialization)
+# add_subdirectory(Serialization) # HLSL Change
 add_subdirectory(Frontend)
 add_subdirectory(FrontendTool)
 add_subdirectory(Tooling)

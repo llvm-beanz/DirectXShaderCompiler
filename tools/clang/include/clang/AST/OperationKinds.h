@@ -1,16 +1,15 @@
 //===- OperationKinds.h - Operation enums -----------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// OperationKinds.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file enumerates the different kinds of operations that can be        //
+// performed by various expressions.                                         //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file enumerates the different kinds of operations that can be
-// performed by various expressions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_AST_OPERATIONKINDS_H
 #define LLVM_CLANG_AST_OPERATIONKINDS_H
@@ -299,6 +298,26 @@ enum CastKind {
 
   // Convert a pointer to a different address space.
   CK_AddressSpaceConversion
+  
+  // HLSL Change Starts
+  ,
+  CK_FlatConversion,
+  CK_HLSLVectorSplat,
+  CK_HLSLMatrixSplat,
+  CK_HLSLVectorToScalarCast,
+  CK_HLSLMatrixToScalarCast,
+  CK_HLSLVectorTruncationCast,
+  CK_HLSLMatrixTruncationCast,
+  CK_HLSLVectorToMatrixCast,
+  CK_HLSLMatrixToVectorCast,
+  // HLSL ComponentConversion (HLSLCC) Casts:
+  CK_HLSLCC_IntegralCast,
+  CK_HLSLCC_IntegralToBoolean,
+  CK_HLSLCC_IntegralToFloating,
+  CK_HLSLCC_FloatingToIntegral,
+  CK_HLSLCC_FloatingToBoolean,
+  CK_HLSLCC_FloatingCast
+  // HLSL Change Ends  
 };
 
 static const CastKind CK_Invalid = static_cast<CastKind>(-1);

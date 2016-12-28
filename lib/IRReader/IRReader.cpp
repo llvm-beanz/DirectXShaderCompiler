@@ -1,15 +1,16 @@
 //===---- IRReader.cpp - Reader for LLVM IR files -------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IRReader.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IRReader/IRReader.h"
-#include "llvm-c/Core.h"
-#include "llvm-c/IRReader.h"
+// #include "llvm-c/Core.h"
+// #include "llvm-c/IRReader.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/IR/LLVMContext.h"
@@ -93,6 +94,8 @@ std::unique_ptr<Module> llvm::parseIRFile(StringRef Filename, SMDiagnostic &Err,
   return parseIR(FileOrErr.get()->getMemBufferRef(), Err, Context);
 }
 
+#if 0 // HLSL Change Starts
+
 //===----------------------------------------------------------------------===//
 // C API.
 //===----------------------------------------------------------------------===//
@@ -114,10 +117,12 @@ LLVMBool LLVMParseIRInContext(LLVMContextRef ContextRef,
       Diag.print(nullptr, os, false);
       os.flush();
 
-      *OutMessage = strdup(buf.c_str());
+      *OutMessage = _strdup(buf.c_str());
     }
     return 1;
   }
 
   return 0;
 }
+
+#endif // HLSL Change Ends

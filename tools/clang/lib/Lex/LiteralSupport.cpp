@@ -1,16 +1,15 @@
 //===--- LiteralSupport.cpp - Code to parse and process literals ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the NumericLiteralParser, CharLiteralParser, and
-// StringLiteralParser interfaces.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LiteralSupport.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the NumericLiteralParser, CharLiteralParser, and     //
+// StringLiteralParser interfaces.                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Lex/LiteralSupport.h"
 #include "clang/Basic/CharInfo.h"
@@ -367,7 +366,7 @@ static int MeasureUCNEscape(const char *ThisTokBegin, const char *&ThisTokBuf,
 /// we will likely rework our support for UCN's.
 static void EncodeUCNEscape(const char *ThisTokBegin, const char *&ThisTokBuf,
                             const char *ThisTokEnd,
-                            char *&ResultBuf, bool &HadError,
+                            _Out_cap_(4) char *&ResultBuf, bool &HadError,
                             FullSourceLoc Loc, unsigned CharByteWidth,
                             DiagnosticsEngine *Diags,
                             const LangOptions &Features) {
@@ -513,7 +512,7 @@ NumericLiteralParser::NumericLiteralParser(StringRef TokSpelling,
   // and FP constants (specifically, the 'pp-number' regex), and assumes that
   // the byte at "*end" is both valid and not part of the regex.  Because of
   // this, it doesn't have to check for 'overscan' in various places.
-  assert(!isPreprocessingNumberBody(*ThisTokEnd) && "didn't maximally munch?");
+  assert(!isPreprocessingNumberBody(*ThisTokEnd) || *ThisTokEnd == '.' && "didn't maximally munch?"); // HLSL Change - '.' might be a second '.' for a '1.2.x' literal
 
   s = DigitsBegin = ThisTokBegin;
   saw_exponent = false;

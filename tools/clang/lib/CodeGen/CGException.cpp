@@ -1,15 +1,14 @@
 //===--- CGException.cpp - Emit LLVM Code for C++ exceptions --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code dealing with C++ exception related code generation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGException.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code dealing with C++ exception related code generation.    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCXXABI.h"
@@ -28,6 +27,33 @@
 
 using namespace clang;
 using namespace CodeGen;
+
+// HLSL Change Starts
+// No exeption codegen support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 1
+// No GCC compat requirements, no notion of personality for HLSL.
+void CodeGenModule::SimplifyPersonality() { }
+// No exception support.
+void CodeGenFunction::EmitStartEHSpec(const Decl *) { }
+void CodeGenFunction::EmitEndEHSpec(const Decl *) { }
+void CodeGenFunction::EmitCXXThrowExpr(const CXXThrowExpr *, bool) {
+  llvm_unreachable("HLSL does not generate throw expressions");
+}
+llvm::Constant *CodeGenModule::getTerminateFn() {
+  llvm_unreachable("HLSL does not terminate");
+  return nullptr;
+}
+llvm::Value *CodeGenFunction::getExceptionFromSlot() {
+  llvm_unreachable("HLSL does not support exceptions");
+  return nullptr;
+}
+llvm::Value *CodeGenFunction::getSelectorFromSlot() {
+  llvm_unreachable("HLSL does not support exceptions");
+  return nullptr;
+}
+#else
+// HLSL Change Ends
 
 static llvm::Constant *getFreeExceptionFn(CodeGenModule &CGM) {
   // void __cxa_free_exception(void *thrown_exception);
@@ -1787,3 +1813,5 @@ void CodeGenFunction::EmitSEHLeaveStmt(const SEHLeaveStmt &S) {
 
   EmitBranchThroughCleanup(*SEHTryEpilogueStack.back());
 }
+
+#endif // HLSL Change

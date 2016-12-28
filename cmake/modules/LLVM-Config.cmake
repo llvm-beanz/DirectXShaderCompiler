@@ -97,7 +97,7 @@ function(llvm_map_components_to_libnames out_libs)
       else()
         if( TARGET LLVM${c} )
           list(APPEND expanded_components "LLVM${c}")
-        else()
+        elseif( NOT c STREQUAL "None" ) # HLSL Change
           message(FATAL_ERROR "Target ${c} is not in the set of libraries.")
         endif()
       endif()

@@ -1,15 +1,14 @@
 //===-- llvm-dwarfdump.cpp - Debug info dumping utility for llvm ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This program is a utility that works like "dwarfdump".
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-dwarfdump.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This program is a utility that works like "dwarfdump".                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
@@ -100,7 +99,8 @@ static void DumpInput(StringRef Filename) {
   DICtx->dump(outs(), DumpType);
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   // Print a stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);

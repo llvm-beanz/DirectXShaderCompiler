@@ -8,6 +8,9 @@ Driver Design & Internals
 Introduction
 ============
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 This document describes the Clang driver. The purpose of this document
 is to describe both the motivation and design goals for the driver, as
 well as details of the internal implementation.

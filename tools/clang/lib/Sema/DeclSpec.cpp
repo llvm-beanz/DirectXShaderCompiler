@@ -1,15 +1,14 @@
 //===--- SemaDeclSpec.cpp - Declaration Specifier Semantic Analysis -------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for declaration specifiers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclSpec.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for declaration specifiers.       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/DeclSpec.h"
 #include "clang/AST/ASTContext.h"
@@ -454,6 +453,10 @@ const char *DeclSpec::getSpecifierName(DeclSpec::TST T,
   case DeclSpec::TST_char32:      return "char32_t";
   case DeclSpec::TST_int:         return "int";
   case DeclSpec::TST_int128:      return "__int128";
+  // HLSL Change Starts
+  case DeclSpec::TST_min10float:  return "min10float";
+  case DeclSpec::TST_min12int:    return "min12int";
+    // HLSL Change Ends
   case DeclSpec::TST_half:        return "half";
   case DeclSpec::TST_float:       return "float";
   case DeclSpec::TST_double:      return "double";
@@ -562,6 +565,7 @@ bool DeclSpec::SetStorageClassSpecThread(TSCS TSC, SourceLocation Loc,
   ThreadStorageClassSpecLoc = Loc;
   return false;
 }
+
 
 /// These methods set the specified attribute of the DeclSpec, but return true
 /// and ignore the request if invalid (e.g. "extern" then "auto" is

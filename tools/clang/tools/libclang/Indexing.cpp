@@ -1,11 +1,12 @@
 //===- CIndexHigh.cpp - Higher level API functions ------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Indexing.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "IndexingContext.h"
 #include "CIndexDiagnostic.h"
@@ -585,7 +586,9 @@ static void clang_indexSourceFile_Impl(void *UserData) {
   // (often very broken) source code, where spell-checking can have a
   // significant negative impact on performance (particularly when 
   // precompiled headers are involved), we disable it.
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
   CInvok->getLangOpts()->SpellChecking = false;
+#endif
 
   if (index_options & CXIndexOpt_SuppressWarnings)
     CInvok->getDiagnosticOpts().IgnoreWarnings = true;
@@ -804,7 +807,7 @@ static void clang_indexTranslationUnit_Impl(void *UserData) {
 // libclang public APIs.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {                 // HLSL Change -Don't use c linkage.
 
 int clang_index_isEntityObjCContainerKind(CXIdxEntityKind K) {
   return CXIdxEntity_ObjCClass <= K && K <= CXIdxEntity_ObjCCategory;
@@ -1081,5 +1084,5 @@ CXSourceLocation clang_indexLoc_getCXSourceLocation(CXIdxLoc location) {
   return cxloc::translateSourceLocation(IndexCtx.getASTContext(), Loc);
 }
 
-} // end: extern "C"
+// } // end: extern "C"        // HLSL Change -Don't use c linkage.
 

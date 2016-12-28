@@ -1,16 +1,17 @@
 //===- yaml2elf - Convert YAML to a ELF object file -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// yaml2elf.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief The ELF component of yaml2obj.
+/// \file                                                                    //
+/// \brief The ELF component of yaml2obj.                                    //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "yaml2obj.h"
 #include "llvm/ADT/ArrayRef.h"

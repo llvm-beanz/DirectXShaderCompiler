@@ -1,15 +1,14 @@
 //===-- llvm/MC/MCInstrItineraries.h - Scheduling ---------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file describes the structures used for instruction
-// itineraries, stages, and operand reads/writes.  This is used by
-// schedulers to determine instruction stages and latencies.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MCInstrItineraries.h                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file describes the structures used for instruction                   //
+// itineraries, stages, and operand reads/writes.  This is used by           //
+// schedulers to determine instruction stages and latencies.                 //
 //
 //===----------------------------------------------------------------------===//
 
@@ -101,9 +100,8 @@ struct InstrItinerary {
   unsigned FirstOperandCycle;  ///< Index of first operand rd/wr
   unsigned LastOperandCycle;   ///< Index of last + 1 operand rd/wr
 };
-
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// Itinerary data supplied by a subtarget to be used by a target.
 ///
 class InstrItineraryData {

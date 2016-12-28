@@ -1,16 +1,17 @@
 //===--- LangOptions.h - C Language Family Language Options -----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LangOptions.h                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines the clang::LangOptions interface.
+/// \file                                                                    //
+/// \brief Defines the clang::LangOptions interface.                         //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_BASIC_LANGOPTIONS_H
 #define LLVM_CLANG_BASIC_LANGOPTIONS_H
@@ -30,18 +31,36 @@ namespace clang {
 class LangOptionsBase {
 public:
   // Define simple language options (with no accessors).
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
+
 #define LANGOPT(Name, Bits, Default, Description) unsigned Name : Bits;
 #define ENUM_LANGOPT(Name, Type, Bits, Default, Description)
 #include "clang/Basic/LangOptions.def"
 
+#else
+
+#define LANGOPT(Name, Bits, Default, Description) static const unsigned Name = Default;
+#define ENUM_LANGOPT(Name, Type, Bits, Default, Description)
+#include "clang/Basic/LangOptions.fixed.def"
+
+#endif
+
 protected:
   // Define language options of enumeration type. These are private, and will
   // have accessors (below).
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
 #define LANGOPT(Name, Bits, Default, Description)
 #define ENUM_LANGOPT(Name, Type, Bits, Default, Description) \
   unsigned Name : Bits;
 #include "clang/Basic/LangOptions.def"
+#endif
 };
+
+// #ifndef MS_SUPPORT_VARIABLE_LANGOPTS
+// #define LANGOPT(Name, Bits, Default, Description) __declspec(selectany) unsigned LangOptionsBase::#Name = Default;
+// #define ENUM_LANGOPT(Name, Type, Bits, Default, Description)
+// #include "clang/Basic/LangOptions.fixed.def"
+// #endif
 
 /// \brief Keeps track of the various options that can be
 /// enabled, which controls the dialect of C or C++ that is accepted.
@@ -112,11 +131,30 @@ public:
   LangOptions();
 
   // Define accessors/mutators for language options of enumeration type.
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
+
 #define LANGOPT(Name, Bits, Default, Description) 
 #define ENUM_LANGOPT(Name, Type, Bits, Default, Description) \
   Type get##Name() const { return static_cast<Type>(Name); } \
   void set##Name(Type Value) { Name = static_cast<unsigned>(Value); }  
 #include "clang/Basic/LangOptions.def"
+  
+#else
+
+#define LANGOPT(Name, Bits, Default, Description) 
+#define ENUM_LANGOPT(Name, Type, Bits, Default, Description) \
+  Type get##Name() const { return static_cast<Type>(Default); } \
+  void set##Name(Type Value) { assert(Value == Default); }  
+#include "clang/Basic/LangOptions.fixed.def"
+
+#endif
+
+  // MS Change Starts
+  bool HLSL2015;  // Only supported for IntelliSense scenarios.
+  bool HLSL2016;
+  unsigned RootSigMajor;
+  unsigned RootSigMinor;
+  // MS Change Ends
   
   bool isSignedOverflowDefined() const {
     return getSignedOverflowBehavior() == SOB_Defined;

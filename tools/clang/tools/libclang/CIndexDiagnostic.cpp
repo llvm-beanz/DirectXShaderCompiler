@@ -1,15 +1,15 @@
 /*===-- CIndexDiagnostics.cpp - Diagnostics C Interface ---------*- C++ -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* Implements the diagnostic functions of the Clang C interface.              *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CIndexDiagnostic.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Implements the diagnostic functions of the Clang C interface.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 #include "CIndexDiagnostic.h"
 #include "CIndexer.h"
 #include "CXTranslationUnit.h"
@@ -207,7 +207,7 @@ CXDiagnosticSetImpl *cxdiag::lazyCreateDiags(CXTranslationUnit TU,
 //-----------------------------------------------------------------------------
 // C Interface Routines
 //-----------------------------------------------------------------------------
-extern "C" {
+// extern "C" {   // HLSL Change -Don't use c linkage.
 
 unsigned clang_getNumDiagnostics(CXTranslationUnit Unit) {
   if (cxtu::isNotUsableTU(Unit)) {
@@ -304,6 +304,7 @@ CXString clang_formatDiagnostic(CXDiagnostic Diagnostic, unsigned Options) {
   }
 
   /* Print warning/error/etc. */
+  if (Options & CXDiagnostic_DisplaySeverity) { // HLSL Change
   switch (Severity) {
   case CXDiagnostic_Ignored: llvm_unreachable("impossible");
   case CXDiagnostic_Note: Out << "note: "; break;
@@ -311,6 +312,7 @@ CXString clang_formatDiagnostic(CXDiagnostic Diagnostic, unsigned Options) {
   case CXDiagnostic_Error: Out << "error: "; break;
   case CXDiagnostic_Fatal: Out << "fatal error: "; break;
   }
+  } // HLSL Change
 
   CXString Text = clang_getDiagnosticSpelling(Diagnostic);
   if (clang_getCString(Text))
@@ -480,4 +482,4 @@ unsigned clang_getNumDiagnosticsInSet(CXDiagnosticSet Diags) {
   return 0;
 }
 
-} // end extern "C"
+// } // end extern "C"      // HLSL Change -Don't use c linkage.

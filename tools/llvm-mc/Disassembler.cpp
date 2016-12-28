@@ -1,16 +1,15 @@
 //===- Disassembler.cpp - Disassembler for hex strings --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This class implements the disassembler of strings of bytes written in
-// hexadecimal, from standard input or from a file.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Disassembler.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This class implements the disassembler of strings of bytes written in     //
+// hexadecimal, from standard input or from a file.                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Disassembler.h"
 #include "llvm/ADT/Triple.h"

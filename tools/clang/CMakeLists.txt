@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 cmake_minimum_required(VERSION 2.8.8)
 
 # FIXME: It may be removed when we use 2.8.12.
@@ -358,7 +360,7 @@ macro(add_clang_library name)
       set_source_files_properties(${tds}} PROPERTIES HEADER_FILE_ONLY ON)
 
       if(headers OR tds)
-	set(srcs ${headers} ${tds})
+    set(srcs ${headers} ${tds})
       endif()
     endif()
   endif(MSVC_IDE OR XCODE)
@@ -485,21 +487,21 @@ if (CLANG_BUILD_EXAMPLES)
 else()
   set(ENABLE_CLANG_EXAMPLES "0")
 endif()
-add_subdirectory(examples)
+# add_subdirectory(examples) # HLSL Change
 
 option(CLANG_INCLUDE_TESTS
        "Generate build targets for the Clang unit tests."
        ${LLVM_INCLUDE_TESTS})
 
-if( CLANG_INCLUDE_TESTS )
-  if(EXISTS ${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include/gtest/gtest.h)
+if( CLANG_INCLUDE_TESTS OR HLSL_INCLUDE_TESTS ) # HLSL Change
+  if(HLSL_INCLUDE_TESTS OR EXISTS ${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include/gtest/gtest.h) # HLSL Change - no need for gtest
     add_subdirectory(unittests)
     list(APPEND CLANG_TEST_DEPS ClangUnitTests)
     list(APPEND CLANG_TEST_PARAMS
       clang_unit_site_config=${CMAKE_CURRENT_BINARY_DIR}/test/Unit/lit.site.cfg
       )
   endif()
-  add_subdirectory(test)
+#  add_subdirectory(test) # HLSL Change - disable pure .lit tests
 
   if(CLANG_BUILT_STANDALONE)
     # Add a global check rule now that all subdirectories have been traversed

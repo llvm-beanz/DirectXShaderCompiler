@@ -1,15 +1,14 @@
 //===- Version.cpp - Clang Version Number -----------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines several version-related utility functions for Clang.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Version.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines several version-related utility functions for Clang.    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/Version.h"
 #include "clang/Basic/LLVM.h"
@@ -36,7 +35,7 @@ std::string getClangRepositoryPath() {
 
   // If the SVN_REPOSITORY is empty, try to use the SVN keyword. This helps us
   // pick up a tag in an SVN export, for example.
-  StringRef SVNRepository("$URL$");
+  StringRef SVNRepository("$URL: https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_370/final/lib/Basic/Version.cpp $");
   if (URL.empty()) {
     URL = SVNRepository.slice(SVNRepository.find(':'),
                               SVNRepository.find("/lib/Basic"));

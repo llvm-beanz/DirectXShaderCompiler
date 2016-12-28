@@ -1,15 +1,14 @@
 //===--- raw_ostream.cpp - Implement the raw_ostream classes --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This implements support for bulk buffered stream output.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// raw_ostream.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This implements support for bulk buffered stream output.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/STLExtras.h"
@@ -86,7 +85,7 @@ void raw_ostream::SetBuffered() {
     SetUnbuffered();
 }
 
-void raw_ostream::SetBufferAndMode(char *BufferStart, size_t Size,
+void raw_ostream::SetBufferAndMode(_In_opt_ char *BufferStart, size_t Size,
                                    BufferKind Mode) {
   assert(((Mode == Unbuffered && !BufferStart && Size == 0) ||
           (Mode != Unbuffered && BufferStart && Size != 0)) &&
@@ -422,6 +421,8 @@ raw_ostream &raw_ostream::operator<<(const FormattedNumber &FN) {
     unsigned long long N = FN.HexValue;
     while (N) {
       uintptr_t x = N % 16;
+      assert(CurPtr > NumberBuffer && "else FN values inconsistent"); // HLSL Change
+      _Analysis_assume_(CurPtr > NumberBuffer); // HLSL Change
       *--CurPtr = (x < 10 ? '0' + x : A + x - 10);
       N /= 16;
     }
@@ -524,7 +525,7 @@ raw_fd_ostream::raw_fd_ostream(int fd, bool shouldClose, bool unbuffered)
   }
 
   // Get the starting position.
-  off_t loc = ::lseek(FD, 0, SEEK_CUR);
+  off_t loc = llvm::sys::fs::msf_lseek(FD, 0, SEEK_CUR);  // HLSL Change - msf_lseek
 #ifdef LLVM_ON_WIN32
   // MSVCRT's _lseek(SEEK_CUR) doesn't return -1 for pipes.
   sys::fs::file_status Status;
@@ -572,7 +573,7 @@ void raw_fd_ostream::write_impl(const char *Ptr, size_t Size) {
 
     // Check whether we should attempt to use atomic writes.
     if (LLVM_LIKELY(!UseAtomicWrites)) {
-      ret = ::write(FD, Ptr, Size);
+      ret = llvm::sys::fs::msf_write(FD, Ptr, Size);
     } else {
       // Use ::writev() where available.
 #if defined(HAVE_WRITEV)
@@ -580,7 +581,7 @@ void raw_fd_ostream::write_impl(const char *Ptr, size_t Size) {
       struct iovec IOV = {const_cast<void *>(Addr), Size };
       ret = ::writev(FD, &IOV, 1);
 #else
-      ret = ::write(FD, Ptr, Size);
+      ret = llvm::sys::fs::msf_write(FD, Ptr, Size);
 #endif
     }
 
@@ -624,7 +625,7 @@ void raw_fd_ostream::close() {
 
 uint64_t raw_fd_ostream::seek(uint64_t off) {
   flush();
-  pos = ::lseek(FD, off, SEEK_SET);
+  pos = llvm::sys::fs::msf_lseek(FD, off, SEEK_SET);  // HLSL Change
   if (pos == (uint64_t)-1)
     error_detected();
   return pos;

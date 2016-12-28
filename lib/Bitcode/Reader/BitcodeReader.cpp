@@ -1,11 +1,12 @@
 //===- BitcodeReader.cpp - Internal BitcodeReader implementation ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BitcodeReader.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/ADT/STLExtras.h"
@@ -233,6 +234,8 @@ public:
 
   void releaseBuffer();
 
+  BitstreamUseTracker Tracker; // HLSL Change
+
   bool isDematerializable(const GlobalValue *GV) const override;
   std::error_code materialize(GlobalValue *GV) override;
   std::error_code materializeModule(Module *M) override;
@@ -422,6 +425,14 @@ static DiagnosticHandlerFunction getDiagHandler(DiagnosticHandlerFunction F,
     return F;
   return [&C](const DiagnosticInfo &DI) { C.diagnose(DI); };
 }
+
+// HLSL Change Starts
+static void ReportWarning(DiagnosticHandlerFunction F, const char *Msg) {
+  BitcodeDiagnosticInfo BDI(std::error_code(), DiagnosticSeverity::DS_Warning,
+                            Msg);
+  F(BDI);
+}
+// HLSL Change Ends
 
 BitcodeReader::BitcodeReader(MemoryBuffer *Buffer, LLVMContext &Context,
                              DiagnosticHandlerFunction DiagnosticHandler)
@@ -1036,7 +1047,11 @@ std::error_code BitcodeReader::parseAttributeBlock() {
 
   // Read all the records.
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -1209,7 +1224,11 @@ std::error_code BitcodeReader::parseAttributeGroupBlock() {
 
   // Read all the records.
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -1302,7 +1321,11 @@ std::error_code BitcodeReader::parseTypeTableBody() {
 
   // Read all the records for this type table.
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -1535,7 +1558,11 @@ std::error_code BitcodeReader::parseValueSymbolTable() {
   // Read all the records for this value table.
   SmallString<128> ValueName;
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -1617,7 +1644,11 @@ std::error_code BitcodeReader::parseMetadata() {
 
   // Read all the records.
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -2158,7 +2189,11 @@ std::error_code BitcodeReader::parseConstants() {
   Type *CurTy = Type::getInt32Ty(Context);
   unsigned NextCstNo = ValueList.size();
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -2614,7 +2649,11 @@ std::error_code BitcodeReader::parseUseLists() {
   // Read all the records.
   SmallVector<uint64_t, 64> Record;
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -2767,10 +2806,17 @@ std::error_code BitcodeReader::parseModule(bool Resume,
       default:  // Skip unknown content.
         if (Stream.SkipBlock())
           return error("Invalid record");
+        ReportWarning(DiagnosticHandler, "Unrecognized block found"); // HLSL Change - check for skipped blocks
         break;
       case bitc::BLOCKINFO_BLOCK_ID:
-        if (Stream.ReadBlockInfoBlock())
+        // HLSL Changes Start -- check for skipped blocks
+        unsigned count;
+        count = 0;
+        if (Stream.ReadBlockInfoBlock(&count))
           return error("Malformed block");
+        if (count > 0)
+          ReportWarning(DiagnosticHandler, "Unrecognized block found");
+        // HLSL Changes End
         break;
       case bitc::PARAMATTR_BLOCK_ID:
         if (std::error_code EC = parseAttributeBlock())
@@ -3143,7 +3189,6 @@ BitcodeReader::parseBitcodeInto(std::unique_ptr<DataStreamer> Streamer,
   // need to understand them all.
   while (1) {
     if (Stream.AtEndOfStream()) {
-      // We didn't really read a proper Module.
       return error("Malformed IR file");
     }
 
@@ -3153,11 +3198,16 @@ BitcodeReader::parseBitcodeInto(std::unique_ptr<DataStreamer> Streamer,
     if (Entry.Kind != BitstreamEntry::SubBlock)
       return error("Malformed block");
 
-    if (Entry.ID == bitc::MODULE_BLOCK_ID)
+    // HLSL Change - process the complete stream.
+    if (Entry.ID == bitc::MODULE_BLOCK_ID) {
       return parseModule(false, ShouldLazyLoadMetadata);
-
-    if (Stream.SkipBlock())
-      return error("Invalid record");
+    }
+    else {
+      ReportWarning(DiagnosticHandler, "Unrecognized block found");
+      if (Stream.SkipBlock())
+        return error("Invalid record");
+    }
+    // HLSL Change Ends - process the complete stream.
   }
 }
 
@@ -3170,7 +3220,11 @@ ErrorOr<std::string> BitcodeReader::parseModuleTriple() {
   std::string Triple;
   // Read all the records for this module.
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -3230,6 +3284,7 @@ ErrorOr<std::string> BitcodeReader::parseTriple() {
       // Ignore other sub-blocks.
       if (Stream.SkipBlock())
         return error("Malformed block");
+      ReportWarning(DiagnosticHandler, "Unrecognized block found");
       continue;
 
     case BitstreamEntry::Record:
@@ -3246,7 +3301,11 @@ std::error_code BitcodeReader::parseMetadataAttachment(Function &F) {
 
   SmallVector<uint64_t, 64> Record;
   while (1) {
-    BitstreamEntry Entry = Stream.advanceSkippingSubblocks();
+    // HLSL Change Starts - count skipped blocks
+    unsigned skipCount = 0;
+    BitstreamEntry Entry = Stream.advanceSkippingSubblocks(0, &skipCount);
+    if (skipCount) ReportWarning(DiagnosticHandler, "Unrecognized subblock");
+    // HLSL Change End
 
     switch (Entry.Kind) {
     case BitstreamEntry::SubBlock: // Handled for us already.
@@ -3360,6 +3419,7 @@ std::error_code BitcodeReader::parseFunctionBody(Function *F) {
       default:  // Skip unknown content.
         if (Stream.SkipBlock())
           return error("Invalid record");
+        ReportWarning(DiagnosticHandler, "Unrecognized block found");
         break;
       case bitc::CONSTANTS_BLOCK_ID:
         if (std::error_code EC = parseConstants())
@@ -4562,6 +4622,13 @@ std::error_code BitcodeReader::materializeModule(Module *M) {
     UpgradeInstWithTBAATag(InstsWithTBAATag[I]);
 
   UpgradeDebugInfo(*M);
+
+  // HLSL Change Starts
+  if (!Tracker.isDense((uint64_t)(Buffer->getBufferSize()) * 8)) {
+    ReportWarning(DiagnosticHandler, "Unused bits in buffer.");
+  }
+  // HLSL Change Ends
+
   return std::error_code();
 }
 
@@ -4581,7 +4648,7 @@ std::error_code BitcodeReader::initStreamFromBuffer() {
   const unsigned char *BufEnd = BufPtr+Buffer->getBufferSize();
 
   if (Buffer->getBufferSize() & 3)
-    return error("Invalid bitcode signature");
+    return error("Invalid bitcode size"); // HLSL Change - bitcode size is the problem, not the signature per se
 
   // If we have a wrapper header, parse it and ignore the non-bc file contents.
   // The magic number is 0x0B17C0DE stored in little endian.
@@ -4590,6 +4657,7 @@ std::error_code BitcodeReader::initStreamFromBuffer() {
       return error("Invalid bitcode wrapper header");
 
   StreamFile.reset(new BitstreamReader(BufPtr, BufEnd));
+  StreamFile->Tracker = &Tracker; // HLSL Change
   Stream.init(&*StreamFile);
 
   return std::error_code();
@@ -4640,10 +4708,10 @@ class BitcodeErrorCategoryType : public std::error_category {
 };
 }
 
-static ManagedStatic<BitcodeErrorCategoryType> ErrorCategory;
+static BitcodeErrorCategoryType g_ErrorCategory; // HLSL Change - not a ManagedStatic
 
 const std::error_category &llvm::BitcodeErrorCategory() {
-  return *ErrorCategory;
+  return g_ErrorCategory; // HLSL Change - simple global
 }
 
 //===----------------------------------------------------------------------===//
@@ -4722,9 +4790,30 @@ ErrorOr<std::unique_ptr<Module>> llvm::getStreamedBitcodeModule(
                               false);
 }
 
+// HLSL Change Starts
+struct report_fatal_error_data {
+  report_fatal_error_data(DiagnosticHandlerFunction DH)
+      : DiagnosticHandler(DH) {}
+  DiagnosticHandlerFunction DiagnosticHandler;
+};
+void report_fatal_error_handler(void *user_datam, const std::string &reason,
+                                bool gen_crash_diag) {
+  report_fatal_error_data *data = (report_fatal_error_data *)user_datam;
+  BitcodeDiagnosticInfo BDI(std::error_code(EINVAL, std::system_category()),
+                            DiagnosticSeverity::DS_Error, reason);
+  data->DiagnosticHandler(BDI);
+  throw std::exception("Invalid bitcode");
+}
+// HLSL Change Ends
+
 ErrorOr<std::unique_ptr<Module>>
 llvm::parseBitcodeFile(MemoryBufferRef Buffer, LLVMContext &Context,
                        DiagnosticHandlerFunction DiagnosticHandler) {
+  // HLSL Change Starts - introduce a ScopedFatalErrorHandler to handle
+  // report_fatal_error from readers.
+  report_fatal_error_data data(DiagnosticHandler);
+  ScopedFatalErrorHandler SFE(report_fatal_error_handler, &data);
+  // HLSL Change Ends
   std::unique_ptr<MemoryBuffer> Buf = MemoryBuffer::getMemBuffer(Buffer, false);
   return getLazyBitcodeModuleImpl(std::move(Buf), Context, true,
                                   DiagnosticHandler);

@@ -1,13 +1,14 @@
 //===- VirtualFileSystem.cpp - Virtual File System Layer --------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-// This file implements the VirtualFileSystem interface.
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// VirtualFileSystem.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the VirtualFileSystem interface.                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/VirtualFileSystem.h"
 #include "llvm/ADT/DenseMap.h"
@@ -135,8 +136,9 @@ RealFile::getBuffer(const Twine &Name, int64_t FileSize,
 #define S_ISFIFO(x) (0)
 #endif
 #endif
+#include "llvm/Support/FileSystem.h" // HLSL Change
 std::error_code RealFile::close() {
-  if (::close(FD))
+  if (llvm::sys::fs::msf_close(FD)) // HLSL Change
     return std::error_code(errno, std::generic_category());
   FD = -1;
   return std::error_code();

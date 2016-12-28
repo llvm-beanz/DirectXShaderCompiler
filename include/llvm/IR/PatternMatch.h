@@ -1,28 +1,27 @@
 //===- PatternMatch.h - Match on the LLVM IR --------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PatternMatch.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides a simple and efficient mechanism for performing general//
+// tree-based pattern matches on the LLVM IR.  The power of these routines is//
+// that it allows you to write concise patterns that are expressive and easy to//
+// understand.  The other major advantage of this is that it allows you to   //
+// trivially capture/bind elements in the pattern to variables.  For example,//
+// you can do something like this:                                           //
 //
-//                     The LLVM Compiler Infrastructure
+//  Value *Exp = ...                                                         //
+//  Value *X, *Y;  ConstantInt *C1, *C2;      // (X & C1) | (Y & C2)         //
+//  if (match(Exp, m_Or(m_And(m_Value(X), m_ConstantInt(C1)),                //
+//                      m_And(m_Value(Y), m_ConstantInt(C2))))) {            //
+//    ... Pattern is matched and variables are bound ...                     //
+//  }                                                                        //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file provides a simple and efficient mechanism for performing general
-// tree-based pattern matches on the LLVM IR.  The power of these routines is
-// that it allows you to write concise patterns that are expressive and easy to
-// understand.  The other major advantage of this is that it allows you to
-// trivially capture/bind elements in the pattern to variables.  For example,
-// you can do something like this:
-//
-//  Value *Exp = ...
-//  Value *X, *Y;  ConstantInt *C1, *C2;      // (X & C1) | (Y & C2)
-//  if (match(Exp, m_Or(m_And(m_Value(X), m_ConstantInt(C1)),
-//                      m_And(m_Value(Y), m_ConstantInt(C2))))) {
-//    ... Pattern is matched and variables are bound ...
-//  }
-//
-// This is primarily useful to things like the instruction combiner, but can
-// also be useful for static analysis tools or code generators.
+// This is primarily useful to things like the instruction combiner, but can //
+// also be useful for static analysis tools or code generators.              //
 //
 //===----------------------------------------------------------------------===//
 
@@ -1105,8 +1104,8 @@ inline MaxMin_match<FCmpInst, LHS, RHS, ufmax_pred_ty>
 m_UnordFMax(const LHS &L, const RHS &R) {
   return MaxMin_match<FCmpInst, LHS, RHS, ufmax_pred_ty>(L, R);
 }
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 // Matchers for overflow check patterns: e.g. (a + b) u< a
 //
 

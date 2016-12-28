@@ -1,16 +1,15 @@
 //===--- ASTImporter.cpp - Importing ASTs from other Contexts ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the ASTImporter class which imports AST nodes from one
-//  context into another context.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTImporter.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the ASTImporter class which imports AST nodes from one //
+//  context into another context.                                            //
+//                                                                           //
+
 #include "clang/AST/ASTImporter.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTDiagnostic.h"
@@ -23,7 +22,8 @@
 #include "clang/Basic/SourceManager.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <deque>
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 namespace clang {
   class ASTNodeImporter : public TypeVisitor<ASTNodeImporter, QualType>,
                           public DeclVisitor<ASTNodeImporter, Decl *>,
@@ -1676,7 +1676,7 @@ QualType ASTNodeImporter::VisitFunctionProtoType(const FunctionProtoType *T) {
   ToEPI.ExceptionSpec.SourceTemplate = cast_or_null<FunctionDecl>(
       Importer.Import(FromEPI.ExceptionSpec.SourceTemplate));
 
-  return Importer.getToContext().getFunctionType(ToResultType, ArgTypes, ToEPI);
+  return Importer.getToContext().getFunctionType(ToResultType, ArgTypes, ToEPI, None); // HLSL Change - add param modifiers
 }
 
 QualType ASTNodeImporter::VisitParenType(const ParenType *T) {
@@ -2812,7 +2812,7 @@ Decl *ASTNodeImporter::VisitFunctionDecl(FunctionDecl *D) {
         FromEPI.ExceptionSpec.NoexceptExpr) {
       FunctionProtoType::ExtProtoInfo DefaultEPI;
       FromTy = Importer.getFromContext().getFunctionType(
-          FromFPT->getReturnType(), FromFPT->getParamTypes(), DefaultEPI);
+          FromFPT->getReturnType(), FromFPT->getParamTypes(), DefaultEPI, None); // HLSL Change - add param modifiers
       usedDifferentExceptionSpec = true;
     }
   }

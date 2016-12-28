@@ -1,15 +1,14 @@
 /*===-- main.c - tool for testing libLLVM and llvm-c API ------------------===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* Main file for llvm-c-tests. "Parses" arguments and dispatches.             *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// main.c                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Main file for llvm-c-tests. "Parses" arguments and dispatches.            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm-c-test.h"
 #include "llvm-c/BitReader.h"
@@ -44,7 +43,8 @@ static void print_usage(void) {
       "    Read lines of name, rpn from stdin - print generated module\n\n");
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   LLVMPassRegistryRef pr = LLVMGetGlobalPassRegistry();
 
   LLVMInitializeCore(pr);

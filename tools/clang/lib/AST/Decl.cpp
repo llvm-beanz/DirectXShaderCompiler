@@ -1,15 +1,14 @@
 //===--- Decl.cpp - Declaration AST Node Implementation -------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Decl subclasses.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Decl.cpp                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Decl subclasses.                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/Decl.h"
 #include "clang/AST/ASTContext.h"
@@ -536,6 +535,9 @@ static void mergeTemplateLV(LinkageInfo &LV,
 }
 
 static bool useInlineVisibilityHidden(const NamedDecl *D) {
+#if 1 // HLSL Change Starts
+  return false;
+#else
   // FIXME: we should warn if -fvisibility-inlines-hidden is used with c.
   const LangOptions &Opts = D->getASTContext().getLangOpts();
   if (!Opts.CPlusPlus || !Opts.InlineVisibilityHidden)
@@ -561,6 +563,7 @@ static bool useInlineVisibilityHidden(const NamedDecl *D) {
   return TSK != TSK_ExplicitInstantiationDeclaration &&
     TSK != TSK_ExplicitInstantiationDefinition &&
     FD->hasBody(Def) && Def->isInlined() && !Def->hasAttr<GNUInlineAttr>();
+#endif // HLSL Change Ends
 }
 
 template <typename T> static bool isFirstInExternCContext(T *D) {
@@ -597,6 +600,7 @@ static LinkageInfo getLVForNamespaceScopeDecl(const NamedDecl *D,
     //   declared to have external linkage; or (there is no equivalent in C99)
     if (Context.getLangOpts().CPlusPlus &&
         Var->getType().isConstQualified() && 
+        !Context.getLangOpts().HLSL && // HLSL Change -Initializer used on a global 'const' variable will be ignored for hlsl.
         !Var->getType().isVolatileQualified()) {
       const VarDecl *PrevVar = Var->getPreviousDecl();
       if (PrevVar)
@@ -1328,6 +1332,7 @@ public:
     // static can follow an extern, so we can have two decls with different
     // linkages.
     const LangOptions &Opts = D->getASTContext().getLangOpts();
+    (Opts); // HLSL Change - this only has static consts referenced
     if (!Opts.CPlusPlus || Opts.MicrosoftExt)
       return LV;
 
@@ -2055,6 +2060,7 @@ void VarDecl::setInit(Expr *I) {
 
 bool VarDecl::isUsableInConstantExpressions(ASTContext &C) const {
   const LangOptions &Lang = C.getLangOpts();
+  (Lang); // HLSL Change - this object is only accessed through static consts
 
   if (!Lang.CPlusPlus)
     return false;
@@ -2277,9 +2283,10 @@ ParmVarDecl *ParmVarDecl::Create(ASTContext &C, DeclContext *DC,
                                  SourceLocation StartLoc,
                                  SourceLocation IdLoc, IdentifierInfo *Id,
                                  QualType T, TypeSourceInfo *TInfo,
-                                 StorageClass S, Expr *DefArg) {
+                                 StorageClass S, Expr *DefArg,
+                                 hlsl::ParameterModifier ParamMod) {
   return new (C, DC) ParmVarDecl(ParmVar, C, DC, StartLoc, IdLoc, Id, T, TInfo,
-                                 S, DefArg);
+                                 S, DefArg, ParamMod);
 }
 
 QualType ParmVarDecl::getOriginalType() const {
@@ -2293,7 +2300,7 @@ QualType ParmVarDecl::getOriginalType() const {
 ParmVarDecl *ParmVarDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
   return new (C, ID)
       ParmVarDecl(ParmVar, C, nullptr, SourceLocation(), SourceLocation(),
-                  nullptr, QualType(), nullptr, SC_None, nullptr);
+                  nullptr, QualType(), nullptr, SC_None, nullptr, hlsl::ParameterModifier());
 }
 
 SourceRange ParmVarDecl::getSourceRange() const {
@@ -2345,6 +2352,16 @@ void ParmVarDecl::setParameterIndexLarge(unsigned parameterIndex) {
 unsigned ParmVarDecl::getParameterIndexLarge() const {
   return getASTContext().getParameterIndex(this);
 }
+
+// HLSL Change Begins
+void ParmVarDecl::updateOutParamToRefType(ASTContext &C) {
+  // Aggregate type will be indirect param convert to pointer type.
+  // So don't update to ReferenceType.
+  if ((!getType()->isArrayType() && !getType()->isRecordType()) ||
+      hlsl::IsHLSLVecMatType(getType()))
+    setType(C.getLValueReferenceType(getType(), false));
+}
+// HLSL Change Ends
 
 //===----------------------------------------------------------------------===//
 // FunctionDecl Implementation

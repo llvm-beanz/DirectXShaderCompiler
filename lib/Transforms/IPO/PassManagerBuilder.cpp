@@ -1,17 +1,15 @@
 //===- PassManagerBuilder.cpp - Build Standard Pass -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the PassManagerBuilder class, which is used to set up a
-// "standard" optimization sequence suitable for languages like C and C++.
-//
-//===----------------------------------------------------------------------===//
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PassManagerBuilder.cpp                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the PassManagerBuilder class, which is used to set up a //
+// "standard" optimization sequence suitable for languages like C and C++.   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm-c/Transforms/PassManagerBuilder.h"
@@ -27,8 +25,12 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Vectorize.h"
+#include "dxc/HLSL/DxilGenerationPass.h" // HLSL Change
+#include "dxc/HLSL/HLMatrixLowerPass.h" // HLSL Change
 
 using namespace llvm;
+
+#if HLSL_VECTORIZATION_ENABLED // HLSL Change - don't build vectorization passes
 
 static cl::opt<bool>
 RunLoopVectorization("vectorize-loops", cl::Hidden,
@@ -50,6 +52,12 @@ UseGVNAfterVectorization("use-gvn-after-vectorization",
 static cl::opt<bool> ExtraVectorizerPasses(
     "extra-vectorizer-passes", cl::init(false), cl::Hidden,
     cl::desc("Run cleanup optimization passes after vectorization."));
+
+#else
+
+// Don't declare the 'false' counterparts - simply avoid altogether.
+
+#endif // HLSL Change - don't build vectorization passes
 
 static cl::opt<bool> UseNewSROA("use-new-sroa",
   cl::init(true), cl::Hidden,
@@ -96,9 +104,13 @@ PassManagerBuilder::PassManagerBuilder() {
     Inliner = nullptr;
     DisableUnitAtATime = false;
     DisableUnrollLoops = false;
+#if HLSL_VECTORIZATION_ENABLED // HLSL Change - don't build vectorization passes
     BBVectorize = RunBBVectorization;
     SLPVectorize = RunSLPVectorization;
     LoopVectorize = RunLoopVectorization;
+#else
+    BBVectorize = SLPVectorize = LoopVectorize = false;
+#endif
     RerollLoops = RunLoopRerolling;
     LoadCombine = RunLoadCombine;
     DisableGVNLoadPRE = false;
@@ -162,6 +174,9 @@ void PassManagerBuilder::populateFunctionPassManager(
   addInitialAliasAnalysisPasses(FPM);
 
   FPM.add(createCFGSimplificationPass());
+  // HLSL Change - don't run SROA. 
+  // HLSL uses special SROA added in addHLSLPasses.
+  if (HLSLHighLevel) // HLSL Change
   if (UseNewSROA)
     FPM.add(createSROAPass());
   else
@@ -170,11 +185,61 @@ void PassManagerBuilder::populateFunctionPassManager(
   FPM.add(createLowerExpectIntrinsicPass());
 }
 
+// HLSL Change Starts
+static void addHLSLPasses(bool HLSLHighLevel, bool NoOpt, legacy::PassManagerBase &MPM) {
+  // Don't do any lowering if we're targeting high-level.
+  if (HLSLHighLevel) {
+    MPM.add(createHLEmitMetadataPass());
+    return;
+  }
+
+  // Split struct and array of parameter.
+  MPM.add(createSROA_Parameter_HLSL());
+
+  // Split struct.
+  MPM.add(createScalarReplAggregatesHLSLPass(/*UseDomTree*/ true,
+                                             /*Promote*/ !NoOpt));
+
+  MPM.add(createHLMatrixLowerPass());
+  // DCE should after SROA to remove unused element.
+  MPM.add(createDeadCodeEliminationPass());
+  MPM.add(createGlobalDCEPass());
+
+  // Change dynamic indexing vector to array.
+  MPM.add(createDynamicIndexingVectorToArrayPass(NoOpt));
+
+  MPM.add(createDxilGenerationPass(NoOpt));
+
+  MPM.add(createSimplifyInstPass());
+
+  if (!NoOpt) {
+    // mem2reg
+    MPM.add(createPromoteMemoryToRegisterPass());
+  }
+
+  // Propagate precise attribute.
+  MPM.add(createDxilPrecisePropagatePass());
+
+  // scalarize vector to scalar
+  MPM.add(createScalarizerPass());
+
+  MPM.add(createSimplifyInstPass());
+
+  MPM.add(createCFGSimplificationPass());
+
+  MPM.add(createDeadCodeEliminationPass());
+}
+// HLSL Change Ends
+
 void PassManagerBuilder::populateModulePassManager(
     legacy::PassManagerBase &MPM) {
   // If all optimizations are disabled, just run the always-inline pass and,
   // if enabled, the function merging pass.
   if (OptLevel == 0) {
+    if (!HLSLHighLevel) {
+      MPM.add(createHLEnsureMetadataPass()); // HLSL Change - rehydrate metadata from high-level codegen
+    }
+
     if (Inliner) {
       MPM.add(Inliner);
       Inliner = nullptr;
@@ -191,8 +256,29 @@ void PassManagerBuilder::populateModulePassManager(
       MPM.add(createBarrierNoopPass());
 
     addExtensionsToPM(EP_EnabledOnOptLevel0, MPM);
+    // HLSL Change Begins.
+    addHLSLPasses(HLSLHighLevel, true/*NoOpt*/, MPM); // HLSL Change
+    if (!HLSLHighLevel) {
+      MPM.add(createMultiDimArrayToOneDimArrayPass());// HLSL Change
+      MPM.add(createDxilCondenseResourcesPass()); // HLSL Change
+      MPM.add(createDxilEmitMetadataPass());      // HLSL Change
+    }
+    // HLSL Change Ends.
     return;
   }
+
+  if (!HLSLHighLevel) {
+    MPM.add(createHLEnsureMetadataPass()); // HLSL Change - rehydrate metadata from high-level codegen
+  }
+
+  // HLSL Change Begins
+  MPM.add(createAlwaysInlinerPass(/*InsertLifeTime*/false));
+  if (Inliner) {
+    delete Inliner;
+    Inliner = nullptr;
+  }
+  addHLSLPasses(HLSLHighLevel, false/*NoOpt*/, MPM); // HLSL Change
+  // HLSL Change Ends
 
   // Add LibraryInfo if we have some.
   if (LibraryInfo)
@@ -227,18 +313,23 @@ void PassManagerBuilder::populateModulePassManager(
 
   // Start of function pass.
   // Break up aggregate allocas, using SSAUpdater.
+  // HLSL Change - don't run SROA. 
+  // HLSL uses special SROA added in addHLSLPasses.
+  if (HLSLHighLevel) // HLSL Change
   if (UseNewSROA)
     MPM.add(createSROAPass(/*RequiresDomTree*/ false));
   else
     MPM.add(createScalarReplAggregatesPass(-1, false));
   MPM.add(createEarlyCSEPass());              // Catch trivial redundancies
-  MPM.add(createJumpThreadingPass());         // Thread jumps.
+  // HLSL Change. MPM.add(createJumpThreadingPass());         // Thread jumps.
   MPM.add(createCorrelatedValuePropagationPass()); // Propagate conditionals
   MPM.add(createCFGSimplificationPass());     // Merge & remove BBs
   MPM.add(createInstructionCombiningPass());  // Combine silly seq's
   addExtensionsToPM(EP_Peephole, MPM);
-
-  MPM.add(createTailCallEliminationPass()); // Eliminate tail calls
+  // HLSL Change Begins.
+  // HLSL does not allow recursize functions.
+  //MPM.add(createTailCallEliminationPass()); // Eliminate tail calls
+  // HLSL Change Ends.
   MPM.add(createCFGSimplificationPass());     // Merge & remove BBs
   MPM.add(createReassociatePass());           // Reassociate expressions
   // Rotate Loop - disable header duplication at -Oz
@@ -262,7 +353,10 @@ void PassManagerBuilder::populateModulePassManager(
       MPM.add(createMergedLoadStoreMotionPass()); // Merge ld/st in diamonds
     MPM.add(createGVNPass(DisableGVNLoadPRE));  // Remove redundancies
   }
-  MPM.add(createMemCpyOptPass());             // Remove memcpy / form memset
+  // HLSL Change Begins.
+  // HLSL don't allow memcpy and memset.
+  //MPM.add(createMemCpyOptPass());             // Remove memcpy / form memset
+  // HLSL Change Ends.
   MPM.add(createSCCPPass());                  // Constant prop with SCCP
 
   // Delete dead bit computations (instcombine runs after to fold away the dead
@@ -274,7 +368,7 @@ void PassManagerBuilder::populateModulePassManager(
   // opened up by them.
   MPM.add(createInstructionCombiningPass());
   addExtensionsToPM(EP_Peephole, MPM);
-  MPM.add(createJumpThreadingPass());         // Thread jumps
+  // HLSL Change. MPM.add(createJumpThreadingPass());         // Thread jumps
   MPM.add(createCorrelatedValuePropagationPass());
   MPM.add(createDeadStoreEliminationPass());  // Delete dead stores
   MPM.add(createLICMPass());
@@ -283,6 +377,7 @@ void PassManagerBuilder::populateModulePassManager(
 
   if (RerollLoops)
     MPM.add(createLoopRerollPass());
+#if HLSL_VECTORIZATION_ENABLED // HLSL Change - don't build vectorization passes
   if (!RunSLPAfterLoopVectorization) {
     if (SLPVectorize)
       MPM.add(createSLPVectorizerPass());   // Vectorize parallel scalar chains.
@@ -301,6 +396,7 @@ void PassManagerBuilder::populateModulePassManager(
         MPM.add(createLoopUnrollPass());
     }
   }
+#endif
 
   if (LoadCombine)
     MPM.add(createLoadCombinePass());
@@ -328,13 +424,17 @@ void PassManagerBuilder::populateModulePassManager(
   if (EnableLoopDistribute)
     MPM.add(createLoopDistributePass());
 
+#if HLSL_VECTORIZATION_ENABLED // HLSL Change - don't build vectorization passes
   MPM.add(createLoopVectorizePass(DisableUnrollLoops, LoopVectorize));
+#endif
+
   // FIXME: Because of #pragma vectorize enable, the passes below are always
   // inserted in the pipeline, even when the vectorizer doesn't run (ex. when
   // on -O1 and no #pragma is found). Would be good to have these two passes
   // as function calls, so that we can only pass them when the vectorizer
   // changed the code.
   MPM.add(createInstructionCombiningPass());
+#if HLSL_VECTORIZATION_ENABLED // HLSL Change - don't build vectorization passes
   if (OptLevel > 1 && ExtraVectorizerPasses) {
     // At higher optimization levels, try to clean up any runtime overlap and
     // alignment checks inserted by the vectorizer. We want to track correllated
@@ -373,6 +473,7 @@ void PassManagerBuilder::populateModulePassManager(
         MPM.add(createLoopUnrollPass());
     }
   }
+#endif // HLSL Change - don't build vectorization passes
 
   addExtensionsToPM(EP_Peephole, MPM);
   MPM.add(createCFGSimplificationPass());
@@ -421,6 +522,13 @@ void PassManagerBuilder::populateModulePassManager(
   if (MergeFunctions)
     MPM.add(createMergeFunctionsPass());
 
+  // HLSL Change Begins.
+  if (!HLSLHighLevel) {
+    MPM.add(createMultiDimArrayToOneDimArrayPass());// HLSL Change
+    MPM.add(createDxilCondenseResourcesPass());
+    MPM.add(createDxilEmitMetadataPass());
+  }
+  // HLSL Change Ends.
   addExtensionsToPM(EP_OptimizerLast, MPM);
 }
 
@@ -471,7 +579,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
   // The IPO passes may leave cruft around.  Clean up after them.
   PM.add(createInstructionCombiningPass());
   addExtensionsToPM(EP_Peephole, PM);
-  PM.add(createJumpThreadingPass());
+  // HLSL Change. PM.add(createJumpThreadingPass());
 
   // Break up allocas
   if (UseNewSROA)
@@ -498,6 +606,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
   if (EnableLoopInterchange)
     PM.add(createLoopInterchangePass());
 
+#if HLSL_VECTORIZATION_ENABLED // HLSL Change - don't build vectorization passes
   PM.add(createLoopVectorizePass(true, LoopVectorize));
 
   // More scalar chains could be vectorized due to more alias information
@@ -508,6 +617,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
   // After vectorization, assume intrinsics may tell us more about pointer
   // alignments.
   PM.add(createAlignmentFromAssumptionsPass());
+#endif
 
   if (LoadCombine)
     PM.add(createLoadCombinePass());
@@ -516,7 +626,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
   PM.add(createInstructionCombiningPass());
   addExtensionsToPM(EP_Peephole, PM);
 
-  PM.add(createJumpThreadingPass());
+  // HLSL Change. PM.add(createJumpThreadingPass());
 }
 
 void PassManagerBuilder::addLateLTOOptimizationPasses(

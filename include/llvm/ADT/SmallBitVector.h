@@ -1,15 +1,14 @@
 //===- llvm/ADT/SmallBitVector.h - 'Normally small' bit vectors -*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SmallBitVector.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the SmallBitVector class.                            //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the SmallBitVector class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ADT_SMALLBITVECTOR_H
 #define LLVM_ADT_SMALLBITVECTOR_H
@@ -559,10 +558,13 @@ private:
       if (AddBits) setSmallBits(getSmallBits() | M);
       else         setSmallBits(getSmallBits() & ~M);
     } else {
+#pragma warning( push ) // HLSL Change
+#pragma warning( disable: 4319 ) // HLSL Change - not a branch in 64-bit - '~': zero extending 'uint32_t' to 'uintptr_t' of greater size
       uint32_t M = Mask[0];
       if (InvertMask) M = ~M;
       if (AddBits) setSmallBits(getSmallBits() | M);
       else         setSmallBits(getSmallBits() & ~M);
+#pragma warning( pop ) // HLSL Change
     }
   }
 };

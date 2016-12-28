@@ -1,15 +1,14 @@
 //===--- ExprClassification.cpp - Expression AST Node Implementation ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements Expr::classify.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExprClassification.cpp                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements Expr::classify.                                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/Expr.h"
 #include "clang/AST/ASTContext.h"
@@ -59,6 +58,7 @@ Cl Expr::ClassifyImpl(ASTContext &Ctx, SourceLocation *Loc) const {
   case Cl::CL_Void:
   case Cl::CL_AddressableVoid:
   case Cl::CL_DuplicateVectorComponents:
+  case Cl::CL_DuplicateMatrixComponents: // HLSL Change  
   case Cl::CL_MemberFunction:
   case Cl::CL_SubObjCPropertySetting:
   case Cl::CL_ClassTemporary:
@@ -102,6 +102,13 @@ static Cl::Kinds ClassifyExprValueKind(const LangOptions &Lang,
 static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
   // This function takes the first stab at classifying expressions.
   const LangOptions &Lang = Ctx.getLangOpts();
+
+  // HLSL Change Starts
+  // 'this' is an LValue rather than PRValue to be consistent with
+  // the way 'this' is represented in HLSL.
+  if (Lang.HLSL && E->getStmtClass() == Expr::CXXThisExprClass)
+    return Cl::CL_LValue;
+  // HLSL Change Ends
 
   switch (E->getStmtClass()) {
   case Stmt::NoStmtClass:
@@ -300,6 +307,21 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
       return Cl::CL_LValue;
     return ClassifyInternal(Ctx, cast<ExtVectorElementExpr>(E)->getBase());
 
+    // HLSL Change Starts
+  case Expr::ExtMatrixElementExprClass:
+    if (cast<ExtMatrixElementExpr>(E)->containsDuplicateElements())
+      return Cl::CL_DuplicateMatrixComponents;
+    if (cast<ExtMatrixElementExpr>(E)->isArrow())
+      return Cl::CL_LValue;
+    return ClassifyInternal(Ctx, cast<ExtMatrixElementExpr>(E)->getBase());
+  case Expr::HLSLVectorElementExprClass:
+    if (cast<HLSLVectorElementExpr>(E)->containsDuplicateElements())
+      return Cl::CL_DuplicateVectorComponents;
+    if (cast<HLSLVectorElementExpr>(E)->isArrow())
+      return Cl::CL_LValue;
+    return ClassifyInternal(Ctx, cast<HLSLVectorElementExpr>(E)->getBase());
+    // HLSL Change Ends
+
     // Simply look at the actual default argument.
   case Expr::CXXDefaultArgExprClass:
     return ClassifyInternal(Ctx, cast<CXXDefaultArgExpr>(E)->getExpr());
@@ -318,6 +340,12 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
 
     // Casts depend completely on the target type. All casts work the same.
   case Expr::CStyleCastExprClass:
+    // HLSL Change Starts
+    // C-style casts will be lvalue for shortened matrices and vectors;
+    // perform regular processing otherwise, which is based purely on type.
+    if (Lang.HLSL && E->getValueKind() == VK_LValue) return Cl::CL_LValue;
+    __fallthrough;
+    // HLSL Change Ends  
   case Expr::CXXFunctionalCastExprClass:
   case Expr::CXXStaticCastExprClass:
   case Expr::CXXDynamicCastExprClass:
@@ -514,6 +542,12 @@ static Cl::Kinds ClassifyBinaryOp(ASTContext &Ctx, const BinaryOperator *E) {
     return (E->getLHS()->getObjectKind() == OK_ObjCProperty
               ? Cl::CL_PRValue : Cl::CL_LValue);
 
+  // HLSL Change Starts
+  // In HLSL, BO_Comma yields a prvalue.
+  if (E->getOpcode() == BO_Comma && Ctx.getLangOpts().HLSL)
+    return Cl::CL_PRValue;
+  // HLSL Change Ends
+
   // C++ [expr.comma]p1: the result is of the same value category as its right
   //   operand, [...].
   if (E->getOpcode() == BO_Comma)
@@ -611,7 +645,7 @@ static Cl::ModifiableType IsModifiable(ASTContext &Ctx, const Expr *E,
     return Cl::CM_ConstAddrSpace;
 
   // Arrays are not modifiable, only their elements are.
-  if (CT->isArrayType())
+  if (CT->isArrayType() && !Ctx.getLangOpts().HLSL) // HLSL Change: arrays are assignable
     return Cl::CM_ArrayType;
   // Incomplete types are not modifiable.
   if (CT->isIncompleteType())
@@ -634,6 +668,7 @@ Expr::LValueClassification Expr::ClassifyLValue(ASTContext &Ctx) const {
   case Cl::CL_Void: return LV_InvalidExpression;
   case Cl::CL_AddressableVoid: return LV_IncompleteVoidType;
   case Cl::CL_DuplicateVectorComponents: return LV_DuplicateVectorComponents;
+  case Cl::CL_DuplicateMatrixComponents: return LV_DuplicateMatrixComponents; // HLSL Change
   case Cl::CL_MemberFunction: return LV_MemberFunction;
   case Cl::CL_SubObjCPropertySetting: return LV_SubObjCPropertySetting;
   case Cl::CL_ClassTemporary: return LV_ClassTemporary;
@@ -655,6 +690,7 @@ Expr::isModifiableLvalue(ASTContext &Ctx, SourceLocation *Loc) const {
   case Cl::CL_Void: return MLV_InvalidExpression;
   case Cl::CL_AddressableVoid: return MLV_IncompleteVoidType;
   case Cl::CL_DuplicateVectorComponents: return MLV_DuplicateVectorComponents;
+  case Cl::CL_DuplicateMatrixComponents: return MLV_DuplicateMatrixComponents;  // HLSL Change
   case Cl::CL_MemberFunction: return MLV_MemberFunction;
   case Cl::CL_SubObjCPropertySetting: return MLV_SubObjCPropertySetting;
   case Cl::CL_ClassTemporary: return MLV_ClassTemporary;

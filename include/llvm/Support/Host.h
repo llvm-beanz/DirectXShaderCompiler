@@ -1,15 +1,14 @@
 //===- llvm/Support/Host.h - Host machine characteristics --------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Host.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Methods for querying the nature of the host machine.                      //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Methods for querying the nature of the host machine.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_HOST_H
 #define LLVM_SUPPORT_HOST_H
@@ -44,7 +43,8 @@ namespace sys {
   ///   CPU_TYPE-VENDOR-OPERATING_SYSTEM
   /// or
   ///   CPU_TYPE-VENDOR-KERNEL-OPERATING_SYSTEM
-  std::string getDefaultTargetTriple();
+  // std::string getDefaultTargetTriple(); // HLSL Change - single triple supported, no allocation required
+  const char *getDefaultTargetTriple();
 
   /// getProcessTriple() - Return an appropriate target triple for generating
   /// code to be loaded into the current process, e.g. when using the JIT.

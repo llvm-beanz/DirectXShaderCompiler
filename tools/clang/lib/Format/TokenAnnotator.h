@@ -1,17 +1,18 @@
 //===--- TokenAnnotator.h - Format C++ code ---------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TokenAnnotator.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file implements a token annotator, i.e. creates
-/// \c AnnotatedTokens out of \c FormatTokens with required extra information.
+/// \file                                                                    //
+/// \brief This file implements a token annotator, i.e. creates              //
+/// \c AnnotatedTokens out of \c FormatTokens with required extra information.//
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LIB_FORMAT_TOKENANNOTATOR_H
 #define LLVM_CLANG_LIB_FORMAT_TOKENANNOTATOR_H

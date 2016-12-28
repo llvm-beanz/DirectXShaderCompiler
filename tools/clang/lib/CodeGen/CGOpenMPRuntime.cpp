@@ -1,15 +1,14 @@
 //===----- CGOpenMPRuntime.cpp - Interface to OpenMP Runtimes -------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides a class for OpenMP runtime code generation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGOpenMPRuntime.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides a class for OpenMP runtime code generation.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGOpenMPRuntime.h"
 #include "CodeGenFunction.h"
@@ -26,6 +25,12 @@
 
 using namespace clang;
 using namespace CodeGen;
+
+// HLSL Change Starts
+// No OpenMP codegen support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 0
+// HLSL Change Ends
 
 namespace {
 /// \brief Base class for handling code generation inside OpenMP regions.
@@ -2089,7 +2094,7 @@ emitTaskPrivateMappingFunction(CodeGenModule &CGM, SourceLocation Loc,
   return TaskPrivatesMap;
 }
 
-static int array_pod_sort_comparator(const PrivateDataTy *P1,
+static int __cdecl array_pod_sort_comparator(const PrivateDataTy *P1, // HLSL Change - __cdecl
                                      const PrivateDataTy *P2) {
   return P1->first < P2->first ? 1 : (P2->first < P1->first ? -1 : 0);
 }
@@ -2834,3 +2839,4 @@ void CGOpenMPRuntime::emitCancelCall(CodeGenFunction &CGF, SourceLocation Loc,
   }
 }
 
+#endif // HLSL Change

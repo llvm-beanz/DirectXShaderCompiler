@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 add_custom_target(ClangUnitTests)
 set_target_properties(ClangUnitTests PROPERTIES FOLDER "Clang tests")
 
@@ -8,6 +10,8 @@ set_target_properties(ClangUnitTests PROPERTIES FOLDER "Clang tests")
 function(add_clang_unittest test_dirname)
   add_unittest(ClangUnitTests ${test_dirname} ${ARGN})
 endfunction()
+
+if ( CLANG_INCLUDE_TESTS ) # HLSL Change
 
 add_subdirectory(Basic)
 add_subdirectory(Lex)
@@ -28,3 +32,14 @@ add_subdirectory(CodeGen)
 if(NOT WIN32) 
   add_subdirectory(libclang)
 endif()
+
+endif (CLANG_INCLUDE_TESTS) # HLSL Change
+
+# HLSL Change Starts
+
+if (HLSL_INCLUDE_TESTS) 
+  add_subdirectory(HLSL)
+  add_subdirectory(HLSLHost)
+endif (HLSL_INCLUDE_TESTS)
+
+# HLSL Change Ends

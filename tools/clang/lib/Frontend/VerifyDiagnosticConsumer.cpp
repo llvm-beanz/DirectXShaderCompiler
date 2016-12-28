@@ -1,15 +1,14 @@
 //===---- VerifyDiagnosticConsumer.cpp - Verifying Diagnostic Client ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is a concrete diagnostic client, which buffers the diagnostic messages.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// VerifyDiagnosticConsumer.cpp                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is a concrete diagnostic client, which buffers the diagnostic messages.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/VerifyDiagnosticConsumer.h"
 #include "clang/Basic/CharInfo.h"
@@ -377,6 +376,7 @@ static bool ParseDirective(StringRef S, ExpectedData *ED, SourceManager &SM,
     } else {
       PH.Advance();
       unsigned Line = 0;
+      bool ExpectInvalid = false; // HLSL Change
       bool FoundPlus = PH.Next("+");
       if (FoundPlus || PH.Next("-")) {
         // Relative to current line.
@@ -388,6 +388,10 @@ static bool ParseDirective(StringRef S, ExpectedData *ED, SourceManager &SM,
           else ExpectedLine -= Line;
           ExpectedLoc = SM.translateLineCol(SM.getFileID(Pos), ExpectedLine, 1);
         }
+      // HLSL Change Starts
+      } else if (PH.Next("?")) {
+        ExpectInvalid = true;
+      // HLSL Change Ends
       } else if (PH.Next(Line)) {
         // Absolute line number.
         if (Line > 0)
@@ -419,7 +423,8 @@ static bool ParseDirective(StringRef S, ExpectedData *ED, SourceManager &SM,
         }
       }
 
-      if (ExpectedLoc.isInvalid()) {
+      // HLSL Change: guard against explicit invalid lcoations
+      if (!ExpectInvalid && ExpectedLoc.isInvalid()) {
         Diags.Report(Pos.getLocWithOffset(PH.C-PH.Begin),
                      diag::err_verify_missing_line) << KindStr;
         continue;

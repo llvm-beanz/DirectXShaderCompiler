@@ -1,11 +1,12 @@
 //===------ utils/obj2yaml.cpp - obj2yaml conversion tool -------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// obj2yaml.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Error.h"
 #include "obj2yaml.h"
@@ -47,7 +48,8 @@ static std::error_code dumpInput(StringRef File) {
 cl::opt<std::string> InputFilename(cl::Positional, cl::desc("<input file>"),
                                    cl::init("-"));
 
-int main(int argc, char *argv[]) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char *argv[]) {
   cl::ParseCommandLineOptions(argc, argv);
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);

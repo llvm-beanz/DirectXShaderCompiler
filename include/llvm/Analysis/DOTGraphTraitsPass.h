@@ -1,15 +1,14 @@
 //===-- DOTGraphTraitsPass.h - Print/View dotty graphs-----------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DOTGraphTraitsPass.h                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Templates to create dotty viewer and printer passes for GraphTraits graphs.//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Templates to create dotty viewer and printer passes for GraphTraits graphs.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ANALYSIS_DOTGRAPHTRAITSPASS_H
 #define LLVM_ANALYSIS_DOTGRAPHTRAITSPASS_H
@@ -41,6 +40,14 @@ public:
     std::string GraphName = DOTGraphTraits<GraphT>::getGraphName(Graph);
     std::string Title = GraphName + " for '" + F.getName().str() + "' function";
 
+    // HLSL Change Starts
+    if (OSOverride != nullptr) {
+      *OSOverride << "\ngraph: " << GraphName << ".dot\n";
+      llvm::WriteGraph(*OSOverride, Graph, false, Title);
+      return false;
+    }
+    // HLSL Change Ends
+
     ViewGraph(Graph, Name, IsSimple, Title);
 
     return false;
@@ -65,6 +72,13 @@ public:
 
   bool runOnFunction(Function &F) override {
     GraphT Graph = AnalysisGraphTraitsT::getGraph(&getAnalysis<AnalysisT>());
+    // HLSL Change Starts
+    if (OSOverride != nullptr) {
+      *OSOverride << "\ngraph: " << Name + "." + F.getName().str() + ".dot\n";
+      llvm::WriteGraph(*OSOverride, Graph, false, DOTGraphTraits<GraphT>::getGraphName(Graph));
+      return false;
+    }
+    // HLSL Change Ends
     std::string Filename = Name + "." + F.getName().str() + ".dot";
     std::error_code EC;
 
@@ -103,6 +117,13 @@ public:
   bool runOnModule(Module &M) override {
     GraphT Graph = AnalysisGraphTraitsT::getGraph(&getAnalysis<AnalysisT>());
     std::string Title = DOTGraphTraits<GraphT>::getGraphName(Graph);
+    // HLSL Change Starts
+    if (OSOverride != nullptr) {
+      *OSOverride << "\ngraph: " << Title << ".dot\n";
+      llvm::WriteGraph(*OSOverride, Graph, false, Title);
+      return false;
+    }
+    // HLSL Change Ends
 
     ViewGraph(Graph, Name, IsSimple, Title);
 
@@ -128,6 +149,14 @@ public:
 
   bool runOnModule(Module &M) override {
     GraphT Graph = AnalysisGraphTraitsT::getGraph(&getAnalysis<AnalysisT>());
+    // HLSL Change Starts
+    if (OSOverride != nullptr) {
+      *OSOverride << "\ngraph: " << Name << ".dot\n";
+      llvm::WriteGraph(*OSOverride, Graph, false, DOTGraphTraits<GraphT>::getGraphName(Graph));
+      return false;
+    }
+    // HLSL Change Ends
+
     std::string Filename = Name + ".dot";
     std::error_code EC;
 

@@ -1,22 +1,12 @@
 /*===-- jitprofiling.h - JIT Profiling API-------------------------*- C -*-===*
- *
- *                     The LLVM Compiler Infrastructure
- *
- * This file is distributed under the University of Illinois Open Source
- * License. See LICENSE.TXT for details.
- *
- *===----------------------------------------------------------------------===*
- *
- * This file provides Intel(R) Performance Analyzer JIT (Just-In-Time) 
- * Profiling API declaration.
- *
- * NOTE: This file comes in a style different from the rest of LLVM
- * source base since  this is a piece of code shared from Intel(R)
- * products.  Please do not reformat / re-style this code to make
- * subsequent merges and contributions from the original source base eaiser.
- *
- *===----------------------------------------------------------------------===*/
-#ifndef __JITPROFILING_H__
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// jitprofiling.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////#ifndef __JITPROFILING_H__
 #define __JITPROFILING_H__
 
 /*
@@ -233,7 +223,8 @@ extern "C" {
 #  endif /* defined WIN32 || defined _WIN32 */
 #endif /* CDECL */
 
-#define JITAPI CDECL
+// HLSL Change: changed calling convention to __stdcall
+#define JITAPI __stdcall
 
 /* called when the settings are changed with new settings */
 typedef void (*iJIT_ModeChangedEx)(void *UserData, iJIT_ModeFlags Flags);

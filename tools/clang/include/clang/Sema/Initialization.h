@@ -1,15 +1,14 @@
 //===--- Initialization.h - Semantic Analysis for Initializers --*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Initialization.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides supporting data types for initialization of objects.   //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file provides supporting data types for initialization of objects.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_SEMA_INITIALIZATION_H
 #define LLVM_CLANG_SEMA_INITIALIZATION_H
 
@@ -436,6 +435,23 @@ public:
   /// Dump a representation of the initialized entity to standard error,
   /// for debugging purposes.
   void dump() const;
+
+  // HLSL Change Starts
+  SourceLocation getDiagLoc() const {
+    switch (getKind()) {
+    case EK_Result:
+    case EK_Exception:
+    case EK_Temporary:
+    case EK_New:
+      return SourceLocation::getFromRawEncoding(LocAndNRVO.Location);
+    case EK_LambdaCapture:
+      return SourceLocation::getFromRawEncoding(Capture.Location);
+    default:
+      // Consider adding additional cases such as EK_Variable
+      return SourceLocation();
+    }
+  }
+  // HLSL Change Ends
 
 private:
   unsigned dumpImpl(raw_ostream &OS) const;

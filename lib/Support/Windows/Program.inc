@@ -1,15 +1,14 @@
 //===- Win32/Program.cpp - Win32 Program Implementation ------- -*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file provides the Win32 specific implementation of the Program class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Program.inc                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides the Win32 specific implementation of the Program class.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "WindowsSupport.h"
 #include "llvm/ADT/StringExtras.h"
@@ -35,6 +34,7 @@ ProcessInfo::ProcessInfo() : ProcessHandle(0), Pid(0), ReturnCode(0) {}
 
 ErrorOr<std::string> sys::findProgramByName(StringRef Name,
                                             ArrayRef<StringRef> Paths) {
+#ifdef MSFT_SUPPORTS_CHILD_PROCESSES  // HLSL Change
   assert(!Name.empty() && "Must have a name!");
 
   if (Name.find_first_of("/\\") != StringRef::npos)
@@ -95,8 +95,12 @@ ErrorOr<std::string> sys::findProgramByName(StringRef Name,
     return EC;
 
   return std::string(U8Result.begin(), U8Result.end());
+#else
+  return "";
+#endif
 }
 
+#ifdef MSFT_SUPPORTS_CHILD_PROCESSES  // HLSL Change
 static HANDLE RedirectIO(const StringRef *path, int fd, std::string* ErrMsg) {
   HANDLE h;
   if (path == 0) {
@@ -462,17 +466,23 @@ ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
   return WaitResult;
 }
 
+#endif // HLSL Change - MSFT_SUPPORTS_CHILD_PROCESSES
+
 std::error_code sys::ChangeStdinToBinary() {
+#ifdef MSFT_SUPPORTS_TEXTMODE_STREAMS  // HLSL Change
   int result = _setmode(_fileno(stdin), _O_BINARY);
   if (result == -1)
     return std::error_code(errno, std::generic_category());
+#endif  // HLSL Change
   return std::error_code();
 }
 
 std::error_code sys::ChangeStdoutToBinary() {
+#ifdef MSFT_SUPPORTS_TEXTMODE_STREAMS  // HLSL Change
   int result = _setmode(_fileno(stdout), _O_BINARY);
   if (result == -1)
     return std::error_code(errno, std::generic_category());
+#endif  // HLSL Change
   return std::error_code();
 }
 
@@ -520,6 +530,8 @@ llvm::sys::writeFileWithEncoding(StringRef FileName, StringRef Contents,
   return EC;
 }
 
+#ifdef MSFT_SUPPORTS_CHILD_PROCESSES  // HLSL Change
+
 bool llvm::sys::argumentsFitWithinSystemLimits(ArrayRef<const char*> Args) {
   // The documented max length of the command line passed to CreateProcess.
   static const size_t MaxCommandStringLength = 32768;
@@ -535,4 +547,7 @@ bool llvm::sys::argumentsFitWithinSystemLimits(ArrayRef<const char*> Args) {
   }
   return true;
 }
+
+#endif // MSFT_SUPPORTS_CHILD_PROCESSES  // HLSL Change
+
 }

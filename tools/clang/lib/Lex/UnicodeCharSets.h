@@ -1,11 +1,12 @@
 //===--- UnicodeCharSets.h - Contains important sets of characters --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// UnicodeCharSets.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_LIB_LEX_UNICODECHARSETS_H
 #define LLVM_CLANG_LIB_LEX_UNICODECHARSETS_H
 
@@ -74,7 +75,7 @@ static const llvm::sys::UnicodeCharRange CXX03AllowedIDCharRanges[] = {
   // Devanagari
   { 0x0905, 0x0939 }, { 0x0958, 0x0962 },
 
-  // Bengali
+  // Bangla  // MS Change
   { 0x0985, 0x098C }, { 0x098F, 0x0990 }, { 0x0993, 0x09A8 },
   { 0x09AA, 0x09B0 }, { 0x09B2, 0x09B2 }, { 0x09B6, 0x09B9 },
   { 0x09DC, 0x09DD }, { 0x09DF, 0x09E1 }, { 0x09F0, 0x09F1 },
@@ -223,7 +224,7 @@ static const llvm::sys::UnicodeCharRange C99AllowedIDCharRanges[] = {
   // Digits (3)
   { 0x0966, 0x096F },
 
-  // Bengali (1)
+  // Bangla (1)  // MS Change
   { 0x0981, 0x0983 }, { 0x0985, 0x098C }, { 0x098F, 0x0990 },
   { 0x0993, 0x09A8 }, { 0x09AA, 0x09B0 }, { 0x09B2, 0x09B2 },
   { 0x09B6, 0x09B9 }, { 0x09BE, 0x09C4 }, { 0x09C7, 0x09C8 },
@@ -232,7 +233,7 @@ static const llvm::sys::UnicodeCharRange C99AllowedIDCharRanges[] = {
   // Digits (4)
   { 0x09E6, 0x09EF },
 
-  // Bengali (2)
+  // Bangla (2)  // MS Change
   { 0x09F0, 0x09F1 },
 
   // Gurmukhi (1)

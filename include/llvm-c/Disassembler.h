@@ -1,16 +1,15 @@
 /*===-- llvm-c/Disassembler.h - Disassembler Public C Interface ---*- C -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header provides a public interface to a disassembler library.         *|
-|* LLVM provides an implementation of this interface.                         *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Disassembler.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header provides a public interface to a disassembler library.        //
+// LLVM provides an implementation of this interface.                        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_C_DISASSEMBLER_H
 #define LLVM_C_DISASSEMBLER_H
@@ -241,7 +240,7 @@ void LLVMDisasmDispose(LLVMDisasmContextRef DC);
  */
 size_t LLVMDisasmInstruction(LLVMDisasmContextRef DC, uint8_t *Bytes,
                              uint64_t BytesSize, uint64_t PC,
-                             char *OutString, size_t OutStringSize);
+                             _Out_writes_z_(OutStringSize) char *OutString, size_t OutStringSize); // HLSL Change: annotation
 
 /**
  * @}

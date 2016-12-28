@@ -1,16 +1,15 @@
 //===--- SemaChecking.cpp - Extra Semantic Checking -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements extra semantic analysis beyond what is enforced
-//  by the C type system.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaChecking.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements extra semantic analysis beyond what is enforced     //
+//  by the C type system.                                                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTContext.h"
@@ -187,7 +186,8 @@ static bool SemaBuiltinCallWithStaticChain(Sema &S, CallExpr *BuiltinCall) {
   QualType ReturnTy = CE->getCallReturnType(S.Context);
   QualType ArgTys[2] = { ReturnTy, ChainResult.get()->getType() };
   QualType BuiltinTy = S.Context.getFunctionType(
-      ReturnTy, ArgTys, FunctionProtoType::ExtProtoInfo());
+      ReturnTy, ArgTys, FunctionProtoType::ExtProtoInfo(),
+      None); // HLSL Change - builtins are all in parameters
   QualType BuiltinPtrTy = S.Context.getPointerType(BuiltinTy);
 
   Builtin =
@@ -525,6 +525,7 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
 
   // Since the target specific builtins for each arch overlap, only check those
   // of the arch we are compiling for.
+#if 0 // HLSL Change Starts
   if (BuiltinID >= Builtin::FirstTSBuiltin) {
     switch (Context.getTargetInfo().getTriple().getArch()) {
       case llvm::Triple::arm:
@@ -565,9 +566,12 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
         break;
     }
   }
+#endif // HLSL Change Ends
 
   return TheCallResult;
 }
+
+#if 0 // HLSL Change Starts
 
 // Get the valid immediate range for the specified NEON type code.
 static unsigned RFT(unsigned t, bool shift = false, bool ForceQuad = false) {
@@ -1089,6 +1093,8 @@ bool Sema::CheckX86BuiltinFunctionCall(unsigned BuiltinID, CallExpr *TheCall) {
   return SemaBuiltinConstantArgRange(TheCall, i, l, u);
 }
 
+#endif // HLSL Change Ends
+
 /// Given a FunctionDecl's FormatAttr, attempts to populate the FomatStringInfo
 /// parameter with the FormatAttr's correct format_idx and firstDataArg.
 /// Returns true when the format fits the function and the FormatStringInfo has
@@ -1149,14 +1155,18 @@ static void CheckNonNullArgument(Sema &S,
 }
 
 bool Sema::GetFormatNSStringIdx(const FormatAttr *Format, unsigned &Idx) {
+#if 0 // HLSL Change Starts
   FormatStringInfo FSI;
   if ((GetFormatStringType(Format) == FST_NSString) &&
       getFormatStringInfo(Format, false, &FSI)) {
     Idx = FSI.FormatIdx;
     return true;
   }
+#endif // HLSL Change Ends
   return false;
 }
+
+#if 0 // HLSL Change Starts
 /// \brief Diagnose use of %s directive in an NSString which is being passed
 /// as formatting string to formatting method.
 static void
@@ -1198,6 +1208,7 @@ DiagnoseCStringFormatDirectiveInCFAPI(Sema &S,
       << FDecl->getDeclName();
   }
 }
+#endif // HLSL Change Ends
 
 /// Determine whether the given type has a non-null nullability annotation.
 static bool isNonNullType(ASTContext &ctx, QualType type) {
@@ -1310,6 +1321,9 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
   if (CurContext->isDependentContext())
     return;
 
+#if 1 // HLSL Change - no format string support
+  (IsMemberFunction); (CallType); (Range);
+#else
   // Printf and scanf checking.
   llvm::SmallBitVector CheckedVarArgs;
   if (FDecl) {
@@ -1340,7 +1354,7 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
       }
     }
   }
-
+#endif 0 // HLSL Change - no format string support
   if (FDecl || Proto) {
     CheckNonNullArguments(*this, FDecl, Proto, Args, Loc);
 
@@ -1394,6 +1408,7 @@ bool Sema::CheckFunctionCall(FunctionDecl *FDecl, CallExpr *TheCall,
     return false;
 
   CheckAbsoluteValueFunction(TheCall, FDecl, FnInfo);
+#if 0 // HLSL Change Starts
   if (getLangOpts().ObjC1)
     DiagnoseCStringFormatDirectiveInCFAPI(*this, FDecl, Args, NumArgs);
 
@@ -1408,24 +1423,27 @@ bool Sema::CheckFunctionCall(FunctionDecl *FDecl, CallExpr *TheCall,
     CheckStrncatArguments(TheCall, FnInfo);
   else
     CheckMemaccessArguments(TheCall, CMId, FnInfo);
+#endif // HLSL Change Ends
 
   return false;
 }
 
 bool Sema::CheckObjCMethodCall(ObjCMethodDecl *Method, SourceLocation lbrac, 
                                ArrayRef<const Expr *> Args) {
+#if 0 // HLSL Change Starts
   VariadicCallType CallType =
       Method->isVariadic() ? VariadicMethod : VariadicDoesNotApply;
 
   checkCall(Method, nullptr, Args,
             /*IsMemberFunction=*/false, lbrac, Method->getSourceRange(), 
             CallType);
-
+#endif // HLSL Change Ends
   return false;
 }
 
 bool Sema::CheckPointerCall(NamedDecl *NDecl, CallExpr *TheCall,
                             const FunctionProtoType *Proto) {
+#if 0 // HLSL Change Starts
   QualType Ty;
   if (const auto *V = dyn_cast<VarDecl>(NDecl))
     Ty = V->getType().getNonReferenceType();
@@ -1451,7 +1469,7 @@ bool Sema::CheckPointerCall(NamedDecl *NDecl, CallExpr *TheCall,
             llvm::makeArrayRef(TheCall->getArgs(), TheCall->getNumArgs()),
             /*IsMemberFunction=*/false, TheCall->getRParenLoc(),
             TheCall->getCallee()->getSourceRange(), CallType);
-
+#endif // HLSL Change Ends
   return false;
 }
 
@@ -2214,6 +2232,7 @@ Sema::SemaBuiltinAtomicOverloaded(ExprResult TheCallResult) {
 /// Note: It might also make sense to do the UTF-16 conversion here (would
 /// simplify the backend).
 bool Sema::CheckObjCString(Expr *Arg) {
+#if 0 // HLSL Change Starts
   Arg = Arg->IgnoreParenCasts();
   StringLiteral *Literal = dyn_cast<StringLiteral>(Arg);
 
@@ -2238,6 +2257,7 @@ bool Sema::CheckObjCString(Expr *Arg) {
       Diag(Arg->getLocStart(),
            diag::warn_cfstring_truncated) << Arg->getSourceRange();
   }
+#endif // HLSL Change Ends
   return false;
 }
 
@@ -2688,6 +2708,9 @@ bool Sema::SemaBuiltinConstantArgRange(CallExpr *TheCall, int ArgNum,
 bool Sema::SemaBuiltinARMSpecialReg(unsigned BuiltinID, CallExpr *TheCall,
                                     int ArgNum, unsigned ExpectedFieldNum,
                                     bool AllowName) {
+#if 1 // HLSL Change - remove unsupported builtins
+  return false;
+#else
   bool IsARMBuiltin = BuiltinID == ARM::BI__builtin_arm_rsr64 ||
                       BuiltinID == ARM::BI__builtin_arm_wsr64 ||
                       BuiltinID == ARM::BI__builtin_arm_rsr ||
@@ -2782,6 +2805,7 @@ bool Sema::SemaBuiltinARMSpecialReg(unsigned BuiltinID, CallExpr *TheCall,
   }
 
   return false;
+#endif // HLSL Change Ends
 }
 
 /// SemaBuiltinCpuSupports - Handle __builtin_cpu_supports(char *).
@@ -2835,6 +2859,12 @@ bool Sema::SemaBuiltinSetjmp(CallExpr *TheCall) {
              << SourceRange(TheCall->getLocStart(), TheCall->getLocEnd());
   return false;
 }
+
+#if 1 // HLSL Change Starts - no support for format strings
+bool Sema::hasCStrMethod(const Expr *) {
+  return false;
+}
+#else
 
 namespace {
 enum StringLiteralCheckType {
@@ -4574,6 +4604,8 @@ bool Sema::FormatStringHasSArg(const StringLiteral *FExpr) {
                                                          getLangOpts(),
                                                          Context.getTargetInfo());
 }
+
+#endif // HLSL Change - no support for format strings
 
 //===--- CHECK: Warn on use of wrong absolute value function. -------------===//
 
@@ -6573,6 +6605,14 @@ static void AnalyzeComparison(Sema &S, BinaryOperator *E) {
   // The type the comparison is being performed in.
   QualType T = E->getLHS()->getType();
 
+  // HLSL Change Starts
+  // HLSL has a different set of standard conversions allowed. Until
+  // the warning analysis is updated, simply skip this step.
+  if (S.getLangOpts().HLSL) {
+    return;
+  }
+  // HLSL Change Ends
+
   // Only analyze comparison operators where both sides have been converted to
   // the same type.
   if (!S.Context.hasSameUnqualifiedType(T, E->getRHS()->getType()))
@@ -7065,6 +7105,10 @@ void CheckImplicitConversion(Sema &S, Expr *E, QualType T,
     // ...and the target is floating point...
     if (TargetBT && TargetBT->isFloatingPoint()) {
       // ...then warn if we're dropping FP rank.
+
+      // HLSL Change - unless source is literal float
+      if (SourceBT->getKind() == BuiltinType::LitFloat)
+        return;
 
       // Builtin FP kinds are ordered by increasing FP rank.
       if (SourceBT->getKind() > TargetBT->getKind()) {
@@ -8725,6 +8769,8 @@ static bool isSetterLikeSelector(Selector sel) {
   return !isLowercase(str.front());
 }
 
+#if 1 // HLSL Change Starts
+#else // HLSL Change Ends
 static Optional<int> GetNSMutableArrayArgumentIndex(Sema &S,
                                                     ObjCMessageExpr *Message) {
   bool IsMutableArray = S.NSAPIObj->isSubclassOfNSClass(
@@ -9058,6 +9104,7 @@ void Sema::checkUnsafeExprAssigns(SourceLocation Loc,
     }
   }
 }
+#endif // HLSL Change
 
 //===--- CHECK: Empty statement body (-Wempty-body) ---------------------===//
 

@@ -1,16 +1,15 @@
 //===--- ASTDumper.cpp - Dumping implementation for ASTs ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the AST dump methods, which dump out the
-// AST in a form that exposes type details and other fields.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTDumper.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the AST dump methods, which dump out the             //
+// AST in a form that exposes type details and other fields.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -229,6 +228,7 @@ namespace  {
     void dumpDeclContext(const DeclContext *DC);
     void dumpLookups(const DeclContext *DC, bool DumpDecls);
     void dumpAttr(const Attr *A);
+    void dumpHLSLUnusualAnnotations(const llvm::ArrayRef<hlsl::UnusualAnnotation*> UA);
 
     // C++ Utilities
     void dumpAccessSpecifier(AccessSpecifier AS);
@@ -424,6 +424,7 @@ namespace  {
     void VisitVarDecl(const VarDecl *D);
     void VisitFileScopeAsmDecl(const FileScopeAsmDecl *D);
     void VisitImportDecl(const ImportDecl *D);
+    void VisitHLSLBufferDecl(const HLSLBufferDecl* D); // HLSL Change
 
     // C++ Decls
     void VisitNamespaceDecl(const NamespaceDecl *D);
@@ -499,6 +500,8 @@ namespace  {
     void VisitUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *Node);
     void VisitMemberExpr(const MemberExpr *Node);
     void VisitExtVectorElementExpr(const ExtVectorElementExpr *Node);
+    void VisitExtMatrixElementExpr(const ExtMatrixElementExpr *Node); // HLSL Change
+    void VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *Node); // HLSL Change
     void VisitBinaryOperator(const BinaryOperator *Node);
     void VisitCompoundAssignOperator(const CompoundAssignOperator *Node);
     void VisitAddrLabelExpr(const AddrLabelExpr *Node);
@@ -974,7 +977,82 @@ void ASTDumper::dumpObjCTypeParamList(const ObjCTypeParamList *typeParams) {
 //  Decl dumping methods.
 //===----------------------------------------------------------------------===//
 
+// HLSL Change Begins
+void ASTDumper::dumpHLSLUnusualAnnotations(const ArrayRef<hlsl::UnusualAnnotation*> UA)
+{
+  for (auto It = UA.begin(), E = UA.end(); It != E; ++It)
+  {
+    dumpChild([=] {
+      {
+        ColorScope Color(*this, AttrColor);
+        switch ((*It)->getKind())
+        {
+          case hlsl::UnusualAnnotation::UA_ConstantPacking:
+            OS << "ConstantPacking"; break;
+          case hlsl::UnusualAnnotation::UA_RegisterAssignment:
+            OS << "RegisterAssignment"; break;
+          case hlsl::UnusualAnnotation::UA_SemanticDecl:
+            OS << "SemanticDecl"; break;
+        }
+      }
+      dumpPointer(It);
+      dumpSourceRange(SourceRange((*It)->Loc));
+
+      switch ((*It)->getKind())
+      {
+      case hlsl::UnusualAnnotation::UA_ConstantPacking: {
+          const hlsl::ConstantPacking* constantPacking = cast<hlsl::ConstantPacking>(*It);
+          OS << " packoffset(c";
+          OS << constantPacking->Subcomponent;
+          OS << ".";
+          const char *xyzw[4] = { "x", "y", "z", "w" };
+          if(constantPacking->ComponentOffset < 4)
+            OS << xyzw[constantPacking->ComponentOffset];
+          else
+            OS << "<invalid>";
+          OS << ")";
+          if (!constantPacking->IsValid)
+            OS << " invalid";
+          break;
+        }
+      case hlsl::UnusualAnnotation::UA_RegisterAssignment: {
+          const hlsl::RegisterAssignment* registerAssignment = cast<hlsl::RegisterAssignment>(*It);
+          OS << " register(";
+          if (!registerAssignment->ShaderProfile.empty())
+            OS << registerAssignment->ShaderProfile << ", ";
+          if (!registerAssignment->RegisterType)
+            OS << "invalid";
+          else
+            OS << std::string(&(registerAssignment->RegisterType), 1);
+          OS << registerAssignment->RegisterNumber + registerAssignment->RegisterOffset;
+          if (registerAssignment->RegisterSpace)
+            OS << ", space" << registerAssignment->RegisterSpace;
+          OS << ")";
+          if (!registerAssignment->IsValid)
+            OS << " invalid";
+          break;
+        }
+      case hlsl::UnusualAnnotation::UA_SemanticDecl: {
+          const hlsl::SemanticDecl* semanticDecl = cast<hlsl::SemanticDecl>(*It);
+          OS << " \"" << semanticDecl->SemanticName << "\"";
+          break;
+        }
+      }
+    });
+  }
+}
+// HLSL Change Ends
+
 void ASTDumper::dumpDecl(const Decl *D) {
+  // MS Change Starts: Don't display decls with invalid SourceLocations.
+  if (D && D->getDeclContext() &&
+      D->getDeclContext()->getDeclKind() == Decl::Kind::TranslationUnit &&
+      D->getSourceRange().isInvalid())
+  {
+    return;
+  }
+  // MS Change Ends
+
   dumpChild([=] {
     if (!D) {
       ColorScope Color(*this, NullColor);
@@ -1023,6 +1101,11 @@ void ASTDumper::dumpDecl(const Decl *D) {
          ++I)
       dumpAttr(*I);
 
+    // HLSL Change Begins
+    if (const NamedDecl *ND = dyn_cast<NamedDecl>(D))
+      dumpHLSLUnusualAnnotations(const_cast<NamedDecl*>(ND)->getUnusualAnnotations());
+    // HLSL Change Ends
+
     if (const FullComment *Comment =
             D->getASTContext().getLocalCommentForDeclUncached(D))
       dumpFullComment(Comment);
@@ -1044,6 +1127,16 @@ void ASTDumper::VisitTypedefDecl(const TypedefDecl *D) {
   if (D->isModulePrivate())
     OS << " __module_private__";
 }
+
+// HLSL Change Starts
+void ASTDumper::VisitHLSLBufferDecl(const HLSLBufferDecl* D) {
+  if (D->isCBuffer())
+    OS << " cbuffer";
+  else
+    OS << " tbuffer";
+  dumpName(D);
+}
+// HLSL Change Ends
 
 void ASTDumper::VisitEnumDecl(const EnumDecl *D) {
   if (D->isScoped()) {
@@ -1885,6 +1978,17 @@ void ASTDumper::VisitExtVectorElementExpr(const ExtVectorElementExpr *Node) {
   VisitExpr(Node);
   OS << " " << Node->getAccessor().getNameStart();
 }
+
+// HLSL Change Starts
+void ASTDumper::VisitExtMatrixElementExpr(const ExtMatrixElementExpr *Node) {
+  VisitExpr(Node);
+  OS << " " << Node->getAccessor().getNameStart();
+}
+void ASTDumper::VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *Node) {
+  VisitExpr(Node);
+  OS << " " << Node->getAccessor().getNameStart();
+}
+// HLSL Change Ends
 
 void ASTDumper::VisitBinaryOperator(const BinaryOperator *Node) {
   VisitExpr(Node);

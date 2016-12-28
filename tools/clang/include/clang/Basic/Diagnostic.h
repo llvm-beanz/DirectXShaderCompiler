@@ -1,14 +1,14 @@
 //===--- Diagnostic.h - C Language Family Diagnostic Handling ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Diagnostic.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines the Diagnostic-related interfaces.
+/// \file                                                                    //
+/// \brief Defines the Diagnostic-related interfaces.                        //
 ///
 //===----------------------------------------------------------------------===//
 
@@ -973,6 +973,7 @@ public:
     assert(isActive() && "Clients must not add to cleared diagnostic!");
     assert(NumArgs < DiagnosticsEngine::MaxArguments &&
            "Too many arguments to diagnostic!");
+    _Analysis_assume_(NumArgs < DiagnosticsEngine::MaxArguments);
     DiagObj->DiagArgumentsKind[NumArgs] = DiagnosticsEngine::ak_std_string;
     DiagObj->DiagArgumentsStr[NumArgs++] = S;
   }
@@ -981,6 +982,7 @@ public:
     assert(isActive() && "Clients must not add to cleared diagnostic!");
     assert(NumArgs < DiagnosticsEngine::MaxArguments &&
            "Too many arguments to diagnostic!");
+    _Analysis_assume_(NumArgs < DiagnosticsEngine::MaxArguments);
     DiagObj->DiagArgumentsKind[NumArgs] = Kind;
     DiagObj->DiagArgumentsVal[NumArgs++] = V;
   }
@@ -1130,7 +1132,8 @@ inline DiagnosticBuilder DiagnosticsEngine::Report(unsigned DiagID) {
 
 //===----------------------------------------------------------------------===//
 // Diagnostic
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 /// A little helper class (which is basically a smart pointer that forwards
 /// info from DiagnosticsEngine) that allows clients to enquire about the

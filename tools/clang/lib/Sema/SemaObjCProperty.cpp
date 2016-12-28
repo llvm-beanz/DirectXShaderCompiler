@@ -1,16 +1,15 @@
 //===--- SemaObjCProperty.cpp - Semantic Analysis for ObjC @property ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for Objective C @property and
-//  @synthesize declarations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaObjCProperty.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for Objective C @property and     //
+//  @synthesize declarations.                                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTMutationListener.h"
@@ -25,6 +24,142 @@
 #include "llvm/ADT/SmallString.h"
 
 using namespace clang;
+
+// HLSL Change Starts
+// No ObjC parse/sema support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 1
+
+Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
+  SourceLocation LParenLoc,
+  FieldDeclarator &FD,
+  ObjCDeclSpec &ODS,
+  Selector GetterSel,
+  Selector SetterSel,
+  bool *isOverridingProperty,
+  tok::ObjCKeywordKind MethodImplKind,
+  DeclContext *lexicalDC) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+
+ObjCPropertyDecl *
+Sema::HandlePropertyInClassExtension(Scope *S,
+  SourceLocation AtLoc,
+  SourceLocation LParenLoc,
+  FieldDeclarator &FD,
+  Selector GetterSel, Selector SetterSel,
+  const bool isAssign,
+  const bool isReadWrite,
+  const unsigned Attributes,
+  const unsigned AttributesAsWritten,
+  bool *isOverridingProperty,
+  QualType T,
+  TypeSourceInfo *TSI,
+  tok::ObjCKeywordKind MethodImplKind) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
+  ObjCContainerDecl *CDecl,
+  SourceLocation AtLoc,
+  SourceLocation LParenLoc,
+  FieldDeclarator &FD,
+  Selector GetterSel,
+  Selector SetterSel,
+  const bool isAssign,
+  const bool isReadWrite,
+  const unsigned Attributes,
+  const unsigned AttributesAsWritten,
+  QualType T,
+  TypeSourceInfo *TInfo,
+  tok::ObjCKeywordKind MethodImplKind,
+  DeclContext *lexicalDC) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+Decl *Sema::ActOnPropertyImplDecl(Scope *S,
+  SourceLocation AtLoc,
+  SourceLocation PropertyLoc,
+  bool Synthesize,
+  IdentifierInfo *PropertyId,
+  IdentifierInfo *PropertyIvar,
+  SourceLocation PropertyIvarLoc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void
+Sema::DiagnosePropertyMismatch(ObjCPropertyDecl *Property,
+  ObjCPropertyDecl *SuperProperty,
+  const IdentifierInfo *inheritedName,
+  bool OverridingProtocolProperty) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool Sema::DiagnosePropertyAccessorMismatch(ObjCPropertyDecl *property,
+  ObjCMethodDecl *GetterMethod,
+  SourceLocation Loc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool
+Sema::IvarBacksCurrentMethodAccessor(ObjCInterfaceDecl *IFace,
+  ObjCMethodDecl *Method, ObjCIvarDecl *IV) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::DefaultSynthesizeProperties(Scope *S, ObjCImplDecl* IMPDecl,
+  ObjCInterfaceDecl *IDecl) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::DefaultSynthesizeProperties(Scope *S, Decl *D) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::DiagnoseUnimplementedProperties(Scope *S, ObjCImplDecl* IMPDecl,
+  ObjCContainerDecl *CDecl,
+  bool SynthesizeProperties) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::diagnoseNullResettableSynthesizedSetters(const ObjCImplDecl *impDecl) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void
+Sema::AtomicPropertySetterGetterRules(ObjCImplDecl* IMPDecl,
+  ObjCContainerDecl* IDecl) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::DiagnoseOwningPropertyGetterSynthesis(const ObjCImplementationDecl *D) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::DiagnoseMissingDesignatedInitOverrides(
+  const ObjCImplementationDecl *ImplD,
+  const ObjCInterfaceDecl *IFD) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
+  ObjCContainerDecl *CD,
+  ObjCPropertyDecl *redeclaredProperty,
+  ObjCContainerDecl *lexicalDC) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::CheckObjCPropertyAttributes(Decl *PDecl,
+  SourceLocation Loc,
+  unsigned &Attributes,
+  bool propertyInPrimaryClass) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+// HLSL Change Ends
+#else
+// HLSL Change Ends
 
 //===----------------------------------------------------------------------===//
 // Grammar actions.
@@ -2366,3 +2501,5 @@ void Sema::CheckObjCPropertyAttributes(Decl *PDecl,
     Diag(Loc, diag::warn_objc_readonly_property_has_setter);
       
 }
+
+#endif // HLSL Change

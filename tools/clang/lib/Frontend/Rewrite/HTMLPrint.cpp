@@ -1,15 +1,14 @@
 //===--- HTMLPrint.cpp - Source code -> HTML pretty-printing --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Pretty-printing of source code to HTML.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// HTMLPrint.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Pretty-printing of source code to HTML.                                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Rewrite/Frontend/ASTConsumers.h"
 #include "clang/AST/ASTConsumer.h"

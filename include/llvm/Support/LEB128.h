@@ -1,16 +1,15 @@
 //===- llvm/Support/LEB128.h - [SU]LEB128 utility functions -----*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LEB128.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file declares some utility functions for encoding SLEB128 and        //
+// ULEB128 values.                                                           //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file declares some utility functions for encoding SLEB128 and
-// ULEB128 values.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_LEB128_H
 #define LLVM_SUPPORT_LEB128_H
@@ -98,7 +97,7 @@ inline int64_t decodeSLEB128(const uint8_t *p, unsigned *n = nullptr) {
   uint8_t Byte;
   do {
     Byte = *p++;
-    Value |= ((Byte & 0x7f) << Shift);
+    Value |= (((uint64_t)(Byte & 0x7f)) << Shift); // HLSL Change - use 64 bits before casting, not after
     Shift += 7;
   } while (Byte >= 128);
   // Sign extend negative numbers.

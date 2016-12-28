@@ -1,28 +1,26 @@
-//===- llvm/Pass.h - Base class for Passes ----------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Pass.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines a base class that indicates that a specified class is a //
+// transformation pass implementation.                                       //
 //
-//                     The LLVM Compiler Infrastructure
+// Passes are designed this way so that it is possible to run passes in a cache//
+// and organizationally optimal order without having to specify it at the front//
+// end.  This allows arbitrary passes to be strung together and have them    //
+// executed as efficiently as possible.                                      //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Passes should extend one of the classes below, depending on the guarantees//
+// that it can make about what will be modified as it is run.  For example, most//
+// global optimizations should derive from FunctionPass, because they do not add//
+// or delete functions, they operate on the internals of the function.       //
 //
-//===----------------------------------------------------------------------===//
-//
-// This file defines a base class that indicates that a specified class is a
-// transformation pass implementation.
-//
-// Passes are designed this way so that it is possible to run passes in a cache
-// and organizationally optimal order without having to specify it at the front
-// end.  This allows arbitrary passes to be strung together and have them
-// executed as efficiently as possible.
-//
-// Passes should extend one of the classes below, depending on the guarantees
-// that it can make about what will be modified as it is run.  For example, most
-// global optimizations should derive from FunctionPass, because they do not add
-// or delete functions, they operate on the internals of the function.
-//
-// Note that this file #includes PassSupport.h and PassAnalysisSupport.h (at the
-// bottom), so the APIs exposed by these files are also automatically available
-// to all users of this file.
+// Note that this file #includes PassSupport.h and PassAnalysisSupport.h (at the//
+// bottom), so the APIs exposed by these files are also automatically available//
+// to all users of this file.                                                //
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,6 +29,8 @@
 
 #include "llvm/Support/Compiler.h"
 #include <string>
+#include "llvm/ADT/ArrayRef.h" // HLSL Change
+#include "llvm/ADT/StringRef.h" // HLSL Change
 
 namespace llvm {
 
@@ -74,6 +74,35 @@ enum PassKind {
   PT_PassManager
 };
 
+// HLSL Change Starts
+//
+// LLVM passes typically support an empty constructor, but often they will
+// have in addition to that constructors with arguments, as well as global
+// options that can modify their behavior.
+//
+// This section allows a data-driven pipeline assembler to be built.
+// The DxcOptimizer holds much of the needed information, but passes
+// frequently are implemented in non-header files and as such this
+// becomes a reasonable mechanism to pass flags around.
+//
+// Pass implementations should use the GetPassOption* functions to read
+// arguments, setting fields in place of globals and updating state
+// for constructor arguments.
+//
+typedef std::pair<llvm::StringRef, llvm::StringRef> PassOption;
+typedef llvm::ArrayRef<PassOption> PassOptions;
+struct PassOptionsCompare {
+  bool operator()(const PassOption &a, const PassOption &b) {
+    return a.first < b.first;
+  }
+};
+bool GetPassOption(PassOptions &O, llvm::StringRef name, llvm::StringRef *pValue);
+bool GetPassOptionBool(PassOptions &O, llvm::StringRef name, bool *pValue, bool defaultValue);
+bool GetPassOptionUnsigned(PassOptions &O, llvm::StringRef name, unsigned *pValue, unsigned defaultValue);
+bool GetPassOptionInt(PassOptions &O, llvm::StringRef name, int *pValue, int defaultValue);
+bool GetPassOptionUInt32(PassOptions &O, llvm::StringRef name, uint32_t *pValue, uint32_t defaultValue);
+// HLSL Change Ends
+
 //===----------------------------------------------------------------------===//
 /// Pass interface - Implemented by all 'passes'.  Subclass this if you are an
 /// interprocedural optimization or you do not fit into any of the more
@@ -86,11 +115,16 @@ class Pass {
   void operator=(const Pass&) = delete;
   Pass(const Pass &) = delete;
 
+protected: raw_ostream *OSOverride; // HLSL Change
+
 public:
   explicit Pass(PassKind K, char &pid)
-    : Resolver(nullptr), PassID(&pid), Kind(K) { }
+    : Resolver(nullptr), PassID(&pid), Kind(K), OSOverride(nullptr) { } // HLSL Change
   virtual ~Pass();
 
+  void setOSOverride(raw_ostream *OS) { OSOverride = OS; } // HLSL Change
+  virtual void applyOptions(PassOptions O) { return; } // HLSL Change
+  virtual void dumpConfig(raw_ostream &OS); // HLSL Change
 
   PassKind getPassKind() const { return Kind; }
 
@@ -99,6 +133,7 @@ public:
   /// Registration templates, but can be overloaded directly.
   ///
   virtual const char *getPassName() const;
+  const char *getPassArgument() const; // HLSL Change
 
   /// getPassID - Return the PassID number that corresponds to this pass.
   AnalysisID getPassID() const {
@@ -314,10 +349,8 @@ protected:
   /// and most transformation passes should skip it.
   bool skipOptnoneFunction(const Function &F) const;
 };
-
-
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// BasicBlockPass class - This class is used to implement most local
 /// optimizations.  Optimizations should subclass this class if they
 /// meet the following constraints:

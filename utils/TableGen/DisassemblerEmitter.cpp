@@ -1,21 +1,22 @@
 //===- DisassemblerEmitter.cpp - Generate a disassembler ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DisassemblerEmitter.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenTarget.h"
-#include "X86DisassemblerTables.h"
-#include "X86RecognizableInstr.h"
+// #include "X86DisassemblerTables.h" // HLSL Change
+// #include "X86RecognizableInstr.h"  // HLSL Change
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/TableGenBackend.h"
 
 using namespace llvm;
-using namespace llvm::X86Disassembler;
+// using namespace llvm::X86Disassembler; // HLSL Change
 
 /// DisassemblerEmitter - Contains disassembler table emitters for various
 /// architectures.
@@ -107,6 +108,7 @@ void EmitDisassembler(RecordKeeper &Records, raw_ostream &OS) {
   CodeGenTarget Target(Records);
   emitSourceFileHeader(" * " + Target.getName() + " Disassembler", OS);
 
+#if 0 // HLSL Change
   // X86 uses a custom disassembler.
   if (Target.getName() == "X86") {
     DisassemblerTables Tables;
@@ -140,6 +142,7 @@ void EmitDisassembler(RecordKeeper &Records, raw_ostream &OS) {
                           "MCDisassembler::Success;\n(void)S;");
     return;
   }
+#endif // HLSL Change
 
   EmitFixedLenDecoder(Records, OS, Target.getName(),
                       "if (", " == MCDisassembler::Fail)"

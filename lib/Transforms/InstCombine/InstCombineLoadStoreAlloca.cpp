@@ -1,15 +1,14 @@
 //===- InstCombineLoadStoreAlloca.cpp -------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the visit functions for load, store and alloca.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InstCombineLoadStoreAlloca.cpp                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the visit functions for load, store and alloca.      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "InstCombineInternal.h"
 #include "llvm/ADT/Statistic.h"
@@ -444,6 +443,7 @@ static StoreInst *combineStoreToNewValue(InstCombiner &IC, StoreInst &SI, Value 
 /// later. However, it is risky in case some backend or other part of LLVM is
 /// relying on the exact type loaded to select appropriate atomic operations.
 static Instruction *combineLoadToOperationType(InstCombiner &IC, LoadInst &LI) {
+#if 0 // HLSL Change - bitcast to i32* won't help HLSL.
   // FIXME: We could probably with some care handle both volatile and atomic
   // loads here but it isn't clear that this is important.
   if (!LI.isSimple())
@@ -499,6 +499,9 @@ static Instruction *combineLoadToOperationType(InstCombiner &IC, LoadInst &LI) {
   // FIXME: We should also canonicalize loads of vectors when their elements are
   // cast to other types.
   return nullptr;
+#else
+  return nullptr;
+#endif // HLSL Change - bitcast to i32* won't help HLSL.
 }
 
 static Instruction *unpackLoadToAggregate(InstCombiner &IC, LoadInst &LI) {

@@ -1,13 +1,13 @@
 //===------- TreeTransform.h - Semantic Tree Transformation -----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//===----------------------------------------------------------------------===//
-//
-//  This file implements a semantic tree transformation that takes a given
-//  AST and rebuilds it, possibly transforming some nodes in the process.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TreeTransform.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements a semantic tree transformation that takes a given   //
+//  AST and rebuilds it, possibly transforming some nodes in the process.    //
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,6 +32,7 @@
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaDiagnostic.h"
 #include "clang/Sema/SemaInternal.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
@@ -1989,6 +1990,46 @@ public:
                                               NameInfo,
                                               /* TemplateArgs */ nullptr);
   }
+
+  // HLSL Changes Start
+
+  /// \brief Build a new extended matrix element access expression.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
+  ExprResult RebuildExtMatrixElementExpr(Expr *Base,
+    SourceLocation OpLoc,
+    SourceLocation AccessorLoc,
+    IdentifierInfo &Accessor) {
+
+    const bool IsArrowFalse = false;
+    ExprResult result;
+    DeclarationName Name(&Accessor);
+
+    hlsl::LookupMatrixMemberExprForHLSL(&getSema(), *Base, Name, IsArrowFalse, OpLoc, AccessorLoc, &result);
+
+    return result;
+  }
+
+  /// \brief Build a new extended vector element access expression.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
+  ExprResult RebuildHLSLVectorElementExpr(Expr *Base,
+    SourceLocation OpLoc,
+    SourceLocation AccessorLoc,
+    IdentifierInfo &Accessor) {
+
+    const bool IsArrowFalse = false;
+    ExprResult result;
+    DeclarationName Name(&Accessor);
+
+    hlsl::LookupVectorMemberExprForHLSL(&getSema(), *Base, Name, IsArrowFalse, OpLoc, AccessorLoc, &result);
+
+    return result;
+  }
+
+  // HLSL Changes End
 
   /// \brief Build a new initializer list expression.
   ///
@@ -4425,7 +4466,8 @@ ParmVarDecl *TreeTransform<Derived>::TransformFunctionTypeParam(
                                              NewDI->getType(),
                                              NewDI,
                                              OldParm->getStorageClass(),
-                                             /* DefArg */ nullptr);
+                                             /* DefArg */ nullptr,
+                                             OldParm->getParamModifiers()); // HLSL Change
   newParm->setScopeInfo(OldParm->getFunctionScopeDepth(),
                         OldParm->getFunctionScopeIndex() + indexAdjustment);
   return newParm;
@@ -5784,6 +5826,14 @@ StmtResult
 TreeTransform<Derived>::TransformNullStmt(NullStmt *S) {
   return S;
 }
+
+// HLSL Change Starts - adding hlsl discard stmt support
+template<typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformDiscardStmt(DiscardStmt *S) {
+  return S;
+}
+// HLSL Change Ends
 
 template<typename Derived>
 StmtResult
@@ -8095,6 +8145,45 @@ TreeTransform<Derived>::TransformExtVectorElementExpr(ExtVectorElementExpr *E) {
                                                   E->getAccessorLoc(),
                                                   E->getAccessor());
 }
+
+// HLSL Change Starts
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformExtMatrixElementExpr(ExtMatrixElementExpr *E) {
+  ExprResult Base = getDerived().TransformExpr(E->getBase());
+  if (Base.isInvalid())
+    return ExprError();
+
+  if (!getDerived().AlwaysRebuild() &&
+    Base.get() == E->getBase())
+    return E;
+
+  // FIXME: Bad source location
+  SourceLocation FakeOperatorLoc
+    = SemaRef.getLocForEndOfToken(E->getBase()->getLocEnd());
+  return getDerived().RebuildExtMatrixElementExpr(Base.get(), FakeOperatorLoc,
+    E->getAccessorLoc(),
+    E->getAccessor());
+}
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformHLSLVectorElementExpr(HLSLVectorElementExpr *E) {
+  ExprResult Base = getDerived().TransformExpr(E->getBase());
+  if (Base.isInvalid())
+    return ExprError();
+
+  if (!getDerived().AlwaysRebuild() &&
+    Base.get() == E->getBase())
+    return E;
+
+  // FIXME: Bad source location
+  SourceLocation FakeOperatorLoc
+    = SemaRef.getLocForEndOfToken(E->getBase()->getLocEnd());
+  return getDerived().RebuildHLSLVectorElementExpr(Base.get(), FakeOperatorLoc,
+    E->getAccessorLoc(),
+    E->getAccessor());
+}
+// HLSL Change Ends
 
 template<typename Derived>
 ExprResult
@@ -10615,7 +10704,8 @@ TreeTransform<Derived>::TransformAtomicExpr(AtomicExpr *E) {
 
 //===----------------------------------------------------------------------===//
 // Type reconstruction
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 template<typename Derived>
 QualType TreeTransform<Derived>::RebuildPointerType(QualType PointeeType,

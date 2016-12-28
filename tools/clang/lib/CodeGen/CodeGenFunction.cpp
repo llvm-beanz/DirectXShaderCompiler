@@ -1,19 +1,19 @@
 //===--- CodeGenFunction.cpp - Emit LLVM Code from ASTs for a Function ----===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This coordinates the per-function state used while generating code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeGenFunction.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This coordinates the per-function state used while generating code.       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCleanup.h"
 #include "CGCUDARuntime.h"
+#include "CGHLSLRuntime.h"       // HLSL Change
 #include "CGCXXABI.h"
 #include "CGDebugInfo.h"
 #include "CGOpenMPRuntime.h"
@@ -86,9 +86,11 @@ CodeGenFunction::~CodeGenFunction() {
   if (FirstBlockInfo)
     destroyBlockInfos(FirstBlockInfo);
 
+#if 0 // HLSL Change - no OpenMP support
   if (getLangOpts().OpenMP) {
     CGM.getOpenMPRuntime().functionFinished(*this);
   }
+#endif // HLSL Change - no OpenMP support
 }
 
 LValue CodeGenFunction::MakeNaturalAlignAddrLValue(llvm::Value *V, QualType T) {
@@ -152,6 +154,16 @@ TypeEvaluationKind CodeGenFunction::getEvaluationKind(QualType type) {
     case Type::Record:
     case Type::ObjCObject:
     case Type::ObjCInterface:
+      // HLSL Change Starts
+      if (hlsl::IsHLSLVecType(type)) {
+        // Treat hlsl vector as ext vector.
+        return TEK_Scalar;
+      }
+      if (hlsl::IsHLSLMatType(type)) {
+        // Treat hlsl matrix as scalar type too.
+        return TEK_Scalar;
+      }
+      // HLSL Change Ends
       return TEK_Aggregate;
 
     // We operate on atomic values according to their underlying type.
@@ -682,9 +694,8 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
       ArgTypes.push_back((*i)->getType());
     }
 
-    QualType FnType =
-      getContext().getFunctionType(RetTy, ArgTypes,
-                                   FunctionProtoType::ExtProtoInfo());
+    QualType FnType = getContext().getFunctionType(
+        RetTy, ArgTypes, FunctionProtoType::ExtProtoInfo(), None); // HLSL Change - add param mods - TODO: review for inout
     DI->EmitFunctionStart(GD, Loc, StartLoc, FnType, CurFn, Builder);
   }
 
@@ -848,6 +859,12 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
 
   FunctionArgList Args;
   QualType ResTy = FD->getReturnType();
+
+  // HLSL Change Start - emit root signature associated with function
+  if (HLSLRootSignatureAttr *RSA = FD->getAttr<HLSLRootSignatureAttr>()) {
+    CGM.getHLSLRuntime().EmitHLSLRootSignature(*this, RSA, Fn);
+  }
+  // HLSL Change Ends - emit root signature associated with function
 
   CurGD = GD;
   const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(FD);
@@ -1070,6 +1087,20 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
                                     TrueCount);
       }
 
+      // HLSL Change Begins.
+      if (getLangOpts().HLSL) {
+        // HLSL don't short circuit.
+        // Emit the code with the fully general case.
+        llvm::Value *CondV;
+        {
+          ApplyDebugLocation DL(*this, Cond);
+          CondV = EvaluateExprAsBool(Cond);
+        }
+        Builder.CreateCondBr(CondV, TrueBlock, FalseBlock);
+        return;
+      }
+      // HLSL Change Ends.
+
       // Emit the LHS as a conditional.  If the LHS conditional is false, we
       // want to jump to the FalseBlock.
       llvm::BasicBlock *LHSTrue = createBasicBlock("land.lhs.true");
@@ -1115,6 +1146,20 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
         return EmitBranchOnBoolExpr(CondBOp->getLHS(), TrueBlock, FalseBlock,
                                     TrueCount);
       }
+
+      // HLSL Change Begins.
+      if (getLangOpts().HLSL) {
+        // HLSL don't short circuit.
+        // Emit the code with the fully general case.
+        llvm::Value *CondV;
+        {
+          ApplyDebugLocation DL(*this, Cond);
+          CondV = EvaluateExprAsBool(Cond);
+        }
+        Builder.CreateCondBr(CondV, TrueBlock, FalseBlock);
+        return;
+      }
+      // HLSL Change Ends.
 
       // Emit the LHS as a conditional.  If the LHS conditional is true, we
       // want to jump to the TrueBlock.

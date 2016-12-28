@@ -1,11 +1,5 @@
-;===- ./utils/LLVMBuild.txt ------------------------------------*- Conf -*--===;
-;
-;                     The LLVM Compiler Infrastructure
-;
-; This file is distributed under the University of Illinois Open Source
-; License. See LICENSE.TXT for details.
-;
-;===------------------------------------------------------------------------===;
+; Copyright (C) Microsoft Corporation. All rights reserved.
+; Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 ;
 ; This is an LLVMBuild description file for the components in this subdirectory.
 ;
@@ -16,7 +10,7 @@
 ;===------------------------------------------------------------------------===;
 
 [common]
-subdirectories = TableGen unittest
+subdirectories = TableGen
 
 [component_0]
 type = Group
@@ -27,3 +21,5 @@ parent = $ROOT
 type = Group
 name = UtilityTools
 parent = $ROOT
+
+# HLSL Change: remove unittest

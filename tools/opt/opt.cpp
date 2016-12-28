@@ -1,16 +1,15 @@
 //===- opt.cpp - The LLVM Modular Optimizer -------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Optimizations may be specified an arbitrary number of times on the command
-// line, They are run in the order specified.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// opt.cpp                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Optimizations may be specified an arbitrary number of times on the command//
+// line, They are run in the order specified.                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "BreakpointPrinter.h"
 #include "NewPMDriver.h"
@@ -51,6 +50,14 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+
+// HLSL Change Starts
+#include "dxc/Support/Global.h"
+#include "dxc/HLSL/ReducibilityAnalysis.h"
+#include "dxc/Support/WinIncludes.h"
+#include "llvm/Support/MSFileSystem.h"
+// HLSL Change Ends
+
 #include <algorithm>
 #include <memory>
 using namespace llvm;
@@ -290,9 +297,18 @@ void initializePollyPasses(llvm::PassRegistry &Registry);
 //===----------------------------------------------------------------------===//
 // main for opt
 //
-int main(int argc, char **argv) {
-  sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc, argv);
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
+  // HLSL Change Starts
+  llvm::sys::fs::MSFileSystem* msfPtr;
+  if (FAILED(CreateMSFileSystemForDisk(&msfPtr))) return 1;
+  std::unique_ptr<llvm::sys::fs::MSFileSystem> msf(msfPtr);
+  llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
+  //llvm::STDStreamCloser stdStreamCloser;
+  // HLSL Change Ends
+  
+  //sys::PrintStackTraceOnErrorSignal();          // HLSL Change
+  //llvm::PrettyStackTraceProgram X(argc, argv);  // HLSL Change
 
   // Enable debug stream buffering.
   EnableDebugBuffering = true;
@@ -301,30 +317,38 @@ int main(int argc, char **argv) {
   LLVMContext &Context = getGlobalContext();
 
   InitializeAllTargets();
-  InitializeAllTargetMCs();
+  // InitializeAllTargetMCs(); // HLSL Change: remove MC targets
   InitializeAllAsmPrinters();
 
   // Initialize passes
   PassRegistry &Registry = *PassRegistry::getPassRegistry();
   initializeCore(Registry);
   initializeScalarOpts(Registry);
-  initializeObjCARCOpts(Registry);
-  initializeVectorization(Registry);
+  initializeReducibilityAnalysisPass(Registry); // HLSL Change: add ReducibilityAnalysis pass
+  // initializeObjCARCOpts(Registry);    // HLSL Change: remove ObjC ARC passes
+  // initializeVectorization(Registry);  // HLSL Change: remove vectorization passes
   initializeIPO(Registry);
   initializeAnalysis(Registry);
   initializeIPA(Registry);
   initializeTransformUtils(Registry);
   initializeInstCombine(Registry);
-  initializeInstrumentation(Registry);
+  // initializeInstrumentation(Registry); // HLSL Change: remove instrumentation
   initializeTarget(Registry);
   // For codegen passes, only passes that do IR to IR transformation are
   // supported.
-  initializeCodeGenPreparePass(Registry);
-  initializeAtomicExpandPass(Registry);
+  // initializeCodeGenPreparePass(Registry); // HLSL Change: remove EH passes
+  //initializeAtomicExpandPass(Registry); // HLSL Change: remove EH passes
   initializeRewriteSymbolsPass(Registry);
-  initializeWinEHPreparePass(Registry);
-  initializeDwarfEHPreparePass(Registry);
-  initializeSjLjEHPreparePass(Registry);
+  //initializeWinEHPreparePass(Registry);   // HLSL Change: remove EH passes
+  //initializeDwarfEHPreparePass(Registry); // HLSL Change: remove EH passes
+  //initializeSjLjEHPreparePass(Registry);  // HLSL Change: remove EH passes
+  // MS Change Starts
+  initializeReducibilityAnalysisPass(Registry);
+#if HLSL_INTERNAL
+  void initializeHlslInternalPasses(PassRegistry &);
+  initializeHlslInternalPasses(Registry);
+#endif
+  // MS Change Ends
 
 #ifdef LINK_POLLY_INTO_TOOLS
   polly::initializePollyPasses(Registry);
@@ -597,7 +621,14 @@ int main(int argc, char **argv) {
   cl::PrintOptionValues();
 
   // Now that we have all of the passes ready, run them.
-  Passes.run(*M);
+  // HLSL Change Starts - wrap in try-catch
+  try {
+    Passes.run(*M);
+  }
+  catch(...) {
+    exit(1);
+  }
+  // HLSL Change Ends
 
   // Declare success.
   if (!NoOutput || PrintBreakpoints)

@@ -1,16 +1,15 @@
 //===----- CGCXXABI.cpp - Interface to C++ ABIs ---------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides an abstract class for C++ code generation. Concrete subclasses
-// of this implement code generation for specific C++ ABIs.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGCXXABI.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides an abstract class for C++ code generation. Concrete subclasses//
+// of this implement code generation for specific C++ ABIs.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGCXXABI.h"
 
@@ -165,8 +164,12 @@ void CGCXXABI::buildThisParam(CodeGenFunction &CGF, FunctionArgList &params) {
 void CGCXXABI::EmitThisParam(CodeGenFunction &CGF) {
   /// Initialize the 'this' slot.
   assert(getThisDecl(CGF) && "no 'this' variable for function");
-  getThisValue(CGF)
-    = CGF.Builder.CreateLoad(CGF.GetAddrOfLocalVar(getThisDecl(CGF)),
+  // HLSL Change Starts:
+  if (CGF.CurFn) {
+    getThisValue(CGF) = CGF.CurFn->args().begin();
+  } else
+  // HLSL Change Ends
+    getThisValue(CGF) = CGF.Builder.CreateLoad(CGF.GetAddrOfLocalVar(getThisDecl(CGF)),
                              "this");
 }
 

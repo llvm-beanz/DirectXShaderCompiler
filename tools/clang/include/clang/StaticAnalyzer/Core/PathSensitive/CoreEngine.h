@@ -1,14 +1,13 @@
 //==- CoreEngine.h - Path-Sensitive Dataflow Engine ----------------*- C++ -*-//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines a generic engine for intraprocedural, path-sensitive,
-//  dataflow analysis via graph reachability.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CoreEngine.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines a generic engine for intraprocedural, path-sensitive,  //
+//  dataflow analysis via graph reachability.                                //
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,8 +29,8 @@ class ProgramPointTag;
 namespace ento {
 
 class NodeBuilder;
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// CoreEngine - Implements the core logic of the graph-reachability
 ///   analysis. It traverses the CFG and generates the ExplodedGraph.
 ///   Program "states" are treated as opaque void pointers.

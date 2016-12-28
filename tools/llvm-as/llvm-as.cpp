@@ -1,19 +1,18 @@
 //===--- llvm-as.cpp - The low-level LLVM assembler -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This utility may be invoked in the following manner:
-//   llvm-as --help         - Output information about command line switches
-//   llvm-as [options]      - Read LLVM asm from stdin, write bitcode to stdout
-//   llvm-as [options] x.ll - Read LLVM asm from the x.ll file, write bitcode
-//                            to the x.bc file.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-as.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This utility may be invoked in the following manner:                     //
+//   llvm-as --help         - Output information about command line switches //
+//   llvm-as [options]      - Read LLVM asm from stdin, write bitcode to stdout//
+//   llvm-as [options] x.ll - Read LLVM asm from the x.ll file, write bitcode//
+//                            to the x.bc file.                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/AsmParser/Parser.h"
@@ -83,10 +82,28 @@ static void WriteOutputFile(const Module *M) {
   Out->keep();
 }
 
-int main(int argc, char **argv) {
+// HLSL Change Starts
+#define NOMINMAX
+#include <windows.h>
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MSFileSystem.h"
+// HLSL Change Ends
+
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   // Print a stack trace if we signal out.
-  sys::PrintStackTraceOnErrorSignal();
-  PrettyStackTraceProgram X(argc, argv);
+  // sys::PrintStackTraceOnErrorSignal(); // HLSL Change - disable this
+  // PrettyStackTraceProgram X(argc, argv); // HLSL Change - disable this
+  // HLSL Change Starts
+  llvm::sys::fs::MSFileSystem* msfPtr;
+  HRESULT hr;
+  if (!SUCCEEDED(hr = CreateMSFileSystemForDisk(&msfPtr)))
+    return 1;
+  std::unique_ptr<llvm::sys::fs::MSFileSystem> msf(msfPtr);
+  llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
+  llvm::STDStreamCloser stdStreamCloser;
+  // HLSL Change Ends
+
   LLVMContext &Context = getGlobalContext();
   llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
   cl::ParseCommandLineOptions(argc, argv, "llvm .ll -> .bc assembler\n");

@@ -1,13 +1,3 @@
-add_subdirectory(BrainF)
-add_subdirectory(Fibonacci)
-add_subdirectory(HowToUseJIT)
-add_subdirectory(Kaleidoscope)
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 add_subdirectory(ModuleMaker)
-
-if( ( NOT WIN32 ) AND ( NOT "${LLVM_NATIVE_ARCH}" STREQUAL "ARM" ) )
-    add_subdirectory(ExceptionDemo)
-endif()
-
-if( HAVE_PTHREAD_H )
-  add_subdirectory(ParallelJIT)
-endif( HAVE_PTHREAD_H )

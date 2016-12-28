@@ -1,16 +1,15 @@
 //=- ReachableCodePathInsensitive.cpp ---------------------------*- C++ --*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements a flow-sensitive, path-insensitive analysis of
-// determining reachable blocks within a CFG.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ReachableCode.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements a flow-sensitive, path-insensitive analysis of       //
+// determining reachable blocks within a CFG.                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Analysis/Analyses/ReachableCode.h"
 #include "clang/AST/Expr.h"
@@ -430,7 +429,8 @@ const Stmt *DeadCodeScan::findDeadCode(const clang::CFGBlock *Block) {
   return nullptr;
 }
 
-static int SrcCmp(const std::pair<const CFGBlock *, const Stmt *> *p1,
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl SrcCmp(const std::pair<const CFGBlock *, const Stmt *> *p1,
                   const std::pair<const CFGBlock *, const Stmt *> *p2) {
   if (p1->second->getLocStart() < p2->second->getLocStart())
     return -1;

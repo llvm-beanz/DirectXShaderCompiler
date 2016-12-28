@@ -1,20 +1,18 @@
 /*===-- llvm-c/ExecutionEngine.h - ExecutionEngine Lib C Iface --*- C++ -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header declares the C interface to libLLVMExecutionEngine.o, which    *|
-|* implements various analyses of the LLVM IR.                                *|
-|*                                                                            *|
-|* Many exotic languages can interoperate with C code but have a harder time  *|
-|* with C++ due to name mangling. So in addition to C, this interface enables *|
-|* tools written in such languages.                                           *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExecutionEngine.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header declares the C interface to libLLVMExecutionEngine.o, which   //
+// implements various analyses of the LLVM IR.                               //
+// Many exotic languages can interoperate with C code but have a harder time //
+// with C++ due to name mangling. So in addition to C, this interface enables//
+// tools written in such languages.                                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_C_EXECUTIONENGINE_H
 #define LLVM_C_EXECUTIONENGINE_H
@@ -74,16 +72,16 @@ void LLVMDisposeGenericValue(LLVMGenericValueRef GenVal);
 
 LLVMBool LLVMCreateExecutionEngineForModule(LLVMExecutionEngineRef *OutEE,
                                             LLVMModuleRef M,
-                                            char **OutError);
+											_Out_opt_  char **OutError);
 
 LLVMBool LLVMCreateInterpreterForModule(LLVMExecutionEngineRef *OutInterp,
                                         LLVMModuleRef M,
-                                        char **OutError);
+										_Out_opt_ char **OutError);
 
 LLVMBool LLVMCreateJITCompilerForModule(LLVMExecutionEngineRef *OutJIT,
                                         LLVMModuleRef M,
                                         unsigned OptLevel,
-                                        char **OutError);
+										_Out_opt_ char **OutError);
 
 void LLVMInitializeMCJITCompilerOptions(
   struct LLVMMCJITCompilerOptions *Options, size_t SizeOfOptions);
@@ -108,23 +106,23 @@ void LLVMInitializeMCJITCompilerOptions(
 LLVMBool LLVMCreateMCJITCompilerForModule(
   LLVMExecutionEngineRef *OutJIT, LLVMModuleRef M,
   struct LLVMMCJITCompilerOptions *Options, size_t SizeOfOptions,
-  char **OutError);
+	  _Out_opt_ char **OutError);
 
 /** Deprecated: Use LLVMCreateExecutionEngineForModule instead. */
 LLVMBool LLVMCreateExecutionEngine(LLVMExecutionEngineRef *OutEE,
                                    LLVMModuleProviderRef MP,
-                                   char **OutError);
+								   _Out_opt_ char **OutError);
 
 /** Deprecated: Use LLVMCreateInterpreterForModule instead. */
 LLVMBool LLVMCreateInterpreter(LLVMExecutionEngineRef *OutInterp,
                                LLVMModuleProviderRef MP,
-                               char **OutError);
+							   _Out_opt_ char **OutError);
 
 /** Deprecated: Use LLVMCreateJITCompilerForModule instead. */
 LLVMBool LLVMCreateJITCompiler(LLVMExecutionEngineRef *OutJIT,
                                LLVMModuleProviderRef MP,
                                unsigned OptLevel,
-                               char **OutError);
+							   _Out_opt_ char **OutError);
 
 void LLVMDisposeExecutionEngine(LLVMExecutionEngineRef EE);
 
@@ -148,12 +146,12 @@ void LLVMAddModule(LLVMExecutionEngineRef EE, LLVMModuleRef M);
 void LLVMAddModuleProvider(LLVMExecutionEngineRef EE, LLVMModuleProviderRef MP);
 
 LLVMBool LLVMRemoveModule(LLVMExecutionEngineRef EE, LLVMModuleRef M,
-                          LLVMModuleRef *OutMod, char **OutError);
+	LLVMModuleRef *OutMod, _Out_opt_  char **OutError);
 
 /** Deprecated: Use LLVMRemoveModule instead. */
 LLVMBool LLVMRemoveModuleProvider(LLVMExecutionEngineRef EE,
                                   LLVMModuleProviderRef MP,
-                                  LLVMModuleRef *OutMod, char **OutError);
+								  LLVMModuleRef *OutMod, _Out_opt_ char **OutError);
 
 LLVMBool LLVMFindFunction(LLVMExecutionEngineRef EE, const char *Name,
                           LLVMValueRef *OutFn);

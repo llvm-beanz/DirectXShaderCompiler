@@ -1,11 +1,12 @@
 //===- BitstreamReader.cpp - BitstreamReader implementation ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BitstreamReader.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Bitcode/BitstreamReader.h"
 
@@ -291,7 +292,7 @@ void BitstreamCursor::ReadAbbrevRecord() {
   CurAbbrevs.push_back(Abbv);
 }
 
-bool BitstreamCursor::ReadBlockInfoBlock() {
+bool BitstreamCursor::ReadBlockInfoBlock(unsigned *pCount) {
   // If this is the second stream to get to the block info block, skip it.
   if (BitStream->hasBlockInfoRecords())
     return SkipBlock();
@@ -303,7 +304,7 @@ bool BitstreamCursor::ReadBlockInfoBlock() {
 
   // Read all the records for this module.
   while (1) {
-    BitstreamEntry Entry = advanceSkippingSubblocks(AF_DontAutoprocessAbbrevs);
+    BitstreamEntry Entry = advanceSkippingSubblocks(AF_DontAutoprocessAbbrevs, pCount);
 
     switch (Entry.Kind) {
     case llvm::BitstreamEntry::SubBlock: // Handled for us already.
@@ -359,3 +360,95 @@ bool BitstreamCursor::ReadBlockInfoBlock() {
   }
 }
 
+// HLSL Change Starts
+void BitstreamUseTracker::track(BitstreamUseTracker *BT, uint64_t begin,
+                                   uint64_t end) {
+  if (BT)
+    BT->insert(begin, end);
+}
+
+BitstreamUseTracker::ExtendResult
+BitstreamUseTracker::extendRange(UseRange &Curr, UseRange &NewRange) {
+  // Most likely case first.
+  if (Curr.first <= NewRange.first && Curr.second < NewRange.second) {
+    Curr.second = NewRange.second;
+    return ExtendedEnd;
+  }
+  if (Curr.first <= NewRange.first && NewRange.second <= Curr.second) {
+    return Included; // already included.
+  }
+  if (NewRange.first < Curr.first && NewRange.second <= Curr.second) {
+    return ExtendedBegin;
+  }
+  if (NewRange.first < Curr.first && Curr.second < NewRange.second) {
+    return ExtendedBoth;
+  }
+  return Exclusive;
+}
+
+bool BitstreamUseTracker::isDense(uint64_t endBitoffset) const {
+  return Ranges.size() == 1 && Ranges[0].first == 0 &&
+         Ranges[0].second == endBitoffset;
+}
+
+bool BitstreamUseTracker::considerMergeRight(size_t idx) {
+  bool changed = false;
+  while (idx < Ranges.size() - 1) {
+    if (Ranges[idx].second >= Ranges[idx + 1].first) {
+      Ranges[idx].second = Ranges[idx + 1].second;
+      Ranges.erase(&Ranges[idx + 1]);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+void BitstreamUseTracker::insert(uint64_t begin, uint64_t end) {
+  UseRange IR(begin, end);
+  for (size_t i = 0; i < Ranges.size(); ++i) {
+    ExtendResult ER = extendRange(Ranges[i], IR);
+    switch (ER) {
+    case Included:
+      return;
+    case ExtendedEnd:
+      considerMergeRight(i);
+      return;
+    case ExtendedBegin:
+      if (i > 0)
+        considerMergeRight(i - 1);
+      return;
+    case ExtendedBoth:
+      if (i > 0) {
+        if (!considerMergeRight(i - 1))
+          considerMergeRight(i);
+      } else
+        considerMergeRight(i);
+      return;
+    case Exclusive:
+      // If completely to the left, then insert there; otherwise,
+      // keep traversing in order.
+      if (end <= Ranges[i].first) {
+        Ranges.insert(&Ranges[i], IR);
+        return;
+      }
+    }
+  }
+
+  // This range goes at the end.
+  Ranges.push_back(IR);
+}
+
+BitstreamUseTracker::ScopeTrack::~ScopeTrack() {
+  if (BC->getBitStreamReader()->Tracker != nullptr)
+    BC->getBitStreamReader()->Tracker->insert(begin, BC->GetCurrentBitNo());
+}
+
+BitstreamUseTracker::ScopeTrack
+BitstreamUseTracker::scope_track(BitstreamCursor *BC) {
+  ScopeTrack Result;
+  Result.BC = BC;
+  Result.begin = BC->GetCurrentBitNo();
+  return Result;
+}
+
+// HLSL Change Ends

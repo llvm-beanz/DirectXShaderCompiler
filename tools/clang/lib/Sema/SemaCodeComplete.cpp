@@ -1,15 +1,14 @@
 //===---------------- SemaCodeComplete.cpp - Code Completion ----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the code-completion semantic actions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaCodeComplete.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the code-completion semantic actions.                  //
+//                                                                           //
+
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/ExprCXX.h"
@@ -34,7 +33,8 @@
 #include <list>
 #include <map>
 #include <vector>
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 using namespace sema;
 

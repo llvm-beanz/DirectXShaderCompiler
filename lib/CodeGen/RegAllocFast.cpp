@@ -1,16 +1,15 @@
 //===-- RegAllocFast.cpp - A fast register allocator for debug code -------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This register allocator allocates registers to a basic block at a time,
-// attempting to keep values in registers and reusing registers as appropriate.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RegAllocFast.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This register allocator allocates registers to a basic block at a time,   //
+// attempting to keep values in registers and reusing registers as appropriate.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/ADT/DenseMap.h"
@@ -296,12 +295,12 @@ void RAFast::spillVirtReg(MachineBasicBlock::iterator MI,
     SmallVectorImpl<MachineInstr *> &LRIDbgValues =
       LiveDbgValueMap[LRI->VirtReg];
     for (unsigned li = 0, le = LRIDbgValues.size(); li != le; ++li) {
-      MachineInstr *DBG = LRIDbgValues[li];
-      const MDNode *Var = DBG->getDebugVariable();
-      const MDNode *Expr = DBG->getDebugExpression();
-      bool IsIndirect = DBG->isIndirectDebugValue();
-      uint64_t Offset = IsIndirect ? DBG->getOperand(1).getImm() : 0;
-      DebugLoc DL = DBG->getDebugLoc();
+      MachineInstr *DBG_instr = LRIDbgValues[li];
+      const MDNode *Var = DBG_instr->getDebugVariable();
+      const MDNode *Expr = DBG_instr->getDebugExpression();
+      bool IsIndirect = DBG_instr->isIndirectDebugValue();
+      uint64_t Offset = IsIndirect ? DBG_instr->getOperand(1).getImm() : 0;
+      DebugLoc DL = DBG_instr->getDebugLoc();
       assert(cast<DILocalVariable>(Var)->isValidLocationForIntrinsic(DL) &&
              "Expected inlined-at fields to agree");
       MachineInstr *NewDV =

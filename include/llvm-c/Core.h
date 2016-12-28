@@ -1,16 +1,15 @@
 /*===-- llvm-c/Core.h - Core Library C Interface ------------------*- C -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header declares the C interface to libLLVMCore.a, which implements    *|
-|* the LLVM intermediate representation.                                      *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Core.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header declares the C interface to libLLVMCore.a, which implements   //
+// the LLVM intermediate representation.                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_C_CORE_H
 #define LLVM_C_CORE_H
@@ -432,7 +431,7 @@ void LLVMShutdown(void);
 /*===-- Error handling ----------------------------------------------------===*/
 
 char *LLVMCreateMessage(const char *Message);
-void LLVMDisposeMessage(char *Message);
+void LLVMDisposeMessage(_Out_opt_ char *Message);
 
 typedef void (*LLVMFatalErrorHandler)(const char *Reason);
 
@@ -616,7 +615,7 @@ void LLVMDumpModule(LLVMModuleRef M);
  * @see Module::print()
  */
 LLVMBool LLVMPrintModuleToFile(LLVMModuleRef M, const char *Filename,
-                               char **ErrorMessage);
+    _Out_opt_ char **ErrorMessage);
 
 /**
  * Return a string representation of the module. Use
@@ -2901,9 +2900,9 @@ void LLVMDisposeModuleProvider(LLVMModuleProviderRef M);
 
 LLVMBool LLVMCreateMemoryBufferWithContentsOfFile(const char *Path,
                                                   LLVMMemoryBufferRef *OutMemBuf,
-                                                  char **OutMessage);
+                                                  _Out_opt_ char **OutMessage);
 LLVMBool LLVMCreateMemoryBufferWithSTDIN(LLVMMemoryBufferRef *OutMemBuf,
-                                         char **OutMessage);
+    _Out_opt_ char **OutMessage);
 LLVMMemoryBufferRef LLVMCreateMemoryBufferWithMemoryRange(const char *InputData,
                                                           size_t InputDataLength,
                                                           const char *BufferName,

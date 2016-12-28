@@ -1,16 +1,17 @@
 //===--- OnDiskHashTable.h - On-Disk Hash Table Implementation --*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// OnDiskHashTable.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines facilities for reading and writing on-disk hash tables.
+/// \file                                                                    //
+/// \brief Defines facilities for reading and writing on-disk hash tables.   //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_SUPPORT_ONDISKHASHTABLE_H
 #define LLVM_SUPPORT_ONDISKHASHTABLE_H
 
@@ -95,6 +96,7 @@ private:
   /// \brief Resize the hash table, moving the old entries into the new buckets.
   void resize(size_t NewSize) {
     Bucket *NewBuckets = (Bucket *)std::calloc(NewSize, sizeof(Bucket));
+    if (NewBuckets == nullptr) throw std::bad_alloc(); // HLSL Change
     // Populate NewBuckets with the old entries.
     for (size_t I = 0; I < NumBuckets; ++I)
       for (Item *E = Buckets[I].Head; E;) {
@@ -188,6 +190,7 @@ public:
     // Note that we do not need to run the constructors of the individual
     // Bucket objects since 'calloc' returns bytes that are all 0.
     Buckets = (Bucket *)std::calloc(NumBuckets, sizeof(Bucket));
+    if (Buckets == nullptr) throw std::bad_alloc(); // HLSL Change
   }
 
   ~OnDiskChainedHashTableGenerator() { std::free(Buckets); }

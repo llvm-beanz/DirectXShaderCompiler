@@ -1,76 +1,74 @@
 //==- MachineScheduler.h - MachineInstr Scheduling Pass ----------*- C++ -*-==//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MachineScheduler.h                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides an interface for customizing the standard MachineScheduler//
+// pass. Note that the entire pass may be replaced as follows:               //
 //
-//                     The LLVM Compiler Infrastructure
+// <Target>TargetMachine::createPassConfig(PassManagerBase &PM) {            //
+//   PM.substitutePass(&MachineSchedulerID, &CustomSchedulerPassID);         //
+//   ...}                                                                    //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// The MachineScheduler pass is only responsible for choosing the regions to be//
+// scheduled. Targets can override the DAG builder and scheduler without     //
+// replacing the pass as follows:                                            //
 //
-//===----------------------------------------------------------------------===//
+// ScheduleDAGInstrs *<Target>PassConfig::                                   //
+// createMachineScheduler(MachineSchedContext *C) {                          //
+//   return new CustomMachineScheduler(C);                                   //
+// }                                                                         //
 //
-// This file provides an interface for customizing the standard MachineScheduler
-// pass. Note that the entire pass may be replaced as follows:
+// The default scheduler, ScheduleDAGMILive, builds the DAG and drives list  //
+// scheduling while updating the instruction stream, register pressure, and live//
+// intervals. Most targets don't need to override the DAG builder and list   //
+// schedulier, but subtargets that require custom scheduling heuristics may  //
+// plugin an alternate MachineSchedStrategy. The strategy is responsible for //
+// selecting the highest priority node from the list:                        //
 //
-// <Target>TargetMachine::createPassConfig(PassManagerBase &PM) {
-//   PM.substitutePass(&MachineSchedulerID, &CustomSchedulerPassID);
-//   ...}
+// ScheduleDAGInstrs *<Target>PassConfig::                                   //
+// createMachineScheduler(MachineSchedContext *C) {                          //
+//   return new ScheduleDAGMI(C, CustomStrategy(C));                         //
+// }                                                                         //
 //
-// The MachineScheduler pass is only responsible for choosing the regions to be
-// scheduled. Targets can override the DAG builder and scheduler without
-// replacing the pass as follows:
+// The DAG builder can also be customized in a sense by adding DAG mutations //
+// that will run after DAG building and before list scheduling. DAG mutations//
+// can adjust dependencies based on target-specific knowledge or add weak edges//
+// to aid heuristics:                                                        //
 //
-// ScheduleDAGInstrs *<Target>PassConfig::
-// createMachineScheduler(MachineSchedContext *C) {
-//   return new CustomMachineScheduler(C);
-// }
+// ScheduleDAGInstrs *<Target>PassConfig::                                   //
+// createMachineScheduler(MachineSchedContext *C) {                          //
+//   ScheduleDAGMI *DAG = new ScheduleDAGMI(C, CustomStrategy(C));           //
+//   DAG->addMutation(new CustomDependencies(DAG->TII, DAG->TRI));           //
+//   return DAG;                                                             //
+// }                                                                         //
 //
-// The default scheduler, ScheduleDAGMILive, builds the DAG and drives list
-// scheduling while updating the instruction stream, register pressure, and live
-// intervals. Most targets don't need to override the DAG builder and list
-// schedulier, but subtargets that require custom scheduling heuristics may
-// plugin an alternate MachineSchedStrategy. The strategy is responsible for
-// selecting the highest priority node from the list:
+// A target that supports alternative schedulers can use the                 //
+// MachineSchedRegistry to allow command line selection. This can be done by //
+// implementing the following boilerplate:                                   //
 //
-// ScheduleDAGInstrs *<Target>PassConfig::
-// createMachineScheduler(MachineSchedContext *C) {
-//   return new ScheduleDAGMI(C, CustomStrategy(C));
-// }
+// static ScheduleDAGInstrs *createCustomMachineSched(MachineSchedContext *C) {//
+//  return new CustomMachineScheduler(C);                                    //
+// }                                                                         //
+// static MachineSchedRegistry                                               //
+// SchedCustomRegistry("custom", "Run my target's custom scheduler",         //
+//                     createCustomMachineSched);                            //
 //
-// The DAG builder can also be customized in a sense by adding DAG mutations
-// that will run after DAG building and before list scheduling. DAG mutations
-// can adjust dependencies based on target-specific knowledge or add weak edges
-// to aid heuristics:
+// Finally, subtargets that don't need to implement custom heuristics but would//
+// like to configure the GenericScheduler's policy for a given scheduler region,//
+// including scheduling direction and register pressure tracking policy, can do//
+// this:                                                                     //
 //
-// ScheduleDAGInstrs *<Target>PassConfig::
-// createMachineScheduler(MachineSchedContext *C) {
-//   ScheduleDAGMI *DAG = new ScheduleDAGMI(C, CustomStrategy(C));
-//   DAG->addMutation(new CustomDependencies(DAG->TII, DAG->TRI));
-//   return DAG;
-// }
-//
-// A target that supports alternative schedulers can use the
-// MachineSchedRegistry to allow command line selection. This can be done by
-// implementing the following boilerplate:
-//
-// static ScheduleDAGInstrs *createCustomMachineSched(MachineSchedContext *C) {
-//  return new CustomMachineScheduler(C);
-// }
-// static MachineSchedRegistry
-// SchedCustomRegistry("custom", "Run my target's custom scheduler",
-//                     createCustomMachineSched);
-//
-//
-// Finally, subtargets that don't need to implement custom heuristics but would
-// like to configure the GenericScheduler's policy for a given scheduler region,
-// including scheduling direction and register pressure tracking policy, can do
-// this:
-//
-// void <SubTarget>Subtarget::
-// overrideSchedPolicy(MachineSchedPolicy &Policy,
-//                     MachineInstr *begin,
-//                     MachineInstr *end,
-//                     unsigned NumRegionInstrs) const {
-//   Policy.<Flag> = true;
-// }
+// void <SubTarget>Subtarget::                                               //
+// overrideSchedPolicy(MachineSchedPolicy &Policy,                           //
+//                     MachineInstr *begin,                                  //
+//                     MachineInstr *end,                                    //
+//                     unsigned NumRegionInstrs) const {                     //
+//   Policy.<Flag> = true;                                                   //
+// }                                                                         //
 //
 //===----------------------------------------------------------------------===//
 
@@ -463,7 +461,8 @@ protected:
 /// Helpers for implementing custom MachineSchedStrategy classes. These take
 /// care of the book-keeping associated with list scheduling heuristics.
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 /// ReadyQueue encapsulates vector of "ready" SUnits with basic convenience
 /// methods for pushing and removing nodes. ReadyQueue's are uniquely identified

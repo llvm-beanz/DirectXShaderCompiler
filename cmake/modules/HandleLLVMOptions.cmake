@@ -60,6 +60,7 @@ if( LLVM_ENABLE_ASSERTIONS )
   if( NOT MSVC )
     add_definitions( -D_DEBUG )
   endif()
+  add_definitions( -DDBG ) # HLSL Change
   # On non-Debug builds cmake automatically defines NDEBUG, so we
   # explicitly undefine it:
   if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
@@ -315,13 +316,25 @@ if( MSVC )
 	# When we switch to requiring a version of MSVC that supports the 'alignas'
 	# specifier (MSVC 2015?) this warning can be re-enabled.
     -wd4324 # Suppress 'structure was padded due to __declspec(align())'
-	    
+
     # Promoted warnings.
-    -w14062 # Promote 'enumerator in switch of enum is not handled' to level 1 warning.
+    # HLSL Change - don't do this - -w14062 # Promote 'enumerator in switch of enum is not handled' to level 1 warning.
 
     # Promoted warnings to errors.
     -we4238 # Promote 'nonstandard extension used : class rvalue used as lvalue' to error.
     )
+
+  # HLSL Changes Start
+  if (HLSL_ENABLE_ANALYZE)
+    append("/analyze" CMAKE_CXX_FLAGS)
+  endif ()
+
+  # Change release to always build debug information out-of-line, but
+  # also enable Reference optimization, ie dead function elimination.
+  append("/Zi" CMAKE_CXX_FLAGS_RELEASE)
+  append("/DEBUG /OPT:REF" CMAKE_SHARED_LINKER_FLAGS_RELEASE)
+
+  # HLSL Changes End
 
   # Enable warnings
   if (LLVM_ENABLE_WARNINGS)

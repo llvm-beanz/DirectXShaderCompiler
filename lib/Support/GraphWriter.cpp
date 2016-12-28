@@ -1,15 +1,14 @@
 //===-- GraphWriter.cpp - Implements GraphWriter support routines ---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements misc. GraphWriter support routines.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// GraphWriter.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements misc. GraphWriter support routines.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Config/config.h"
@@ -82,6 +81,7 @@ static bool ExecGraphViewer(StringRef ExecPath, std::vector<const char *> &args,
                             StringRef Filename, bool wait,
                             std::string &ErrMsg) {
   assert(args.back() == nullptr);
+#if 0 // HLSL Change Starts
   if (wait) {
     if (sys::ExecuteAndWait(ExecPath, args.data(), nullptr, nullptr, 0, 0,
                             &ErrMsg)) {
@@ -94,6 +94,9 @@ static bool ExecGraphViewer(StringRef ExecPath, std::vector<const char *> &args,
     sys::ExecuteNoWait(ExecPath, args.data(), nullptr, nullptr, 0, &ErrMsg);
     errs() << "Remember to erase graph file: " << Filename << "\n";
   }
+#else
+  errs() << "Support for graph creation disabled.\n";
+#endif // HLSL Change Ends
   return false;
 }
 

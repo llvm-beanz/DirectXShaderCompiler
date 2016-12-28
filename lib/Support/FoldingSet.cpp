@@ -1,16 +1,15 @@
 //===-- Support/FoldingSet.cpp - Uniquing Hash Set --------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements a hash set that can be used to remove duplication of
-// nodes in a graph.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FoldingSet.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements a hash set that can be used to remove duplication of //
+// nodes in a graph.                                                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -215,6 +214,7 @@ static void **GetBucketFor(unsigned Hash, void **Buckets, unsigned NumBuckets) {
 /// AllocateBuckets - Allocated initialized bucket memory.
 static void **AllocateBuckets(unsigned NumBuckets) {
   void **Buckets = static_cast<void**>(calloc(NumBuckets+1, sizeof(void*)));
+  if (Buckets == nullptr) throw std::bad_alloc(); // HLSL Change
   // Set the very last bucket to be a non-null "pointer".
   Buckets[NumBuckets] = reinterpret_cast<void*>(-1);
   return Buckets;

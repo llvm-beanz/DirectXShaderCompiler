@@ -1,15 +1,14 @@
 //===-- Timer.cpp - Interval Timing Support -------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Interval Timing implementation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Timer.cpp                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Interval Timing implementation.                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/Timer.h"
 #include "llvm/ADT/StringMap.h"
@@ -76,9 +75,12 @@ raw_ostream *llvm::CreateInfoOutputFile() {
   return new raw_fd_ostream(2, false); // stderr.
 }
 
-
-static TimerGroup *DefaultTimerGroup = nullptr;
+#define DefaultTimerGroupName "Miscellaneous Ungrouped Timers"
+static TimerGroup DefaultTimerGroup(DefaultTimerGroupName); // HLSL Change - global init
 static TimerGroup *getDefaultTimerGroup() {
+#if 1 // HLSL Change Starts - global with special clean-up and init
+  return &DefaultTimerGroup;
+#else
   TimerGroup *tmp = DefaultTimerGroup;
   sys::MemoryFence();
   if (tmp) return tmp;
@@ -92,6 +94,7 @@ static TimerGroup *getDefaultTimerGroup() {
   }
 
   return tmp;
+#endif // HLSL Change Ends
 }
 
 //===----------------------------------------------------------------------===//
@@ -250,6 +253,14 @@ static TimerGroup *TimerGroupList = nullptr;
 
 TimerGroup::TimerGroup(StringRef name)
   : Name(name.begin(), name.end()), FirstTimer(nullptr) {
+  // HLSL Change Starts - initialize as head without locking
+  if (name.equals(DefaultTimerGroupName)) {
+    Next = TimerGroupList;
+    Prev = &TimerGroupList;
+    TimerGroupList = this;
+    return;
+  }
+  // HLSL Change Ends
     
   // Add the group to TimerGroupList.
   sys::SmartScopedLock<true> L(*TimerLock);
@@ -265,6 +276,12 @@ TimerGroup::~TimerGroup() {
   // print the timing data.
   while (FirstTimer)
     removeTimer(*FirstTimer);
+
+  // HLSL Change Starts - don't bother cleaning up global
+  if (this == &DefaultTimerGroup) {
+    return;
+  }
+  // HLSL Change Ends
   
   // Remove the group from the TimerGroupList.
   sys::SmartScopedLock<true> L(*TimerLock);
@@ -328,7 +345,7 @@ void TimerGroup::PrintQueuedTimers(raw_ostream &OS) {
   // If this is not an collection of ungrouped times, print the total time.
   // Ungrouped timers don't really make sense to add up.  We still print the
   // TOTAL line to make the percentages make sense.
-  if (this != DefaultTimerGroup)
+  if (this != &DefaultTimerGroup)
     OS << format("  Total Execution Time: %5.4f seconds (%5.4f wall clock)\n",
                  Total.getProcessTime(), Total.getWallTime());
   OS << '\n';

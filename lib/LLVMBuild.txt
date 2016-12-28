@@ -1,11 +1,5 @@
-;===- ./lib/LLVMBuild.txt --------------------------------------*- Conf -*--===;
-;
-;                     The LLVM Compiler Infrastructure
-;
-; This file is distributed under the University of Illinois Open Source
-; License. See LICENSE.TXT for details.
-;
-;===------------------------------------------------------------------------===;
+; Copyright (C) Microsoft Corporation. All rights reserved.
+; Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 ;
 ; This is an LLVMBuild description file for the components in this subdirectory.
 ;
@@ -23,8 +17,6 @@ subdirectories =
  CodeGen
  DebugInfo
  ExecutionEngine
- LibDriver
- LineEditor
  Linker
  IR
  IRReader
@@ -38,6 +30,9 @@ subdirectories =
  TableGen
  Target
  Transforms
+ HLSL
+
+; HLSL Change: remove LibDriver, LineEditor, add HLSL
 
 [component_0]
 type = Group

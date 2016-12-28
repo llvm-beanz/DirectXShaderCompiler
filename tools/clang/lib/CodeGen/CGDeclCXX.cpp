@@ -1,15 +1,14 @@
 //===--- CGDeclCXX.cpp - Emit LLVM Code for C++ declarations --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code dealing with code generation of C++ declarations
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGDeclCXX.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code dealing with code generation of C++ declarations       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCXXABI.h"
@@ -119,6 +118,13 @@ static void EmitDeclInvariant(CodeGenFunction &CGF, const VarDecl &D,
   // Don't emit the intrinsic if we're not optimizing.
   if (!CGF.CGM.getCodeGenOpts().OptimizationLevel)
     return;
+  // HLSL Change Begins.
+  // Don't emit the intrinsic for hlsl.
+  // Enable this will require SROA_HLSL to support the intrinsic.
+  // Will do it later when support invariant marker in HLSL.
+  if (CGF.CGM.getLangOpts().HLSL)
+    return;
+  // HLSL Change Ends.
 
   // Grab the llvm.invariant.start intrinsic.
   llvm::Intrinsic::ID InvStartID = llvm::Intrinsic::invariant_start;
@@ -527,10 +533,12 @@ CodeGenFunction::GenerateCXXGlobalInitFunc(llvm::Function *Fn,
 
     // When building in Objective-C++ ARC mode, create an autorelease pool
     // around the global initializers.
+#if 0 // HLSL Change - no ObjC support
     if (getLangOpts().ObjCAutoRefCount && getLangOpts().CPlusPlus) {
       llvm::Value *token = EmitObjCAutoreleasePoolPush();
       EmitObjCAutoreleasePoolCleanup(token);
     }
+#endif // HLSL Change - no ObjC support
 
     for (unsigned i = 0, e = Decls.size(); i != e; ++i)
       if (Decls[i])

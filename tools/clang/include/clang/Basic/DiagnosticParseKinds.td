@@ -1,15 +1,13 @@
 //==--- DiagnosticParseKinds.td - libparse diagnostics --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// Parser Diagnostics
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DiagnosticParseKinds.td                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+// Parser Diagnostics                                                        //
 
 let Component = "Parse" in {
 
@@ -281,6 +279,8 @@ def ext_generalized_initializer_lists : ExtWarn<
 def warn_cxx98_compat_generalized_initializer_lists : Warning<
   "generalized initializer lists are incompatible with C++98">,
   InGroup<CXX98Compat>, DefaultIgnore;
+def err_hlsl_compat_generalized_initializer_lists : Error<
+  "generalized initializer lists are incompatible with HLSL">;
 def err_init_list_bin_op : Error<"initializer list cannot be used on the "
   "%select{left|right}0 hand side of operator '%1'">;
 def warn_cxx98_compat_trailing_return_type : Warning<
@@ -972,6 +972,58 @@ def warn_pragma_expected_enable_disable : Warning<
   "expected 'enable' or 'disable' - ignoring">, InGroup<IgnoredPragmas>;
 def warn_pragma_unknown_extension : Warning<
   "unknown OpenCL extension %0 - ignoring">, InGroup<IgnoredPragmas>;
+
+// HLSL Change: Errors for hlsl, need to be implemented
+def err_hlsl_unknown : Error<
+  "This error message needs to be implemented">;
+def err_hlsl_incompatible_option : Error<
+  "Cannot use %0 and %1 together">;
+def err_hlsl_bool_redeclaration : Error< // Patterned after err_bool_redeclaration
+  "redeclaration of HLSL built-in type 'bool'">;
+def err_hlsl_rootsig : Error<
+  "root signature error - %0">;
+def err_hlsl_expected_space : Error<
+  "expected space definition with syntax 'spaceX', where X is an integral value">;
+def err_hlsl_reserved_keyword : Error<
+  "'%0' is a reserved keyword in HLSL">;
+def err_hlsl_packoffset_requires_c_register : Error<
+  "register type for packoffset must be 'c'">;
+def err_hlsl_unsupported_attributes : Error<
+  "attribute annotations are unsupported in HLSL">;
+def err_hlsl_unsupported_construct : Error<
+  "%0 is unsupported in HLSL">;
+def err_hlsl_unsupported_member_default : Error<
+  "struct/class members cannot have default values">;
+def err_hlsl_unsupported_packoffset_component : Error<
+  "packoffset component should indicate offset with one of x, y, z, w, r, g, b, or a">;
+def err_hlsl_unsupported_pointer : Error<
+  "pointers are unsupported in HLSL">;
+def err_hlsl_unsupported_register_number : Error<
+  "register number should be an integral numeric string">;
+def err_hlsl_unsupported_register_noninteger : Error<
+  "register subcomponent is not an integral constant">;
+def err_hlsl_unsupported_register_type : Error<
+  "register type is unsupported - available types are 'b', 'c', 'i', 's', 't', 'u'">;
+def err_hlsl_unsupported_space_number : Error<
+  "space number should be an integral numeric string">;
+def err_hlsl_modifier_after_type : Error<
+  "modifiers must appear before type">;
+def err_hlsl_nested_namespace_definition : Error<
+  "nested namespace definition must define each namespace separately">;
+def warn_hlsl_minprecision_promotion : Warning <
+  "%0 is promoted to %1">;
+def warn_hlsl_effect_annotation : Warning <
+  "possible effect annotation ignored - effect syntax is deprecated">,
+  InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_effect_sampler_state : Warning <
+  "effect sampler_state assignment ignored - effect syntax is deprecated">,
+  InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_effect_state_block : Warning <
+  "effect state block ignored - effect syntax is deprecated">,
+  InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_effect_technique : Warning <
+  "effect technique ignored - effect syntax is deprecated">,
+  InGroup< HLSLEffectsSyntax >;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

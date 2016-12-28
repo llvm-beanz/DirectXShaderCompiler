@@ -66,6 +66,22 @@ function(add_version_info_from_vcs VERS)
           set(result "${result}${git_svn_rev}")
         endif()
       endif()
+    else()
+      # HLSL Change - if no .git/svn, grab the hash 
+      find_program(git_executable NAMES git git.exe git.cmd)
+      if( git_executable )
+        execute_process(COMMAND ${git_executable} describe --tags --always --dirty
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+          TIMEOUT 5
+          RESULT_VARIABLE git_result
+          OUTPUT_VARIABLE git_output)
+        if( git_result EQUAL 0 )
+          string(STRIP "${git_output}" git_ref_id)
+          set(result "3.7-${git_ref_id}")
+        else()
+          message (WARNING "failed to run git describe to get version")
+        endif()
+      endif()
     endif()
   endif()
   set(${VERS} ${result} PARENT_SCOPE)

@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 add_subdirectory(ChildTarget)
 
 set(LLVM_LINK_COMPONENTS
@@ -7,8 +9,8 @@ set(LLVM_LINK_COMPONENTS
   IRReader
   Instrumentation
   Interpreter
-  MC
-  MCJIT
+#  MC     # HLSL Change
+#  MCJIT  # HLSL Change
   Object
   OrcJIT
   RuntimeDyld

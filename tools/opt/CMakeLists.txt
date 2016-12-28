@@ -1,16 +1,18 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   Analysis
   BitWriter
-  CodeGen
+#  CodeGen # HLSL Change
   Core
   IPA
   IPO
   IRReader
   InstCombine
-  Instrumentation
-  MC
-  ObjCARCOpts
+#  Instrumentation # HLSL Change
+#  MC # HLSL Change
+#  ObjCARCOpts # HLSL Change
   ScalarOpts
   Support
   Target
@@ -22,6 +24,8 @@ set(LLVM_LINK_COMPONENTS
 # Support plugins.
 set(LLVM_NO_DEAD_STRIP 1)
 
+set(LLVM_LINK_COMPONENTS ${LLVM_LINK_COMPONENTS} mssupport hlsl)  # HLSL Change
+
 add_llvm_tool(opt
   AnalysisWrappers.cpp
   BreakpointPrinter.cpp
@@ -32,6 +36,12 @@ add_llvm_tool(opt
   opt.cpp
   )
 export_executable_symbols(opt)
+
+# HLSL Change Starts
+if (NOT HLSL_OPTIONAL_PROJS_IN_DEFAULT)
+  set_target_properties(opt PROPERTIES EXCLUDE_FROM_ALL ON EXCLUDE_FROM_DEFAULT_BUILD ON)
+endif ()
+# HLSL Change Ends
 
 if(WITH_POLLY AND LINK_POLLY_INTO_TOOLS)
   target_link_libraries(opt Polly)

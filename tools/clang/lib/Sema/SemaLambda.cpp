@@ -1,15 +1,15 @@
 //===--- SemaLambda.cpp - Semantic Analysis for C++11 Lambdas -------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for C++ lambda expressions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaLambda.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for C++ lambda expressions.       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 #include "clang/Sema/DeclSpec.h"
 #include "TypeLocBuilder.h"
 #include "clang/AST/ASTLambda.h"
@@ -23,6 +23,196 @@
 #include "clang/Sema/SemaLambda.h"
 using namespace clang;
 using namespace sema;
+
+// HLSL Change Starts
+// No lambda support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 1
+
+/// \brief Determine whether the given context is or is enclosed in an inline
+/// function.
+static bool isInInlineFunction(const DeclContext *DC) {
+  while (!DC->isFileContext()) {
+    if (const FunctionDecl *FD = dyn_cast<FunctionDecl>(DC))
+      if (FD->isInlined())
+        return true;
+
+    DC = DC->getLexicalParent();
+  }
+
+  return false;
+}
+
+Optional<unsigned> clang::getStackIndexOfNearestEnclosingCaptureCapableLambda(
+  ArrayRef<const sema::FunctionScopeInfo *> FunctionScopes,
+  VarDecl *VarToCapture, Sema &S) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+CXXRecordDecl *Sema::createLambdaClosureType(SourceRange IntroducerRange,
+  TypeSourceInfo *Info,
+  bool KnownDependent,
+  LambdaCaptureDefault CaptureDefault) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+MangleNumberingContext *
+Sema::getCurrentMangleNumberContext(const DeclContext *DC,
+  Decl *&ManglingContextDecl) {
+  // Compute the context for allocating mangling numbers in the current
+  // expression, if the ABI requires them.
+  ManglingContextDecl = ExprEvalContexts.back().ManglingContextDecl;
+
+  enum ContextKind {
+    Normal,
+    DefaultArgument,
+    DataMember,
+    StaticDataMember
+  } Kind = Normal;
+
+  // Default arguments of member function parameters that appear in a class
+  // definition, as well as the initializers of data members, receive special
+  // treatment. Identify them.
+  if (ManglingContextDecl) {
+    if (ParmVarDecl *Param = dyn_cast<ParmVarDecl>(ManglingContextDecl)) {
+      if (const DeclContext *LexicalDC
+        = Param->getDeclContext()->getLexicalParent())
+        if (LexicalDC->isRecord())
+          Kind = DefaultArgument;
+    }
+    else if (VarDecl *Var = dyn_cast<VarDecl>(ManglingContextDecl)) {
+      if (Var->getDeclContext()->isRecord())
+        Kind = StaticDataMember;
+    }
+    else if (isa<FieldDecl>(ManglingContextDecl)) {
+      Kind = DataMember;
+    }
+  }
+
+  // Itanium ABI [5.1.7]:
+  //   In the following contexts [...] the one-definition rule requires closure
+  //   types in different translation units to "correspond":
+  bool IsInNonspecializedTemplate =
+    !ActiveTemplateInstantiations.empty() || CurContext->isDependentContext();
+  switch (Kind) {
+  case Normal:
+    //  -- the bodies of non-exported nonspecialized template functions
+    //  -- the bodies of inline functions
+    if ((IsInNonspecializedTemplate &&
+      !(ManglingContextDecl && isa<ParmVarDecl>(ManglingContextDecl))) ||
+      isInInlineFunction(CurContext)) {
+      ManglingContextDecl = nullptr;
+      return &Context.getManglingNumberContext(DC);
+    }
+
+    ManglingContextDecl = nullptr;
+    return nullptr;
+
+  case StaticDataMember:
+    //  -- the initializers of nonspecialized static members of template classes
+    if (!IsInNonspecializedTemplate) {
+      ManglingContextDecl = nullptr;
+      return nullptr;
+    }
+    // Fall through to get the current context.
+
+  case DataMember:
+    //  -- the in-class initializers of class members
+  case DefaultArgument:
+    //  -- default arguments appearing in class definitions
+    return &ExprEvalContexts.back().getMangleNumberingContext(Context);
+  }
+
+  llvm_unreachable("unexpected context");
+}
+
+MangleNumberingContext &
+Sema::ExpressionEvaluationContextRecord::getMangleNumberingContext(
+  ASTContext &Ctx) {
+  assert(ManglingContextDecl && "Need to have a context declaration");
+  if (!MangleNumbering)
+    MangleNumbering = Ctx.createMangleNumberingContext();
+  return *MangleNumbering;
+}
+
+CXXMethodDecl *Sema::startLambdaDefinition(CXXRecordDecl *Class,
+  SourceRange IntroducerRange,
+  TypeSourceInfo *MethodTypeInfo,
+  SourceLocation EndLoc,
+  ArrayRef<ParmVarDecl *> Params) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+void Sema::buildLambdaScope(LambdaScopeInfo *LSI,
+  CXXMethodDecl *CallOperator,
+  SourceRange IntroducerRange,
+  LambdaCaptureDefault CaptureDefault,
+  SourceLocation CaptureDefaultLoc,
+  bool ExplicitParams,
+  bool ExplicitResultType,
+  bool Mutable) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+void Sema::finishLambdaExplicitCaptures(LambdaScopeInfo *LSI) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+void Sema::addLambdaParameters(CXXMethodDecl *CallOperator, Scope *CurScope) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+void Sema::deduceClosureReturnType(CapturingScopeInfo &CSI) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+QualType Sema::performLambdaInitCaptureInitialization(SourceLocation Loc,
+  bool ByRef,
+  IdentifierInfo *Id,
+  Expr *&Init) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+VarDecl *Sema::createLambdaInitCaptureVarDecl(SourceLocation Loc,
+  QualType InitCaptureType, IdentifierInfo *Id, Expr *Init) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+FieldDecl *Sema::buildInitCaptureField(LambdaScopeInfo *LSI, VarDecl *Var) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+void Sema::ActOnStartOfLambdaDefinition(LambdaIntroducer &Intro,
+  Declarator &ParamInfo,
+  Scope *CurScope) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+void Sema::ActOnLambdaError(SourceLocation StartLoc, Scope *CurScope,
+  bool IsInstantiation) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+ExprResult Sema::ActOnLambdaExpr(SourceLocation StartLoc, Stmt *Body,
+  Scope *CurScope) {
+  llvm_unreachable("HLSL does not support lambdas");
+  return ExprError();
+}
+
+ExprResult Sema::BuildLambdaExpr(SourceLocation StartLoc, SourceLocation EndLoc,
+  LambdaScopeInfo *LSI) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+ExprResult Sema::BuildBlockForLambdaConversion(SourceLocation CurrentLocation,
+  SourceLocation ConvLocation,
+  CXXConversionDecl *Conv,
+  Expr *Src) {
+  llvm_unreachable("HLSL does not support lambdas");
+}
+
+#else
+// HLSL Change Ends
 
 /// \brief Examines the FunctionScopeInfo stack to determine the nearest
 /// enclosing lambda (to the current lambda) that is 'capture-ready' for 
@@ -1714,3 +1904,5 @@ ExprResult Sema::BuildBlockForLambdaConversion(SourceLocation CurrentLocation,
 
   return BuildBlock;
 }
+
+#endif // HLSL Change

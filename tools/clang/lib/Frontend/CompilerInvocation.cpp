@@ -1,11 +1,12 @@
 //===--- CompilerInvocation.cpp -------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CompilerInvocation.cpp                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Basic/FileManager.h"
@@ -675,6 +676,8 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.CudaGpuBinaryFileNames =
       Args.getAllArgValues(OPT_fcuda_include_gpubinary);
 
+  Opts.HLSLEntryFunction = Args.getLastArgValue(OPT_hlsl_entry);
+
   return Success;
 }
 
@@ -719,7 +722,9 @@ bool clang::ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.ShowLocation = !Args.hasArg(OPT_fno_show_source_location);
   Opts.ShowOptionNames = Args.hasArg(OPT_fdiagnostics_show_option);
 
+#ifdef MSFT_SUPPORTS_ANSI_ESCAPE_CODES
   llvm::sys::Process::UseANSIEscapeCodes(Args.hasArg(OPT_fansi_escape_codes));
+#endif
 
   // Default behavior is to not to show note include stacks.
   Opts.ShowNoteIncludeStack = false;
@@ -1041,6 +1046,7 @@ static InputKind ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       .Case("objective-c++-header", IK_ObjCXX)
       .Cases("ast", "pcm", IK_AST)
       .Case("ir", IK_LLVM_IR)
+      .Case("hlsl", IK_HLSL) // HLSL Change: Default File extension for hlsl files
       .Default(IK_None);
     if (DashX == IK_None)
       Diags.Report(diag::err_drv_invalid_value)
@@ -1193,6 +1199,8 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
   // Set some properties which depend solely on the input kind; it would be nice
   // to move these to the language standard, and have the driver resolve the
   // input kind + language standard.
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
+
   if (IK == IK_Asm) {
     Opts.AsmPreprocessor = 1;
   } else if (IK == IK_ObjC ||
@@ -1228,6 +1236,9 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     case IK_ObjCXX:
     case IK_PreprocessedObjCXX:
       LangStd = LangStandard::lang_gnucxx98;
+      break;
+    case IK_HLSL: // HLSL Change: LangStandard for Input Kind files for HLSL
+      LangStd = LangStandard::lang_hlsl;
       break;
     }
   }
@@ -1267,6 +1278,8 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     Opts.NativeHalfType = 1;
   }
 
+  Opts.HLSL = IK == IK_HLSL || LangStd == LangStandard::lang_hlsl // HLSL Change: Langstandard for HLSL
+
   Opts.CUDA = IK == IK_CUDA || IK == IK_PreprocessedCuda ||
               LangStd == LangStandard::lang_cuda;
 
@@ -1283,6 +1296,8 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
   Opts.CXXOperatorNames = Opts.CPlusPlus;
 
   Opts.DollarIdents = !Opts.AsmPreprocessor;
+#endif
+
 }
 
 /// Attempt to parse a visibility value out of the given argument.
@@ -1305,6 +1320,7 @@ static Visibility parseVisibility(Arg *arg, ArgList &args,
 
 static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
                           DiagnosticsEngine &Diags) {
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
   // FIXME: Cleanup per-file based stuff.
   LangStandard::Kind LangStd = LangStandard::lang_unspecified;
   if (const Arg *A = Args.getLastArg(OPT_std_EQ)) {
@@ -1704,6 +1720,16 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.SanitizeAddressFieldPadding =
       getLastArgIntValue(Args, OPT_fsanitize_address_field_padding, 0, Diags);
   Opts.SanitizerBlacklistFiles = Args.getAllArgValues(OPT_fsanitize_blacklist);
+#else
+  StringRef ver = Args.getLastArgValue(OPT_hlsl_version);
+  if (ver.empty() || ver == "2016") {
+    Opts.HLSL2016 = true;
+  }
+  else {
+    Opts.HLSL2016 = false;
+  }
+  Opts.HLSL2015 = !Opts.HLSL2016;
+#endif // #ifdef MS_SUPPORT_VARIABLE_LANGOPTS
 }
 
 static void ParsePreprocessorArgs(PreprocessorOptions &Opts, ArgList &Args,
@@ -1860,7 +1886,12 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
 
   // Parse the arguments.
   std::unique_ptr<OptTable> Opts(createDriverOptTable());
-  const unsigned IncludedFlagsBitmask = options::CC1Option;
+  // HLSL Change: change IncludedFlagsBitmask from options::CC1Option to 0
+  // (meaning everything should be included).
+  // This is used for internal testing and to drive some libclang scenarios,
+  // where we have a dxc-based command-line. We choose to accept additional
+  // options even if they don't get applied.
+  const unsigned IncludedFlagsBitmask = 0;
   unsigned MissingArgIndex, MissingArgCount;
   InputArgList Args =
       Opts->ParseArgs(llvm::makeArrayRef(ArgBegin, ArgEnd), MissingArgIndex,
@@ -1893,8 +1924,10 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
   ParseHeaderSearchArgs(Res.getHeaderSearchOpts(), Args);
   if (DashX != IK_AST && DashX != IK_LLVM_IR) {
     ParseLangArgs(*Res.getLangOpts(), Args, DashX, Diags);
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
     if (Res.getFrontendOpts().ProgramAction == frontend::RewriteObjC)
       Res.getLangOpts()->ObjCExceptions = 1;
+#endif
   }
   // FIXME: ParsePreprocessorArgs uses the FileManager to read the contents of
   // PCH file and find the original header name. Remove the need to do that in
@@ -1961,6 +1994,7 @@ llvm::APInt ModuleSignature::getAsInteger() const {
 }
 
 std::string CompilerInvocation::getModuleHash() const {
+#ifdef MSFT_SUPPORTS_MODULES
   // Note: For QoI reasons, the things we use as a hash here should all be
   // dumped via the -module-info flag.
   using llvm::hash_code;
@@ -1979,7 +2013,7 @@ std::string CompilerInvocation::getModuleHash() const {
   code = hash_combine(code, static_cast<unsigned>(LangOpts->get##Name()));
 #define BENIGN_LANGOPT(Name, Bits, Default, Description)
 #define BENIGN_ENUM_LANGOPT(Name, Type, Bits, Default, Description)
-#include "clang/Basic/LangOptions.def"
+#include "clang/Basic/LangOptions.fixed.def"
 
   for (StringRef Feature : LangOpts->ModuleFeatures)
     code = hash_combine(code, Feature);
@@ -2045,6 +2079,9 @@ std::string CompilerInvocation::getModuleHash() const {
   }
 
   return llvm::APInt(64, code).toString(36, /*Signed=*/false);
+#else
+  return std::string();
+#endif // MSFT_SUPPORTS_MODULES
 }
 
 namespace clang {

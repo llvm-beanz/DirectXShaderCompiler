@@ -1,19 +1,18 @@
 //===--- ItaniumMangle.cpp - Itanium C++ Name Mangling ----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Implements C++ name mangling according to the Itanium C++ ABI,
-// which is used in GCC 3.2 and newer (and many compilers that are
-// ABI-compatible with GCC):
-//
-//   http://mentorembedded.github.io/cxx-abi/abi.html#mangling
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ItaniumMangle.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Implements C++ name mangling according to the Itanium C++ ABI,            //
+// which is used in GCC 3.2 and newer (and many compilers that are           //
+// ABI-compatible with GCC):                                                 //
+//                                                                           //
+//   http://mentorembedded.github.io/cxx-abi/abi.html#mangling               //
+//                                                                           //
+
 #include "clang/AST/Mangle.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -31,7 +30,8 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #define MANGLE_CHECKER 0
 
 #if MANGLE_CHECKER
@@ -942,7 +942,10 @@ void CXXNameMangler::mangleUnqualifiedName(const NamedDecl *ND,
           getEffectiveDeclContext(ND)->isFileContext())
         Out << 'L';
 
-      mangleSourceName(II);
+      // HLSL Change - use the 'name for IR' rather than II directly.
+      StringRef r = ND->getNameForIR();
+      Out << r.size() << r.data();
+
       break;
     }
 
@@ -2708,6 +2711,8 @@ recurse:
   case Expr::CompoundLiteralExprClass:
   case Expr::DesignatedInitExprClass:
   case Expr::ExtVectorElementExprClass:
+  case Expr::ExtMatrixElementExprClass: // HLSL Change
+  case Expr::HLSLVectorElementExprClass: // HLSL Change
   case Expr::GenericSelectionExprClass:
   case Expr::ObjCEncodeExprClass:
   case Expr::ObjCIsaExprClass:

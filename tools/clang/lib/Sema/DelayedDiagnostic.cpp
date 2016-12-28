@@ -1,24 +1,24 @@
 //===--- DelayedDiagnostic.cpp - Delayed declarator diagnostics -*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the DelayedDiagnostic class implementation, which
-// is used to record diagnostics that are being conditionally produced
-// during declarator parsing.
-//
-// This file also defines AccessedEntity.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DelayedDiagnostic.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the DelayedDiagnostic class implementation, which       //
+// is used to record diagnostics that are being conditionally produced       //
+// during declarator parsing.                                                //
+//                                                                           //
+// This file also defines AccessedEntity.                                    //
+//                                                                           //
+
 #include "clang/Sema/DelayedDiagnostic.h"
 #include <string.h>
 using namespace clang;
 using namespace sema;
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 DelayedDiagnostic
 DelayedDiagnostic::makeAvailability(Sema::AvailabilityDiagnostic AD,
                                     SourceLocation Loc,

@@ -1,12 +1,11 @@
 //===-- llvm/ADT/UniqueVector.h ---------------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// UniqueVector.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 #ifndef LLVM_ADT_UNIQUEVECTOR_H
 #define LLVM_ADT_UNIQUEVECTOR_H
 
@@ -15,8 +14,8 @@
 #include <vector>
 
 namespace llvm {
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// UniqueVector - This class produces a sequential ID number (base 1) for each
 /// unique entry that is added.  T is the type of entries in the vector. This
 /// class should have an implementation of operator== and of operator<.

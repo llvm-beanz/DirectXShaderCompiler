@@ -1,24 +1,23 @@
 //===- Format.h - Efficient printf-style formatting for streams -*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Format.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the format() function, which can be used with other  //
+// LLVM subsystems to provide printf-style formatting.  This gives all the power//
+// and risk of printf.  This can be used like this (with raw_ostreams as an  //
+// example):                                                                 //
 //
-//                     The LLVM Compiler Infrastructure
+//    OS << "mynumber: " << format("%4.5f", 1234.412) << '\n';               //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Or if you prefer:                                                         //
 //
-//===----------------------------------------------------------------------===//
+//  OS << format("mynumber: %4.5f\n", 1234.412);                             //
 //
-// This file implements the format() function, which can be used with other
-// LLVM subsystems to provide printf-style formatting.  This gives all the power
-// and risk of printf.  This can be used like this (with raw_ostreams as an
-// example):
-//
-//    OS << "mynumber: " << format("%4.5f", 1234.412) << '\n';
-//
-// Or if you prefer:
-//
-//  OS << format("mynumber: %4.5f\n", 1234.412);
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_FORMAT_H
 #define LLVM_SUPPORT_FORMAT_H
@@ -42,7 +41,7 @@ protected:
   virtual void home(); // Out of line virtual method.
 
   /// Call snprintf() for this object, on the given buffer and size.
-  virtual int snprint(char *Buffer, unsigned BufferSize) const = 0;
+  virtual int snprint(_Out_ char *Buffer, unsigned BufferSize) const = 0;   // HLSL Change - SAL
 
 public:
   format_object_base(const char *fmt) : Fmt(fmt) {}
@@ -50,7 +49,7 @@ public:
   /// Format the object into the specified buffer.  On success, this returns
   /// the length of the formatted string.  If the buffer is too small, this
   /// returns a length to retry with, which will be larger than BufferSize.
-  unsigned print(char *Buffer, unsigned BufferSize) const {
+  unsigned print(_Out_ char *Buffer, unsigned BufferSize) const {   // HLSL Change - SAL
     assert(BufferSize && "Invalid buffer size!");
 
     // Print the string, leaving room for the terminating null.
@@ -83,7 +82,10 @@ class format_object final : public format_object_base {
   int snprint_tuple(char *Buffer, unsigned BufferSize,
                     index_sequence<Is...>) const {
 #ifdef _MSC_VER
-    return _snprintf(Buffer, BufferSize, Fmt, std::get<Is>(Vals)...);
+    // Use _TRUNCATE as the buffer size; truncation will still return -1 as
+    // a result, thereby triggering the 'double on VC++' behavior in
+    // caller, for example llvm::format_object_base::print(char * Buffer, unsigned int BufferSize)
+    return _snprintf_s(Buffer, BufferSize, _TRUNCATE, Fmt, std::get<Is>(Vals)...);
 #else
     return snprintf(Buffer, BufferSize, Fmt, std::get<Is>(Vals)...);
 #endif

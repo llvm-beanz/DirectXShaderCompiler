@@ -1,16 +1,15 @@
 //===--- NestedNameSpecifier.cpp - C++ nested name specifiers -----*- C++ -*-=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the NestedNameSpecifier class, which represents
-//  a C++ nested-name-specifier.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// NestedNameSpecifier.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the NestedNameSpecifier class, which represents        //
+//  a C++ nested-name-specifier.                                             //
+//                                                                           //
+
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
@@ -21,7 +20,8 @@
 #include "llvm/Support/AlignOf.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 
 NestedNameSpecifier *
@@ -433,7 +433,7 @@ TypeLoc NestedNameSpecifierLoc::getTypeLoc() const {
 }
 
 namespace {
-  void Append(char *Start, char *End, char *&Buffer, unsigned &BufferSize,
+  void Append(_In_reads_to_ptr_(End) char *Start, _In_reads_(0) char *End, _Outref_result_buffer_(BufferSize) char *&Buffer, unsigned &BufferSize,
               unsigned &BufferCapacity) {
     if (Start == End)
       return;
@@ -457,7 +457,7 @@ namespace {
   }
   
   /// \brief Save a source location to the given buffer.
-  void SaveSourceLocation(SourceLocation Loc, char *&Buffer,
+  void SaveSourceLocation(SourceLocation Loc, _Outref_result_buffer_(BufferSize) char *&Buffer,
                           unsigned &BufferSize, unsigned &BufferCapacity) {
     unsigned Raw = Loc.getRawEncoding();
     Append(reinterpret_cast<char *>(&Raw),
@@ -466,7 +466,7 @@ namespace {
   }
   
   /// \brief Save a pointer to the given buffer.
-  void SavePointer(void *Ptr, char *&Buffer, unsigned &BufferSize,
+  void SavePointer(void *Ptr, _Outref_result_buffer_(BufferSize) char *&Buffer, unsigned &BufferSize,
                    unsigned &BufferCapacity) {
     Append(reinterpret_cast<char *>(&Ptr),
            reinterpret_cast<char *>(&Ptr) + sizeof(void *),

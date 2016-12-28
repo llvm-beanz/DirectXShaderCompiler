@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Opts.td                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 include "llvm/Option/OptParser.td"
 
 def OptFlag1 : OptionFlag;

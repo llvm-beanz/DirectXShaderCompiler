@@ -28,6 +28,9 @@ The LLVM Target-Independent Code Generator
 Introduction
 ============
 
+NOTE: this document describes the instructions for LLVM, not the DirectX
+Compiler. It's available only for informational purposes.
+
 The LLVM target-independent code generator is a framework that provides a suite
 of reusable components for translating the LLVM internal representation to the
 machine code for a specified target---either in assembly form (suitable for a

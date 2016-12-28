@@ -1,15 +1,14 @@
 //===--- DependencyFile.cpp - Generate dependency file --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This code generates dependency files.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DependencyFile.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This code generates dependency files.                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/Utils.h"
 #include "clang/Basic/FileManager.h"
@@ -82,6 +81,7 @@ struct DepCollectorPPCallbacks : public PPCallbacks {
   }
 };
 
+#if 0 // HLSL Change Starts - no support for AST serialization
 struct DepCollectorASTListener : public ASTReaderListener {
   DependencyCollector &DepCollector;
   DepCollectorASTListener(DependencyCollector &L) : DepCollector(L) { }
@@ -104,6 +104,8 @@ struct DepCollectorASTListener : public ASTReaderListener {
     return true;
   }
 };
+
+#endif // HLSL Change Ends - no support for AST serialization
 } // end anonymous namespace
 
 void DependencyCollector::maybeAddDependency(StringRef Filename, bool FromModule,
@@ -133,9 +135,11 @@ void DependencyCollector::attachToPreprocessor(Preprocessor &PP) {
   PP.addPPCallbacks(
       llvm::make_unique<DepCollectorPPCallbacks>(*this, PP.getSourceManager()));
 }
+#if 0 // HLSL Change Starts - no support for AST serialization
 void DependencyCollector::attachToASTReader(ASTReader &R) {
   R.addListener(llvm::make_unique<DepCollectorASTListener>(*this));
 }
+#endif // HLSL Change Ends - no support for AST serialization
 
 namespace {
 /// Private implementation for DependencyFileGenerator
@@ -185,6 +189,7 @@ public:
   bool includeModuleFiles() const { return IncludeModuleFiles; }
 };
 
+#if 0 // HLSL Change Starts - no support for AST serialization
 class DFGASTReaderListener : public ASTReaderListener {
   DFGImpl &Parent;
 public:
@@ -198,6 +203,7 @@ public:
   bool visitInputFile(StringRef Filename, bool isSystem,
                       bool isOverridden) override;
 };
+#endif // HLSL Change Ends - no support for AST serialization
 }
 
 DependencyFileGenerator::DependencyFileGenerator(void *Impl)
@@ -220,11 +226,13 @@ DependencyFileGenerator *DependencyFileGenerator::CreateAndAttachToPreprocessor(
   return new DependencyFileGenerator(Callback);
 }
 
+#if 0 // HLSL Change Starts - no support for AST serialization
 void DependencyFileGenerator::AttachToASTReader(ASTReader &R) {
   DFGImpl *I = reinterpret_cast<DFGImpl *>(Impl);
   assert(I && "missing implementation");
   R.addListener(llvm::make_unique<DFGASTReaderListener>(*I));
 }
+#endif // HLSL Change Starts - no support for AST serialization
 
 /// FileMatchesDepCriteria - Determine whether the given Filename should be
 /// considered as a dependency.
@@ -437,6 +445,7 @@ void DFGImpl::OutputDependencyFile() {
   }
 }
 
+#if 0 // HLSL Change Starts - no support for AST serialization
 bool DFGASTReaderListener::visitInputFile(llvm::StringRef Filename,
                                           bool IsSystem, bool IsOverridden) {
   assert(!IsSystem || needsSystemInputFileVisitation());
@@ -451,3 +460,4 @@ void DFGASTReaderListener::visitModuleFile(llvm::StringRef Filename) {
   if (Parent.includeModuleFiles())
     Parent.AddFilename(Filename);
 }
+#endif // HLSL Change Ends - no support for AST serialization

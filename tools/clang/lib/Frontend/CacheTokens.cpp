@@ -1,16 +1,15 @@
 //===--- CacheTokens.cpp - Caching of lexer tokens for PTH support --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides a possible implementation of PTH support for Clang that is
-// based on caching lexed tokens and identifiers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CacheTokens.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides a possible implementation of PTH support for Clang that is  //
+// based on caching lexed tokens and identifiers.                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/Utils.h"
 #include "clang/Basic/Diagnostic.h"
@@ -656,6 +655,7 @@ std::pair<Offset,Offset> PTHWriter::EmitIdentifierTable() {
 
   // Note that we use 'calloc', so all the bytes are 0.
   PTHIdKey *IIDMap = (PTHIdKey*)calloc(idcount, sizeof(PTHIdKey));
+  if (IIDMap == nullptr) throw std::bad_alloc(); // HLSL Change
 
   // Create the hashtable.
   llvm::OnDiskChainedHashTableGenerator<PTHIdentifierTableTrait> IIOffMap;

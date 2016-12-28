@@ -1,15 +1,14 @@
 //===--- ParseDeclCXX.cpp - C++ Declaration Parsing -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the C++ Declaration portions of the Parser interfaces.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseDeclCXX.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the C++ Declaration portions of the Parser interfaces.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "RAIIObjectsForParser.h"
@@ -92,6 +91,11 @@ Decl *Parser::ParseNamespace(unsigned Context,
       ExtraIdentLoc.push_back(ConsumeToken());
     }
   }
+  // HLSL Change Starts
+  else if (getLangOpts().HLSL) {
+    Diag(Tok, diag::err_expected) << tok::identifier;
+  }
+  // HLSL Change Ends
 
   // A nested namespace definition cannot have attributes.
   if (!ExtraNamespaceLoc.empty() && attrLoc.isValid())
@@ -104,7 +108,7 @@ Decl *Parser::ParseNamespace(unsigned Context,
   }
 
   if (Tok.is(tok::equal)) {
-    if (!Ident) {
+    if (!Ident || getLangOpts().HLSL) { // HLSL Change: HLSL disallows namespace aliases
       Diag(Tok, diag::err_expected) << tok::identifier;
       // Skip to end of the definition and eat the ';'.
       SkipUntil(tok::semi);
@@ -150,7 +154,9 @@ Decl *Parser::ParseNamespace(unsigned Context,
     TPA.Revert();
 
     if (!rBraceToken.is(tok::r_brace)) {
-      Diag(ExtraNamespaceLoc[0], diag::ext_nested_namespace_definition)
+      Diag(ExtraNamespaceLoc[0], 
+        getLangOpts().HLSL ? diag::err_hlsl_nested_namespace_definition : // HLSL Change
+        diag::ext_nested_namespace_definition)
           << SourceRange(ExtraNamespaceLoc.front(), ExtraIdentLoc.back());
     } else {
       std::string NamespaceFix;
@@ -164,7 +170,9 @@ Decl *Parser::ParseNamespace(unsigned Context,
       for (unsigned i = 0, e = ExtraIdent.size(); i != e; ++i)
         RBraces +=  "} ";
 
-      Diag(ExtraNamespaceLoc[0], diag::ext_nested_namespace_definition)
+      Diag(ExtraNamespaceLoc[0], 
+        getLangOpts().HLSL ? diag::err_hlsl_nested_namespace_definition : // HLSL Change
+        diag::ext_nested_namespace_definition)
           << FixItHint::CreateReplacement(SourceRange(ExtraNamespaceLoc.front(),
                                                       ExtraIdentLoc.back()),
                                           NamespaceFix)
@@ -304,6 +312,7 @@ Decl *Parser::ParseLinkage(ParsingDeclSpec &DS, unsigned Context) {
 
   ParsedAttributesWithRange attrs(AttrFactory);
   MaybeParseCXX11Attributes(attrs);
+  MaybeParseHLSLAttributes(attrs); // HLSL Change
   MaybeParseMicrosoftAttributes(attrs);
 
   if (Tok.isNot(tok::l_brace)) {
@@ -355,6 +364,7 @@ Decl *Parser::ParseLinkage(ParsingDeclSpec &DS, unsigned Context) {
     default:
       ParsedAttributesWithRange attrs(AttrFactory);
       MaybeParseCXX11Attributes(attrs);
+    MaybeParseHLSLAttributes(attrs); // HLSL Change
       MaybeParseMicrosoftAttributes(attrs);
       ParseExternalDeclaration(attrs);
       continue;
@@ -497,6 +507,7 @@ Decl *Parser::ParseUsingDeclaration(unsigned Context,
   // alias-declaration.
   ParsedAttributesWithRange MisplacedAttrs(AttrFactory);
   MaybeParseCXX11Attributes(MisplacedAttrs);
+  assert(!getLangOpts().HLSL); // HLSL Change: in lieu of MaybeParseHLSLAttributes - using not allowed
 
   // Ignore optional 'typename'.
   // FIXME: This is wrong; we should parse this as a typename-specifier.
@@ -555,6 +566,7 @@ Decl *Parser::ParseUsingDeclaration(unsigned Context,
   ParsedAttributesWithRange Attrs(AttrFactory);
   MaybeParseGNUAttributes(Attrs);
   MaybeParseCXX11Attributes(Attrs);
+  assert(!getLangOpts().HLSL); // HLSL Change: in lieu of MaybeParseHLSLAttributes - using not allowed
 
   // Maybe this is an alias-declaration.
   TypeResult TypeAlias;
@@ -689,9 +701,9 @@ Decl *Parser::ParseStaticAssertDeclaration(SourceLocation &DeclEnd){
   assert(Tok.isOneOf(tok::kw_static_assert, tok::kw__Static_assert) &&
          "Not a static_assert declaration");
 
-  if (Tok.is(tok::kw__Static_assert) && !getLangOpts().C11)
+  if (Tok.is(tok::kw__Static_assert) && !getLangOpts().C11 && !getLangOpts().HLSL) // HLSL Change - support enabled
     Diag(Tok, diag::ext_c11_static_assert);
-  if (Tok.is(tok::kw_static_assert))
+  if (Tok.is(tok::kw_static_assert) && !getLangOpts().HLSL) // HLSL Change - support enabled
     Diag(Tok, diag::warn_cxx98_compat_static_assert);
 
   SourceLocation StaticAssertLoc = ConsumeToken();
@@ -878,6 +890,20 @@ void Parser::AnnotateExistingDecltypeSpecifier(const DeclSpec& DS,
 }
 
 void Parser::ParseUnderlyingTypeSpecifier(DeclSpec &DS) {
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    Diag(Tok, diag::err_hlsl_unsupported_construct) << Tok.getName();
+    DS.SetTypeSpecError();
+    ConsumeToken();
+    if (Tok.is(tok::l_paren)) {
+      BalancedDelimiterTracker T(*this, tok::l_paren);
+      T.consumeOpen();
+      T.skipToEnd();
+    }
+    return;
+  }
+  // HLSL Change Ends
+
   assert(Tok.is(tok::kw___underlying_type) &&
          "Not an underlying type specifier");
 
@@ -985,7 +1011,7 @@ TypeResult Parser::ParseBaseTypeSpecifier(SourceLocation &BaseLoc,
   IdentifierInfo *Id = Tok.getIdentifierInfo();
   SourceLocation IdLoc = ConsumeToken();
 
-  if (Tok.is(tok::less)) {
+  if (Tok.is(tok::less) && !getLangOpts().HLSL) { // HLSL Change - do not fix for HLSL
     // It looks the user intended to write a template-id here, but the
     // template-name was wrong. Try to fix that.
     TemplateNameKind TNK = TNK_Type_template;
@@ -1073,6 +1099,19 @@ void Parser::ParseMicrosoftInheritanceClassAttributes(ParsedAttributes &attrs) {
 /// which could be a standalone declaration. This will conservatively return
 /// true if there's any doubt, and is appropriate for insert-';' fixits.
 bool Parser::isValidAfterTypeSpecifier(bool CouldBeBitfield) {
+  // HLSL Change Starts - abridged version of the table below
+  if (getLangOpts().HLSL) {
+    switch (Tok.getKind()) {
+    case tok::semi:
+    case tok::identifier:
+      return true;
+    case tok::colon:
+      return CouldBeBitfield;
+    default:
+      return false;
+    }
+  }
+  // HLSL Change Ends
   // This switch enumerates the valid "follow" set for type-specifiers.
   switch (Tok.getKind()) {
   default: break;
@@ -1197,7 +1236,7 @@ void Parser::ParseClassSpecifier(tok::TokenKind TagTokKind,
   DeclSpec::TST TagType;
   if (TagTokKind == tok::kw_struct)
     TagType = DeclSpec::TST_struct;
-  else if (TagTokKind == tok::kw___interface)
+  else if (TagTokKind == tok::kw___interface || TagTokKind == tok::kw_interface) // HLSL Change - support 'interface'
     TagType = DeclSpec::TST_interface;
   else if (TagTokKind == tok::kw_class)
     TagType = DeclSpec::TST_class;
@@ -1233,20 +1272,28 @@ void Parser::ParseClassSpecifier(tok::TokenKind TagTokKind,
   MaybeParseMicrosoftDeclSpecs(attrs);
 
   // Parse inheritance specifiers.
+  // HLSL Change Starts - these keywords are only defined for Microsoft Extensions
+  assert(!getLangOpts().HLSL ||
+    (!Tok.is(tok::kw___single_inheritance) && !Tok.is(tok::kw___multiple_inheritance) && !Tok.is(tok::kw___virtual_inheritance))); // HLSL Change
+  if (!getLangOpts().HLSL) {
+  // HLSL Change Ends - succeeding block is now conditional
   if (Tok.isOneOf(tok::kw___single_inheritance,
                   tok::kw___multiple_inheritance,
                   tok::kw___virtual_inheritance))
     ParseMicrosoftInheritanceClassAttributes(attrs);
+  } // HLSL Change - close conditional block
 
   // If C++0x attributes exist here, parse them.
   // FIXME: Are we consistent with the ordering of parsing of different
   // styles of attributes?
   MaybeParseCXX11Attributes(attrs);
+  MaybeParseHLSLAttributes(attrs); // HLSL Change
 
   // Source location used by FIXIT to insert misplaced
   // C++11 attributes
   SourceLocation AttrFixitLoc = Tok.getLocation();
 
+  if (!getLangOpts().HLSL) { // HLSL Change - skip fixes for GNU libstdc++ - succeeding block is now conditional
   if (TagType == DeclSpec::TST_struct &&
       Tok.isNot(tok::identifier) &&
       !Tok.isAnnotation() &&
@@ -1306,6 +1353,7 @@ void Parser::ParseClassSpecifier(tok::TokenKind TagTokKind,
     // X", make X into a normal identifier rather than a keyword, to
     // allow libstdc++ 4.2 and libc++ to work properly.
     TryKeywordIdentFallback(true);
+  } // HLSL Change - close conditional block
 
   // Parse the (optional) nested-name-specifier.
   CXXScopeSpec &SS = DS.getTypeSpecScope();
@@ -1429,6 +1477,7 @@ void Parser::ParseClassSpecifier(tok::TokenKind TagTokKind,
 
   // If there are attributes after class name, parse them.
   MaybeParseCXX11Attributes(Attributes);
+  MaybeParseHLSLAttributes(Attributes); // HLSL Change
 
   const PrintingPolicy &Policy = Actions.getASTContext().getPrintingPolicy();
   Sema::TagUseKind TUK;
@@ -1830,13 +1879,16 @@ BaseResult Parser::ParseBaseSpecifier(Decl *ClassDecl) {
   MaybeParseCXX11Attributes(Attributes);
 
   // Parse the 'virtual' keyword.
-  if (TryConsumeToken(tok::kw_virtual))
+  if (TryConsumeToken(tok::kw_virtual)) {
+    if (getLangOpts().HLSL) Diag(Tok, diag::err_hlsl_unsupported_construct) << "virtual base type"; // HLSL Change
     IsVirtual = true;
+  }
 
   CheckMisplacedCXX11Attribute(Attributes, StartLoc);
 
   // Parse an (optional) access specifier.
   AccessSpecifier Access = getAccessSpecifierIfPresent();
+  if (Access != AS_none) Diag(Tok, diag::err_hlsl_unsupported_construct) << "base type access specifier"; // HLSL Change
   if (Access != AS_none)
     ConsumeToken();
 
@@ -1845,6 +1897,7 @@ BaseResult Parser::ParseBaseSpecifier(Decl *ClassDecl) {
   // Parse the 'virtual' keyword (again!), in case it came after the
   // access specifier.
   if (Tok.is(tok::kw_virtual))  {
+    if (getLangOpts().HLSL) Diag(Tok, diag::err_hlsl_unsupported_construct) << "virtual base type"; // HLSL Change
     SourceLocation VirtualLoc = ConsumeToken();
     if (IsVirtual) {
       // Complain about duplicate 'virtual'
@@ -1869,6 +1922,7 @@ BaseResult Parser::ParseBaseSpecifier(Decl *ClassDecl) {
   // parse it here for convenience.
   SourceLocation EllipsisLoc;
   TryConsumeToken(tok::ellipsis, EllipsisLoc);
+  if (getLangOpts().HLSL && EllipsisLoc != SourceLocation()) Diag(Tok, diag::err_hlsl_unsupported_construct) << "base type ellipsis"; // HLSL Change
 
   // Find the complete source range for the base-specifier.
   SourceRange Range(StartLoc, EndLocation);
@@ -1946,7 +2000,7 @@ void Parser::HandleMemberFunctionDeclDelays(Declarator& DeclaratorInfo,
 ///         override
 ///         final
 VirtSpecifiers::Specifier Parser::isCXX11VirtSpecifier(const Token &Tok) const {
-  if (!getLangOpts().CPlusPlus || Tok.isNot(tok::identifier))
+  if (!getLangOpts().CPlusPlus || Tok.isNot(tok::identifier) || getLangOpts().HLSL) // HLSL Change: remove support for override and final
     return VirtSpecifiers::VS_None;
 
   IdentifierInfo *II = Tok.getIdentifierInfo();
@@ -2021,6 +2075,7 @@ void Parser::ParseOptionalCXX11VirtSpecifierSeq(VirtSpecifiers &VS,
 /// isCXX11FinalKeyword - Determine whether the next token is a C++11
 /// 'final' or Microsoft 'sealed' contextual keyword.
 bool Parser::isCXX11FinalKeyword() const {
+  if (getLangOpts().HLSL) return false; // HLSL Change - HLSL does not support final/sealed/override.
   VirtSpecifiers::Specifier Specifier = isCXX11VirtSpecifier();
   return Specifier == VirtSpecifiers::VS_Final ||
          Specifier == VirtSpecifiers::VS_Sealed;
@@ -2056,6 +2111,13 @@ bool Parser::ParseCXXMemberDeclaratorBeforeInitializer(
 
   // If a simple-asm-expr is present, parse it.
   if (Tok.is(tok::kw_asm)) {
+    // HLSL Change Starts - disallow asm
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      SkipUntil(tok::comma, StopAtSemi | StopBeforeMatch);
+      return true;
+    }
+    // HLSL Change Ends
     SourceLocation Loc;
     ExprResult AsmLabel(ParseSimpleAsm(&Loc));
     if (AsmLabel.isInvalid())
@@ -2067,10 +2129,11 @@ bool Parser::ParseCXXMemberDeclaratorBeforeInitializer(
 
   // If attributes exist after the declarator, but before an '{', parse them.
   MaybeParseGNUAttributes(DeclaratorInfo, &LateParsedAttrs);
+  MaybeParseHLSLAttributes(DeclaratorInfo); // HLSL Change: Parse semantic on struct members
 
   // For compatibility with code written to older Clang, also accept a
   // virt-specifier *after* the GNU attributes.
-  if (BitfieldSize.isUnset() && VS.isUnset()) {
+  if (!getLangOpts().HLSL && BitfieldSize.isUnset() && VS.isUnset()) { // HLSL Change - disallowed
     ParseOptionalCXX11VirtSpecifierSeq(
         VS, getCurrentClass().IsInterface,
         DeclaratorInfo.getDeclSpec().getFriendSpecLoc());
@@ -2283,6 +2346,13 @@ void Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
   if (Tok.is(tok::kw_template)) {
     assert(!TemplateInfo.TemplateParams &&
            "Nested template improperly parsed?");
+    // HLSL Change Start - disallow template members
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      SkipUntil(tok::r_brace, StopAtSemi);
+      return;
+    }
+    // HLSL Change End
     SourceLocation DeclEnd;
     ParseDeclarationStartingWithTemplate(Declarator::MemberContext, DeclEnd,
                                          AS, AccessAttrs);
@@ -2302,6 +2372,7 @@ void Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
   ParsedAttributesWithRange FnAttrs(AttrFactory);
   // Optional C++11 attribute-specifier
   MaybeParseCXX11Attributes(attrs);
+  MaybeParseHLSLAttributes(attrs);  // HLSL Change
   // We need to keep these attributes for future diagnostic
   // before they are taken over by declaration specifier.
   FnAttrs.addAll(attrs.getList());
@@ -2310,6 +2381,13 @@ void Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
   MaybeParseMicrosoftAttributes(attrs);
 
   if (Tok.is(tok::kw_using)) {
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      SkipUntil(tok::semi, StopBeforeMatch);
+      return;
+    }
+    // HLSL Change Ends
     ProhibitAttributes(attrs);
 
     // Eat 'using'.
@@ -2494,6 +2572,7 @@ void Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
     InClassInitStyle HasInClassInit = ICIS_NoInit;
     bool HasStaticInitializer = false;
     if (Tok.isOneOf(tok::equal, tok::l_brace) && PureSpecLoc.isInvalid()) {
+      Diag(Tok, diag::err_hlsl_unsupported_member_default); // HLSL Change
       if (BitfieldSize.get()) {
         Diag(Tok, diag::err_bitfield_member_init);
         SkipUntil(tok::comma, StopAtSemi | StopBeforeMatch);
@@ -2520,6 +2599,7 @@ void Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
 
     NamedDecl *ThisDecl = nullptr;
     if (DS.isFriendSpecified()) {
+      assert(!getLangOpts().HLSL && "unreachable in HLSL"); // HLSL Change
       // C++11 [dcl.attr.grammar] p4: If an attribute-specifier-seq appertains
       // to a friend declaration, that declaration shall be a definition.
       //
@@ -2644,6 +2724,7 @@ void Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
 
     // GNU attributes are allowed before the second and subsequent declarator.
     MaybeParseGNUAttributes(DeclaratorInfo);
+    MaybeParseHLSLAttributes(DeclaratorInfo); // HLSL Change
 
     if (ParseCXXMemberDeclaratorBeforeInitializer(
             DeclaratorInfo, VS, BitfieldSize, LateParsedAttrs))
@@ -2804,6 +2885,12 @@ void Parser::ParseCXXMemberSpecification(SourceLocation RecordLoc,
         // We're inside a class scope, so this is a nested class.
         NonNestedClass = false;
 
+        // HLSL Change Starts
+        if (getLangOpts().HLSL) {
+          Diag(RecordLoc, diag::err_hlsl_unsupported_construct) << "nested class";
+          break;
+        } else {
+        // HLSL Change Ends - succeeding block is now conditional
         // The Microsoft extension __interface does not permit nested classes.
         if (getCurrentClass().IsInterface) {
           Diag(RecordLoc, diag::err_invalid_member_in_interface)
@@ -2812,6 +2899,7 @@ void Parser::ParseCXXMemberSpecification(SourceLocation RecordLoc,
                   ? cast<NamedDecl>(TagDecl)->getQualifiedNameAsString()
                   : "(anonymous)");
         }
+        } // HLSL Change - close conditional
         break;
       }
 
@@ -2934,6 +3022,10 @@ void Parser::ParseCXXMemberSpecification(SourceLocation RecordLoc,
     CurAS = AS_private;
   else
     CurAS = AS_public;
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) 
+    CurAS = AS_public; // HLSL only has public
+  // HLSL Change Ends
   ParsedAttributes AccessAttrs(AttrFactory);
 
   if (TagDecl) {
@@ -2941,7 +3033,7 @@ void Parser::ParseCXXMemberSpecification(SourceLocation RecordLoc,
     while (Tok.isNot(tok::r_brace) && !isEofOrEom()) {
       // Each iteration of this loop reads one member-declaration.
 
-      if (getLangOpts().MicrosoftExt && Tok.isOneOf(tok::kw___if_exists,
+      if (!getLangOpts().HLSL && getLangOpts().MicrosoftExt && Tok.isOneOf(tok::kw___if_exists, // HLSL Change - remove support
                                                     tok::kw___if_not_exists)) {
         ParseMicrosoftIfExistsClassDeclaration((DeclSpec::TST)TagType, CurAS);
         continue;
@@ -2953,32 +3045,32 @@ void Parser::ParseCXXMemberSpecification(SourceLocation RecordLoc,
         continue;
       }
 
-      if (Tok.is(tok::annot_pragma_vis)) {
+      if (!getLangOpts().HLSL && Tok.is(tok::annot_pragma_vis)) { // HLSL Change - remove support
         HandlePragmaVisibility();
         continue;
       }
 
-      if (Tok.is(tok::annot_pragma_pack)) {
+      if (!getLangOpts().HLSL && Tok.is(tok::annot_pragma_pack)) { // HLSL Change - remove support
         HandlePragmaPack();
         continue;
       }
 
-      if (Tok.is(tok::annot_pragma_align)) {
+      if (!getLangOpts().HLSL && Tok.is(tok::annot_pragma_align)) { // HLSL Change - remove support
         HandlePragmaAlign();
         continue;
       }
 
-      if (Tok.is(tok::annot_pragma_openmp)) {
+      if (!getLangOpts().HLSL && Tok.is(tok::annot_pragma_openmp)) { // HLSL Change - remove support
         ParseOpenMPDeclarativeDirective();
         continue;
       }
 
-      if (Tok.is(tok::annot_pragma_ms_pointers_to_members)) {
+      if (!getLangOpts().HLSL && Tok.is(tok::annot_pragma_ms_pointers_to_members)) { // HLSL Change - remove support
         HandlePragmaMSPointersToMembers();
         continue;
       }
 
-      if (Tok.is(tok::annot_pragma_ms_pragma)) {
+      if (!getLangOpts().HLSL && Tok.is(tok::annot_pragma_ms_pragma)) { // HLSL Change - remove support
         HandlePragmaMSPragma();
         continue;
       }
@@ -2991,6 +3083,16 @@ void Parser::ParseCXXMemberSpecification(SourceLocation RecordLoc,
 
       AccessSpecifier AS = getAccessSpecifierIfPresent();
       if (AS != AS_none) {
+        // HLSL Change Starts
+        if (getLangOpts().HLSL) {
+          Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+          ConsumeToken();
+          if (Tok.is(tok::colon))
+            ConsumeToken();
+          continue;
+        }
+        // HLSL Change Ends
+
         // Current token is a C++ access specifier.
         CurAS = AS;
         SourceLocation ASLoc = Tok.getLocation();
@@ -3126,6 +3228,13 @@ void Parser::ParseConstructorInitializer(Decl *ConstructorDecl) {
   assert(Tok.is(tok::colon) &&
          "Constructor initializer always starts with ':'");
 
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    Diag(Tok, diag::err_hlsl_unsupported_construct) << "constructor initializer";
+    return;
+  }
+  // HLSL Change Ends
+
   // Poison the SEH identifiers so they are flagged as illegal in constructor
   // initializers.
   PoisonSEHIdentifiersRAIIObject PoisonSEHIdentifiers(*this, true);
@@ -3183,6 +3292,7 @@ void Parser::ParseConstructorInitializer(Decl *ConstructorDecl) {
 ///         '::'[opt] nested-name-specifier[opt] class-name
 ///         identifier
 MemInitResult Parser::ParseMemInitializer(Decl *ConstructorDecl) {
+  assert(!getLangOpts().HLSL && "unreachable from HLSL - without constructors, no mem initializers"); // HLSL Change
   // parse '::'[opt] nested-name-specifier[opt]
   CXXScopeSpec SS;
   ParseOptionalCXXScopeSpecifier(SS, ParsedType(), /*EnteringContext=*/false);
@@ -3286,6 +3396,14 @@ Parser::tryParseExceptionSpecification(bool Delayed,
     if (Tok.isNot(tok::kw_throw) && Tok.isNot(tok::kw_noexcept))
       return EST_None;
 
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      assert(Tok.isNot(tok::kw_noexcept)); // not a keyword in the language.
+      Diag(SpecificationRange.getBegin(), diag::err_hlsl_unsupported_construct) << "exception specification";
+      return Result;
+    }
+    // HLSL Change Ends
+
     // Consume and cache the starting token.
     bool IsNoexcept = Tok.is(tok::kw_noexcept);
     Token StartTok = Tok;
@@ -3324,7 +3442,22 @@ Parser::tryParseExceptionSpecification(bool Delayed,
                                                 DynamicExceptionRanges);
     assert(DynamicExceptions.size() == DynamicExceptionRanges.size() &&
            "Produced different number of exception types and ranges.");
+
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      assert(Tok.isNot(tok::kw_noexcept)); // not a keyword in the language.
+      Diag(SpecificationRange.getBegin(), diag::err_hlsl_unsupported_construct) << "exception specification";
+      return Result;
+    }
+    // HLSL Change Ends           
   }
+
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    assert(Tok.isNot(tok::kw_noexcept)); // not a keyword in the language.
+    return Result;
+  }
+  // HLSL Change Ends
 
   // If there's no noexcept specification, we're done.
   if (Tok.isNot(tok::kw_noexcept))
@@ -3380,7 +3513,7 @@ Parser::tryParseExceptionSpecification(bool Delayed,
 
 static void diagnoseDynamicExceptionSpecification(
     Parser &P, const SourceRange &Range, bool IsNoexcept) {
-  if (P.getLangOpts().CPlusPlus11) {
+  if (P.getLangOpts().CPlusPlus11 && !P.getLangOpts().HLSL) { // HLSL Change - don't try to fix this for HLSL
     const char *Replacement = IsNoexcept ? "noexcept" : "noexcept(false)";
     P.Diag(Range.getBegin(), diag::warn_exception_spec_deprecated) << Range;
     P.Diag(Range.getBegin(), diag::note_exception_spec_deprecated)
@@ -3459,6 +3592,7 @@ ExceptionSpecificationType Parser::ParseDynamicExceptionSpecification(
 /// ParseTrailingReturnType - Parse a trailing return type on a new-style
 /// function declaration.
 TypeResult Parser::ParseTrailingReturnType(SourceRange &Range) {
+  assert(!getLangOpts().HLSL && "unreachable from HLSL, no lambda or new-style function declaration support"); // HLSL Change
   assert(Tok.is(tok::arrow) && "expected arrow");
 
   ConsumeToken();
@@ -3678,6 +3812,7 @@ bool Parser::ParseCXX11AttributeArgs(IdentifierInfo *AttrName,
 ///         identifier
 void Parser::ParseCXX11AttributeSpecifier(ParsedAttributes &attrs,
                                           SourceLocation *endLoc) {
+  assert(!getLangOpts().HLSL && "unreachable code in HLSL, no parsing of C++11-style attributes"); // HLSL Change
   if (Tok.is(tok::kw_alignas)) {
     Diag(Tok.getLocation(), diag::warn_cxx98_compat_alignas);
     ParseAlignmentSpecifier(attrs, endLoc);
@@ -3818,6 +3953,7 @@ SourceLocation Parser::SkipCXX11Attributes() {
 ///             ms-attribute ms-attribute-seq
 void Parser::ParseMicrosoftAttributes(ParsedAttributes &attrs,
                                       SourceLocation *endLoc) {
+  assert(!getLangOpts().HLSL && "unreachable code for HLSL - Microsoft extension parsing is disabled"); // HLSL Change
   assert(Tok.is(tok::l_square) && "Not a Microsoft attribute list");
 
   do {
@@ -3833,6 +3969,7 @@ void Parser::ParseMicrosoftAttributes(ParsedAttributes &attrs,
 
 void Parser::ParseMicrosoftIfExistsClassDeclaration(DeclSpec::TST TagType,
                                                     AccessSpecifier& CurAS) {
+  assert(!getLangOpts().HLSL && "unreachable code for HLSL - if-exists extension parsing skipped"); // HLSL Change
   IfExistsCondition Result;
   if (ParseMicrosoftIfExistsCondition(Result))
     return;

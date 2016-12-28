@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 # Discover the projects that use CMake in the subdirectories.
 # Note that explicit cmake invocation is required every time a new project is
 # added or removed.

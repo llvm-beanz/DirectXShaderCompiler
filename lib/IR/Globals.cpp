@@ -1,16 +1,15 @@
 //===-- Globals.cpp - Implement the GlobalValue & GlobalVariable class ----===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the GlobalValue & GlobalVariable classes for the IR
-// library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Globals.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the GlobalValue & GlobalVariable classes for the IR  //
+// library.                                                                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -19,6 +18,7 @@
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
+#include "dxc/HLSL/HLModule.h" // HLSL Change
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace llvm;
@@ -188,10 +188,12 @@ void GlobalVariable::setParent(Module *parent) {
 }
 
 void GlobalVariable::removeFromParent() {
+  if (getParent()->HasHLModule()) getParent()->GetHLModule().RemoveGlobal(this);
   getParent()->getGlobalList().remove(this);
 }
 
 void GlobalVariable::eraseFromParent() {
+  if (getParent()->HasHLModule()) getParent()->GetHLModule().RemoveGlobal(this);
   getParent()->getGlobalList().erase(this);
 }
 

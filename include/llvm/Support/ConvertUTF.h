@@ -1,12 +1,12 @@
 /*===--- ConvertUTF.h - Universal Character Names conversions ---------------===
- *
- *                     The LLVM Compiler Infrastructure
- *
- * This file is distributed under the University of Illinois Open Source
- * License. See LICENSE.TXT for details.
- *
- *==------------------------------------------------------------------------==*/
-/*
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ConvertUTF.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+////////////////////////////////////////////////////////////////////////////////*
  * Copyright 2001-2004 Unicode, Inc.
  *
  * Disclaimer
@@ -195,7 +195,7 @@ namespace llvm {
  * \return true on success.
  */
 bool ConvertUTF8toWide(unsigned WideCharWidth, llvm::StringRef Source,
-                       char *&ResultPtr, const UTF8 *&ErrorPtr);
+                       _Out_cap_x_(WideCharWidth * (Source.Size() + 1)) char *&ResultPtr, const UTF8 *&ErrorPtr); // HLSL Change
 
 /**
  * Convert an Unicode code point to UTF8 sequence.
@@ -207,7 +207,7 @@ bool ConvertUTF8toWide(unsigned WideCharWidth, llvm::StringRef Source,
  *
  * \returns true on success.
  */
-bool ConvertCodePointToUTF8(unsigned Source, char *&ResultPtr);
+bool ConvertCodePointToUTF8(unsigned Source, _Inout_cap_(UNI_MAX_UTF8_BYTES_PER_CODE_POINT) char *&ResultPtr); // HLSL Change
 
 /**
  * Convert the first UTF8 sequence in the given source buffer to a UTF32

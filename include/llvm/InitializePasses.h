@@ -1,16 +1,14 @@
-//===- llvm/InitializePasses.h -------- Initialize All Passes ---*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InitializePasses.h                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains the declarations for the pass initialization routines  //
+// for the entire LLVM project.                                              //
 //
-//                      The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains the declarations for the pass initialization routines
-// for the entire LLVM project.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_INITIALIZEPASSES_H
 #define LLVM_INITIALIZEPASSES_H
@@ -237,6 +235,7 @@ void initializePromotePassPass(PassRegistry&);
 void initializePruneEHPass(PassRegistry&);
 void initializeReassociatePass(PassRegistry&);
 void initializeRegToMemPass(PassRegistry&);
+void initializeRegToMemHlslPass(PassRegistry&); // HLSL Change
 void initializeRegionInfoPassPass(PassRegistry&);
 void initializeRegionOnlyPrinterPass(PassRegistry&);
 void initializeRegionOnlyViewerPass(PassRegistry&);
@@ -248,6 +247,14 @@ void initializeSCCPPass(PassRegistry&);
 void initializeSROAPass(PassRegistry&);
 void initializeSROA_DTPass(PassRegistry&);
 void initializeSROA_SSAUpPass(PassRegistry&);
+// HLSL Change Begins
+void initializeSROA_HLSLPass(PassRegistry&);
+void initializeSROA_DT_HLSLPass(PassRegistry&);
+void initializeSROA_Parameter_HLSLPass(PassRegistry&);
+void initializeDynamicIndexingVectorToArrayPass(PassRegistry&);
+void initializeMultiDimArrayToOneDimArrayPass(PassRegistry&);
+void initializeSROA_SSAUp_HLSLPass(PassRegistry&);
+// HLSL Change Ends
 void initializeScalarEvolutionAliasAnalysisPass(PassRegistry&);
 void initializeScalarEvolutionPass(PassRegistry&);
 void initializeShrinkWrapPass(PassRegistry &);

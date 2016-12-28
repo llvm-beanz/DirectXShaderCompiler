@@ -1,16 +1,15 @@
 //===--- ModuleMap.cpp - Describe the layout of modules ---------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the ModuleMap implementation, which describes the layout
-// of a module as it relates to headers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ModuleMap.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the ModuleMap implementation, which describes the layout//
+// of a module as it relates to headers.                                     //
+//                                                                           //
+
 #include "clang/Lex/ModuleMap.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Diagnostic.h"
@@ -35,7 +34,8 @@
 #include <limits.h>
 #endif
 using namespace clang;
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 Module::ExportDecl 
 ModuleMap::resolveExport(Module *Mod, 
                          const Module::UnresolvedExportDecl &Unresolved,
@@ -90,7 +90,9 @@ ModuleMap::ModuleMap(SourceManager &SourceMgr, DiagnosticsEngine &Diags,
     : SourceMgr(SourceMgr), Diags(Diags), LangOpts(LangOpts), Target(Target),
       HeaderInfo(HeaderInfo), BuiltinIncludeDir(nullptr),
       CompilingModule(nullptr), SourceModule(nullptr), NumCreatedModules(0) {
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
   MMapLangOpts.LineComment = true;
+#endif
 }
 
 ModuleMap::~ModuleMap() {
@@ -2330,8 +2332,13 @@ bool ModuleMap::parseModuleMapFile(const FileEntry *File, bool IsSystem,
   auto FileCharacter = IsSystem ? SrcMgr::C_System : SrcMgr::C_User;
   FileID ID = SourceMgr.createFileID(File, ExternModuleLoc, FileCharacter);
   const llvm::MemoryBuffer *Buffer = SourceMgr.getBuffer(ID);
-  if (!Buffer)
-    return ParsedModuleMap[File] = true;
+  if (!Buffer) {
+  // HLSL Change Starts - the assignment and return value usage are expected, but is flagged as a problem by static analysis
+    // return ParsedModuleMap[File] = true;
+    ParsedModuleMap[File] = true;
+    return true;
+  }
+  // HLSL Change Ends
 
   // Parse this module map file.
   Lexer L(ID, SourceMgr.getBuffer(ID), SourceMgr, MMapLangOpts);

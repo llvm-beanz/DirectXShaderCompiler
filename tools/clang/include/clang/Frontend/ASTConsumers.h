@@ -1,15 +1,14 @@
 //===--- ASTConsumers.h - ASTConsumer implementations -----------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTConsumers.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// AST Consumers.                                                            //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// AST Consumers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_FRONTEND_ASTCONSUMERS_H
 #define LLVM_CLANG_FRONTEND_ASTCONSUMERS_H
@@ -36,7 +35,8 @@ std::unique_ptr<ASTConsumer> CreateASTPrinter(raw_ostream *OS,
 
 // AST dumper: dumps the raw AST in human-readable form to stderr; this is
 // intended for debugging.
-std::unique_ptr<ASTConsumer> CreateASTDumper(StringRef FilterString,
+std::unique_ptr<ASTConsumer> CreateASTDumper(raw_ostream *OS, // HLSL Change - explicit output stream
+                                             StringRef FilterString,
                                              bool DumpDecls,
                                              bool DumpLookups);
 

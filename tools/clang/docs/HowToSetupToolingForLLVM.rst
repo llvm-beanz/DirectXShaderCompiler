@@ -2,6 +2,9 @@
 How To Setup Clang Tooling For LLVM
 ===================================
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 Clang Tooling provides infrastructure to write tools that need syntactic
 and semantic information about a program. This term also relates to a set
 of specific tools using this infrastructure (e.g. ``clang-check``). This

@@ -1,21 +1,20 @@
 //===--- TransRetainReleaseDealloc.cpp - Transformations to ARC mode ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// removeRetainReleaseDealloc:
-//
-// Removes retain/release/autorelease/dealloc messages.
-//
-//  return [[foo retain] autorelease];
-// ---->
-//  return foo;
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TransRetainReleaseDealloc.cpp                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// removeRetainReleaseDealloc:                                               //
+//                                                                           //
+// Removes retain/release/autorelease/dealloc messages.                      //
+//                                                                           //
+//  return [[foo retain] autorelease];                                       //
+// ---->                                                                     //
+//  return foo;                                                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Transforms.h"
 #include "Internals.h"

@@ -1,15 +1,14 @@
 //===--- SemaExprObjC.cpp - Semantic Analysis for ObjC Expressions --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for Objective-C expressions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaExprObjC.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for Objective-C expressions.      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTContext.h"
@@ -30,6 +29,346 @@
 using namespace clang;
 using namespace sema;
 using llvm::makeArrayRef;
+
+// HLSL Change Starts
+// No ObjC parse/sema support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 1
+ExprResult Sema::ParseObjCStringLiteral(SourceLocation *AtLocs,
+  Expr **strings,
+  unsigned NumStrings) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCStringLiteral(SourceLocation AtLoc, StringLiteral *S) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCNumericLiteral(SourceLocation AtLoc, Expr *Number) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::ActOnObjCBoolLiteral(SourceLocation AtLoc,
+  SourceLocation ValueLoc,
+  bool Value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCBoxedExpr(SourceRange SR, Expr *ValueExpr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCSubscriptExpression(SourceLocation RB, Expr *BaseExpr,
+  Expr *IndexExpr,
+  ObjCMethodDecl *getterMethod,
+  ObjCMethodDecl *setterMethod) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCArrayLiteral(SourceRange SR, MultiExprArg Elements) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCDictionaryLiteral(SourceRange SR,
+  ObjCDictionaryElement *Elements,
+  unsigned NumElements) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCEncodeExpression(SourceLocation AtLoc,
+  TypeSourceInfo *EncodedTypeInfo,
+  SourceLocation RParenLoc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::ParseObjCEncodeExpression(SourceLocation AtLoc,
+  SourceLocation EncodeLoc,
+  SourceLocation LParenLoc,
+  ParsedType ty,
+  SourceLocation RParenLoc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::ParseObjCSelectorExpression(Selector Sel,
+  SourceLocation AtLoc,
+  SourceLocation SelLoc,
+  SourceLocation LParenLoc,
+  SourceLocation RParenLoc,
+  bool WarnMultipleSelectors) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
+  SourceLocation AtLoc,
+  SourceLocation ProtoLoc,
+  SourceLocation LParenLoc,
+  SourceLocation ProtoIdLoc,
+  SourceLocation RParenLoc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return ExprError();
+}
+
+/// Try to capture an implicit reference to 'self'.
+ObjCMethodDecl *Sema::tryCaptureObjCSelf(SourceLocation Loc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+QualType Sema::getMessageSendResultType(QualType ReceiverType,
+  ObjCMethodDecl *Method,
+  bool isClassMessage,
+  bool isSuperMessage) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return QualType();
+}
+
+void Sema::EmitRelatedResultTypeNoteForReturn(QualType destType) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::EmitRelatedResultTypeNote(const Expr *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool Sema::CheckMessageArgumentTypes(QualType ReceiverType,
+  MultiExprArg Args,
+  Selector Sel,
+  ArrayRef<SourceLocation> SelectorLocs,
+  ObjCMethodDecl *Method,
+  bool isClassMessage, bool isSuperMessage,
+  SourceLocation lbrac, SourceLocation rbrac,
+  SourceRange RecRange,
+  QualType &ReturnType, ExprValueKind &VK) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return false;
+}
+
+bool Sema::isSelfExpr(Expr *RExpr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return false;
+}
+
+bool Sema::isSelfExpr(Expr *receiver, const ObjCMethodDecl *method) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return false;
+}
+
+ObjCMethodDecl *Sema::LookupMethodInObjectType(Selector sel, QualType type,
+  bool isInstance) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+ObjCMethodDecl *Sema::LookupMethodInQualifiedType(Selector Sel,
+  const ObjCObjectPointerType *OPT,
+  bool Instance)
+{
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+ExprResult Sema::
+HandleExprPropertyRefExpr(const ObjCObjectPointerType *OPT,
+  Expr *BaseExpr, SourceLocation OpLoc,
+  DeclarationName MemberName,
+  SourceLocation MemberLoc,
+  SourceLocation SuperLoc, QualType SuperType,
+  bool Super) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return ExprError();
+}
+
+ExprResult Sema::
+ActOnClassPropertyRefExpr(IdentifierInfo &receiverName,
+  IdentifierInfo &propertyName,
+  SourceLocation receiverNameLoc,
+  SourceLocation propertyNameLoc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return ExprError();
+}
+
+Sema::ObjCMessageKind Sema::getObjCMessageKind(Scope *S,
+  IdentifierInfo *Name,
+  SourceLocation NameLoc,
+  bool IsSuper,
+  bool HasTrailingDot,
+  ParsedType &ReceiverType) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::ActOnSuperMessage(Scope *S,
+  SourceLocation SuperLoc,
+  Selector Sel,
+  SourceLocation LBracLoc,
+  ArrayRef<SourceLocation> SelectorLocs,
+  SourceLocation RBracLoc,
+  MultiExprArg Args) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return ExprError();
+}
+
+
+ExprResult Sema::BuildClassMessageImplicit(QualType ReceiverType,
+  bool isSuperReceiver,
+  SourceLocation Loc,
+  Selector Sel,
+  ObjCMethodDecl *Method,
+  MultiExprArg Args) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return ExprError();
+}
+
+ExprResult Sema::BuildClassMessage(TypeSourceInfo *ReceiverTypeInfo,
+  QualType ReceiverType,
+  SourceLocation SuperLoc,
+  Selector Sel,
+  ObjCMethodDecl *Method,
+  SourceLocation LBracLoc,
+  ArrayRef<SourceLocation> SelectorLocs,
+  SourceLocation RBracLoc,
+  MultiExprArg ArgsIn,
+  bool isImplicit) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return ExprError();
+}
+
+ExprResult Sema::ActOnClassMessage(Scope *S,
+  ParsedType Receiver,
+  Selector Sel,
+  SourceLocation LBracLoc,
+  ArrayRef<SourceLocation> SelectorLocs,
+  SourceLocation RBracLoc,
+  MultiExprArg Args) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildInstanceMessageImplicit(Expr *Receiver,
+  QualType ReceiverType,
+  SourceLocation Loc,
+  Selector Sel,
+  ObjCMethodDecl *Method,
+  MultiExprArg Args) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildInstanceMessage(Expr *Receiver,
+  QualType ReceiverType,
+  SourceLocation SuperLoc,
+  Selector Sel,
+  ObjCMethodDecl *Method,
+  SourceLocation LBracLoc,
+  ArrayRef<SourceLocation> SelectorLocs,
+  SourceLocation RBracLoc,
+  MultiExprArg ArgsIn,
+  bool isImplicit) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::ActOnInstanceMessage(Scope *S,
+  Expr *Receiver,
+  Selector Sel,
+  SourceLocation LBracLoc,
+  ArrayRef<SourceLocation> SelectorLocs,
+  SourceLocation RBracLoc,
+  MultiExprArg Args) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool Sema::isKnownName(StringRef name) {
+  if (name.empty())
+    return false;
+  LookupResult R(*this, &Context.Idents.get(name), SourceLocation(),
+    Sema::LookupOrdinaryName);
+  return LookupName(R, TUScope, false);
+}
+
+static void addFixitForObjCARCConversion(Sema &S,
+  DiagnosticBuilder &DiagB,
+  Sema::CheckedConversionKind CCK,
+  SourceLocation afterLParen,
+  QualType castType,
+  Expr *castExpr,
+  Expr *realCast,
+  const char *bridgeKeyword,
+  const char *CFBridgeName) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::CheckTollFreeBridgeCast(QualType castType, Expr *castExpr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void Sema::CheckObjCBridgeRelatedCast(QualType castType, Expr *castExpr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool Sema::CheckTollFreeBridgeStaticCast(QualType castType, Expr *castExpr,
+  CastKind &Kind) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool Sema::checkObjCBridgeRelatedComponents(SourceLocation Loc,
+  QualType DestType, QualType SrcType,
+  ObjCInterfaceDecl *&RelatedClass,
+  ObjCMethodDecl *&ClassMethod,
+  ObjCMethodDecl *&InstanceMethod,
+  TypedefNameDecl *&TDNDecl,
+  bool CfToNs) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool
+Sema::CheckObjCBridgeRelatedConversions(SourceLocation Loc,
+  QualType DestType, QualType SrcType,
+  Expr *&SrcExpr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+Sema::ARCConversionResult
+Sema::CheckObjCARCConversion(SourceRange castRange, QualType castType,
+  Expr *&castExpr, CheckedConversionKind CCK,
+  bool DiagnoseCFAudited,
+  BinaryOperatorKind Opc) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+/// Given that we saw an expression with the ARCUnbridgedCastTy
+/// placeholder type, complain bitterly.
+void Sema::diagnoseARCUnbridgedCast(Expr *e) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+/// stripARCUnbridgedCast - Given an expression of ARCUnbridgedCast
+/// type, remove the placeholder cast.
+Expr *Sema::stripARCUnbridgedCast(Expr *e) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool Sema::CheckObjCARCUnavailableWeakConversion(QualType castType,
+  QualType exprType) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::BuildObjCBridgedCast(SourceLocation LParenLoc,
+  ObjCBridgeCastKind Kind,
+  SourceLocation BridgeKeywordLoc,
+  TypeSourceInfo *TSInfo,
+  Expr *SubExpr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::ActOnObjCBridgedCast(Scope *S,
+  SourceLocation LParenLoc,
+  ObjCBridgeCastKind Kind,
+  SourceLocation BridgeKeywordLoc,
+  ParsedType Type,
+  SourceLocation RParenLoc,
+  Expr *SubExpr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+#else
+// HLSL Change Ends
 
 ExprResult Sema::ParseObjCStringLiteral(SourceLocation *AtLocs,
                                         Expr **strings,
@@ -4300,3 +4639,5 @@ ExprResult Sema::ActOnObjCBridgedCast(Scope *S,
   return BuildObjCBridgedCast(LParenLoc, Kind, BridgeKeywordLoc, TSInfo, 
                               SubExpr);
 }
+
+#endif // HLSL Change

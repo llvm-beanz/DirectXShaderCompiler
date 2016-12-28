@@ -1,15 +1,14 @@
 //===--- ParseInit.cpp - Initializer Parsing ------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements initializer parsing as specified by C99 6.7.8.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseInit.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements initializer parsing as specified by C99 6.7.8.       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "RAIIObjectsForParser.h"
@@ -393,6 +392,7 @@ ExprResult Parser::ParseInitializerWithPotentialDesignator() {
 ///         initializer-list ',' designation[opt] initializer ...[opt]
 ///
 ExprResult Parser::ParseBraceInitializer() {
+  // HLSL Note - this is used for float f[] = { 1, 2, 3 };
   InMessageExpressionRAIIObject InMessage(*this, false);
   
   BalancedDelimiterTracker T(*this, tok::l_brace);
@@ -435,8 +435,17 @@ ExprResult Parser::ParseBraceInitializer() {
     else
       SubElt = ParseInitializer();
 
-    if (Tok.is(tok::ellipsis))
+    if (Tok.is(tok::ellipsis)) {
+      // HLSL Change Starts
+      if (getLangOpts().HLSL) {
+        Diag(Tok, diag::err_hlsl_unsupported_construct) << "expansion";
+        InitExprsOk = false;
+        SkipUntil(tok::r_brace, StopBeforeMatch);
+        break;
+      }
+      // HLSL Change Ends
       SubElt = Actions.ActOnPackExpansion(SubElt.get(), ConsumeToken());
+    }
 
     SubElt = Actions.CorrectDelayedTyposInExpr(SubElt.get());
 
@@ -484,6 +493,7 @@ ExprResult Parser::ParseBraceInitializer() {
 // __if_exists/if_not_exists statement.
 bool Parser::ParseMicrosoftIfExistsBraceInitializer(ExprVector &InitExprs,
                                                     bool &InitExprsOk) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   bool trailingComma = false;
   IfExistsCondition Result;
   if (ParseMicrosoftIfExistsCondition(Result))

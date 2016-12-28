@@ -1,15 +1,14 @@
 //===-- macho-dump.cpp - Mach Object Dumping Tool -------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is a testing tool for use with the MC/Mach-O LLVM components.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// macho-dump.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is a testing tool for use with the MC/Mach-O LLVM components.        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Object/MachO.h"
 #include "llvm/ADT/StringExtras.h"
@@ -396,7 +395,8 @@ static void printHeader(const MachOObjectFile *Obj,
   }
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   ProgramName = argv[0];
   llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
 

@@ -1,11 +1,12 @@
 //===- CIndexHigh.cpp - Higher level API functions ------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CIndexHigh.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CursorVisitor.h"
 #include "CLog.h"
@@ -407,7 +408,7 @@ static bool findIncludesInFile(CXTranslationUnit TU, const FileEntry *File,
 // libclang public APIs.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {         // HLSL Change -Don't use c linkage.
 
 CXResult clang_findReferencesInFile(CXCursor cursor, CXFile file,
                                     CXCursorAndRangeVisitor visitor) {
@@ -534,5 +535,5 @@ CXResult clang_findIncludesInFileWithBlock(CXTranslationUnit TU,
   return clang_findIncludesInFile(TU, file, visitor);
 }
 
-} // end: extern "C"
+// } // end: extern "C"    // HLSL Change -Don't use c linkage.
 

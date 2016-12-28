@@ -1,15 +1,14 @@
 //==-- llvm/Target/TargetSelectionDAGInfo.h - SelectionDAG Info --*- C++ -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file declares the TargetSelectionDAGInfo class, which targets can
-// subclass to parameterize the SelectionDAG lowering and instruction
-// selection process.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetSelectionDAGInfo.h                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file declares the TargetSelectionDAGInfo class, which targets can    //
+// subclass to parameterize the SelectionDAG lowering and instruction        //
+// selection process.                                                        //
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,8 +18,8 @@
 #include "llvm/CodeGen/SelectionDAGNodes.h"
 
 namespace llvm {
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// TargetSelectionDAGInfo - Targets can subclass this to parameterize the
 /// SelectionDAG lowering and instruction selection process.
 ///

@@ -1,16 +1,15 @@
 //===- llvm-extract.cpp - LLVM function extraction utility ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This utility changes the input module to only contain a single function,
-// which is primarily used for debugging transformations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-extract.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This utility changes the input module to only contain a single function,  //
+// which is primarily used for debugging transformations.                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -100,7 +99,7 @@ static cl::opt<bool> PreserveAssemblyUseListOrder(
     cl::desc("Preserve use-list order when writing LLVM assembly."),
     cl::init(false), cl::Hidden);
 
-int main(int argc, char **argv) {
+int __cdecl main(int argc, char **argv) { // HLSL Change - __cdecl
   // Print a stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);

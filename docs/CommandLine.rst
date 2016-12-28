@@ -8,6 +8,12 @@ CommandLine 2.0 Library Manual
 Introduction
 ============
 
+NOTE: This document describes the CommandLine library as used for the original
+LLVM project, not the DirectX Compiler. For the DirectX Compiler project, we
+prefer to avoid globals for a few reasons: thread-safety, control over
+initialization and cleanup timing (explicit vs. runtime/linker-determined) and
+ability to control memory allocations.
+
 This document describes the CommandLine argument processing library.  It will
 show you how to use it, and what it can do.  The CommandLine library uses a
 declarative approach to specifying the command line options that your program

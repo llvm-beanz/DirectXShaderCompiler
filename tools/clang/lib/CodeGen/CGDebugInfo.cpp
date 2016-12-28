@@ -1,15 +1,14 @@
 //===--- CGDebugInfo.cpp - Emit Debug Information for a Module ------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This coordinates the debug information generation while generating code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGDebugInfo.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This coordinates the debug information generation while generating code.  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGDebugInfo.h"
 #include "CGBlocks.h"
@@ -186,6 +185,7 @@ StringRef CGDebugInfo::getFunctionName(const FunctionDecl *FD) {
   return internString(OS.str());
 }
 
+#if 0 // HLSL Change - no ObjC support
 StringRef CGDebugInfo::getObjCMethodName(const ObjCMethodDecl *OMD) {
   SmallString<256> MethodName;
   llvm::raw_svector_ostream OS(MethodName);
@@ -213,6 +213,7 @@ StringRef CGDebugInfo::getObjCMethodName(const ObjCMethodDecl *OMD) {
 
   return internString(OS.str());
 }
+#endif // HLSL Change - no ObjC support
 
 StringRef CGDebugInfo::getSelectorName(Selector S) {
   return internString(S.getAsString());
@@ -383,6 +384,7 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
     return DBuilder.createNullPtrType();
   case BuiltinType::Void:
     return nullptr;
+#if 0 // HLSL Change - no ObjC or OpenCL support
   case BuiltinType::ObjCClass:
     if (!ClassTy)
       ClassTy = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
@@ -446,6 +448,7 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
         CGM.getContext().getTypeAlign(BT), llvm::dwarf::DW_ATE_unsigned);
   case BuiltinType::OCLEvent:
     return getOrCreateStructPtrType("opencl_event_t", OCLEventDITy);
+#endif // HLSL Change - no ObjC or OpenCL support
 
   case BuiltinType::UChar:
   case BuiltinType::Char_U:
@@ -554,6 +557,7 @@ llvm::DIType *CGDebugInfo::CreateQualifiedType(QualType Ty,
   return DBuilder.createQualifiedType(Tag, FromTy);
 }
 
+#if 0 // HLSL Change - no ObjC support
 llvm::DIType *CGDebugInfo::CreateType(const ObjCObjectPointerType *Ty,
                                       llvm::DIFile *Unit) {
 
@@ -566,6 +570,7 @@ llvm::DIType *CGDebugInfo::CreateType(const ObjCObjectPointerType *Ty,
   return CreatePointerLikeType(llvm::dwarf::DW_TAG_pointer_type, Ty,
                                Ty->getPointeeType(), Unit);
 }
+#endif // HLSL Change - no ObjC support
 
 llvm::DIType *CGDebugInfo::CreateType(const PointerType *Ty,
                                       llvm::DIFile *Unit) {
@@ -684,6 +689,7 @@ llvm::DIType *CGDebugInfo::getOrCreateStructPtrType(StringRef Name,
   return Cache;
 }
 
+#if 0 // HLSL Change - no block support
 llvm::DIType *CGDebugInfo::CreateType(const BlockPointerType *Ty,
                                       llvm::DIFile *Unit) {
   SmallVector<llvm::Metadata *, 8> EltTys;
@@ -741,6 +747,7 @@ llvm::DIType *CGDebugInfo::CreateType(const BlockPointerType *Ty,
 
   return DBuilder.createPointerType(EltTy, Size);
 }
+#endif // HLSL Change - no block support
 
 llvm::DIType *CGDebugInfo::CreateType(const TemplateSpecializationType *Ty,
                                       llvm::DIFile *Unit) {
@@ -1557,11 +1564,13 @@ llvm::DIType *CGDebugInfo::CreateTypeDefinition(const RecordType *Ty) {
   return FwdDecl;
 }
 
+#if 0 // HLSL Change - no ObjC support
 llvm::DIType *CGDebugInfo::CreateType(const ObjCObjectType *Ty,
                                       llvm::DIFile *Unit) {
   // Ignore protocols.
   return getOrCreateType(Ty->getBaseType(), Unit);
 }
+#endif // HLSL Change - no ObjC support
 
 /// \return true if Getter has the default name for the property PD.
 static bool hasDefaultGetterName(const ObjCPropertyDecl *PD,
@@ -1587,6 +1596,7 @@ static bool hasDefaultSetterName(const ObjCPropertyDecl *PD,
          Setter->getDeclName().getObjCSelector().getNameForSlot(0);
 }
 
+#if 0 // HLSL Change - no ObjC support
 llvm::DIType *CGDebugInfo::CreateType(const ObjCInterfaceType *Ty,
                                       llvm::DIFile *Unit) {
   ObjCInterfaceDecl *ID = Ty->getDecl();
@@ -1612,6 +1622,7 @@ llvm::DIType *CGDebugInfo::CreateType(const ObjCInterfaceType *Ty,
 
   return CreateTypeDefinition(Ty, Unit);
 }
+#endif // HLSL Change - no ObjC support
 
 llvm::DIModule *
 CGDebugInfo::getOrCreateModuleRef(ExternalASTSource::ASTSourceDescriptor Mod) {
@@ -1654,6 +1665,7 @@ CGDebugInfo::getOrCreateModuleRef(ExternalASTSource::ASTSourceDescriptor Mod) {
   return ModuleRef;
 }
 
+#if 0 // HLSL Change - no ObjC support
 llvm::DIType *CGDebugInfo::CreateTypeDefinition(const ObjCInterfaceType *Ty,
                                                 llvm::DIFile *Unit) {
   ObjCInterfaceDecl *ID = Ty->getDecl();
@@ -1798,6 +1810,7 @@ llvm::DIType *CGDebugInfo::CreateTypeDefinition(const ObjCInterfaceType *Ty,
   LexicalBlockStack.pop_back();
   return RealDecl;
 }
+#endif // HLSL Change - no ObjC support
 
 llvm::DIType *CGDebugInfo::CreateType(const VectorType *Ty,
                                       llvm::DIFile *Unit) {
@@ -2071,6 +2084,7 @@ llvm::DIType *CGDebugInfo::getOrCreateType(QualType Ty, llvm::DIFile *Unit) {
   return Res;
 }
 
+#if 0 // HLSL Change - no ObjC support
 unsigned CGDebugInfo::Checksum(const ObjCInterfaceDecl *ID) {
   // The assumption is that the number of ivars can only increase
   // monotonically, so it is safe to just use their current number as
@@ -2094,6 +2108,7 @@ ObjCInterfaceDecl *CGDebugInfo::getObjCInterfaceDecl(QualType Ty) {
     return nullptr;
   }
 }
+#endif // HLSL Change - no ObjC support
 
 llvm::DIType *CGDebugInfo::CreateTypeNode(QualType Ty, llvm::DIFile *Unit) {
   // Handle qualifiers, which recursively handles what they refer to.
@@ -2112,12 +2127,14 @@ llvm::DIType *CGDebugInfo::CreateTypeNode(QualType Ty, llvm::DIFile *Unit) {
   case Type::ExtVector:
   case Type::Vector:
     return CreateType(cast<VectorType>(Ty), Unit);
+#if 0 // HLSL Change - no ObjC support
   case Type::ObjCObjectPointer:
     return CreateType(cast<ObjCObjectPointerType>(Ty), Unit);
   case Type::ObjCObject:
     return CreateType(cast<ObjCObjectType>(Ty), Unit);
   case Type::ObjCInterface:
     return CreateType(cast<ObjCInterfaceType>(Ty), Unit);
+#endif // HLSL Change - no ObjC support
   case Type::Builtin:
     return CreateType(cast<BuiltinType>(Ty));
   case Type::Complex:
@@ -2129,8 +2146,10 @@ llvm::DIType *CGDebugInfo::CreateTypeNode(QualType Ty, llvm::DIFile *Unit) {
     // Decayed and adjusted types use the adjusted type in LLVM and DWARF.
     return CreateType(
         cast<PointerType>(cast<AdjustedType>(Ty)->getAdjustedType()), Unit);
+#if 0 // HLSL Change - no block support
   case Type::BlockPointer:
     return CreateType(cast<BlockPointerType>(Ty), Unit);
+#endif // HLSL Change - no block support
   case Type::Typedef:
     return CreateType(cast<TypedefType>(Ty), Unit);
   case Type::Record:
@@ -2374,9 +2393,9 @@ CGDebugInfo::getFunctionForwardDeclaration(const FunctionDecl *FD) {
   SmallVector<QualType, 16> ArgTypes;
   for (const ParmVarDecl *Parm: FD->parameters())
     ArgTypes.push_back(Parm->getType());
-  QualType FnType =
-    CGM.getContext().getFunctionType(FD->getReturnType(), ArgTypes,
-                                     FunctionProtoType::ExtProtoInfo());
+  QualType FnType = CGM.getContext().getFunctionType(
+      FD->getReturnType(), ArgTypes, FunctionProtoType::ExtProtoInfo(),
+      ArrayRef<hlsl::ParameterModifier>()); // HLSL Change - parameter modifiers
   llvm::DISubprogram *SP = DBuilder.createTempFunctionFwdDecl(
       DContext, Name, LinkageName, Unit, Line,
       getOrCreateFunctionType(FD, FnType, Unit), !FD->isExternallyVisible(),
@@ -2481,6 +2500,7 @@ llvm::DISubroutineType *CGDebugInfo::getOrCreateFunctionType(const Decl *D,
 
   if (const CXXMethodDecl *Method = dyn_cast<CXXMethodDecl>(D))
     return getOrCreateMethodType(Method, F);
+#if 0 // HLSL Change - no ObjC support
   if (const ObjCMethodDecl *OMethod = dyn_cast<ObjCMethodDecl>(D)) {
     // Add "self" and "_cmd"
     SmallVector<llvm::Metadata *, 16> Elts;
@@ -2510,6 +2530,7 @@ llvm::DISubroutineType *CGDebugInfo::getOrCreateFunctionType(const Decl *D,
     llvm::DITypeRefArray EltTypeArray = DBuilder.getOrCreateTypeArray(Elts);
     return DBuilder.createSubroutineType(F, EltTypeArray);
   }
+#endif // HLSL Change - no ObjC support
 
   // Handle variadic function types; they need an additional
   // unspecified parameter.
@@ -2560,9 +2581,11 @@ void CGDebugInfo::EmitFunctionStart(GlobalDecl GD, SourceLocation Loc,
     }
     collectFunctionDeclProps(GD, Unit, Name, LinkageName, FDContext,
                              TParamsArray, Flags);
+#if 0 // HLSL Change - no ObjC support
   } else if (const ObjCMethodDecl *OMD = dyn_cast<ObjCMethodDecl>(D)) {
     Name = getObjCMethodName(OMD);
     Flags |= llvm::DINode::FlagPrototyped;
+#endif // HLSL Change - no ObjC support
   } else {
     // Use llvm function name.
     Name = Fn->getName();
@@ -2686,6 +2709,7 @@ llvm::DIType *CGDebugInfo::EmitTypeForVarWithBlocksAttr(const VarDecl *VD,
   EltTys.push_back(CreateMemberType(Unit, FType, "__flags", &FieldOffset));
   EltTys.push_back(CreateMemberType(Unit, FType, "__size", &FieldOffset));
 
+#if 0 // HLSL Change - no ObjC or block support
   bool HasCopyAndDispose = CGM.getContext().BlockRequiresCopying(Type, VD);
   if (HasCopyAndDispose) {
     FType = CGM.getContext().getPointerType(CGM.getContext().VoidTy);
@@ -2703,6 +2727,7 @@ llvm::DIType *CGDebugInfo::EmitTypeForVarWithBlocksAttr(const VarDecl *VD,
     EltTys.push_back(
         CreateMemberType(Unit, FType, "__byref_variable_layout", &FieldOffset));
   }
+#endif // HLSL Change - no ObjC or block support
 
   CharUnits Align = CGM.getContext().getDeclAlign(VD);
   if (Align > CGM.getContext().toCharUnitsFromBits(
@@ -2961,6 +2986,7 @@ bool operator<(const BlockLayoutChunk &l, const BlockLayoutChunk &r) {
 }
 }
 
+#if 0 // HLSL Change - no block support
 void CGDebugInfo::EmitDeclareOfBlockLiteralArgVariable(const CGBlockInfo &block,
                                                        llvm::Value *Arg,
                                                        unsigned ArgNo,
@@ -3106,6 +3132,7 @@ void CGDebugInfo::EmitDeclareOfBlockLiteralArgVariable(const CGBlockInfo &block,
                          llvm::DebugLoc::get(line, column, scope),
                          Builder.GetInsertBlock());
 }
+#endif // HLSL Change - no block support
 
 llvm::DIDerivedType *
 CGDebugInfo::getOrCreateStaticDataMemberDeclarationOrNull(const VarDecl *D) {
@@ -3308,6 +3335,9 @@ CGDebugInfo::getOrCreateNameSpace(const NamespaceDecl *NSDecl) {
 void CGDebugInfo::finalize() {
   // Creating types might create further types - invalidating the current
   // element and the size(), so don't cache/reference them.
+#if 1 // HLSL Change - no ObjC support
+  assert(ObjCInterfaceCache.size() == 0);
+#else
   for (size_t i = 0; i != ObjCInterfaceCache.size(); ++i) {
     ObjCInterfaceCacheEntry E = ObjCInterfaceCache[i];
     llvm::DIType *Ty = E.Type->getDecl()->getDefinition()
@@ -3315,6 +3345,7 @@ void CGDebugInfo::finalize() {
                            : E.Decl;
     DBuilder.replaceTemporary(llvm::TempDIType(E.Decl), Ty);
   }
+#endif // HLSL Change - no ObjC support
 
   for (auto p : ReplaceMap) {
     assert(p.second);

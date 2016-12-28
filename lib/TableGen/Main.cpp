@@ -1,19 +1,18 @@
 //===- Main.cpp - Top-Level TableGen implementation -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// TableGen is a tool which can be used to build up a description of something,
-// then invoke one or more "tablegen backends" to emit information about the
-// description in some predefined format.  In practice, this is used by the LLVM
-// code generators to automate generation of a code generator through a
-// high-level description of the target.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Main.cpp                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// TableGen is a tool which can be used to build up a description of something,//
+// then invoke one or more "tablegen backends" to emit information about the //
+// description in some predefined format.  In practice, this is used by the LLVM//
+// code generators to automate generation of a code generator through a      //
+// high-level description of the target.                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/TableGen/Main.h"
 #include "TGParser.h"
@@ -72,6 +71,15 @@ static int createDependencyFile(const TGParser &Parser, const char *argv0) {
 
 int llvm::TableGenMain(char *argv0, TableGenMainFn *MainFn) {
   RecordKeeper Records;
+
+  // HLSL Change Starts
+  struct SrcMgrCleanup {
+    ~SrcMgrCleanup() {
+      SrcMgr.Reset();
+    }
+  };
+  SrcMgrCleanup SrcMgrCleanupInstance;
+  // HLSL Change Ends
 
   // Parse the input file.
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =

@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 
 
 add_llvm_library(LLVMExecutionEngine
@@ -15,9 +17,9 @@ add_llvm_library(LLVMExecutionEngine
   )
 
 add_subdirectory(Interpreter)
-add_subdirectory(MCJIT)
-add_subdirectory(Orc)
-add_subdirectory(RuntimeDyld)
+# add_subdirectory(MCJIT) # HLSL Change
+# add_subdirectory(Orc) # HLSL Change
+# add_subdirectory(RuntimeDyld) # HLSL Change
 
 if( LLVM_USE_OPROFILE )
   add_subdirectory(OProfileJIT)

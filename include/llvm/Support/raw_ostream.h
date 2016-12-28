@@ -1,13 +1,12 @@
 //===--- raw_ostream.h - Raw output stream ----------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the raw_ostream class.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// raw_ostream.h                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the raw_ostream class.                                 //
 //
 //===----------------------------------------------------------------------===//
 
@@ -288,7 +287,7 @@ protected:
   /// Use the provided buffer as the raw_ostream buffer. This is intended for
   /// use only by subclasses which can arrange for the output to go directly
   /// into the desired output buffer, instead of being copied on each flush.
-  void SetBuffer(char *BufferStart, size_t Size) {
+  void SetBuffer(_Out_opt_ char *BufferStart, size_t Size) {  // HLSL Change - SAL
     SetBufferAndMode(BufferStart, Size, ExternalBuffer);
   }
 
@@ -304,7 +303,7 @@ protected:
   //===--------------------------------------------------------------------===//
 private:
   /// Install the given buffer and mode.
-  void SetBufferAndMode(char *BufferStart, size_t Size, BufferKind Mode);
+  void SetBufferAndMode(_Out_opt_ char *BufferStart, size_t Size, BufferKind Mode);  // HLSL Change - SAL
 
   /// Flush the current buffer, which is known to be non-empty. This outputs the
   /// currently buffered data and resets the buffer to empty.
@@ -456,9 +455,35 @@ raw_ostream &errs();
 /// This returns a reference to a raw_ostream which simply discards output.
 raw_ostream &nulls();
 
+// HLSL Change Starts
+
+// Flush and close STDOUT/STDERR streams before MSFileSystem goes down, 
+// otherwise static destructors will attempt to close after we no longer 
+// have a file system, which will raise an exception on static shutdown.  
+// This is a temporary work around until outs() and errs() is fixed to 
+// do the right thing.
+// The usage pattern is to create an instance in main() after a console-based
+// MSFileSystem has been installed.
+class STDStreamCloser
+{
+public:
+  ~STDStreamCloser()
+  {
+    llvm::raw_fd_ostream& fo = static_cast<llvm::raw_fd_ostream&>(llvm::outs());
+    llvm::raw_fd_ostream& fe = static_cast<llvm::raw_fd_ostream&>(llvm::errs());
+    fo.flush();
+    fe.flush();
+    fo.close();
+    // do not close fe (STDERR), since it was initialized with ShouldClose to false.
+    // (see errs() definition).
+  }
+};
+// HLSL Change Ends
+
 //===----------------------------------------------------------------------===//
 // Output Stream Adaptors
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 /// A raw_ostream that writes to an std::string.  This is a simple adaptor
 /// class. This class does not encounter output errors.

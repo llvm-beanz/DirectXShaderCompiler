@@ -1,11 +1,12 @@
 //===-- MCELFObjectTargetWriter.cpp - ELF Target Writer Subclass ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MCELFObjectTargetWriter.cpp                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/MC/MCELFObjectWriter.h"
@@ -32,7 +33,8 @@ bool MCELFObjectTargetWriter::needsRelocateWithSymbol(const MCSymbol &Sym,
 // ELF doesn't require relocations to be in any order. We sort by the Offset,
 // just to match gnu as for easier comparison. The use type is an arbitrary way
 // of making the sort deterministic.
-static int cmpRel(const ELFRelocationEntry *AP, const ELFRelocationEntry *BP) {
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl cmpRel(const ELFRelocationEntry *AP, const ELFRelocationEntry *BP) {
   const ELFRelocationEntry &A = *AP;
   const ELFRelocationEntry &B = *BP;
   if (A.Offset != B.Offset)

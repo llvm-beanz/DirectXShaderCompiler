@@ -4,6 +4,9 @@ ThreadSanitizer
 Introduction
 ------------
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 ThreadSanitizer is a tool that detects data races.  It consists of a compiler
 instrumentation module and a run-time library.  Typical slowdown introduced by
 ThreadSanitizer is about **5x-15x**.  Typical memory overhead introduced by

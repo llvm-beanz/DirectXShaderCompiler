@@ -1,17 +1,16 @@
 //===-- llvm/ADT/edit_distance.h - Array edit distance function --- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// edit_distance.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines a Levenshtein distance function that works for any two  //
+// sequences, with each element of each sequence being analogous to a character//
+// in a string.                                                              //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines a Levenshtein distance function that works for any two
-// sequences, with each element of each sequence being analogous to a character
-// in a string.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ADT_EDIT_DISTANCE_H
 #define LLVM_ADT_EDIT_DISTANCE_H
@@ -94,7 +93,11 @@ unsigned ComputeEditDistance(ArrayRef<T> FromArray, ArrayRef<T> ToArray,
       return MaxEditDistance + 1;
   }
 
+#pragma warning( push )             // HLSL Change - suppress this warning
+#pragma warning( disable : 28199 )  // 'Using possibly uninitialized memory '*Row':  The variable has had its address taken but no assignment to it has been discovered.'
+                                    // n is assigned early on and is never < 1 because it's an array size
   unsigned Result = Row[n];
+#pragma warning( pop )
   return Result;
 }
 

@@ -1,5 +1,14 @@
-// Basic handling of line counts.
-// RUN: llvm-profdata merge %S/Inputs/lineExecutionCounts.proftext -o %t.profdata
+//===- showLineExecutionCounts.cpp ------------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// showLineExecutionCounts.cpp                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+// Basic handling of line counts.                                            //
+// RUN: llvm-profdata merge %S/Inputs/lineExecutionCounts.proftext -o %t.profdata//
 
 // before any coverage              // WHOLE-FILE:      | [[@LINE]]|// before
                                     // FILTER-NOT:      | [[@LINE-1]]|// before

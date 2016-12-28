@@ -1,19 +1,18 @@
 //===- llvm/Support/CommandLine.h - Command line handler --------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CommandLine.h                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This class implements a command line argument processor that is useful when//
+// creating a tool.  It provides a simple, minimalistic interface that is easily//
+// extensible and supports nonlocal (library) command line options.          //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This class implements a command line argument processor that is useful when
-// creating a tool.  It provides a simple, minimalistic interface that is easily
-// extensible and supports nonlocal (library) command line options.
-//
-// Note that rather than trying to figure out what this code does, you should
-// read the library documentation located in docs/CommandLine.html or looks at
-// the many example usages in tools/*/*.cpp
+// Note that rather than trying to figure out what this code does, you should//
+// read the library documentation located in docs/CommandLine.html or looks at//
+// the many example usages in tools/*/*.cpp                                  //
 //
 //===----------------------------------------------------------------------===//
 
@@ -1674,8 +1673,8 @@ void PrintHelpMessage(bool Hidden = false, bool Categorized = false);
 /// to be modified by tools or libraries should be handled by sane APIs rather
 /// than just handing around a global list.
 StringMap<Option *> &getRegisteredOptions();
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 // Standalone command line processing utilities.
 //
 

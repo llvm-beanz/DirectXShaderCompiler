@@ -1,16 +1,15 @@
 //===--- Sema.h - Semantic Analysis & AST Building --------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Sema.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the Sema class, which performs semantic analysis and    //
+// builds ASTs.                                                              //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the Sema class, which performs semantic analysis and
-// builds ASTs.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_SEMA_SEMA_H
 #define LLVM_CLANG_SEMA_SEMA_H
@@ -52,6 +51,15 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+// HLSL Change Starts
+
+#include "llvm/Support/OacrIgnoreCond.h" // HLSL Change - all sema use is heavily language-dependant
+
+namespace hlsl {
+  struct UnusualAnnotation;
+}
+// HLSL Change Ends
 
 namespace llvm {
   class APSInt;
@@ -697,7 +705,7 @@ public:
   RecordDecl *MSVCGuidDecl;
 
   /// \brief Caches identifiers/selectors for NSFoundation APIs.
-  std::unique_ptr<NSAPI> NSAPIObj;
+  // std::unique_ptr<NSAPI> NSAPIObj; // HLSL Change
 
   /// \brief The declaration of the Objective-C NSNumber class.
   ObjCInterfaceDecl *NSNumberDecl;
@@ -1622,13 +1630,23 @@ public:
                                     LookupResult &Previous);
   NamedDecl* ActOnTypedefNameDecl(Scope* S, DeclContext* DC, TypedefNameDecl *D,
                                   LookupResult &Previous, bool &Redeclaration);
+  // HLSL Change Starts
+  // This enumeration is used to determine whether a variable declaration
+  // should shadow a prior declaration rather than merging.
+  enum ShadowMergeState {
+    ShadowMergeState_Disallowed,  // shadowing is not allowed
+    ShadowMergeState_Possible,    // shadowing is possible (but may not occur)
+    ShadowMergeState_Effective    // the declaration should shadow a prior one
+  };
+  // HLSL Change Ends
   NamedDecl *ActOnVariableDeclarator(Scope *S, Declarator &D, DeclContext *DC,
                                      TypeSourceInfo *TInfo,
                                      LookupResult &Previous,
                                      MultiTemplateParamsArg TemplateParamLists,
-                                     bool &AddToScope);
+                                     bool &AddToScope,
+                                     ShadowMergeState MergeState = ShadowMergeState_Disallowed); // HLSL Change - add merge state
   // Returns true if the variable declaration is a redeclaration
-  bool CheckVariableDeclaration(VarDecl *NewVD, LookupResult &Previous);
+  bool CheckVariableDeclaration(VarDecl *NewVD, LookupResult &Previous, ShadowMergeState MergeState = ShadowMergeState_Disallowed); // HLSL Change - add merge state
   void CheckVariableDeclarationType(VarDecl *NewVD);
   void CheckCompleteVariableDeclaration(VarDecl *var);
   void MaybeSuggestAddingStaticToDecl(const FunctionDecl *D);
@@ -1661,7 +1679,7 @@ public:
   ParmVarDecl *CheckParameter(DeclContext *DC, SourceLocation StartLoc,
                               SourceLocation NameLoc, IdentifierInfo *Name,
                               QualType T, TypeSourceInfo *TSInfo,
-                              StorageClass SC);
+                              StorageClass SCm, hlsl::ParameterModifier ParamMod); // HLSL Change
   void ActOnParamDefaultArgument(Decl *param,
                                  SourceLocation EqualLoc,
                                  Expr *defarg);
@@ -2101,8 +2119,8 @@ public:
   bool MergeCompatibleFunctionDecls(FunctionDecl *New, FunctionDecl *Old,
                                     Scope *S, bool MergeTypeWithOld);
   void mergeObjCMethodDecls(ObjCMethodDecl *New, ObjCMethodDecl *Old);
-  void MergeVarDecl(VarDecl *New, LookupResult &Previous);
-  void MergeVarDeclTypes(VarDecl *New, VarDecl *Old, bool MergeTypeWithOld);
+  void MergeVarDecl(VarDecl *New, LookupResult &Previous, ShadowMergeState& MergeState); // HLSL Change - add merge state
+  void MergeVarDeclTypes(VarDecl *New, VarDecl *Old, bool MergeTypeWithOld, ShadowMergeState& MergeState); // HLSL Change - add merge state
   void MergeVarDeclExceptionSpecs(VarDecl *New, VarDecl *Old);
   bool MergeCXXFunctionDecl(FunctionDecl *New, FunctionDecl *Old, Scope *S);
 
@@ -3210,6 +3228,8 @@ public:
   StmtResult ActOnExprStmt(ExprResult Arg);
   StmtResult ActOnExprStmtError();
 
+  StmtResult ActOnHlslDiscardStmt(SourceLocation Loc); // HLSL Change
+  
   StmtResult ActOnNullStmt(SourceLocation SemiLoc,
                            bool HasLeadingEmptyMacro = false);
 
@@ -4021,6 +4041,23 @@ public:
   ExprResult ActOnAsTypeExpr(Expr *E, ParsedType ParsedDestTy,
                              SourceLocation BuiltinLoc,
                              SourceLocation RParenLoc);
+
+  // HLSL Change Starts
+  //===---------------------------- HLSL Features -------------------------===//
+
+  /// cbuffer/tbuffer
+  llvm::SmallVector<Decl*, 1> HLSLBuffers;
+  Decl* ActOnStartHLSLBuffer(Scope* bufferScope, bool cbuffer, SourceLocation KwLoc,
+    IdentifierInfo *Ident, SourceLocation IdentLoc,
+    std::vector<hlsl::UnusualAnnotation *>& BufferAttributes,
+    SourceLocation LBrace);
+  void ActOnFinishHLSLBuffer(Decl *Dcl, SourceLocation RBrace);
+  Decl* getActiveHLSLBuffer() const;
+  void ActOnStartHLSLBufferView();
+  bool IsOnHLSLBufferView();
+  Decl *ActOnHLSLBufferView(Scope *bufferScope, SourceLocation KwLoc,
+                        DeclGroupPtrTy &dcl, bool iscbuf);
+  // HLSL Change Ends
 
   //===---------------------------- C++ Features --------------------------===//
 
@@ -8943,6 +8980,11 @@ private:
 
   mutable IdentifierInfo *Ident_super;
   mutable IdentifierInfo *Ident___float128;
+
+  // HLSL Change Starts
+  bool DiagnoseHLSLDecl(Declarator& D, DeclContext* DC, TypeSourceInfo* TInfo, bool isParameter);
+  void TransferUnusualAttributes(Declarator& D, NamedDecl* NewDecl);
+  // HLSL Change Ends
 
   /// Nullability type specifiers.
   IdentifierInfo *Ident__Nonnull = nullptr;

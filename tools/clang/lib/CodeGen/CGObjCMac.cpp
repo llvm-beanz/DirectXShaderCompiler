@@ -1,15 +1,14 @@
 //===------- CGObjCMac.cpp - Interface to Apple Objective-C Runtime -------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides Objective-C code generation targeting the Apple runtime.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGObjCMac.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides Objective-C code generation targeting the Apple runtime.    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGObjCRuntime.h"
 #include "CGBlocks.h"
@@ -40,6 +39,12 @@
 
 using namespace clang;
 using namespace CodeGen;
+
+// HLSL Change Starts
+// No ObjC codegen support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 0
+// HLSL Change Ends
 
 namespace {
 
@@ -7052,3 +7057,5 @@ CodeGen::CreateMacObjCRuntime(CodeGen::CodeGenModule &CGM) {
   }
   llvm_unreachable("bad runtime");
 }
+
+#endif // HLSL Change

@@ -1,16 +1,15 @@
 //===- InstCombineSimplifyDemanded.cpp ------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains logic for simplifying instructions based on information
-// about how they are used.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InstCombineSimplifyDemanded.cpp                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains logic for simplifying instructions based on information//
+// about how they are used.                                                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "InstCombineInternal.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -768,9 +767,11 @@ Value *InstCombiner::SimplifyDemandedUseBits(Value *V, APInt DemandedMask,
         // TODO: Could compute known zero/one bits based on the input.
         break;
       }
+#if 0 // HLSL Change - remove platform intrinsics
       case Intrinsic::x86_sse42_crc32_64_64:
         KnownZero = APInt::getHighBitsSet(64, 32);
         return nullptr;
+#endif // HLSL Change - remove platform intrinsics
       }
     }
     computeKnownBits(V, KnownZero, KnownOne, Depth, CxtI);
@@ -1171,6 +1172,7 @@ Value *InstCombiner::SimplifyDemandedVectorElts(Value *V, APInt DemandedElts,
   case Instruction::Call: {
     IntrinsicInst *II = dyn_cast<IntrinsicInst>(I);
     if (!II) break;
+#if 0 // HLSL Change - remove platform intrinsics
     switch (II->getIntrinsicID()) {
     default: break;
 
@@ -1238,6 +1240,7 @@ Value *InstCombiner::SimplifyDemandedVectorElts(Value *V, APInt DemandedElts,
       UndefElts &= UndefElts2;
       break;
     }
+#endif // HLSL Change - remove platform intrinsics
     break;
   }
   }

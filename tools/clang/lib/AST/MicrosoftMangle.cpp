@@ -1,15 +1,14 @@
 //===--- MicrosoftMangle.cpp - Microsoft Visual C++ Name Mangling ---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides C++ name mangling targeting the Microsoft Visual C++ ABI.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MicrosoftMangle.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides C++ name mangling targeting the Microsoft Visual C++ ABI.   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/Mangle.h"
 #include "clang/AST/ASTContext.h"
@@ -1557,9 +1556,11 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
   case BuiltinType::Long: Out << 'J'; break;
   case BuiltinType::ULong: Out << 'K'; break;
   case BuiltinType::Float: Out << 'M'; break;
+  case BuiltinType::LitFloat: // HLSL Change
   case BuiltinType::Double: Out << 'N'; break;
   // TODO: Determine size and mangle accordingly
   case BuiltinType::LongDouble: Out << 'O'; break;
+  case BuiltinType::LitInt: // HLSL Change
   case BuiltinType::LongLong: Out << "_J"; break;
   case BuiltinType::ULongLong: Out << "_K"; break;
   case BuiltinType::Int128: Out << "_L"; break;
@@ -1591,16 +1592,17 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
   case BuiltinType::OCLEvent: Out << "PAUocl_event@@"; break;
 
   case BuiltinType::NullPtr: Out << "$$T"; break;
-
-  case BuiltinType::Half: {
-    DiagnosticsEngine &Diags = Context.getDiags();
-    unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
-      "cannot mangle this built-in %0 type yet");
-    Diags.Report(Range.getBegin(), DiagID)
-      << T->getName(Context.getASTContext().getPrintingPolicy())
-      << Range;
+  // HLSL Change Starts
+  case BuiltinType::Min10Float:
+    Out << "$min10f@";
     break;
-  }
+  case BuiltinType::Min12Int:
+    Out << "$min12i@";
+    break;
+  case BuiltinType::Half:
+    Out << "$f16@";
+    break;
+  // HLSL Change Ends
   }
 }
 

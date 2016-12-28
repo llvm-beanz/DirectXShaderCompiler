@@ -1,34 +1,33 @@
 //===-LTOCodeGenerator.h - LLVM Link Time Optimizer -----------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LTOCodeGenerator.h                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file declares the LTOCodeGenerator class.                            //
 //
-//                     The LLVM Compiler Infrastructure
+//   LTO compilation consists of three phases: Pre-IPO, IPO and Post-IPO.    //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+//   The Pre-IPO phase compiles source code into bitcode file. The resulting //
+// bitcode files, along with object files and libraries, will be fed to the  //
+// linker to through the IPO and Post-IPO phases. By using obj-file extension,//
+// the resulting bitcode file disguises itself as an object file, and therefore//
+// obviates the need of writing a special set of the make-rules only for LTO //
+// compilation.                                                              //
 //
-//===----------------------------------------------------------------------===//
+//   The IPO phase perform inter-procedural analyses and optimizations, and  //
+// the Post-IPO consists two sub-phases: intra-procedural scalar optimizations//
+// (SOPT), and intra-procedural target-dependent code generator (CG).        //
 //
-// This file declares the LTOCodeGenerator class.
+//   As of this writing, we don't separate IPO and the Post-IPO SOPT. They   //
+// are intermingled together, and are driven by a single pass manager (see   //
+// PassManagerBuilder::populateLTOPassManager()).                            //
 //
-//   LTO compilation consists of three phases: Pre-IPO, IPO and Post-IPO.
-//
-//   The Pre-IPO phase compiles source code into bitcode file. The resulting
-// bitcode files, along with object files and libraries, will be fed to the
-// linker to through the IPO and Post-IPO phases. By using obj-file extension,
-// the resulting bitcode file disguises itself as an object file, and therefore
-// obviates the need of writing a special set of the make-rules only for LTO
-// compilation.
-//
-//   The IPO phase perform inter-procedural analyses and optimizations, and
-// the Post-IPO consists two sub-phases: intra-procedural scalar optimizations
-// (SOPT), and intra-procedural target-dependent code generator (CG).
-//
-//   As of this writing, we don't separate IPO and the Post-IPO SOPT. They
-// are intermingled together, and are driven by a single pass manager (see
-// PassManagerBuilder::populateLTOPassManager()).
-//
-//   The "LTOCodeGenerator" is the driver for the IPO and Post-IPO stages.
-// The "CodeGenerator" here is bit confusing. Don't confuse the "CodeGenerator"
-// with the machine specific code generator.
+//   The "LTOCodeGenerator" is the driver for the IPO and Post-IPO stages.   //
+// The "CodeGenerator" here is bit confusing. Don't confuse the "CodeGenerator"//
+// with the machine specific code generator.                                 //
 //
 //===----------------------------------------------------------------------===//
 
@@ -54,8 +53,8 @@ namespace llvm {
   class TargetMachine;
   class raw_ostream;
   class raw_pwrite_stream;
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// C++ class which implements the opaque lto_code_gen_t type.
 ///
 struct LTOCodeGenerator {

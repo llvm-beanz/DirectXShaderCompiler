@@ -2,6 +2,9 @@
 ClangCheck
 ==========
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 `ClangCheck` is a small wrapper around :doc:`LibTooling` which can be used to
 do basic error checking and AST dumping.
 

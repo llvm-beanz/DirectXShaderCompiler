@@ -8,6 +8,9 @@ Building LLVM with CMake
 Introduction
 ============
 
+NOTE: this document describes the original LLVM project, not the DirectX
+Compiler. It's available only for informational purposes.
+
 `CMake <http://www.cmake.org/>`_ is a cross-platform build-generator tool. CMake
 does not build the project, it generates the files needed by your build tool
 (GNU make, Visual Studio, etc) for building LLVM.

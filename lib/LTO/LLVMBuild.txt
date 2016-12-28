@@ -1,11 +1,5 @@
-;===- ./lib/LTO/LLVMBuild.txt ----------------------------------*- Conf -*--===;
-;
-;                     The LLVM Compiler Infrastructure
-;
-; This file is distributed under the University of Illinois Open Source
-; License. See LICENSE.TXT for details.
-;
-;===------------------------------------------------------------------------===;
+; Copyright (C) Microsoft Corporation. All rights reserved.
+; Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 ;
 ; This is an LLVMBuild description file for the components in this subdirectory.
 ;
@@ -23,15 +17,13 @@ required_libraries =
  Analysis
  BitReader
  BitWriter
- CodeGen
  Core
  IPA
  IPO
  InstCombine
  Linker
- MC
- ObjCARC
- Object
  Scalar
  Support
  Target
+
+; CodeGen MC ObjCARC Object - HLSL Change

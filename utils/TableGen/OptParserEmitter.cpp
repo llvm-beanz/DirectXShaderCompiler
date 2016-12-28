@@ -1,11 +1,12 @@
 //===- OptParserEmitter.cpp - Table Driven Command Line Parsing -----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// OptParserEmitter.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/TableGen/Error.h"
 #include "llvm/ADT/STLExtras.h"
@@ -41,7 +42,8 @@ static int StrCmpOptionName(const char *A, const char *B) {
   return (a < b) ? -1 : 1;
 }
 
-static int CompareOptionRecords(Record *const *Av, Record *const *Bv) {
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl CompareOptionRecords(Record *const *Av, Record *const *Bv) {
   const Record *A = *Av;
   const Record *B = *Bv;
 

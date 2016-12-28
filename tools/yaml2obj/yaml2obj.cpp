@@ -1,18 +1,17 @@
 //===- yaml2obj - Convert YAML to a binary object file --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This program takes a YAML description of an object file and outputs the
-// binary equivalent.
-//
-// This is used for writing tests that require binary files.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// yaml2obj.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This program takes a YAML description of an object file and outputs the   //
+// binary equivalent.                                                        //
+//                                                                           //
+// This is used for writing tests that require binary files.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "yaml2obj.h"
 #include "llvm/ADT/StringExtras.h"
@@ -75,7 +74,8 @@ static int convertYAML(yaml::Input &YIn, raw_ostream &Out,
   return 1;
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);

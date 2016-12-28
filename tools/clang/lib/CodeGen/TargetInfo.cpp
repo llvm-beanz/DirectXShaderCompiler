@@ -1,16 +1,15 @@
 //===---- TargetInfo.cpp - Encapsulate target details -----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// These classes wrap the information about a call or function
-// definition used to handle ABI compliancy.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetInfo.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// These classes wrap the information about a call or function               //
+// definition used to handle ABI compliancy.                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "TargetInfo.h"
 #include "ABIInfo.h"
@@ -6168,6 +6167,84 @@ void AMDGPUTargetCodeGenInfo::setTargetAttributes(
   }
 }
 
+// HLSL Change Begins
+//===----------------------------------------------------------------------===//
+// MSDXIL ABI Implementation
+//===----------------------------------------------------------------------===//
+
+namespace {
+class MSDXILABIInfo : public ABIInfo {
+public:
+  MSDXILABIInfo(CodeGenTypes &CGT) : ABIInfo(CGT) {}
+
+  ABIArgInfo classifyReturnType(QualType RetTy) const {
+    if (RetTy->isVoidType())
+      return ABIArgInfo::getIgnore();
+    // do not create SRet for HLSL
+    return ABIArgInfo::getDirect(CGT.ConvertType(RetTy));
+  }
+
+  ABIArgInfo classifyArgumentType(QualType Ty) const;
+
+  void computeInfo(CGFunctionInfo &FI) const override;
+  llvm::Value *EmitVAArg(llvm::Value *VAListAddr, QualType Ty,
+                         CodeGenFunction &CFG) const override;
+};
+
+class MSDXILTargetCodeGenInfo : public TargetCodeGenInfo {
+public:
+  MSDXILTargetCodeGenInfo(CodeGenTypes &CGT)
+      : TargetCodeGenInfo(new MSDXILABIInfo(CGT)) {}
+
+  void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
+                           CodeGen::CodeGenModule &M) const override;
+
+private:
+};
+
+ABIArgInfo MSDXILABIInfo::classifyArgumentType(QualType Ty) const {
+  // Treat an enum type as its underlying type.
+  if (const EnumType *EnumTy = Ty->getAs<EnumType>())
+    Ty = EnumTy->getDecl()->getIntegerType();
+
+  // Return aggregates type as indirect by value
+  if (isAggregateTypeForABI(Ty))
+    return ABIArgInfo::getIndirect(0, /* byval */ true);
+
+  return (Ty->isPromotableIntegerType() ? ABIArgInfo::getExtend()
+                                        : ABIArgInfo::getDirect());
+}
+
+void MSDXILABIInfo::computeInfo(CGFunctionInfo &FI) const {
+  FI.getReturnInfo() = classifyReturnType(FI.getReturnType());
+  for (auto &I : FI.arguments()) {
+    I.info = classifyArgumentType(I.type);
+    // Do not flat matrix
+    if (hlsl::IsHLSLMatType(I.type))
+      I.info.setCanBeFlattened(false);
+  }
+  // TODO: set calling convention
+  // Every function call will be inlined for now.
+  FI.setEffectiveCallingConvention(getRuntimeCC());
+}
+
+llvm::Value *MSDXILABIInfo::EmitVAArg(llvm::Value *VAListAddr, QualType Ty,
+                                      CodeGenFunction &CFG) const {
+  // TODO: support vaarg
+  llvm_unreachable("Not support printf yet");
+}
+
+void MSDXILTargetCodeGenInfo::setTargetAttributes(
+    const Decl *D, llvm::GlobalValue *GV, CodeGen::CodeGenModule &M) const {
+  const FunctionDecl *FD = dyn_cast<FunctionDecl>(D);
+  if (!FD)
+    return;
+
+  // llvm::Function *F = cast<llvm::Function>(GV);
+  // TODO: add dxil attributes
+}
+}
+// HLSL Change Ends
 
 //===----------------------------------------------------------------------===//
 // SPARC v9 ABI Implementation.
@@ -6605,6 +6682,7 @@ llvm::Value *XCoreABIInfo::EmitVAArg(llvm::Value *VAListAddr, QualType Ty,
   switch (AI.getKind()) {
   case ABIArgInfo::Expand:
   case ABIArgInfo::InAlloca:
+  default: // HLSL Change - fix warning for uninitialized memory later on for unreachable cases
     llvm_unreachable("Unsupported ABI kind for va_arg");
   case ABIArgInfo::Ignore:
     Val = llvm::UndefValue::get(ArgPtrTy);
@@ -7238,5 +7316,10 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
     return *(TheTargetCodeGenInfo = new SparcV9TargetCodeGenInfo(Types));
   case llvm::Triple::xcore:
     return *(TheTargetCodeGenInfo = new XCoreTargetCodeGenInfo(Types));
+  // HLSL Change Begins
+  case llvm::Triple::dxil:
+  case llvm::Triple::dxil64:
+    return *(TheTargetCodeGenInfo = new MSDXILTargetCodeGenInfo(Types));
+  // HLSL Change Ends
   }
 }

@@ -1,15 +1,14 @@
 //===--- CGExpr.cpp - Emit LLVM Code from Expressions ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Expr nodes as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGExpr.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Expr nodes as LLVM code.                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCXXABI.h"
@@ -17,6 +16,7 @@
 #include "CGDebugInfo.h"
 #include "CGObjCRuntime.h"
 #include "CGOpenMPRuntime.h"
+#include "CGHLSLRuntime.h"    // HLSL Change
 #include "CGRecordLayout.h"
 #include "CodeGenModule.h"
 #include "TargetInfo.h"
@@ -911,6 +911,14 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitArraySubscriptExpr(cast<ArraySubscriptExpr>(E));
   case Expr::ExtVectorElementExprClass:
     return EmitExtVectorElementExpr(cast<ExtVectorElementExpr>(E));
+  // HLSL Change Starts
+  case Expr::ExtMatrixElementExprClass:
+    return EmitExtMatrixElementExpr(cast<ExtMatrixElementExpr>(E));
+  case Expr::HLSLVectorElementExprClass:
+    return EmitHLSLVectorElementExpr(cast<HLSLVectorElementExpr>(E));
+  case Expr::CXXThisExprClass:
+    return MakeAddrLValue(LoadCXXThis(), E->getType());
+  // HLSL Change Ends
   case Expr::MemberExprClass:
     return EmitMemberExpr(cast<MemberExpr>(E));
   case Expr::CompoundLiteralExprClass:
@@ -1169,6 +1177,13 @@ llvm::Value *CodeGenFunction::EmitLoadOfScalar(llvm::Value *Addr, bool Volatile,
     return EmitAtomicLoad(lvalue, Loc).getScalarVal();
   }
 
+  // HLSL Change Begins
+  if (hlsl::IsHLSLMatType(Ty)) {
+    // Use matrix load to keep major info.
+    return CGM.getHLSLRuntime().EmitHLSLMatrixLoad(*this, Addr, Ty);
+  }
+  // HLSL Change Ends
+
   llvm::LoadInst *Load = Builder.CreateLoad(Addr);
   if (Volatile)
     Load->setVolatile(true);
@@ -1291,6 +1306,15 @@ void CodeGenFunction::EmitStoreOfScalar(llvm::Value *Value, llvm::Value *Addr,
     return;
   }
 
+  // HLSL Change Begins
+  if (hlsl::IsHLSLMatType(Ty)) {
+    // Use matrix store to keep major info.
+    CGM.getHLSLRuntime().EmitHLSLMatrixStore(*this, Value, Addr, Ty);
+    return;
+  }
+  // HLSL Change Ends
+
+
   llvm::StoreInst *Store = Builder.CreateStore(Value, Addr, Volatile);
   if (Alignment)
     Store->setAlignment(Alignment);
@@ -1350,6 +1374,11 @@ RValue CodeGenFunction::EmitLoadOfLValue(LValue LV, SourceLocation Loc) {
   if (LV.isGlobalReg())
     return EmitLoadOfGlobalRegLValue(LV);
 
+  // HLSL Change Starts
+  if (LV.isExtMatrixElt())
+    return EmitLoadOfExtMatrixElementLValue(LV);
+  // HLSL Change Ends
+
   assert(LV.isBitField() && "Unknown LValue type!");
   return EmitLoadOfBitfieldLValue(LV);
 }
@@ -1399,6 +1428,11 @@ RValue CodeGenFunction::EmitLoadOfExtVectorElementLValue(LValue LV) {
   // If the result of the expression is a non-vector type, we must be extracting
   // a single element.  Just codegen as an extractelement.
   const VectorType *ExprVT = LV.getType()->getAs<VectorType>();
+  // HLSL Change Starts
+  if (ExprVT == nullptr && getContext().getLangOpts().HLSL)
+    ExprVT =
+        hlsl::ConvertHLSLVecMatTypeToExtVectorType(getContext(), LV.getType());
+  // HLSL Change Ends
   if (!ExprVT) {
     unsigned InIdx = getAccessedFieldNo(0, Elts);
     llvm::Value *Elt = llvm::ConstantInt::get(SizeTy, InIdx);
@@ -1461,6 +1495,13 @@ RValue CodeGenFunction::EmitLoadOfGlobalRegLValue(LValue LV) {
     Call = Builder.CreateIntToPtr(Call, OrigTy);
   return RValue::get(Call);
 }
+// HLSL Change Starts
+RValue CodeGenFunction::EmitLoadOfExtMatrixElementLValue(LValue LV) {
+  // TODO: Matrix swizzle members - emit
+  return RValue();
+}
+// HLSL Change Ends
+
 
 
 /// EmitStoreThroughLValue - Store the specified rvalue into the specified
@@ -1639,8 +1680,13 @@ void CodeGenFunction::EmitStoreThroughExtVectorComponentLValue(RValue Src,
   const llvm::Constant *Elts = Dst.getExtVectorElts();
 
   llvm::Value *SrcVal = Src.getScalarVal();
-
-  if (const VectorType *VTy = Dst.getType()->getAs<VectorType>()) {
+  // HLSL Change Starts
+  const VectorType *VTy = Dst.getType()->getAs<VectorType>();
+  if (VTy == nullptr && getContext().getLangOpts().HLSL)
+    VTy =
+        hlsl::ConvertHLSLVecMatTypeToExtVectorType(getContext(), Dst.getType());
+  // HLSL Change Ends
+  if (VTy) {  // HLSL Change
     unsigned NumSrcElts = VTy->getNumElements();
     unsigned NumDstElts =
        cast<llvm::VectorType>(Vec->getType())->getNumElements();
@@ -1850,6 +1896,12 @@ static LValue EmitGlobalVarDeclLValue(CodeGenFunction &CGF,
       CGF.CGM.getCXXABI().usesThreadWrapperFunction())
     return CGF.CGM.getCXXABI().EmitThreadLocalVarDeclLValue(CGF, VD, T);
 
+  // HLSL Change Begins.
+  if (VD->getType()->isIncompleteArrayType() && CGF.getLangOpts().HLSL) {
+    T = CGF.CGM.getHLSLRuntime().UpdateHLSLIncompleteArrayType(const_cast<VarDecl&>(*VD));
+  }
+  // HLSL Change Ends.
+
   llvm::Value *V = CGF.CGM.GetAddrOfGlobalVar(VD);
   llvm::Type *RealVarTy = CGF.getTypes().ConvertTypeForMem(VD->getType());
   V = EmitBitCastOfLValueToProperType(CGF, V, RealVarTy);
@@ -2003,6 +2055,14 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
       V = BuildBlockByrefAddress(V, VD);
 
     LValue LV;
+    // HLSL Change Begins
+    if (getLangOpts().HLSL) {
+      // In hlsl, the referent type is for out parameter.
+      // No pointer of pointer temp alloca created for it.
+      // So always use V directly.
+      LV = MakeAddrLValue(V, T, Alignment);
+    } else
+    // HLSL Change Ends
     if (VD->getType()->isReferenceType()) {
       llvm::LoadInst *LI = Builder.CreateLoad(V);
       LI->setAlignment(Alignment.getQuantity());
@@ -2467,6 +2527,12 @@ LValue CodeGenFunction::EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
   if (Idx->getType() != IntPtrTy)
     Idx = Builder.CreateIntCast(Idx, IntPtrTy, IdxSigned, "idxprom");
 
+  // HLSL Change Starts
+  const Expr *Array = isSimpleArrayDecayOperand(E->getBase());
+  assert((!getLangOpts().HLSL || nullptr == Array) &&
+         "else array decay snuck in AST for HLSL");
+  // HLSL Change Ends
+
   // We know that the pointer points to a type of the correct size, unless the
   // size is a VLA or Objective-C interface.
   llvm::Value *Address = nullptr;
@@ -2514,7 +2580,7 @@ LValue CodeGenFunction::EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
     Address = EmitCastToVoidPtr(Base);
     Address = Builder.CreateGEP(Address, Idx, "arrayidx");
     Address = Builder.CreateBitCast(Address, Base->getType());
-  } else if (const Expr *Array = isSimpleArrayDecayOperand(E->getBase())) {
+  } else if (!getLangOpts().HLSL && Array) { // HLSL Change - No Array to pointer decay for HLSL
     // If this is A[i] where A is an array, the frontend will have decayed the
     // base to be a ArrayToPointerDecay implicit cast.  While correct, it is
     // inefficient at -O0 to emit a "gep A, 0, 0" when codegen'ing it, then a
@@ -2540,15 +2606,46 @@ LValue CodeGenFunction::EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
     else
       Address = Builder.CreateInBoundsGEP(ArrayPtr, Args, "arrayidx");
   } else {
-    // The base must be a pointer, which is not an aggregate.  Emit it.
-    llvm::Value *Base = EmitScalarExpr(E->getBase());
-    if (getLangOpts().isSignedOverflowDefined())
-      Address = Builder.CreateGEP(Base, Idx, "arrayidx");
-    else
-      Address = Builder.CreateInBoundsGEP(Base, Idx, "arrayidx");
+    // HLSL Change Starts
+    const ArrayType *AT = dyn_cast<ArrayType>(E->getBase()->getType()->getCanonicalTypeUnqualified());
+    if (getContext().getLangOpts().HLSL && AT) {
+      LValue ArrayLV;
+      // For simple multidimensional array indexing, set the 'accessed' flag for
+      // better bounds-checking of the base expression.
+      if (const auto *ASE = dyn_cast<ArraySubscriptExpr>(E->getBase()))
+        ArrayLV = EmitArraySubscriptExpr(ASE, /*Accessed*/ true);
+      else
+        ArrayLV = EmitLValue(E->getBase());
+      llvm::Value *ArrayPtr = ArrayLV.getAddress();
+
+      llvm::Value *Zero = llvm::ConstantInt::get(Int32Ty, 0);
+      llvm::Value *Args[] = { Zero, Idx };
+
+      // Propagate the alignment from the array itself to the result.
+      ArrayAlignment = ArrayLV.getAlignment();
+
+      if (getLangOpts().isSignedOverflowDefined())
+        Address = Builder.CreateGEP(ArrayPtr, Args, "arrayidx");
+      else
+        Address = Builder.CreateInBoundsGEP(ArrayPtr, Args, "arrayidx");
+
+    } else {
+      // HLSL Change Ends
+      // The base must be a pointer, which is not an aggregate.  Emit it.
+      llvm::Value *Base = EmitScalarExpr(E->getBase());
+      if (getLangOpts().isSignedOverflowDefined())
+        Address = Builder.CreateGEP(Base, Idx, "arrayidx");
+      else
+        Address = Builder.CreateInBoundsGEP(Base, Idx, "arrayidx");
+    } // HLSL Change 
   }
 
   QualType T = E->getBase()->getType()->getPointeeType();
+  // HLSL Change Starts
+  if (getContext().getLangOpts().HLSL && T.isNull()) {
+    T = QualType(E->getBase()->getType()->getArrayElementTypeNoTypeQual(), 0);
+  }
+  // HLSL Change Ends
   assert(!T.isNull() &&
          "CodeGenFunction::EmitArraySubscriptExpr(): Illegal base type");
 
@@ -2636,6 +2733,121 @@ EmitExtVectorElementExpr(const ExtVectorElementExpr *E) {
   return LValue::MakeExtVectorElt(Base.getExtVectorAddr(), CV, type,
                                   Base.getAlignment());
 }
+
+// HLSL Change Starts
+LValue
+CodeGenFunction::EmitExtMatrixElementExpr(const ExtMatrixElementExpr *E) {
+  LValue Base;
+
+  assert(!E->isArrow() && "ExtMatrixElementExpr's base will not be Arrow");
+  if (E->getBase()->isGLValue()) {
+    // if the base is an lvalue ( as in the case of foo.x.x),
+    // emit the base as an lvalue.
+    const Expr *base = E->getBase();
+
+    assert(hlsl::IsHLSLMatType(base->getType()));
+    Base = EmitLValue(base);
+  } else {
+    // Otherwise, the base is a normal rvalue (as in (V+V).x), emit it as such.
+    assert(hlsl::IsHLSLMatType(E->getBase()->getType()) &&
+           "Result must be a vector");
+    llvm::Value *Vec = EmitScalarExpr(E->getBase());
+
+    // Store the vector to memory (because LValue wants an address).
+    llvm::Value *VecMem = CreateMemTemp(E->getBase()->getType());
+    Builder.CreateStore(Vec, VecMem);
+    Base = MakeAddrLValue(VecMem, E->getBase()->getType());
+  }
+  
+  // Encode the element access list into a vector of unsigned indices.
+  SmallVector<unsigned, 4> Indices;
+  E->getEncodedElementAccess(Indices);
+
+  llvm::Type *ResultTy =
+      ConvertType(getContext().getLValueReferenceType(E->getType()));
+
+  llvm::Value *matBase = nullptr;
+  llvm::Constant *CV = nullptr;
+
+  if (Base.isSimple()) {
+    SmallVector<llvm::Constant *, 4> CElts;
+    for (unsigned i = 0, e = Indices.size(); i != e; ++i)
+      CElts.push_back(Builder.getInt32(Indices[i]));
+
+    CV = llvm::ConstantVector::get(CElts);
+    matBase = Base.getAddress();
+  } else {
+    assert(Base.isExtVectorElt() && "Can only subscript lvalue vec elts here!");
+
+    llvm::Constant *BaseElts = Base.getExtVectorElts();
+    SmallVector<llvm::Constant *, 4> CElts;
+
+    for (unsigned i = 0, e = Indices.size(); i != e; ++i)
+      CElts.push_back(BaseElts->getAggregateElement(Indices[i]));
+
+    CV = llvm::ConstantVector::get(CElts);
+    matBase = Base.getExtVectorAddr();
+  }
+
+  llvm::Value *Result = CGM.getHLSLRuntime().EmitHLSLMatrixElement(
+      *this, ResultTy, {matBase, CV}, E->getBase()->getType());
+  return MakeAddrLValue(Result, E->getType());
+}
+LValue
+CodeGenFunction::EmitHLSLVectorElementExpr(const HLSLVectorElementExpr *E) {
+  // Emit the base vector as an l-value.
+  // Clone EmitExtVectorElementExpr for now
+  // TODO: difference between ExtVector and HlslVector
+  LValue Base;
+
+  // ExtVectorElementExpr's base can either be a vector or pointer to vector.
+  if (E->isArrow()) {
+    // If it is a pointer to a vector, emit the address and form an lvalue with
+    // it.
+    assert(!getLangOpts().HLSL && "this will not happen for hlsl");
+  } else if (E->getBase()->isGLValue()) {
+    // Otherwise, if the base is an lvalue ( as in the case of foo.x.x),
+    // emit the base as an lvalue.
+    const Expr *base = E->getBase();
+
+    assert(hlsl::IsHLSLVecType(base->getType()));
+    Base = EmitLValue(base);
+  } else {
+    // Otherwise, the base is a normal rvalue (as in (V+V).x), emit it as such.
+    assert(hlsl::IsHLSLVecType(E->getBase()->getType()) &&
+           "Result must be a vector");
+    llvm::Value *Vec = EmitScalarExpr(E->getBase());
+
+    // Store the vector to memory (because LValue wants an address).
+    llvm::Value *VecMem = CreateMemTemp(E->getBase()->getType());
+    Builder.CreateStore(Vec, VecMem);
+    Base = MakeAddrLValue(VecMem, E->getBase()->getType());
+  }
+
+  QualType type =
+      E->getType().withCVRQualifiers(Base.getQuals().getCVRQualifiers());
+
+  // Encode the element access list into a vector of unsigned indices.
+  SmallVector<unsigned, 4> Indices;
+  E->getEncodedElementAccess(Indices);
+
+  if (Base.isSimple()) {
+    llvm::Constant *CV = GenerateConstantVector(Builder, Indices);
+    return LValue::MakeExtVectorElt(Base.getAddress(), CV, type,
+                                    Base.getAlignment());
+  }
+  assert(Base.isExtVectorElt() && "Can only subscript lvalue vec elts here!");
+
+  llvm::Constant *BaseElts = Base.getExtVectorElts();
+  SmallVector<llvm::Constant *, 4> CElts;
+
+  for (unsigned i = 0, e = Indices.size(); i != e; ++i)
+    CElts.push_back(BaseElts->getAggregateElement(Indices[i]));
+  llvm::Constant *CV = llvm::ConstantVector::get(CElts);
+  return LValue::MakeExtVectorElt(Base.getExtVectorAddr(), CV, type,
+                                  Base.getAlignment());
+}
+// HLSL Change Ends
 
 LValue CodeGenFunction::EmitMemberExpr(const MemberExpr *E) {
   Expr *BaseExpr = E->getBase();
@@ -2943,6 +3155,19 @@ EmitConditionalOperatorLValue(const AbstractConditionalOperator *expr) {
 /// are permitted with aggregate result, including noop aggregate casts, and
 /// cast from scalar to union.
 LValue CodeGenFunction::EmitCastLValue(const CastExpr *E) {
+  // HLSL Change Begins
+  if (hlsl::IsHLSLMatType(E->getType()) || hlsl::IsHLSLMatType(E->getSubExpr()->getType())) {
+    LValue LV = EmitLValue(E->getSubExpr());
+    QualType ToType = getContext().getLValueReferenceType(E->getType());
+
+    llvm::Type *RetTy = ConvertType(ToType);
+    // type not changed, LValueToRValue, CStyleCast may go this path
+    if (LV.getAddress()->getType() == RetTy)
+      return LV;
+    llvm::Value *cast = CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(*this, E, RetTy, { LV.getAddress() });
+    return MakeAddrLValue(cast, ToType);
+  }
+  // HLSL Change Ends
   switch (E->getCastKind()) {
   case CK_ToVoid:
   case CK_BitCast:
@@ -3072,6 +3297,55 @@ LValue CodeGenFunction::EmitCastLValue(const CastExpr *E) {
                                            ConvertType(ToType));
     return MakeAddrLValue(V, E->getType());
   }
+  // HLSL Change Starts
+  case CK_HLSLVectorSplat: {
+    LValue LV = EmitLValue(E->getSubExpr());
+    llvm::Value *LVal = nullptr;
+    if (LV.isSimple())
+      LVal = LV.getAddress();
+    else if (LV.isExtVectorElt()) {
+      llvm::Constant *VecElts = LV.getExtVectorElts();
+      LVal = Builder.CreateGEP(
+          LV.getExtVectorAddr(),
+          {Builder.getInt32(0), VecElts->getAggregateElement((unsigned)0)});
+    } else
+      // TODO: make sure all cases are supported.
+      assert(0 && "not implement cases");
+
+    QualType ToType = getContext().getLValueReferenceType(E->getType());
+
+    // bitcast to target type
+    llvm::Type *ResultType = ConvertType(ToType);
+    llvm::Value *bitcast = Builder.CreateBitCast(LVal, ResultType);
+    return MakeAddrLValue(bitcast, ToType);
+  }
+  case CK_HLSLVectorTruncationCast: {
+    LValue LV = EmitLValue(E->getSubExpr());
+    QualType ToType = getContext().getLValueReferenceType(E->getType());
+
+    // bitcast to target type
+    llvm::Type *ResultType = ConvertType(ToType);
+    llvm::Value *bitcast = Builder.CreateBitCast(LV.getAddress(), ResultType);
+    return MakeAddrLValue(bitcast, ToType);
+  }
+  case CK_HLSLVectorToScalarCast: {
+    LValue LV = EmitLValue(E->getSubExpr());
+    QualType ToType = getContext().getLValueReferenceType(E->getType());
+    llvm::ConstantInt *idxZero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(getLLVMContext()), 0);
+    llvm::Value *GEP = Builder.CreateInBoundsGEP(LV.getAddress(), {idxZero, idxZero});
+    return MakeAddrLValue(GEP, ToType);
+  } break;
+  case CK_HLSLCC_IntegralToFloating:
+  case CK_HLSLCC_FloatingToIntegral: {
+    LValue LV = EmitLValue(E->getSubExpr());
+    QualType ToType = getContext().getLValueReferenceType(E->getType());
+
+    // bitcast to target type
+    llvm::Type *ResultType = ConvertType(ToType);
+    llvm::Value *bitcast = Builder.CreateBitCast(LV.getAddress(), ResultType);
+    return MakeAddrLValue(bitcast, ToType);
+  }
+  // HLSL Change Ends
   case CK_ZeroToOCLEvent:
     llvm_unreachable("NULL to OpenCL event lvalue cast is not valid");
   }
@@ -3120,6 +3394,16 @@ RValue CodeGenFunction::EmitCallExpr(const CallExpr *E,
   if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(TargetDecl)) {
     if (unsigned builtinID = FD->getBuiltinID())
       return EmitBuiltinExpr(FD, builtinID, E, ReturnValue);
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      if (const NamespaceDecl *ns = dyn_cast<NamespaceDecl>(FD->getParent())) {
+        if (ns->getName() == "hlsl") {
+          // do hlsl intrinsic generation
+          return EmitHLSLBuiltinCallExpr(FD, E, ReturnValue);
+        }
+      }
+    }
+    // HLSL Change End
   }
 
   if (const auto *CE = dyn_cast<CXXOperatorCallExpr>(E))
@@ -3408,12 +3692,30 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, llvm::Value *Callee,
     }
   }
 
+  // HLSL Change Begins
+  llvm::SmallVector<LValue, 8> castArgList;
+  // The argList of the CallExpr, may be update for out parameter
+  llvm::SmallVector<const Stmt *, 8> argList(E->arg_begin(), E->arg_end());
+  ConstExprIterator argBegin = argList.data();
+  ConstExprIterator argEnd = argList.data() + E->getNumArgs();
+  // out param conversion
+  CodeGenFunction::HLSLOutParamScope OutParamScope(*this);
+  auto MapTemp = [&](const VarDecl *LocalVD, llvm::Value *TmpArg) {
+      OutParamScope.addTemp(LocalVD, TmpArg);
+  };
+  if (getLangOpts().HLSL) {
+    if (const FunctionDecl *FD = E->getDirectCallee())
+      CGM.getHLSLRuntime().EmitHLSLOutParamConversionInit(*this, FD, E,
+                                                          castArgList, argList, MapTemp);
+  }
+  // HLSL Change Ends
+
   CallArgList Args;
   if (Chain)
     Args.add(RValue::get(Builder.CreateBitCast(Chain, CGM.VoidPtrTy)),
              CGM.getContext().VoidPtrTy);
-  EmitCallArgs(Args, dyn_cast<FunctionProtoType>(FnType), E->arg_begin(),
-               E->arg_end(), E->getDirectCallee(), /*ParamsToSkip*/ 0);
+  EmitCallArgs(Args, dyn_cast<FunctionProtoType>(FnType), argBegin, argEnd,  // HLSL Change - use updated argList
+               E->getDirectCallee(), /*ParamsToSkip*/ 0);
 
   const CGFunctionInfo &FnInfo = CGM.getTypes().arrangeFreeFunctionCall(
       Args, FnType, /*isChainCall=*/Chain);
@@ -3443,8 +3745,16 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, llvm::Value *Callee,
     CalleeTy = CalleeTy->getPointerTo();
     Callee = Builder.CreateBitCast(Callee, CalleeTy, "callee.knr.cast");
   }
+  RValue CallVal = EmitCall(FnInfo, Callee, ReturnValue, Args, TargetDecl);
 
-  return EmitCall(FnInfo, Callee, ReturnValue, Args, TargetDecl);
+  // HLSL Change Begins
+  // out param conversion
+  // conversion and copy back after the call
+  if (getLangOpts().HLSL)
+    CGM.getHLSLRuntime().EmitHLSLOutParamConversionCopyBack(*this, castArgList);
+  // HLSL Change Ends
+
+  return CallVal;
 }
 
 LValue CodeGenFunction::

@@ -1,18 +1,17 @@
 //===------- CGObjCGNU.cpp - Emit LLVM Code from ASTs for a Module --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides Objective-C code generation targeting the GNU runtime.  The
-// class in this file generates structures used by the GNU Objective-C runtime
-// library.  These structures are defined in objc/objc.h and objc/objc-api.h in
-// the GNU runtime distribution.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGObjCGNU.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides Objective-C code generation targeting the GNU runtime.  The //
+// class in this file generates structures used by the GNU Objective-C runtime//
+// library.  These structures are defined in objc/objc.h and objc/objc-api.h in//
+// the GNU runtime distribution.                                             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGObjCRuntime.h"
 #include "CGCleanup.h"
@@ -39,6 +38,11 @@
 using namespace clang;
 using namespace CodeGen;
 
+// HLSL Change Starts
+// No ObjC codegen support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 0
+// HLSL Change Ends
 
 namespace {
 /// Class that lazily initialises the runtime function.  Avoids inserting the
@@ -2849,3 +2853,5 @@ clang::CodeGen::CreateGNUObjCRuntime(CodeGenModule &CGM) {
   }
   llvm_unreachable("bad runtime");
 }
+
+#endif // HLSL Change

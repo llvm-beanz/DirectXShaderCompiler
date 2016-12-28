@@ -1,17 +1,12 @@
 /*===-- clang-c/CXCompilationDatabase.h - Compilation database  ---*- C -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header provides a public inferface to use CompilationDatabase without *|
-|* the full Clang C++ API.                                                    *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXCompilationDatabase.h                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_C_CXCOMPILATIONDATABASE_H
 #define LLVM_CLANG_C_CXCOMPILATIONDATABASE_H
 

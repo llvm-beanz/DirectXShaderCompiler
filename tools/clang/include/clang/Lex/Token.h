@@ -1,15 +1,14 @@
 //===--- Token.h - Token interface ------------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Token.h                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Token interface.                                   //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Token interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LEX_TOKEN_H
 #define LLVM_CLANG_LEX_TOKEN_H
@@ -291,6 +290,30 @@ public:
 
   /// Returns true if this token contains a universal character name.
   bool hasUCN() const { return (Flags & HasUCN) ? true : false; }
+  
+  // HLSL Change Starts
+  bool isHLSLReserved() const {
+    return
+      is(tok::kw___is_signed) ||
+      is(tok::kw___declspec) ||
+      is(tok::kw___forceinline) ||
+      is(tok::kw_auto) ||
+      is(tok::kw_catch) || is(tok::kw_const_cast) ||
+      is(tok::kw_delete) || is(tok::kw_dynamic_cast) ||
+      is(tok::kw_enum) || is(tok::kw_explicit) ||
+      is(tok::kw_friend) ||
+      is(tok::kw_goto) ||
+      is(tok::kw_mutable) ||
+      is(tok::kw_new) ||
+      is(tok::kw_operator) ||
+      is(tok::kw_protected) || is(tok::kw_private) || is(tok::kw_public) ||
+      is(tok::kw_reinterpret_cast) ||
+      is(tok::kw_signed) || is(tok::kw_sizeof) || is(tok::kw_static_cast) ||
+      is(tok::kw_template) || is(tok::kw_throw) || is(tok::kw_try) || is(tok::kw_typename) ||
+      is(tok::kw_union) || is(tok::kw_using) ||
+      is(tok::kw_virtual);
+  }
+  // HLSL Change Starts  
 
   /// Returns true if this token is formed by macro by stringizing or charizing
   /// operator.

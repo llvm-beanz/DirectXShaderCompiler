@@ -1,16 +1,15 @@
 //===- llvm/ADT/STLExtras.h - Useful STL related functions ------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// STLExtras.h                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains some templates that are useful if you are working with the//
+// STL at all.                                                               //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains some templates that are useful if you are working with the
-// STL at all.
-//
-// No library is required when using these functions.
+// No library is required when using these functions.                        //
 //
 //===----------------------------------------------------------------------===//
 
@@ -249,8 +248,9 @@ LLVM_CONSTEXPR inline size_t array_lengthof(T (&)[N]) {
 }
 
 /// Adapt std::less<T> for array_pod_sort.
+// HLSL Change: changed calling convention to __cdecl
 template<typename T>
-inline int array_pod_sort_comparator(const void *P1, const void *P2) {
+inline int __cdecl array_pod_sort_comparator(const void *P1, const void *P2) {
   if (std::less<T>()(*reinterpret_cast<const T*>(P1),
                      *reinterpret_cast<const T*>(P2)))
     return -1;
@@ -262,9 +262,13 @@ inline int array_pod_sort_comparator(const void *P1, const void *P2) {
 
 /// get_array_pod_sort_comparator - This is an internal helper function used to
 /// get type deduction of T right.
+//
+// HLSL Change: changed calling convention to __cdecl
+// HLSL Change: pulled this out into a typdef to make it easier to make change
+typedef int(__cdecl *llvm_cmp_func)(const void *, const void *);
+
 template<typename T>
-inline int (*get_array_pod_sort_comparator(const T &))
-             (const void*, const void*) {
+inline llvm_cmp_func get_array_pod_sort_comparator(const T &) {
   return array_pod_sort_comparator<T>;
 }
 
@@ -292,10 +296,11 @@ inline void array_pod_sort(IteratorTy Start, IteratorTy End) {
   qsort(&*Start, NElts, sizeof(*Start), get_array_pod_sort_comparator(*Start));
 }
 
+// HLSL Change: changed calling convention of Compare to __cdecl
 template <class IteratorTy>
 inline void array_pod_sort(
     IteratorTy Start, IteratorTy End,
-    int (*Compare)(
+    int (__cdecl *Compare)(
         const typename std::iterator_traits<IteratorTy>::value_type *,
         const typename std::iterator_traits<IteratorTy>::value_type *)) {
   // Don't inefficiently call qsort with one element or trigger undefined
@@ -303,7 +308,7 @@ inline void array_pod_sort(
   auto NElts = End - Start;
   if (NElts <= 1) return;
   qsort(&*Start, NElts, sizeof(*Start),
-        reinterpret_cast<int (*)(const void *, const void *)>(Compare));
+        reinterpret_cast<int (__cdecl *)(const void *, const void *)>(Compare));  // HLSL Change - __cdecl
 }
 
 //===----------------------------------------------------------------------===//
@@ -338,7 +343,8 @@ bool all_of(R &&Range, UnaryPredicate &&P) {
 
 //===----------------------------------------------------------------------===//
 //     Extra additions to <memory>
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 // Implement make_unique according to N3656.
 

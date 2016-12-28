@@ -1,11 +1,12 @@
 //===- MemoryLocation.cpp - Memory location descriptions -------------------==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MemoryLocation.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -117,6 +118,7 @@ MemoryLocation MemoryLocation::getForArgument(ImmutableCallSite CS,
   // We may be able to produce an exact size for known intrinsics.
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(CS.getInstruction())) {
     const DataLayout &DL = II->getModule()->getDataLayout();
+    (void)DL; // HLSL Change - unreferenced local variable
 
     switch (II->getIntrinsicID()) {
     default:
@@ -142,6 +144,7 @@ MemoryLocation MemoryLocation::getForArgument(ImmutableCallSite CS,
       return MemoryLocation(
           Arg, cast<ConstantInt>(II->getArgOperand(1))->getZExtValue(), AATags);
 
+#if 0 // HLSL Change - remove platform intrinsics
     case Intrinsic::arm_neon_vld1:
       assert(ArgIdx == 0 && "Invalid argument index");
       // LLVM's vld1 and vst1 intrinsics currently only support a single
@@ -152,6 +155,7 @@ MemoryLocation MemoryLocation::getForArgument(ImmutableCallSite CS,
       assert(ArgIdx == 0 && "Invalid argument index");
       return MemoryLocation(
           Arg, DL.getTypeStoreSize(II->getArgOperand(1)->getType()), AATags);
+#endif // HLSL Change - remove platform intrinsics
     }
   }
 

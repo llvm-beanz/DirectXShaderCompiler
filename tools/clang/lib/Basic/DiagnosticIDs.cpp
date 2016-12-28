@@ -1,15 +1,14 @@
 //===--- DiagnosticIDs.cpp - Diagnostic IDs Handling ----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the Diagnostic IDs-related interfaces.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DiagnosticIDs.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the Diagnostic IDs-related interfaces.              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/DiagnosticIDs.h"
 #include "clang/Basic/AllDiagnostics.h"
@@ -91,7 +90,7 @@ static const StaticDiagInfoRec StaticDiagInfo[] = {
 #undef DIAG
 };
 
-static const unsigned StaticDiagInfoSize = llvm::array_lengthof(StaticDiagInfo);
+static const unsigned StaticDiagInfoSize = _countof(StaticDiagInfo); // HLSL Change - SAL doesn't understand llvm::array_lengthof(StaticDiagInfo);
 
 /// GetDiagInfo - Return the StaticDiagInfoRec entry for the specified DiagID,
 /// or null if the ID is invalid.

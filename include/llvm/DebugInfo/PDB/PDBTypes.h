@@ -1,11 +1,12 @@
 //===- PDBTypes.h - Defines enums for various fields contained in PDB ---*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PDBTypes.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_DEBUGINFO_PDB_PDBTYPES_H
 #define LLVM_DEBUGINFO_PDB_PDBTYPES_H
@@ -334,6 +335,12 @@ enum class PDB_ThunkOrdinal {
 /// These values correspond to the UdtKind enumeration, and are documented
 /// here: https://msdn.microsoft.com/en-us/library/wcstk66t.aspx
 enum class PDB_UdtType { Struct, Class, Union, Interface };
+
+// HLSL Change Starts - undef FPO if defined
+#ifdef FPO
+#undef FPO
+#endif
+// HLSL Change Ends
 
 /// These values correspond to the StackFrameTypeEnum enumeration, and are
 /// documented here: https://msdn.microsoft.com/en-us/library/bc5207xw.aspx.

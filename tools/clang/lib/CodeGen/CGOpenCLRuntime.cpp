@@ -1,17 +1,16 @@
 //===----- CGOpenCLRuntime.cpp - Interface to OpenCL Runtimes -------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides an abstract class for OpenCL code generation.  Concrete
-// subclasses of this implement code generation for specific OpenCL
-// runtime libraries.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGOpenCLRuntime.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides an abstract class for OpenCL code generation.  Concrete     //
+// subclasses of this implement code generation for specific OpenCL          //
+// runtime libraries.                                                        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGOpenCLRuntime.h"
 #include "CodeGenFunction.h"
@@ -21,6 +20,12 @@
 
 using namespace clang;
 using namespace CodeGen;
+
+// HLSL Change Starts
+// No OpenCL codegen support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 0
+// HLSL Change Ends
 
 CGOpenCLRuntime::~CGOpenCLRuntime() {}
 
@@ -65,3 +70,5 @@ llvm::Type *CGOpenCLRuntime::convertOpenCLSpecificType(const Type *T) {
                            Ctx, "opencl.event_t"), 0);
   }
 }
+
+#endif // HLSL Change

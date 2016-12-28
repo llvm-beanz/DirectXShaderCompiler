@@ -1,23 +1,22 @@
 //===-- ExternalFunctions.cpp - Implement External Functions --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file contains both code to deal with invoking "external" functions, but
-//  also contains code that implements "exported" external functions.
-//
-//  There are currently two mechanisms for handling external functions in the
-//  Interpreter.  The first is to implement lle_* wrapper functions that are
-//  specific to well-known library functions which manually translate the
-//  arguments from GenericValues and make the call.  If such a wrapper does
-//  not exist, and libffi is available, then the Interpreter will attempt to
-//  invoke the function using libffi, after finding its address.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExternalFunctions.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file contains both code to deal with invoking "external" functions, but//
+//  also contains code that implements "exported" external functions.        //
+//                                                                           //
+//  There are currently two mechanisms for handling external functions in the//
+//  Interpreter.  The first is to implement lle_* wrapper functions that are //
+//  specific to well-known library functions which manually translate the    //
+//  arguments from GenericValues and make the call.  If such a wrapper does  //
+//  not exist, and libffi is available, then the Interpreter will attempt to //
+//  invoke the function using libffi, after finding its address.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Interpreter.h"
 #include "llvm/Config/config.h"     // Detect libffi
@@ -326,6 +325,7 @@ static GenericValue lle_X_sprintf(FunctionType *FT,
   char *OutputBuffer = (char *)GVTOP(Args[0]);
   const char *FmtStr = (const char *)GVTOP(Args[1]);
   unsigned ArgNo = 2;
+  const size_t dummy_length_to_trick_oacr = 1000;
 
   // printf should return # chars printed.  This is completely incorrect, but
   // close enough for now.
@@ -335,10 +335,12 @@ static GenericValue lle_X_sprintf(FunctionType *FT,
     switch (*FmtStr) {
     case 0: return GV;             // Null terminator...
     default:                       // Normal nonspecial character
-      sprintf(OutputBuffer++, "%c", *FmtStr++);
+      //sprintf(OutputBuffer++, "%c", *FmtStr++);
+	  sprintf_s(OutputBuffer++, dummy_length_to_trick_oacr, "%c", *FmtStr++);
       break;
     case '\\': {                   // Handle escape codes
-      sprintf(OutputBuffer, "%c%c", *FmtStr, *(FmtStr+1));
+      //sprintf(OutputBuffer, "%c%c", *FmtStr, *(FmtStr + 1));
+  	  sprintf_s(OutputBuffer, dummy_length_to_trick_oacr, "%c%c", *FmtStr, *(FmtStr + 1));
       FmtStr += 2; OutputBuffer += 2;
       break;
     }
@@ -361,7 +363,8 @@ static GenericValue lle_X_sprintf(FunctionType *FT,
       case '%':
         memcpy(Buffer, "%", 2); break;
       case 'c':
-        sprintf(Buffer, FmtBuf, uint32_t(Args[ArgNo++].IntVal.getZExtValue()));
+        //sprintf(Buffer, FmtBuf, uint32_t(Args[ArgNo++].IntVal.getZExtValue()));
+        sprintf_s(Buffer, _countof(Buffer), FmtBuf, uint32_t(Args[ArgNo++].IntVal.getZExtValue()));
         break;
       case 'd': case 'i':
       case 'u': case 'o':
@@ -377,16 +380,21 @@ static GenericValue lle_X_sprintf(FunctionType *FT,
             FmtBuf[Size+1] = 0;
             FmtBuf[Size-1] = 'l';
           }
-          sprintf(Buffer, FmtBuf, Args[ArgNo++].IntVal.getZExtValue());
+          //sprintf(Buffer, FmtBuf, Args[ArgNo++].IntVal.getZExtValue());
+          sprintf_s(Buffer, _countof(Buffer), FmtBuf, Args[ArgNo++].IntVal.getZExtValue());
         } else
-          sprintf(Buffer, FmtBuf,uint32_t(Args[ArgNo++].IntVal.getZExtValue()));
+        // sprintf(Buffer, FmtBuf, uint32_t(Args[ArgNo++].IntVal.getZExtValue()));
+  		sprintf_s(Buffer, _countof(Buffer), FmtBuf, uint32_t(Args[ArgNo++].IntVal.getZExtValue()));
         break;
       case 'e': case 'E': case 'g': case 'G': case 'f':
-        sprintf(Buffer, FmtBuf, Args[ArgNo++].DoubleVal); break;
+		  //sprintf(Buffer, FmtBuf, Args[ArgNo++].DoubleVal); break;
+		  sprintf_s(Buffer, _countof(Buffer), FmtBuf, Args[ArgNo++].DoubleVal); break;
       case 'p':
-        sprintf(Buffer, FmtBuf, (void*)GVTOP(Args[ArgNo++])); break;
+		  //sprintf(Buffer, FmtBuf, (void*)GVTOP(Args[ArgNo++])); break;
+		  sprintf_s(Buffer, _countof(Buffer), FmtBuf, (void*)GVTOP(Args[ArgNo++])); break;
       case 's':
-        sprintf(Buffer, FmtBuf, (char*)GVTOP(Args[ArgNo++])); break;
+		  //sprintf(Buffer, FmtBuf, (char*)GVTOP(Args[ArgNo++])); break;
+		  sprintf_s(Buffer, _countof(Buffer), FmtBuf, (char*)GVTOP(Args[ArgNo++])); break;
       default:
         errs() << "<unknown printf code '" << *FmtStr << "'!>";
         ArgNo++; break;
@@ -406,6 +414,8 @@ static GenericValue lle_X_sprintf(FunctionType *FT,
 static GenericValue lle_X_printf(FunctionType *FT,
                                  ArrayRef<GenericValue> Args) {
   char Buffer[10000];
+  _Analysis_assume_nullterminated_(Buffer);
+
   std::vector<GenericValue> NewArgs;
   NewArgs.push_back(PTOGV((void*)&Buffer[0]));
   NewArgs.insert(NewArgs.end(), Args.begin(), Args.end());
@@ -420,11 +430,14 @@ static GenericValue lle_X_sscanf(FunctionType *FT,
   assert(args.size() < 10 && "Only handle up to 10 args to sscanf right now!");
 
   char *Args[10];
-  for (unsigned i = 0; i < args.size(); ++i)
+  _Analysis_assume_nullterminated_(Args);
+  for (unsigned i = 0; i < args.size(); ++i) {
+	  _Analysis_assume_(i < 10);
     Args[i] = (char*)GVTOP(args[i]);
+  }
 
   GenericValue GV;
-  GV.IntVal = APInt(32, sscanf(Args[0], Args[1], Args[2], Args[3], Args[4],
+  GV.IntVal = APInt(32, sscanf_s(Args[0], Args[1], Args[2], Args[3], Args[4],
                     Args[5], Args[6], Args[7], Args[8], Args[9]));
   return GV;
 }
@@ -433,12 +446,14 @@ static GenericValue lle_X_sscanf(FunctionType *FT,
 static GenericValue lle_X_scanf(FunctionType *FT, ArrayRef<GenericValue> args) {
   assert(args.size() < 10 && "Only handle up to 10 args to scanf right now!");
 
-  char *Args[10];
-  for (unsigned i = 0; i < args.size(); ++i)
+  char *Args[10] = { 0 };
+  for (unsigned i = 0; i < args.size(); ++i) {
+	  _Analysis_assume_(i < 10);
     Args[i] = (char*)GVTOP(args[i]);
+  }
 
   GenericValue GV;
-  GV.IntVal = APInt(32, scanf( Args[0], Args[1], Args[2], Args[3], Args[4],
+  GV.IntVal = APInt(32, scanf_s( Args[0], Args[1], Args[2], Args[3], Args[4],
                     Args[5], Args[6], Args[7], Args[8], Args[9]));
   return GV;
 }
@@ -449,6 +464,8 @@ static GenericValue lle_X_fprintf(FunctionType *FT,
                                   ArrayRef<GenericValue> Args) {
   assert(Args.size() >= 2);
   char Buffer[10000];
+  _Analysis_assume_nullterminated_(Buffer);
+  
   std::vector<GenericValue> NewArgs;
   NewArgs.push_back(PTOGV(Buffer));
   NewArgs.insert(NewArgs.end(), Args.begin()+1, Args.end());

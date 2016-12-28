@@ -1,15 +1,14 @@
 //== DynamicTypePropagation.cpp -------------------------------- -*- C++ -*--=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This checker defines the rules for dynamic type gathering and propagation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DynamicTypePropagation.cpp                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This checker defines the rules for dynamic type gathering and propagation.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "ClangSACheckers.h"
 #include "clang/Basic/Builtins.h"

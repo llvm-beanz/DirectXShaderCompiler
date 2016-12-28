@@ -1,17 +1,18 @@
 //===--- UnwrappedLineParser.cpp - Format C++ code ------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// UnwrappedLineParser.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file contains the implementation of the UnwrappedLineParser,
-/// which turns a stream of tokens into UnwrappedLines.
+/// \file                                                                    //
+/// \brief This file contains the implementation of the UnwrappedLineParser, //
+/// which turns a stream of tokens into UnwrappedLines.                      //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "UnwrappedLineParser.h"
 #include "llvm/ADT/STLExtras.h"

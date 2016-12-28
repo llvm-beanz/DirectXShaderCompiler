@@ -1,28 +1,30 @@
 //===--- DeclSpec.h - Parsed declaration specifiers -------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclSpec.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file defines the classes used to store parsed information about
-/// declaration-specifiers and declarators.
+/// \file                                                                    //
+/// \brief This file defines the classes used to store parsed information about//
+/// declaration-specifiers and declarators.                                  //
 ///
-/// \verbatim
-///   static const int volatile x, *y, *(*(*z)[10])(const void *x);
-///   ------------------------- -  --  ---------------------------
-///     declaration-specifiers  \  |   /
-///                            declarators
-/// \endverbatim
+/// \verbatim                                                                //
+///   static const int volatile x, *y, *(*(*z)[10])(const void *x);          //
+///   ------------------------- -  --  ---------------------------           //
+///     declaration-specifiers  \  |   /                                     //
+///                            declarators                                   //
+/// \endverbatim                                                             //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_SEMA_DECLSPEC_H
 #define LLVM_CLANG_SEMA_DECLSPEC_H
 
+#include "clang/AST/Attr.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/Basic/ExceptionSpecificationType.h"
 #include "clang/Basic/Lambda.h"
@@ -35,6 +37,12 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
+
+// HLSL Change Starts
+namespace hlsl {
+  struct UnusualAnnotation;
+}
+// HLSL Change Ends
 
 namespace clang {
   class ASTContext;
@@ -282,6 +290,10 @@ public:
   static const TST TST_char32 = clang::TST_char32;
   static const TST TST_int = clang::TST_int;
   static const TST TST_int128 = clang::TST_int128;
+  // HLSL Change Starts
+  static const TST TST_min10float = clang::TST_min10float;
+  static const TST TST_min12int = clang::TST_min12int;
+  // HLSL Change Ends
   static const TST TST_half = clang::TST_half;
   static const TST TST_float = clang::TST_float;
   static const TST TST_double = clang::TST_double;
@@ -577,6 +589,11 @@ public:
 
   /// \brief Return true if any type-specifier has been found.
   bool hasTypeSpecifier() const {
+    // HLSL Note: snorm and unorm are not, by themselves, good enough to generate a type
+    // (unlike, for example, 'unsigned' in 'unsigned i = 0;').
+    // If they were, the parser would need to be updated, because typedefs will not work
+    // correctly (so, unsigned min16uint foo fails because min16uint isn't a keyword, and
+    // it will try to parse it as the identifier name).
     return getTypeSpecType() != DeclSpec::TST_unspecified ||
            getTypeSpecWidth() != DeclSpec::TSW_unspecified ||
            getTypeSpecComplex() != DeclSpec::TSC_unspecified ||
@@ -1596,6 +1613,9 @@ public:
     AliasTemplateContext // C++11 alias-declaration template.
   };
 
+  std::vector<InheritableAttr *> customAttributesList; // HLSL Change
+  std::vector<hlsl::UnusualAnnotation *> UnusualAnnotations; // HLSL Change
+
 private:
   const DeclSpec &DS;
   CXXScopeSpec SS;
@@ -2105,6 +2125,13 @@ public:
 
     return true;
   }
+
+  // HLSL Change Starts
+  // This allow appending an InheritableAttr to Decl object
+  void addAttribute(InheritableAttr *attr) {
+    customAttributesList.push_back(attr);
+  }
+  // HLSL Change Ends
 
   /// takeAttributes - Takes attributes from the given parsed-attributes
   /// set and add them to this declarator.

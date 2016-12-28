@@ -1,15 +1,14 @@
 //===--- ModuleBuilder.cpp - Emit LLVM Code from ASTs ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This builds an AST and converts it to LLVM Code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ModuleBuilder.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This builds an AST and converts it to LLVM Code.                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "CGDebugInfo.h"
@@ -208,9 +207,59 @@ namespace {
         M.reset();
         return;
       }
-
       if (Builder)
         Builder->Release();
+      // HLSL Change Begins
+      // Error may happen in Builder->Release for HLSL
+      if (CodeGenOpts.getDebugInfo() == CodeGenOptions::DebugInfoKind::FullDebugInfo) {
+        // Add all file contents in a list of filename/content pairs.
+        llvm::NamedMDNode *pContents = nullptr;
+        llvm::LLVMContext &LLVMCtx = M->getContext();
+        for (SourceManager::fileinfo_iterator
+                 it = Ctx.getSourceManager().fileinfo_begin(),
+                 end = Ctx.getSourceManager().fileinfo_end();
+             it != end; ++it) {
+          if (it->first->isValid() && !it->second->IsSystemFile) {
+            if (pContents == nullptr) {
+              pContents = M->getOrInsertNamedMetadata("llvm.dbg.contents");
+            }
+            llvm::MDTuple *pFileInfo = llvm::MDNode::get(
+                LLVMCtx,
+                {llvm::MDString::get(LLVMCtx, it->first->getName()),
+                 llvm::MDString::get(LLVMCtx,
+                                     it->second->getRawBuffer()->getBuffer())});
+            pContents->addOperand(pFileInfo);
+          }
+        }
+
+        // Add Defines to Debug Info
+        llvm::NamedMDNode *pDefines = M->getOrInsertNamedMetadata("llvm.dbg.defines");
+        std::vector<llvm::Metadata *> vecDefines;
+        vecDefines.resize(CodeGenOpts.HLSLDefines.size());
+        std::transform(CodeGenOpts.HLSLDefines.begin(), CodeGenOpts.HLSLDefines.end(),
+          vecDefines.begin(), [&LLVMCtx](const std::string &str) { return llvm::MDString::get(LLVMCtx, str); });
+        llvm::MDTuple *pDefinesInfo = llvm::MDNode::get(LLVMCtx, vecDefines);
+        pDefines->addOperand(pDefinesInfo);
+
+        // Add main file name to debug info
+        llvm::NamedMDNode *pSourceFilename = M->getOrInsertNamedMetadata("llvm.dbg.mainFileName");
+        llvm::MDTuple *pFileName = llvm::MDNode::get(
+          LLVMCtx, llvm::MDString::get(LLVMCtx, CodeGenOpts.MainFileName));
+        pSourceFilename->addOperand(pFileName);
+
+        // Pass in any other arguments to debug info
+        llvm::NamedMDNode *pArgs = M->getOrInsertNamedMetadata("llvm.dbg.args");
+        std::vector<llvm::Metadata *> vecArguments;
+        vecArguments.resize(CodeGenOpts.HLSLArguments.size());
+        std::transform(CodeGenOpts.HLSLArguments.begin(), CodeGenOpts.HLSLArguments.end(),
+          vecArguments.begin(), [&LLVMCtx](const std::string &str) { return llvm::MDString::get(LLVMCtx, str); });
+        llvm::MDTuple *pArgumentsInfo = llvm::MDNode::get(LLVMCtx, vecArguments);
+        pArgs->addOperand(pArgumentsInfo);
+
+      }
+      if (Diags.hasErrorOccurred())
+        M.reset();
+      // HLSL Change Ends
     }
 
     void CompleteTentativeDefinition(VarDecl *D) override {

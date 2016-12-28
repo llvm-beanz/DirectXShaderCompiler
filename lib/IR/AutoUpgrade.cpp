@@ -1,17 +1,16 @@
 //===-- AutoUpgrade.cpp - Implement auto-upgrade helper functions ---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the auto-upgrade helper functions.
-// This is where deprecated IR intrinsics and other IR features are updated to
-// current specifications.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// AutoUpgrade.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the auto-upgrade helper functions.                   //
+// This is where deprecated IR intrinsics and other IR features are updated to//
+// current specifications.                                                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/AutoUpgrade.h"
 #include "llvm/IR/CFG.h"
@@ -124,6 +123,7 @@ static bool UpgradeIntrinsicFunction1(Function *F, Function *&NewFn) {
     }
     break;
 
+#if 0 // HLSL Change - remove platform intrinsics
   case 'x': {
     if (Name.startswith("x86.sse2.pcmpeq.") ||
         Name.startswith("x86.sse2.pcmpgt.") ||
@@ -217,6 +217,7 @@ static bool UpgradeIntrinsicFunction1(Function *F, Function *&NewFn) {
     }
     break;
   }
+#endif // HLSL Change - remove platform intrinsics
   }
 
   //  This may not belong here. This function is effectively being overloaded
@@ -330,6 +331,8 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
   assert(F && "Intrinsic call is not direct?");
 
   if (!NewFn) {
+    (void)F;  // HLSL Change - unused local variable
+#if 0 // HLSL Change - remove platform intrinsics
     // Get the Function's name.
     StringRef Name = F->getName();
 
@@ -616,6 +619,10 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
 
     CI->replaceAllUsesWith(Rep);
     CI->eraseFromParent();
+
+#endif // HLSL Change - remove platform intrinsics
+    llvm_unreachable("HLSL - should not be upgrading platform intrinsics."); // HLSL Change - remove platform intrinsics
+
     return;
   }
 
@@ -648,6 +655,7 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
     return;
   }
 
+#if 0 // HLSL Change - remove platform intrinsics
   case Intrinsic::x86_xop_vfrcz_ss:
   case Intrinsic::x86_xop_vfrcz_sd:
     CI->replaceAllUsesWith(
@@ -699,6 +707,7 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
     CI->eraseFromParent();
     return;
   }
+#endif // HLSL Change - remove platform intrinsics
   }
 }
 

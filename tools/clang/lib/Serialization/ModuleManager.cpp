@@ -1,16 +1,16 @@
 //===--- ModuleManager.cpp - Module Manager ---------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the ModuleManager class, which manages a set of loaded
-//  modules for the ASTReader.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ModuleManager.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the ModuleManager class, which manages a set of loaded //
+//  modules for the ASTReader.                                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 #include "clang/Frontend/PCHContainerOperations.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/ModuleMap.h"
@@ -20,7 +20,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <system_error>
-
 #ifndef NDEBUG
 #include "llvm/Support/GraphWriter.h"
 #endif

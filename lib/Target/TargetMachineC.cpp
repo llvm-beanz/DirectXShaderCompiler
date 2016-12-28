@@ -1,15 +1,14 @@
 //===-- TargetMachine.cpp -------------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the LLVM-C part of TargetMachine.h
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetMachineC.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the LLVM-C part of TargetMachine.h                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm-c/TargetMachine.h"
 #include "llvm-c/Core.h"
@@ -247,9 +246,11 @@ LLVMBool LLVMTargetMachineEmitToMemoryBuffer(LLVMTargetMachineRef T,
   return Result;
 }
 
+#if 0 // HLSL Change Starts - DXIL has a fixed triple
 char *LLVMGetDefaultTargetTriple(void) {
   return strdup(sys::getDefaultTargetTriple().c_str());
 }
+#endif // HLSL Change Ends
 
 void LLVMAddAnalysisPasses(LLVMTargetMachineRef T, LLVMPassManagerRef PM) {
   unwrap(PM)->add(

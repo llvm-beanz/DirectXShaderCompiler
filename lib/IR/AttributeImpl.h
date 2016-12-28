@@ -1,15 +1,15 @@
 //===-- AttributeImpl.h - Attribute Internals -------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// AttributeImpl.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file defines various helper methods and classes used by
-/// LLVMContextImpl for creating and managing attributes.
+/// \file                                                                    //
+/// \brief This file defines various helper methods and classes used by      //
+/// LLVMContextImpl for creating and managing attributes.                    //
 ///
 //===----------------------------------------------------------------------===//
 
@@ -184,8 +184,8 @@ public:
 static_assert(
     AlignOf<AttributeSetNode>::Alignment >= AlignOf<Attribute>::Alignment,
     "Alignment is insufficient for objects appended to AttributeSetNode");
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// \class
 /// \brief This class represents a set of attributes that apply to the function,
 /// return type, and parameters.

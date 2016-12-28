@@ -1,15 +1,14 @@
 //===--- Lexer.h - C Language Family Lexer ----------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Lexer.h                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Lexer interface.                                   //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Lexer interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LEX_LEXER_H
 #define LLVM_CLANG_LEX_LEXER_H
@@ -599,6 +598,7 @@ private:
   // Helper functions to lex the remainder of a token of the specific type.
   bool LexIdentifier         (Token &Result, const char *CurPtr);
   bool LexNumericConstant    (Token &Result, const char *CurPtr);
+  bool LexNumericConstant    (Token &Result, const char *CurPtr, unsigned Periods); // HLSL Change
   bool LexStringLiteral      (Token &Result, const char *CurPtr,
                               tok::TokenKind Kind);
   bool LexRawStringLiteral   (Token &Result, const char *CurPtr,

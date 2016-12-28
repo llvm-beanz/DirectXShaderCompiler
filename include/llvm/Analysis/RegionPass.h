@@ -1,15 +1,14 @@
 //===- RegionPass.h - RegionPass class --------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the RegionPass class. All region based analysis,
-// optimization and transformation passes are derived from RegionPass.
-// This class is implemented following the some ideas of the LoopPass.h class.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RegionPass.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the RegionPass class. All region based analysis,        //
+// optimization and transformation passes are derived from RegionPass.       //
+// This class is implemented following the some ideas of the LoopPass.h class.//
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,8 +25,8 @@ namespace llvm {
 
 class RGPassManager;
 class Function;
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// @brief A pass that runs on each Region in a function.
 ///
 /// RegionPass is managed by RGPassManager.

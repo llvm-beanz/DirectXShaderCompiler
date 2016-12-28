@@ -1,18 +1,17 @@
 //===------ SimplifyLibCalls.cpp - Library calls simplifier ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is a utility pass used for testing the InstructionSimplify analysis.
-// The analysis is applied to every instruction, and if it simplifies then the
-// instruction is replaced by the simplification.  If you are looking for a pass
-// that performs serious instruction folding, use the instcombine pass instead.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SimplifyLibCalls.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is a utility pass used for testing the InstructionSimplify analysis. //
+// The analysis is applied to every instruction, and if it simplifies then the//
+// instruction is replaced by the simplification.  If you are looking for a pass//
+// that performs serious instruction folding, use the instcombine pass instead.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Utils/SimplifyLibCalls.h"
 #include "llvm/ADT/SmallString.h"

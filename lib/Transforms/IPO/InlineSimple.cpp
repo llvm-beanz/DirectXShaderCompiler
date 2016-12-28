@@ -1,15 +1,14 @@
 //===- InlineSimple.cpp - Code to perform simple function inlining --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements bottom-up inlining of functions into callees.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InlineSimple.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements bottom-up inlining of functions into callees.        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -24,6 +23,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Transforms/IPO/InlinerPass.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 
@@ -103,3 +103,15 @@ void SimpleInliner::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<InlineCostAnalysis>();
   Inliner::getAnalysisUsage(AU);
 }
+
+// HLSL Change Starts
+void Inliner::applyOptions(PassOptions O) {
+  GetPassOptionUnsigned(O, "InlineThreshold", &InlineThreshold, InlineThreshold);
+  GetPassOptionBool(O, "InsertLifetime", &InsertLifetime, InsertLifetime);
+}
+void Inliner::dumpConfig(raw_ostream &OS) {
+  CallGraphSCCPass::dumpConfig(OS);
+  OS << ",InlineThreshold=" << InlineThreshold;
+  OS << ",InsertLifetime=" << (InsertLifetime ? 't' : 'f');
+}
+// HLSL Change Ends

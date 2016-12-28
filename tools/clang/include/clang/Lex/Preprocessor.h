@@ -1,16 +1,17 @@
 //===--- Preprocessor.h - C Language Family Preprocessor --------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Preprocessor.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines the clang::Preprocessor interface.
+/// \file                                                                    //
+/// \brief Defines the clang::Preprocessor interface.                        //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LEX_PREPROCESSOR_H
 #define LLVM_CLANG_LEX_PREPROCESSOR_H
@@ -35,6 +36,8 @@
 #include "llvm/Support/Allocator.h"
 #include <memory>
 #include <vector>
+
+#include "llvm/Support/OacrIgnoreCond.h" // HLSL Change - options change some lexical rules (tokens, identifier chars, others)
 
 namespace llvm {
   template<unsigned InternalLen> class SmallString;

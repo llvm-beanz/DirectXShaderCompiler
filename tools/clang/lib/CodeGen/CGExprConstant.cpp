@@ -1,15 +1,14 @@
 //===--- CGExprConstant.cpp - Emit LLVM Code from Constant Expressions ----===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Constant Expr nodes as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGExprConstant.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Constant Expr nodes as LLVM code.              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCXXABI.h"
@@ -741,6 +740,12 @@ public:
     case CK_FloatingCast:
     case CK_ZeroToOCLEvent:
       return nullptr;
+    // HLSL Change Begins.
+    case CK_FlatConversion:
+      return nullptr;
+    case CK_HLSLVectorSplat:
+      return nullptr;
+    // HLSL Change Ends.
     }
     llvm_unreachable("Invalid CastKind");
   }
@@ -762,7 +767,7 @@ public:
   llvm::Constant *EmitArrayInitialization(InitListExpr *ILE) {
     if (ILE->isStringLiteralInit())
       return Visit(ILE->getInit(0));
-
+    if (CGM.getLangOpts().HLSL) return nullptr; // HLSL Change - Not implement yet.
     llvm::ArrayType *AType =
         cast<llvm::ArrayType>(ConvertType(ILE->getType()));
     llvm::Type *ElemTy = AType->getElementType();
@@ -829,6 +834,13 @@ public:
   llvm::Constant *VisitInitListExpr(InitListExpr *ILE) {
     if (ILE->getType()->isArrayType())
       return EmitArrayInitialization(ILE);
+
+    // HLSL Change Begins.
+    if (hlsl::IsHLSLVecType(ILE->getType()))
+      return CGM.EmitConstantExpr(ILE, ILE->getType(), CGF);
+    if (hlsl::IsHLSLMatType(ILE->getType()))
+      return nullptr;
+    // HLSL Change Ends.
 
     if (ILE->getType()->isRecordType())
       return EmitRecordInitialization(ILE);
@@ -1314,6 +1326,8 @@ llvm::Constant *CodeGenModule::EmitConstantValue(const APValue &Value,
   }
   case APValue::Float: {
     const llvm::APFloat &Init = Value.getFloat();
+// OACR error 6287
+#pragma prefast(disable: __WARNING_REDUNDANTTEST, "language options are constants, by design")
     if (&Init.getSemantics() == &llvm::APFloat::IEEEhalf &&
         !Context.getLangOpts().NativeHalfType &&
         !Context.getLangOpts().HalfArgsAndReturns)

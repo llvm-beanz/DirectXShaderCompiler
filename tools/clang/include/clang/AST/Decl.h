@@ -1,15 +1,14 @@
 //===--- Decl.h - Classes for representing declarations ---------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Decl.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Decl subclasses.                                   //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Decl subclasses.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_AST_DECL_H
 #define LLVM_CLANG_AST_DECL_H
@@ -26,6 +25,12 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
+
+// HLSL Change Starts
+namespace hlsl {
+  struct UnusualAnnotation;
+}
+// HLSL Change Ends
 
 namespace clang {
 struct ASTTemplateArgumentListInfo;
@@ -147,13 +152,14 @@ class NamedDecl : public Decl {
   /// identifier but may also be a special kind of name (C++
   /// constructor, Objective-C selector, etc.)
   DeclarationName Name;
+  ArrayRef<hlsl::UnusualAnnotation*> UnusualAnnotations; // HLSL Change
 
 private:
   NamedDecl *getUnderlyingDeclImpl() LLVM_READONLY;
 
 protected:
   NamedDecl(Kind DK, DeclContext *DC, SourceLocation L, DeclarationName N)
-    : Decl(DK, DC, L), Name(N) { }
+    : Decl(DK, DC, L), Name(N), UnusualAnnotations() { }
 
 public:
   /// getIdentifier - Get the identifier that names this declaration,
@@ -169,6 +175,25 @@ public:
     assert(Name.isIdentifier() && "Name is not a simple identifier");
     return getIdentifier() ? getIdentifier()->getName() : "";
   }
+
+  // HLSL Changes Start
+  /// getName - Get the name of IR identifier for this declaration as a StringRef.
+  /// This requires that the declaration have a name and that it be a simple
+  /// identifier.
+  virtual StringRef getNameForIR() const {
+    return getName();
+  }
+
+  void setUnusualAnnotations(ArrayRef<hlsl::UnusualAnnotation*> annotations) {
+    UnusualAnnotations = annotations;
+  }
+  ArrayRef<hlsl::UnusualAnnotation*> getUnusualAnnotations() {
+    return UnusualAnnotations;
+  }
+  const ArrayRef<hlsl::UnusualAnnotation*> getUnusualAnnotations() const {
+    return UnusualAnnotations;
+  }
+  // HLSL Changes Ends
 
   /// getNameAsString - Get a human-readable name for the declaration, even if
   /// it is one of the special kinds of names (C++ constructor, Objective-C
@@ -784,6 +809,9 @@ protected:
     /// declared.
     unsigned ScopeDepthOrObjCQuals : 7;
 
+    /// Whether the parameter is copied out.
+    unsigned IsModifierOut : 1;
+
     /// The number of parameters preceding this parameter in the
     /// function parameter scope in which it was declared.
     unsigned ParameterIndex : NumParameterIndexBits;
@@ -1339,12 +1367,20 @@ public:
 protected:
   ParmVarDecl(Kind DK, ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
               SourceLocation IdLoc, IdentifierInfo *Id, QualType T,
-              TypeSourceInfo *TInfo, StorageClass S, Expr *DefArg)
+              TypeSourceInfo *TInfo, StorageClass S, Expr *DefArg,
+              hlsl::ParameterModifier ParamMod)  // HLSL Change
       : VarDecl(DK, C, DC, StartLoc, IdLoc, Id, T, TInfo, S) {
     assert(ParmVarDeclBits.HasInheritedDefaultArg == false);
     assert(ParmVarDeclBits.IsKNRPromoted == false);
     assert(ParmVarDeclBits.IsObjCMethodParam == false);
     setDefaultArg(DefArg);
+    // HLSL Change Start
+    setModifierIn(ParamMod.isAnyIn());
+    setModifierOut(ParamMod.isAnyOut());
+    // change to reference type for out param
+    if (ParamMod.isAnyOut())
+      updateOutParamToRefType(C);
+    // HLSL Change End
   }
 
 public:
@@ -1352,7 +1388,8 @@ public:
                              SourceLocation StartLoc,
                              SourceLocation IdLoc, IdentifierInfo *Id,
                              QualType T, TypeSourceInfo *TInfo,
-                             StorageClass S, Expr *DefArg);
+                             StorageClass S, Expr *DefArg,
+                             hlsl::ParameterModifier ParamMod = hlsl::ParameterModifier()); // HLSL Change
 
   static ParmVarDecl *CreateDeserialized(ASTContext &C, unsigned ID);
 
@@ -1410,6 +1447,23 @@ public:
   void setKNRPromoted(bool promoted) {
     ParmVarDeclBits.IsKNRPromoted = promoted;
   }
+
+  // HLSL Change Starts
+  // IsKNRPromoted maps to 'in' bit (flipped).
+  bool isModifierIn() const { return !ParmVarDeclBits.IsKNRPromoted; }
+  void setModifierIn(bool value) { ParmVarDeclBits.IsKNRPromoted = !value; }
+  bool isModifierOut() const { return ParmVarDeclBits.IsModifierOut; }
+  void setModifierOut(bool value) { ParmVarDeclBits.IsModifierOut = value; }
+  /// Synthesize a ParameterModifier value for this parameter.
+  hlsl::ParameterModifier getParamModifiers() const {
+    if (isModifierIn() && !isModifierOut())
+      return hlsl::ParameterModifier(hlsl::ParameterModifier::Kind::In);
+    if (isModifierIn() && isModifierOut())
+      return hlsl::ParameterModifier(hlsl::ParameterModifier::Kind::InOut);
+    return hlsl::ParameterModifier(hlsl::ParameterModifier::Kind::Out);
+  }
+  void updateOutParamToRefType(ASTContext &C);
+  // HLSL Change Ends
 
   Expr *getDefaultArg();
   const Expr *getDefaultArg() const {
@@ -3772,6 +3826,58 @@ public:
   static bool classof(const Decl *D) { return classofKind(D->getKind()); }
   static bool classofKind(Kind K) { return K == Empty; }
 };
+
+// HLSL Change Starts
+/// HLSLBufferDecl - Represent a cbuffer or tbuffer declaration.
+class HLSLBufferDecl : public NamedDecl, public DeclContext {
+  /// LBraceLoc - The ending location of the source range.
+  SourceLocation LBraceLoc;
+  /// RBraceLoc - The ending location of the source range.
+  SourceLocation RBraceLoc;
+  /// KwLoc - The location of the cbuffer or tbuffer keyword.
+  SourceLocation KwLoc;
+  /// IsCBuffer - Whether the buffer is a cbuffer (and not a tbuffer).
+  bool IsCBuffer;
+  /// IsConstantBufferView - Whether the buffer is ConstantBufferView.
+  bool IsConstantBufferView;
+
+  HLSLBufferDecl(DeclContext *DC, bool cbuffer, bool constantbuf,
+                 SourceLocation KwLoc, IdentifierInfo *Id, SourceLocation IdLoc,
+                 std::vector<hlsl::UnusualAnnotation *> &BufferAttributes,
+                 SourceLocation LBrace);
+
+public:
+  static HLSLBufferDecl *Create(ASTContext &C, DeclContext* lexicalParent,
+    bool cbuffer, bool constantbuf, SourceLocation KwLoc,
+    IdentifierInfo *Id, SourceLocation IdLoc, 
+    std::vector<hlsl::UnusualAnnotation *>& BufferAttributes,
+    SourceLocation LBrace);
+
+  virtual SourceRange getSourceRange() const LLVM_READONLY{
+    return SourceRange(getLocStart(), RBraceLoc);
+  }
+
+  SourceLocation getLocStart() const LLVM_READONLY{ return KwLoc; }
+  SourceLocation getRBraceLoc() const { return RBraceLoc; }
+  void setRBraceLoc(SourceLocation L) { RBraceLoc = L; }
+  bool isCBuffer() const { return IsCBuffer; }
+  bool isConstantBufferView() const { return IsConstantBufferView; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return classofKind(D->getKind()); }
+  static bool classofKind(Kind K) { return K == HLSLBuffer; }
+  static DeclContext *castToDeclContext(const HLSLBufferDecl *D) {
+    return static_cast<DeclContext *>(const_cast<HLSLBufferDecl*>(D));
+  }
+  static HLSLBufferDecl *castFromDeclContext(const DeclContext *DC) {
+    return static_cast<HLSLBufferDecl *>(const_cast<DeclContext*>(DC));
+  }
+
+  friend class ASTDeclReader;
+  friend class ASTDeclWriter;
+};
+
+// HLSL Change Ends
 
 /// Insertion operator for diagnostics.  This allows sending NamedDecl's
 /// into a diagnostic with <<.

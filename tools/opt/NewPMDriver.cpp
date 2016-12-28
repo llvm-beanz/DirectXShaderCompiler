@@ -1,17 +1,18 @@
 //===- NewPMDriver.cpp - Driver for opt with new PM -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-/// \file
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// NewPMDriver.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+/// \file                                                                    //
 ///
-/// This file is just a split of the code that logically belongs in opt.cpp but
-/// that includes the new pass manager headers.
+/// This file is just a split of the code that logically belongs in opt.cpp but//
+/// that includes the new pass manager headers.                              //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "NewPMDriver.h"
 #include "llvm/ADT/StringRef.h"

@@ -1,15 +1,14 @@
 //===--- ASTConsumers.cpp - ASTConsumer implementations -------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// AST Consumer Implementations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTConsumers.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// AST Consumer Implementations.                                             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/ASTConsumers.h"
 #include "clang/AST/AST.h"
@@ -127,11 +126,12 @@ std::unique_ptr<ASTConsumer> clang::CreateASTPrinter(raw_ostream *Out,
   return llvm::make_unique<ASTPrinter>(Out, /*Dump=*/false, FilterString);
 }
 
-std::unique_ptr<ASTConsumer> clang::CreateASTDumper(StringRef FilterString,
+std::unique_ptr<ASTConsumer> clang::CreateASTDumper(raw_ostream *Out,  // HLSL Change - explicit Out
+                                                    StringRef FilterString,
                                                     bool DumpDecls,
                                                     bool DumpLookups) {
   assert((DumpDecls || DumpLookups) && "nothing to dump");
-  return llvm::make_unique<ASTPrinter>(nullptr, DumpDecls, FilterString,
+  return llvm::make_unique<ASTPrinter>(Out, DumpDecls, FilterString, // HLSL Change - explicit Out
                                        DumpLookups);
 }
 

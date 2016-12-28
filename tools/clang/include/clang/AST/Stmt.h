@@ -1,13 +1,12 @@
 //===--- Stmt.h - Classes for representing statements -----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Stmt interface and subclasses.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Stmt.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Stmt interface and subclasses.                     //
 //
 //===----------------------------------------------------------------------===//
 
@@ -102,7 +101,8 @@ namespace clang {
 
 //===----------------------------------------------------------------------===//
 // AST classes for statements.
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 /// Stmt - This represents one statement.
 ///
@@ -224,8 +224,8 @@ protected:
     friend class CastExpr;
     unsigned : NumExprBits;
 
-    unsigned Kind : 6;
-    unsigned BasePathSize : 32 - 6 - NumExprBits;
+    unsigned Kind : 7;                            // HLSL Change
+    unsigned BasePathSize : 32 - 7 - NumExprBits; // HLSL Change
   };
 
   class CallExprBitfields {
@@ -550,6 +550,40 @@ public:
   friend class ASTStmtWriter;
 };
 
+// HLSL Change: Adding discard statement support
+
+/// discard - This is the hlsl discard statement "discard;".
+///
+class DiscardStmt : public Stmt {
+  SourceLocation Loc;
+public:
+  DiscardStmt(SourceLocation L)
+    : Stmt(DiscardStmtClass)
+    , Loc(L)
+  {}
+
+  /// \brief Build an empty Discard statement.
+  explicit DiscardStmt(EmptyShell Empty)
+      : Stmt(DiscardStmtClass, Empty)
+  {}
+
+  SourceLocation getLoc() const { return Loc; }
+  void setLoc(SourceLocation L) { Loc = L; }
+
+  SourceLocation getLocStart() const LLVM_READONLY { return Loc; }
+  SourceLocation getLocEnd() const LLVM_READONLY { return Loc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == DiscardStmtClass;
+  }
+
+  child_range children() { return child_range(); }
+
+  friend class ASTStmtReader;
+  friend class ASTStmtWriter;
+};
+
+// End of HLSL Change
 /// CompoundStmt - This represents a group of statements like { stmt stmt }.
 ///
 class CompoundStmt : public Stmt {

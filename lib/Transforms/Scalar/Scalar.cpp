@@ -1,17 +1,16 @@
 //===-- Scalar.cpp --------------------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements common infrastructure for libLLVMScalarOpts.a, which
-// implements several scalar transformations over the LLVM intermediate
-// representation, including the C bindings for that library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Scalar.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements common infrastructure for libLLVMScalarOpts.a, which //
+// implements several scalar transformations over the LLVM intermediate      //
+// representation, including the C bindings for that library.                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Scalar.h"
 #include "llvm-c/Initialization.h"
@@ -63,6 +62,7 @@ void llvm::initializeScalarOpts(PassRegistry &Registry) {
   initializePartiallyInlineLibCallsPass(Registry);
   initializeReassociatePass(Registry);
   initializeRegToMemPass(Registry);
+  initializeRegToMemHlslPass(Registry); // HLSL Change
   initializeRewriteStatepointsForGCPass(Registry);
   initializeSCCPPass(Registry);
   initializeIPSCCPPass(Registry);
@@ -211,6 +211,12 @@ void LLVMAddConstantPropagationPass(LLVMPassManagerRef PM) {
 void LLVMAddDemoteMemoryToRegisterPass(LLVMPassManagerRef PM) {
   unwrap(PM)->add(createDemoteRegisterToMemoryPass());
 }
+
+// HLSL Change start
+void LLVMAddDemoteMemoryToRegisterHlslPass(LLVMPassManagerRef PM) {
+  unwrap(PM)->add(createDemoteRegisterToMemoryHlslPass());
+}
+// HLSL Change end
 
 void LLVMAddVerifierPass(LLVMPassManagerRef PM) {
   unwrap(PM)->add(createVerifierPass());

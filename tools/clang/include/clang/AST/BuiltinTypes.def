@@ -1,37 +1,36 @@
 //===-- BuiltinTypeNodes.def - Metadata about BuiltinTypes ------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the database about various builtin singleton types.
-//
-//  BuiltinType::Id is the enumerator defining the type.
-//
-//  Context.SingletonId is the global singleton of this type.  Some global
-//  singletons are shared by multiple types.
-//
-//    BUILTIN_TYPE(Id, SingletonId) - A builtin type that has not been
-//    covered by any other #define.  Defining this macro covers all
-//    the builtins.
-//
-//    SIGNED_TYPE(Id, SingletonId) - A signed integral type.
-//
-//    UNSIGNED_TYPE(Id, SingletonId) - An unsigned integral type.
-//
-//    FLOATING_TYPE(Id, SingletonId) - A floating-point type.
-//
-//    PLACEHOLDER_TYPE(Id, SingletonId) - A placeholder type.  Placeholder
-//    types are used to perform context-sensitive checking of specific
-//    forms of expression.
-//
-//    SHARED_SINGLETON_TYPE(Expansion) - The given expansion corresponds
-//    to a builtin which uses a shared singleton type.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BuiltinTypes.def                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the database about various builtin singleton types.    //
+//                                                                           //
+//  BuiltinType::Id is the enumerator defining the type.                     //
+//                                                                           //
+//  Context.SingletonId is the global singleton of this type.  Some global   //
+//  singletons are shared by multiple types.                                 //
+//                                                                           //
+//    BUILTIN_TYPE(Id, SingletonId) - A builtin type that has not been       //
+//    covered by any other #define.  Defining this macro covers all          //
+//    the builtins.                                                          //
+//                                                                           //
+//    SIGNED_TYPE(Id, SingletonId) - A signed integral type.                 //
+//                                                                           //
+//    UNSIGNED_TYPE(Id, SingletonId) - An unsigned integral type.            //
+//                                                                           //
+//    FLOATING_TYPE(Id, SingletonId) - A floating-point type.                //
+//                                                                           //
+//    PLACEHOLDER_TYPE(Id, SingletonId) - A placeholder type.  Placeholder   //
+//    types are used to perform context-sensitive checking of specific       //
+//    forms of expression.                                                   //
+//                                                                           //
+//    SHARED_SINGLETON_TYPE(Expansion) - The given expansion corresponds     //
+//    to a builtin which uses a shared singleton type.                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef SIGNED_TYPE
 #define SIGNED_TYPE(Id, SingletonId) BUILTIN_TYPE(Id, SingletonId)
@@ -119,6 +118,12 @@ SIGNED_TYPE(LongLong, LongLongTy)
 // '__int128_t'
 SIGNED_TYPE(Int128, Int128Ty)
 
+// HLSL Change - 'min12int' in HLSL
+SIGNED_TYPE(Min12Int, Min12IntTy)
+
+// HLSL Change - literal int in HLSL
+SIGNED_TYPE(LitInt, LitIntTy)
+
 //===- Floating point types -----------------------------------------------===//
 
 // 'half' in OpenCL, '__fp16' in ARM NEON.
@@ -132,6 +137,12 @@ FLOATING_TYPE(Double, DoubleTy)
 
 // 'long double'
 FLOATING_TYPE(LongDouble, LongDoubleTy)
+
+// HLSL Change - 'min10float' in HLSL
+FLOATING_TYPE(Min10Float, Min10FloatTy)
+
+// HLSL Change - literal float in HLSL
+FLOATING_TYPE(LitFloat, LitFloatTy)
 
 //===- Language-specific types --------------------------------------------===//
 

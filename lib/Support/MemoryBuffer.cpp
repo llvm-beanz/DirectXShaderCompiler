@@ -1,15 +1,14 @@
 //===--- MemoryBuffer.cpp - Memory Buffer implementation ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the MemoryBuffer interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MemoryBuffer.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the MemoryBuffer interface.                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
@@ -56,7 +55,7 @@ void MemoryBuffer::init(const char *BufStart, const char *BufEnd,
 
 /// CopyStringRef - Copies contents of a StringRef into a block of memory and
 /// null-terminates it.
-static void CopyStringRef(char *Memory, StringRef Data) {
+static void CopyStringRef(_Out_cap_x_(Data.size()+1) char *Memory, StringRef Data) {
   if (!Data.empty())
     memcpy(Memory, Data.data(), Data.size());
   Memory[Data.size()] = 0; // Null terminate string.
@@ -226,12 +225,13 @@ public:
 static ErrorOr<std::unique_ptr<MemoryBuffer>>
 getMemoryBufferForStream(int FD, const Twine &BufferName) {
   const ssize_t ChunkSize = 4096*4;
-  SmallString<ChunkSize> Buffer;
+  const ssize_t InitialChunkSize = 4096*2; // HLSL Change - be more conservative on how much stack space we start with
+  SmallString<InitialChunkSize> Buffer;
   ssize_t ReadBytes;
   // Read into Buffer until we hit EOF.
   do {
     Buffer.reserve(Buffer.size() + ChunkSize);
-    ReadBytes = read(FD, Buffer.end(), ChunkSize);
+    ReadBytes = llvm::sys::fs::msf_read(FD, Buffer.end(), ChunkSize);
     if (ReadBytes == -1) {
       if (errno == EINTR) continue;
       return std::error_code(errno, std::generic_category());
@@ -266,7 +266,7 @@ getFileAux(const Twine &Filename, int64_t FileSize, uint64_t MapSize,
   ErrorOr<std::unique_ptr<MemoryBuffer>> Ret =
       getOpenFileImpl(FD, Filename, FileSize, MapSize, Offset,
                       RequiresNullTerminator, IsVolatileSize);
-  close(FD);
+  llvm::sys::fs::msf_close(FD);  // HLSL Change - use msf_close
   return Ret;
 }
 
@@ -377,7 +377,7 @@ getOpenFileImpl(int FD, const Twine &Filename, uint64_t FileSize,
 
   size_t BytesLeft = MapSize;
 #ifndef HAVE_PREAD
-  if (lseek(FD, Offset, SEEK_SET) == -1)
+  if (llvm::sys::fs::msf_lseek(FD, Offset, SEEK_SET) == -1)  // HLSL Change - use msf_lseek
     return std::error_code(errno, std::generic_category());
 #endif
 
@@ -385,7 +385,7 @@ getOpenFileImpl(int FD, const Twine &Filename, uint64_t FileSize,
 #ifdef HAVE_PREAD
     ssize_t NumRead = ::pread(FD, BufPtr, BytesLeft, MapSize-BytesLeft+Offset);
 #else
-    ssize_t NumRead = ::read(FD, BufPtr, BytesLeft);
+    ssize_t NumRead = ::llvm::sys::fs::msf_read(FD, BufPtr, BytesLeft);
 #endif
     if (NumRead == -1) {
       if (errno == EINTR)

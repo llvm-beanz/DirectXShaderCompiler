@@ -1,15 +1,17 @@
 //===- Win32/Signals.cpp - Win32 Signals Implementation ---------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file provides the Win32 specific implementation of the Signals class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Signals.inc                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides the Win32 specific implementation of the Signals class.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
+#if 0 // HLSL Change - disable signal processing
+
 #include "llvm/Support/FileSystem.h"
 #include <algorithm>
 #include <signal.h>
@@ -279,6 +281,7 @@ namespace llvm {
 /// ignore" CRT debug report dialog.  "retry" raises an exception which
 /// ultimately triggers our stack dumper.
 static LLVM_ATTRIBUTE_UNUSED int
+__cdecl // HLSL Change
 AvoidMessageBoxHook(int ReportType, char *Message, int *Return) {
   // Set *Return to the retry code for the return value of _CrtDbgReport:
   // http://msdn.microsoft.com/en-us/library/8hyw4sy7(v=vs.71).aspx
@@ -538,3 +541,20 @@ static BOOL WINAPI LLVMConsoleCtrlHandler(DWORD dwCtrlType) {
  #pragma GCC diagnostic warning "-Wformat"
  #pragma GCC diagnostic warning "-Wformat-extra-args"
 #endif
+
+#else
+
+namespace llvm {
+namespace sys {
+
+bool RemoveFileOnSignal(StringRef Filename, std::string* ErrMsg) { return false; }
+void DontRemoveFileOnSignal(StringRef Filename) { }
+void PrintStackTraceOnErrorSignal(bool) { }
+void PrintStackTrace(FILE *) { }
+void SetInterruptFunction(void (*IF)()) { }
+void AddSignalHandler(void (*FnPtr)(void *), void *Cookie) { }
+void RunInterruptHandlers() { }
+
+} }
+
+#endif // HLSL Change - disable signal processing

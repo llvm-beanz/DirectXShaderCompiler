@@ -1,15 +1,14 @@
 //===--- Parser.cpp - C Language Family Parser ----------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the Parser interfaces.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Parser.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the Parser interfaces.                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "RAIIObjectsForParser.h"
@@ -212,7 +211,7 @@ void Parser::ConsumeExtraSemi(ExtraSemiKind Kind, unsigned TST) {
 
   // C++11 allows extra semicolons at namespace scope, but not in any of the
   // other contexts.
-  if (Kind == OutsideFunction && getLangOpts().CPlusPlus) {
+  if (!getLangOpts().HLSL && (Kind == OutsideFunction && getLangOpts().CPlusPlus)) { // HLSL Change
     if (getLangOpts().CPlusPlus11)
       Diag(StartLoc, diag::warn_cxx98_compat_top_level_semi)
           << FixItHint::CreateRemoval(SourceRange(StartLoc, EndLoc));
@@ -547,10 +546,12 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result) {
   Result = DeclGroupPtrTy();
   switch (Tok.getKind()) {
   case tok::annot_pragma_unused:
+    if (getLangOpts().HLSL) break; // HLSL Change - this should merge with 'default' and avoid unused pragma handling
     HandlePragmaUnused();
     return false;
 
   case tok::annot_module_include:
+    if (getLangOpts().HLSL) break; // HLSL Change - HLSL does not support modules and cannot get to this codepath
     Actions.ActOnModuleInclude(Tok.getLocation(),
                                reinterpret_cast<Module *>(
                                    Tok.getAnnotationValue()));
@@ -558,12 +559,14 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result) {
     return false;
 
   case tok::annot_module_begin:
+    if (getLangOpts().HLSL) break; // HLSL Change - HLSL does not support modules and cannot get to this codepath
     Actions.ActOnModuleBegin(Tok.getLocation(), reinterpret_cast<Module *>(
                                                     Tok.getAnnotationValue()));
     ConsumeToken();
     return false;
 
   case tok::annot_module_end:
+    if (getLangOpts().HLSL) break; // HLSL Change - HLSL does not support modules and cannot get to this codepath
     Actions.ActOnModuleEnd(Tok.getLocation(), reinterpret_cast<Module *>(
                                                   Tok.getAnnotationValue()));
     ConsumeToken();
@@ -581,12 +584,22 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result) {
     //else don't tell Sema that we ended parsing: more input might come.
     return true;
 
+  // HLSL Change Starts - skip legacy effects technique syntax
+  case tok::kw_technique:
+    Diag(Tok.getLocation(), diag::warn_hlsl_effect_technique);
+    SkipUntil(tok::l_brace);    // skip through {
+    SkipUntil(tok::r_brace);    // skip through matching }
+    Result = DeclGroupPtrTy();
+    return false;
+  // HLSL Change Ends
+
   default:
     break;
   }
 
   ParsedAttributesWithRange attrs(AttrFactory);
   MaybeParseCXX11Attributes(attrs);
+  MaybeParseHLSLAttributes(attrs);      // HLSL Change
   MaybeParseMicrosoftAttributes(attrs);
 
   Result = ParseExternalDeclaration(attrs);
@@ -630,41 +643,54 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
   Decl *SingleDecl = nullptr;
   switch (Tok.getKind()) {
   case tok::annot_pragma_vis:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaVisibility();
     return DeclGroupPtrTy();
   case tok::annot_pragma_pack:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaPack();
     return DeclGroupPtrTy();
   case tok::annot_pragma_msstruct:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaMSStruct();
     return DeclGroupPtrTy();
   case tok::annot_pragma_align:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaAlign();
     return DeclGroupPtrTy();
   case tok::annot_pragma_weak:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaWeak();
     return DeclGroupPtrTy();
   case tok::annot_pragma_weakalias:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaWeakAlias();
     return DeclGroupPtrTy();
   case tok::annot_pragma_redefine_extname:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaRedefineExtname();
     return DeclGroupPtrTy();
   case tok::annot_pragma_fp_contract:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaFPContract();
     return DeclGroupPtrTy();
   case tok::annot_pragma_opencl_extension:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaOpenCLExtension();
     return DeclGroupPtrTy();
   case tok::annot_pragma_openmp:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     return ParseOpenMPDeclarativeDirective();
   case tok::annot_pragma_ms_pointers_to_members:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaMSPointersToMembers();
     return DeclGroupPtrTy();
   case tok::annot_pragma_ms_vtordisp:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaMSVtorDisp();
     return DeclGroupPtrTy();
   case tok::annot_pragma_ms_pragma:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     HandlePragmaMSPragma();
     return DeclGroupPtrTy();
   case tok::semi:
@@ -688,6 +714,7 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
     return ParseExternalDeclaration(attrs);
   }
   case tok::kw_asm: {
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     ProhibitAttributes(attrs);
 
     SourceLocation StartLoc = Tok.getLocation();
@@ -713,6 +740,7 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
     break;
   }
   case tok::at:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     return ParseObjCAtDirectives();
   case tok::minus:
   case tok::plus:
@@ -729,6 +757,12 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
                                               : Sema::PCC_Namespace);
     cutOffParsing();
     return DeclGroupPtrTy();
+  // HLSL Change Starts: Start parsing declaration of cbuffer and tbuffers
+  case tok::kw_cbuffer:
+  case tok::kw_tbuffer:
+  case tok::kw_ConstantBuffer:
+  case tok::kw_TextureBuffer:
+    // HLSL Change Ends
   case tok::kw_using:
   case tok::kw_namespace:
   case tok::kw_typedef:
@@ -775,7 +809,7 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
     goto dont_know;
 
   case tok::kw_extern:
-    if (getLangOpts().CPlusPlus && NextToken().is(tok::kw_template)) {
+    if (getLangOpts().CPlusPlus && NextToken().is(tok::kw_template) && !getLangOpts().HLSL) { // HLSL Change
       // Extern templates
       SourceLocation ExternLoc = ConsumeToken();
       SourceLocation TemplateLoc = ConsumeToken();
@@ -791,6 +825,7 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
 
   case tok::kw___if_exists:
   case tok::kw___if_not_exists:
+    if (getLangOpts().HLSL) goto dont_know; // HLSL Change - skip unsupported processing
     ParseMicrosoftIfExistsExternalDeclaration();
     return DeclGroupPtrTy();
       
@@ -809,7 +844,7 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
 /// declarator, continues a declaration or declaration list.
 bool Parser::isDeclarationAfterDeclarator() {
   // Check for '= delete' or '= default'
-  if (getLangOpts().CPlusPlus && Tok.is(tok::equal)) {
+  if (!getLangOpts().HLSL && (getLangOpts().CPlusPlus && Tok.is(tok::equal))) { // HLSL Change - remove support
     const Token &KW = NextToken();
     if (KW.is(tok::kw_default) || KW.is(tok::kw_delete))
       return false;
@@ -836,7 +871,7 @@ bool Parser::isStartOfFunctionDefinition(const ParsingDeclarator &Declarator) {
       Declarator.getFunctionTypeInfo().isKNRPrototype()) 
     return isDeclarationSpecifier();
 
-  if (getLangOpts().CPlusPlus && Tok.is(tok::equal)) {
+  if (!getLangOpts().HLSL && getLangOpts().CPlusPlus && Tok.is(tok::equal)) { // HLSL Change - remove support
     const Token &KW = NextToken();
     return KW.is(tok::kw_default) || KW.is(tok::kw_delete);
   }
@@ -916,7 +951,7 @@ Parser::ParseDeclOrFunctionDefInternal(ParsedAttributesWithRange &attrs,
   // If the declspec consisted only of 'extern' and we have a string
   // literal following it, this must be a C++ linkage specifier like
   // 'extern "C"'.
-  if (getLangOpts().CPlusPlus && isTokenStringLiteral() &&
+  if (!getLangOpts().HLSL && getLangOpts().CPlusPlus && isTokenStringLiteral() && // HLSL Change - disallow extern "C"
       DS.getStorageClassSpec() == DeclSpec::SCS_extern &&
       DS.getParsedSpecifiers() == DeclSpec::PQ_StorageClassSpecifier) {
     Decl *TheDecl = ParseLinkage(DS, Declarator::FileContext);
@@ -981,15 +1016,16 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
   // If this declaration was formed with a K&R-style identifier list for the
   // arguments, parse declarations for all of the args next.
   // int foo(a,b) int a; float b; {}
-  if (FTI.isKNRPrototype())
+  if (!getLangOpts().HLSL && FTI.isKNRPrototype()) // HLSL Change - there is no support for K&R-style functions
     ParseKNRParamDeclarations(D);
 
   // We should have either an opening brace or, in a C++ constructor,
   // we may have a colon.
   if (Tok.isNot(tok::l_brace) && 
+      (getLangOpts().HLSL && Tok.isNot(tok::colon) || // HLSL Change - for HLSL, only allow ':', not try or =
       (!getLangOpts().CPlusPlus ||
        (Tok.isNot(tok::colon) && Tok.isNot(tok::kw_try) &&
-        Tok.isNot(tok::equal)))) {
+        Tok.isNot(tok::equal))))) {
     Diag(Tok, diag::err_expected_fn_body);
 
     // Skip over garbage, until we get to '{'.  Don't eat the '{'.
@@ -1040,7 +1076,7 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
     }
     return DP;
   }
-  else if (CurParsedObjCImpl && 
+  else if (CurParsedObjCImpl && !getLangOpts().HLSL && // HLSL Change - remove support for Obj-C parsing 
            !TemplateInfo.TemplateParams &&
            (Tok.is(tok::l_brace) || Tok.is(tok::kw_try) ||
             Tok.is(tok::colon)) && 
@@ -1079,7 +1115,7 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
   // safe because we're always the sole owner.
   D.getMutableDeclSpec().abort();
 
-  if (TryConsumeToken(tok::equal)) {
+  if (!getLangOpts().HLSL && TryConsumeToken(tok::equal)) { // HLSL Change: this has already been rejected in this function
     assert(getLangOpts().CPlusPlus && "Only C++ function definitions have '='");
 
     bool Delete = false;
@@ -1113,7 +1149,7 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
     return Res;
   }
 
-  if (Tok.is(tok::kw_try))
+  if (Tok.is(tok::kw_try) && !getLangOpts().HLSL)  // HLSL Change: this has already been rejected in this function
     return ParseFunctionTryBlock(Res, BodyScope);
 
   // If we have a colon, then we're probably parsing a C++
@@ -1258,6 +1294,7 @@ void Parser::ParseKNRParamDeclarations(Declarator &D) {
 ///         string-literal
 ///
 ExprResult Parser::ParseAsmStringLiteral() {
+  assert(!getLangOpts().HLSL); // HLSL Change - this point should be unreachable
   if (!isTokenStringLiteral()) {
     Diag(Tok, diag::err_expected_string_literal)
       << /*Source='in...'*/0 << "'asm'";
@@ -1283,6 +1320,7 @@ ExprResult Parser::ParseAsmStringLiteral() {
 ///         'asm' '(' asm-string-literal ')'
 ///
 ExprResult Parser::ParseSimpleAsm(SourceLocation *EndLoc) {
+  assert(!getLangOpts().HLSL); // HLSL Change - this point should be unreachable
   assert(Tok.is(tok::kw_asm) && "Not an asm!");
   SourceLocation Loc = ConsumeToken();
 
@@ -1622,7 +1660,7 @@ bool Parser::TryAnnotateTypeOrScopeToken(bool EnteringContext, bool NeedType) {
   bool WasScopeAnnotation = Tok.is(tok::annot_cxxscope);
 
   CXXScopeSpec SS;
-  if (getLangOpts().CPlusPlus)
+  if (getLangOpts().CPlusPlus)  // HLSL Note - allowing scope qualification
     if (ParseOptionalCXXScopeSpecifier(SS, ParsedType(), EnteringContext))
       return true;
 
@@ -1686,7 +1724,7 @@ bool Parser::TryAnnotateTypeOrScopeTokenAfterScopeSpec(bool EnteringContext,
       return false;
     }
 
-    if (!getLangOpts().CPlusPlus) {
+    if (!getLangOpts().CPlusPlus) { // HLSL Note - allow '::' qualification
       // If we're in C, we can't have :: tokens at all (the lexer won't return
       // them).  If the identifier is not a type, then it can't be scope either,
       // just early exit.
@@ -1934,6 +1972,7 @@ void Parser::ParseMicrosoftIfExistsExternalDeclaration() {
   while (Tok.isNot(tok::r_brace) && !isEofOrEom()) {
     ParsedAttributesWithRange attrs(AttrFactory);
     MaybeParseCXX11Attributes(attrs);
+    assert(!getLangOpts().HLSL); // HLSL Change: in lieu of MaybeParseHLSLAttributes - if-exists not allowed
     MaybeParseMicrosoftAttributes(attrs);
     DeclGroupPtrTy Result = ParseExternalDeclaration(attrs);
     if (Result && !getCurScope()->getParent())

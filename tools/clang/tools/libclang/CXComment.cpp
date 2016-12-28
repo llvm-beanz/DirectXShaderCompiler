@@ -1,15 +1,14 @@
 //===- CXComment.cpp - libclang APIs for manipulating CXComments ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines all libclang APIs related to walking comment AST.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXComment.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines all libclang APIs related to walking comment AST.       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang-c/Index.h"
 #include "CXComment.h"
@@ -27,7 +26,7 @@ using namespace clang;
 using namespace clang::comments;
 using namespace clang::cxcomment;
 
-extern "C" {
+//  extern "C" {           // HLSL Change -Don't use c linkage.
 
 CXComment clang_Cursor_getParsedComment(CXCursor C) {
   using namespace clang::cxcursor;
@@ -407,5 +406,5 @@ CXString clang_FullComment_getAsXML(CXComment CXC) {
   return cxstring::createDup(XML.str());
 }
 
-} // end extern "C"
+// } // end extern "C"          // HLSL Change -Don't use c linkage.
 

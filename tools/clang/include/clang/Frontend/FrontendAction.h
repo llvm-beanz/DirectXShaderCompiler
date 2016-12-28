@@ -1,19 +1,20 @@
 //===-- FrontendAction.h - Generic Frontend Action Interface ----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FrontendAction.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines the clang::FrontendAction interface and various convenience
-/// abstract classes (clang::ASTFrontendAction, clang::PluginASTAction,
-/// clang::PreprocessorFrontendAction, and clang::WrapperFrontendAction)
-/// derived from it.
+/// \file                                                                    //
+/// \brief Defines the clang::FrontendAction interface and various convenience//
+/// abstract classes (clang::ASTFrontendAction, clang::PluginASTAction,      //
+/// clang::PreprocessorFrontendAction, and clang::WrapperFrontendAction)     //
+/// derived from it.                                                         //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_FRONTEND_FRONTENDACTION_H
 #define LLVM_CLANG_FRONTEND_FRONTENDACTION_H

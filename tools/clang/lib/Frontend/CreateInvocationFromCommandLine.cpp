@@ -1,15 +1,14 @@
 //===--- CreateInvocationFromCommandLine.cpp - CompilerInvocation from Args ==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Construct a compiler invocation object for command line driver arguments
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CreateInvocationFromCommandLine.cpp                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Construct a compiler invocation object for command line driver arguments  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/Utils.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -40,12 +39,15 @@ clang::createInvocationFromCommandLine(ArrayRef<const char *> ArgList,
   }
 
   SmallVector<const char *, 16> Args;
-  Args.push_back("<clang>"); // FIXME: Remove dummy argument.
+  //Args.push_back("<clang>"); // FIXME: Remove dummy argument. // HLSL Change - parse directly as compilation
   Args.insert(Args.end(), ArgList.begin(), ArgList.end());
 
   // FIXME: Find a cleaner way to force the driver into restricted modes.
   Args.push_back("-fsyntax-only");
 
+#if 1 // HLSL Change Starts - no support for driver/toolchain support
+  const SmallVector<const char *, 16> &CCArgs = Args;
+#else
   // FIXME: We shouldn't have to pass in the path info.
   driver::Driver TheDriver("clang", llvm::sys::getDefaultTargetTriple(),
                            *Diags);
@@ -95,6 +97,7 @@ clang::createInvocationFromCommandLine(ArrayRef<const char *> ArgList,
   }
 
   const ArgStringList &CCArgs = Cmd.getArguments();
+#endif // HLSL Change Ends - no support for driver/toolchain support
   std::unique_ptr<CompilerInvocation> CI(new CompilerInvocation());
   if (!CompilerInvocation::CreateFromArgs(*CI,
                                      const_cast<const char **>(CCArgs.data()),

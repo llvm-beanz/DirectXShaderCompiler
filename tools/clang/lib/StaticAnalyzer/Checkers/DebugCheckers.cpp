@@ -1,15 +1,14 @@
 //==- DebugCheckers.cpp - Debugging Checkers ---------------------*- C++ -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines checkers that display debugging information.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DebugCheckers.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines checkers that display debugging information.           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "ClangSACheckers.h"
 #include "clang/Analysis/Analyses/Dominators.h"
@@ -161,7 +160,8 @@ namespace {
 class ConfigDumper : public Checker< check::EndOfTranslationUnit > {
   typedef AnalyzerOptions::ConfigTable Table;
 
-  static int compareEntry(const Table::MapEntryTy *const *LHS,
+  // HLSL Change: changed calling convention to __cdecl
+  static int __cdecl compareEntry(const Table::MapEntryTy *const *LHS,
                           const Table::MapEntryTy *const *RHS) {
     return (*LHS)->getKey().compare((*RHS)->getKey());
   }

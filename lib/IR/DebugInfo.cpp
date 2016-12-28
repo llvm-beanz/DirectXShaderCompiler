@@ -1,16 +1,15 @@
 //===--- DebugInfo.cpp - Debug Information Helper Classes -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the helper classes used to build and interpret debug
-// information in LLVM IR form.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DebugInfo.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the helper classes used to build and interpret debug //
+// information in LLVM IR form.                                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/DebugInfo.h"
 #include "LLVMContextImpl.h"
@@ -286,6 +285,12 @@ bool DebugInfoFinder::addGlobalVariable(DIGlobalVariable *DIG) {
   GVs.push_back(DIG);
   return true;
 }
+
+// HLSL Change Begins.
+bool DebugInfoFinder::appendGlobalVariable(DIGlobalVariable *DIG) {
+  return addGlobalVariable(DIG);
+}
+// HLSL Change Ends.
 
 bool DebugInfoFinder::addSubprogram(DISubprogram *SP) {
   if (!SP)

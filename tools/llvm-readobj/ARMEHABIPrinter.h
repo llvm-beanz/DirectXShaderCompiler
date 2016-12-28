@@ -1,11 +1,12 @@
 //===--- ARMEHABIPrinter.h - ARM EHABI Unwind Information Printer ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ARMEHABIPrinter.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_TOOLS_LLVM_READOBJ_ARMEHABIPRINTER_H
 #define LLVM_TOOLS_LLVM_READOBJ_ARMEHABIPRINTER_H

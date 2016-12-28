@@ -1,15 +1,14 @@
 //===- CIndexUSR.cpp - Clang-C Source Indexing Library --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the generation and use of USRs from CXEntities.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CIndexUSRs.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the generation and use of USRs from CXEntities.      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CIndexer.h"
 #include "CXCursor.h"
@@ -36,7 +35,7 @@ bool cxcursor::getDeclCursorUSR(const Decl *D, SmallVectorImpl<char> &Buf) {
   return generateUSRForDecl(D, Buf);
 }
 
-extern "C" {
+// extern "C" {            // HLSL Change -Don't use c linkage.
 
 CXString clang_getCursorUSR(CXCursor C) {
   const CXCursorKind &K = clang_getCursorKind(C);
@@ -141,4 +140,4 @@ CXString clang_constructUSR_ObjCProperty(const char *property,
   return cxstring::createDup(OS.str());
 }
 
-} // end extern "C"
+// } // end extern "C"          // HLSL Change -Don't use c linkage.

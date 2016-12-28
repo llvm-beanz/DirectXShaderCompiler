@@ -1,15 +1,14 @@
 //===---- ParseStmtAsm.cpp - Assembly Statement Parser --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements parsing for GCC and Microsoft inline assembly. 
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseStmtAsm.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements parsing for GCC and Microsoft inline assembly.       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "RAIIObjectsForParser.h"
@@ -33,6 +32,7 @@
 #include "llvm/Support/TargetSelect.h"
 using namespace clang;
 
+#if 0 // HLSL Change - disable this block to avoid having to build/link llvmMC
 namespace {
 class ClangAsmParserCallback : public llvm::MCAsmParserSemaCallback {
   Parser &TheParser;
@@ -175,6 +175,7 @@ private:
   }
 };
 }
+#endif // HLSL Change - disable this block to avoid having to build/link llvmMC
 
 /// Parse an identifier in an MS-style inline assembly block.
 ///
@@ -184,6 +185,7 @@ ExprResult Parser::ParseMSAsmIdentifier(llvm::SmallVectorImpl<Token> &LineToks,
                                         unsigned &NumLineToksConsumed,
                                         void *CastInfo,
                                         bool IsUnevaluatedContext) {
+  assert(!getLangOpts().HLSL && "no MS assembly support in HLSL");    // HLSL Change
   llvm::InlineAsmIdentifierInfo &Info =
       *(llvm::InlineAsmIdentifierInfo *)CastInfo;
 
@@ -332,6 +334,10 @@ static bool buildMSAsmString(Preprocessor &PP, SourceLocation AsmLoc,
 ///         ms-asm-line '\n' ms-asm-instruction-block
 ///
 StmtResult Parser::ParseMicrosoftAsmStatement(SourceLocation AsmLoc) {
+  assert(!getLangOpts().HLSL && "no MS assembly support in HLSL");    // HLSL Change
+#if 1 // HLSL Change - disable this block to avoid having to build/link llvmMC
+  return StmtResult();
+#else
   SourceManager &SrcMgr = PP.getSourceManager();
   SourceLocation EndLoc = AsmLoc;
   SmallVector<Token, 4> AsmToks;
@@ -585,6 +591,7 @@ StmtResult Parser::ParseMicrosoftAsmStatement(SourceLocation AsmLoc) {
   return Actions.ActOnMSAsmStmt(AsmLoc, LBraceLocs[0], AsmToks, AsmStringIR,
                                 NumOutputs, NumInputs, ConstraintRefs,
                                 ClobberRefs, Exprs, EndLoc);
+#endif // HLSL Change
 }
 
 /// ParseAsmStatement - Parse a GNU extended asm statement.
@@ -607,6 +614,7 @@ StmtResult Parser::ParseMicrosoftAsmStatement(SourceLocation AsmLoc) {
 ///         asm-clobbers ',' asm-string-literal
 ///
 StmtResult Parser::ParseAsmStatement(bool &msAsm) {
+  assert(!getLangOpts().HLSL && "no GNU assembly support in HLSL");   // HLSL Change
   assert(Tok.is(tok::kw_asm) && "Not an asm stmt");
   SourceLocation AsmLoc = ConsumeToken();
 
@@ -744,6 +752,7 @@ StmtResult Parser::ParseAsmStatement(bool &msAsm) {
 bool Parser::ParseAsmOperandsOpt(SmallVectorImpl<IdentifierInfo *> &Names,
                                  SmallVectorImpl<Expr *> &Constraints,
                                  SmallVectorImpl<Expr *> &Exprs) {
+  assert(!getLangOpts().HLSL && "no assembly support in HLSL");   // HLSL Change
   // 'asm-operands' isn't present?
   if (!isTokenStringLiteral() && Tok.isNot(tok::l_square))
     return false;

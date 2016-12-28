@@ -1,15 +1,14 @@
 //===--- CodeGenOptions.h ---------------------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeGenOptions.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the CodeGenOptions interface.                          //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the CodeGenOptions interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_FRONTEND_CODEGENOPTIONS_H
 #define LLVM_CLANG_FRONTEND_CODEGENOPTIONS_H
@@ -168,7 +167,32 @@ public:
   /// forward to CUDA runtime back-end for incorporating them into host-side
   /// object file.
   std::vector<std::string> CudaGpuBinaryFileNames;
-
+  // HLSL Change Starts
+  /// Entry point of hlsl shader passed with -hlsl-entry.
+  std::string HLSLEntryFunction;
+  /// Shader model to target for hlsl shader passed with -hlsl-profile.
+  std::string HLSLProfile;
+  /// Whether to target high-level DXIL.
+  bool HLSLHighLevel = false;
+  /// Whether use row major as default matrix major.
+  bool HLSLDefaultRowMajor = false;
+  /// Whether use legacy cbuffer load.
+  bool HLSLNotUseLegacyCBufLoad = false;
+  /// Set [branch] on every if.
+  bool HLSLPreferControlFlow = false;
+  /// Set [flatten] on every if.
+  bool HLSLAvoidControlFlow = false;
+  /// Force [flatten] on every if.
+  bool HLSLAllResourcesBound = false;
+  /// Major version of validator to run.
+  unsigned HLSLValidatorMajorVer = 0;
+  /// Minor version of validator to run.
+  unsigned HLSLValidatorMinorVer = 0;
+  /// Define macros passed in from command line
+  std::vector<std::string> HLSLDefines;
+  /// Arguments passed in from command line
+  std::vector<std::string> HLSLArguments;
+  // HLSL Change Ends
   /// Regular expression to select optimizations for which we should enable
   /// optimization remarks. Transformation passes whose name matches this
   /// expression (and support this feature), will emit a diagnostic

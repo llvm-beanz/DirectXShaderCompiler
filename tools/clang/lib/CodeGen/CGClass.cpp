@@ -1,15 +1,14 @@
 //===--- CGClass.cpp - Emit LLVM Code for C++ classes ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code dealing with C++ code generation of classes
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGClass.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code dealing with C++ code generation of classes            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGBlocks.h"
 #include "CGCXXABI.h"
@@ -815,12 +814,15 @@ void CodeGenFunction::EmitConstructorBody(FunctionArgList &Args) {
   Stmt *Body = Ctor->getBody(Definition);
   assert(Definition == Ctor && "emitting wrong constructor body");
 
+#if 1 // HLSL Change - no support for exception handling
+  assert(!(Body && isa<CXXTryStmt>(Body)));
+#else
   // Enter the function-try-block before the constructor prologue if
   // applicable.
   bool IsTryBody = (Body && isa<CXXTryStmt>(Body));
   if (IsTryBody)
     EnterCXXTryStmt(*cast<CXXTryStmt>(Body), true);
-
+#endif // HLSL Change - no support for exception handling
   incrementProfileCounter(Body);
 
   RunCleanupsScope RunCleanups(*this);
@@ -832,11 +834,15 @@ void CodeGenFunction::EmitConstructorBody(FunctionArgList &Args) {
   // initializers.
   EmitCtorPrologue(Ctor, CtorType, Args);
 
+#if 1 // HLSL Change - no support for exception handling
+  EmitStmt(Body);
+#else
   // Emit the body of the statement.
   if (IsTryBody)
     EmitStmt(cast<CXXTryStmt>(Body)->getTryBlock());
   else if (Body)
     EmitStmt(Body);
+#endif // HLSL Change - no support for exception handling
 
   // Emit any cleanup blocks associated with the member or base
   // initializers, which includes (along the exceptional path) the
@@ -844,8 +850,10 @@ void CodeGenFunction::EmitConstructorBody(FunctionArgList &Args) {
   // constructed.
   RunCleanups.ForceCleanup();
 
+#if 0 // HLSL Change - no support for exception handling
   if (IsTryBody)
     ExitCXXTryStmt(*cast<CXXTryStmt>(Body), true);
+#endif // HLSL Change - no support for exception handling
 }
 
 namespace {
@@ -1407,11 +1415,16 @@ void CodeGenFunction::EmitDestructorBody(FunctionArgList &Args) {
     return;
   }
 
+#if 1 // HLSL Change - no support for exception handling
+  assert(!(Body && isa<CXXTryStmt>(Body)));
+#else
   // If the body is a function-try-block, enter the try before
   // anything else.
   bool isTryBody = (Body && isa<CXXTryStmt>(Body));
   if (isTryBody)
     EnterCXXTryStmt(*cast<CXXTryStmt>(Body), true);
+#endif // HLSL Change - no support for exception handling
+
   EmitAsanPrologueOrEpilogue(false);
 
   // Enter the epilogue cleanups.
@@ -1435,11 +1448,16 @@ void CodeGenFunction::EmitDestructorBody(FunctionArgList &Args) {
     // Enter the cleanup scopes for virtual bases.
     EnterDtorCleanups(Dtor, Dtor_Complete);
 
+#if 1 // HLSL Change - no support for exception handling
+    EmitCXXDestructorCall(Dtor, Dtor_Base, /*ForVirtualBase=*/false,
+      /*Delegating=*/false, LoadCXXThis());
+#else
     if (!isTryBody) {
       EmitCXXDestructorCall(Dtor, Dtor_Base, /*ForVirtualBase=*/false,
                             /*Delegating=*/false, LoadCXXThis());
       break;
     }
+#endif 1 // HLSL Change - no support for exception handling
     // Fallthrough: act like we're in the base variant.
 
   case Dtor_Base:
@@ -1452,9 +1470,12 @@ void CodeGenFunction::EmitDestructorBody(FunctionArgList &Args) {
     if (!CanSkipVTablePointerInitialization(getContext(), Dtor))
         InitializeVTablePointers(Dtor->getParent());
 
+#if 0 // HLSL Change - no support for exception handling
     if (isTryBody)
       EmitStmt(cast<CXXTryStmt>(Body)->getTryBlock());
-    else if (Body)
+    else
+#endif // HLSL Change - no support for exception handling
+    if (Body)
       EmitStmt(Body);
     else {
       assert(Dtor->isImplicit() && "bodyless dtor not implicit");
@@ -1471,8 +1492,10 @@ void CodeGenFunction::EmitDestructorBody(FunctionArgList &Args) {
   DtorEpilogue.ForceCleanup();
 
   // Exit the try if applicable.
+#if 0 // HLSL Change - no support for exception handling
   if (isTryBody)
     ExitCXXTryStmt(*cast<CXXTryStmt>(Body), true);
+#endif // HLSL Change - no support for exception handling
 
   // Insert memory-poisoning instrumentation.
   if (CGM.getCodeGenOpts().SanitizeMemoryUseAfterDtor)

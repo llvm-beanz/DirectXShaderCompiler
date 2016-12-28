@@ -1,27 +1,26 @@
 //===-- Debug.cpp - An easy way to add debug output to your code ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements a handy way of adding debugging information to your
-// code, without it being enabled all of the time, and without having to add
-// command line options to enable it.
-//
-// In particular, just wrap your code with the DEBUG() macro, and it will be
-// enabled automatically if you specify '-debug' on the command-line.
-// Alternatively, you can also use the SET_DEBUG_TYPE("foo") macro to specify
-// that your debug code belongs to class "foo".  Then, on the command line, you
-// can specify '-debug-only=foo' to enable JUST the debug information for the
-// foo class.
-//
-// When compiling without assertions, the -debug-* options and all code in
-// DEBUG() statements disappears, so it does not affect the runtime of the code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Debug.cpp                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements a handy way of adding debugging information to your  //
+// code, without it being enabled all of the time, and without having to add //
+// command line options to enable it.                                        //
+//                                                                           //
+// In particular, just wrap your code with the DEBUG() macro, and it will be //
+// enabled automatically if you specify '-debug' on the command-line.        //
+// Alternatively, you can also use the SET_DEBUG_TYPE("foo") macro to specify//
+// that your debug code belongs to class "foo".  Then, on the command line, you//
+// can specify '-debug-only=foo' to enable JUST the debug information for the//
+// foo class.                                                                //
+//                                                                           //
+// When compiling without assertions, the -debug-* options and all code in   //
+// DEBUG() statements disappears, so it does not affect the runtime of the code.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -29,6 +28,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/circular_raw_ostream.h"
 #include "llvm/Support/raw_ostream.h"
+#include "dxc/Support/WinIncludes.h" // HLSL Change
 
 #undef isCurrentDebugType
 #undef setCurrentDebugType
@@ -71,6 +71,34 @@ void setCurrentDebugType(const char *Type) {
 
 // All Debug.h functionality is a no-op in NDEBUG mode.
 #ifndef NDEBUG
+
+#if 1 // HLSL Change Starts - redirect to OutputDebugString
+namespace llvm {
+  raw_ostream &dbgs() {
+    struct ods_ostream : public llvm::raw_ostream {
+      ods_ostream() {
+        SetUnbuffered();
+      }
+      __override uint64_t current_pos() const { return 0; }
+      __override void write_impl(const char *Ptr, size_t Size) {
+        // Need a null-terminated string here.
+        char chunk[512];
+        while (Size > 0) {
+          size_t len = (Size < _countof(chunk) ? Size : _countof(chunk));
+          memcpy(chunk, Ptr, len);
+          chunk[len] = '\0';
+          OutputDebugStringA(chunk);
+          Size -= len;
+          Ptr += len;
+        }
+      }
+    };
+    static ods_ostream the_stream;
+    return the_stream;
+  }
+}
+
+#else
 
 // -debug - Command line option to enable the DEBUG statements in the passes.
 // This flag may only be enabled in debug builds.
@@ -139,6 +167,8 @@ raw_ostream &llvm::dbgs() {
 
   return thestrm.strm;
 }
+
+#endif // HLSL Change Ends - redirect to OutputDebugString
 
 #else
 // Avoid "has no symbols" warning.

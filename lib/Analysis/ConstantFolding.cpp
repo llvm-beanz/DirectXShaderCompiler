@@ -1,20 +1,19 @@
 //===-- ConstantFolding.cpp - Fold instructions into constants ------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines routines for folding instructions into constants.
-//
-// Also, to supplement the basic IR ConstantExpr simplifications,
-// this file defines some additional folding routines that can make use of
-// DataLayout information. These functions cannot go in IR due to library
-// dependency issues.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ConstantFolding.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines routines for folding instructions into constants.       //
+//                                                                           //
+// Also, to supplement the basic IR ConstantExpr simplifications,            //
+// this file defines some additional folding routines that can make use of   //
+// DataLayout information. These functions cannot go in IR due to library    //
+// dependency issues.                                                        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1254,6 +1253,7 @@ bool llvm::canConstantFoldCallTo(const Function *F) {
   case Intrinsic::umul_with_overflow:
   case Intrinsic::convert_from_fp16:
   case Intrinsic::convert_to_fp16:
+#if 0 // HLSL Change - remove platform intrinsics
   case Intrinsic::x86_sse_cvtss2si:
   case Intrinsic::x86_sse_cvtss2si64:
   case Intrinsic::x86_sse_cvttss2si:
@@ -1262,6 +1262,7 @@ bool llvm::canConstantFoldCallTo(const Function *F) {
   case Intrinsic::x86_sse2_cvtsd2si64:
   case Intrinsic::x86_sse2_cvttsd2si:
   case Intrinsic::x86_sse2_cvttsd2si64:
+#endif // HLSL Change - remove platform intrinsics
     return true;
   default:
     return false;
@@ -1334,7 +1335,8 @@ static inline bool llvm_fenv_testexcept() {
 }
 } // End namespace
 
-static Constant *ConstantFoldFP(double (*NativeFP)(double), double V,
+// HLSL Change: changed calling convention of NativeFP to __cdecl
+static Constant *ConstantFoldFP(double (__cdecl *NativeFP)(double), double V,
                                 Type *Ty) {
   llvm_fenv_clearexcept();
   V = NativeFP(V);
@@ -1346,7 +1348,8 @@ static Constant *ConstantFoldFP(double (*NativeFP)(double), double V,
   return GetConstantFoldFPValue(V, Ty);
 }
 
-static Constant *ConstantFoldBinaryFP(double (*NativeFP)(double, double),
+// HLSL Change: changed calling convention of NativeFP to __cdecl
+static Constant *ConstantFoldBinaryFP(double (__cdecl *NativeFP)(double, double),
                                       double V, double W, Type *Ty) {
   llvm_fenv_clearexcept();
   V = NativeFP(V, W);
@@ -1564,6 +1567,7 @@ static Constant *ConstantFoldScalarCall(StringRef Name, unsigned IntrinsicID,
       }
     }
 
+#if 0 // HLSL Change - remove platform intrinsics
     // Support ConstantVector in case we have an Undef in the top.
     if (isa<ConstantVector>(Operands[0]) ||
         isa<ConstantDataVector>(Operands[0])) {
@@ -1588,6 +1592,7 @@ static Constant *ConstantFoldScalarCall(StringRef Name, unsigned IntrinsicID,
                                           /*roundTowardZero=*/true, Ty);
       }
     }
+#endif // HLSL Change - remove platform intrinsics
 
     if (isa<UndefValue>(Operands[0])) {
       if (IntrinsicID == Intrinsic::bswap)

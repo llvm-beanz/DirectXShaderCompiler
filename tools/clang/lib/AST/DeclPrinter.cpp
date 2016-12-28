@@ -1,16 +1,15 @@
 //===--- DeclPrinter.cpp - Printing implementation for Decl ASTs ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Decl::print method, which pretty prints the
-// AST back out to C/Objective-C/C++/Objective-C++ code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclPrinter.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Decl::print method, which pretty prints the      //
+// AST back out to C/Objective-C/C++/Objective-C++ code.                     //
+//                                                                           //
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -22,8 +21,10 @@
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/Basic/Module.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/Sema/SemaHLSL.h"  // HLSL Change
 using namespace clang;
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 namespace {
   class DeclPrinter : public DeclVisitor<DeclPrinter> {
     raw_ostream &Out;
@@ -97,6 +98,13 @@ namespace {
                                  const TemplateArgumentList *Args = nullptr);
     void prettyPrintAttributes(Decl *D);
     void printDeclType(QualType T, StringRef DeclName, bool Pack = false);
+
+    // HLSL Change Begin
+    void VisitHLSLBufferDecl(HLSLBufferDecl *D);
+    void PrintUnusualAnnotations(NamedDecl *D);
+    void VisitHLSLUnusualAnnotation(const hlsl::UnusualAnnotation *UA);
+    void PrintHLSLPreAttr(NamedDecl *D);
+    // HLSL Change End
   };
 }
 
@@ -202,7 +210,8 @@ void DeclPrinter::prettyPrintAttributes(Decl *D) {
     AttrVec &Attrs = D->getAttrs();
     for (AttrVec::const_iterator i=Attrs.begin(), e=Attrs.end(); i!=e; ++i) {
       Attr *A = *i;
-      A->printPretty(Out, Policy);
+      if (!hlsl::IsHLSLAttr(A->getKind())) // HLSL Change
+        A->printPretty(Out, Policy);       
     }
   }
 }
@@ -318,6 +327,8 @@ void DeclPrinter::VisitDeclContext(DeclContext *DC, bool Indent) {
              isa<ObjCCategoryImplDecl>(*D) ||
              isa<ObjCCategoryDecl>(*D))
       Terminator = nullptr;
+    else if (isa<HLSLBufferDecl>(*D)) // HLSL Change
+      Terminator = nullptr;
     else if (isa<EnumConstantDecl>(*D)) {
       DeclContext::decl_iterator Next = D;
       ++Next;
@@ -350,11 +361,13 @@ void DeclPrinter::VisitTypedefDecl(TypedefDecl *D) {
       Out << "__module_private__ ";
   }
   D->getTypeSourceInfo()->getType().print(Out, Policy, D->getName());
+  PrintUnusualAnnotations(D); // HLSL Change
   prettyPrintAttributes(D);
 }
 
 void DeclPrinter::VisitTypeAliasDecl(TypeAliasDecl *D) {
   Out << "using " << *D;
+  PrintUnusualAnnotations(D); // HLSL Change
   prettyPrintAttributes(D);
   Out << " = " << D->getTypeSourceInfo()->getType().getAsString(Policy);
 }
@@ -379,6 +392,8 @@ void DeclPrinter::VisitEnumDecl(EnumDecl *D) {
     VisitDeclContext(D);
     Indent() << "}";
   }
+
+  PrintUnusualAnnotations(D); // HLSL Change
   prettyPrintAttributes(D);
 }
 
@@ -429,9 +444,23 @@ void DeclPrinter::VisitFunctionDecl(FunctionDecl *D) {
       Out << "explicit ";
   }
 
+  // HLSL Change Begin
+  if (D->hasAttrs() && Policy.LangOpts.HLSL)
+    PrintHLSLPreAttr(D);
+  // HLSL Change End
+
   PrintingPolicy SubPolicy(Policy);
   SubPolicy.SuppressSpecifiers = false;
   std::string Proto = D->getNameInfo().getAsString();
+
+  // HLSL Change Begin
+  DeclContext *Namespace = D->getEnclosingNamespaceContext();
+  DeclContext *Enclosing = D->getLexicalParent();
+  if (!Enclosing->isNamespace() && Namespace->isNamespace()) {
+    NamespaceDecl* ns = (NamespaceDecl*)Namespace;
+    Proto = ns->getName().str() + "::" + Proto;
+  }
+  // HLSL Change End
 
   QualType Ty = D->getType();
   while (const ParenType *PT = dyn_cast<ParenType>(Ty)) {
@@ -587,6 +616,7 @@ void DeclPrinter::VisitFunctionDecl(FunctionDecl *D) {
     Ty.print(Out, Policy, Proto);
   }
 
+  PrintUnusualAnnotations(D); // HLSL Change
   prettyPrintAttributes(D);
 
   if (D->isPure())
@@ -648,6 +678,11 @@ void DeclPrinter::VisitFieldDecl(FieldDecl *D) {
   if (!Policy.SuppressSpecifiers && D->isModulePrivate())
     Out << "__module_private__ ";
 
+  // HLSL Change Begin
+  if (D->hasAttrs())
+    PrintHLSLPreAttr(D);
+  // HLSL Change End
+
   Out << D->getASTContext().getUnqualifiedObjCPointerType(D->getType()).
             stream(Policy, D->getName());
 
@@ -664,6 +699,8 @@ void DeclPrinter::VisitFieldDecl(FieldDecl *D) {
       Out << " = ";
     Init->printPretty(Out, nullptr, Policy, Indentation);
   }
+
+  PrintUnusualAnnotations(D); // HLSL Change
   prettyPrintAttributes(D);
 }
 
@@ -695,10 +732,24 @@ void DeclPrinter::VisitVarDecl(VarDecl *D) {
       Out << "__module_private__ ";
   }
 
+  // HLSL Change Begin
+  if (D->hasAttrs() && Policy.LangOpts.HLSL) 
+    PrintHLSLPreAttr(D); 
+  // HLSL Change End
+
   QualType T = D->getTypeSourceInfo()
     ? D->getTypeSourceInfo()->getType()
     : D->getASTContext().getUnqualifiedObjCPointerType(D->getType());
-  printDeclType(T, D->getName());
+
+  // HLSL Change Begin
+  if (D->hasAttrs() && Policy.LangOpts.HLSL) {
+    printDeclType(T.getNonReferenceType(), D->getName());
+  }
+  else {
+    printDeclType(T, D->getName());
+  }
+  // HLSL Change end
+    
   Expr *Init = D->getInit();
   if (!Policy.SuppressInitializers && Init) {
     bool ImplicitInit = false;
@@ -721,6 +772,7 @@ void DeclPrinter::VisitVarDecl(VarDecl *D) {
         Out << ")";
     }
   }
+  PrintUnusualAnnotations(D); // HLSL Change
   prettyPrintAttributes(D);
 }
 
@@ -781,8 +833,17 @@ void DeclPrinter::VisitEmptyDecl(EmptyDecl *D) {
 void DeclPrinter::VisitCXXRecordDecl(CXXRecordDecl *D) {
   if (!Policy.SuppressSpecifiers && D->isModulePrivate())
     Out << "__module_private__ ";
-  Out << D->getKindName();
 
+  // HLSL Change Begin
+  if (!Policy.LangOpts.HLSL || !D->isInterface()) {
+    Out << D->getKindName();
+  }
+  else {
+    Out << "interface";
+  }
+  // HLSL Change End
+
+  PrintUnusualAnnotations(D); // HLSL Change
   prettyPrintAttributes(D);
 
   if (D->getIdentifier())
@@ -1320,3 +1381,90 @@ void DeclPrinter::VisitOMPThreadPrivateDecl(OMPThreadPrivateDecl *D) {
   }
 }
 
+// HLSL Change Begin
+void DeclPrinter::VisitHLSLBufferDecl(HLSLBufferDecl *D) {
+  if (D->isCBuffer()) {
+    Out << "cbuffer ";
+  }
+  else { 
+    Out << "tbuffer ";
+  }
+    
+  Out << *D;
+
+  PrintUnusualAnnotations(D);
+  prettyPrintAttributes(D);
+
+  Out << " {\n";
+  VisitDeclContext(D);
+  Indent() << "}";
+}
+
+void DeclPrinter::PrintUnusualAnnotations(NamedDecl* D) {
+  if (D->isInvalidDecl()) 
+    return;
+
+  ArrayRef<hlsl::UnusualAnnotation *> Annotations = D->getUnusualAnnotations();
+  if (!Annotations.empty()) {
+    for (auto i = Annotations.begin(), e = Annotations.end(); i != e; ++i) {
+      VisitHLSLUnusualAnnotation(*i);
+    }
+  }
+}
+
+void DeclPrinter::VisitHLSLUnusualAnnotation(const hlsl::UnusualAnnotation *UA) {
+  switch (UA->getKind()) {
+  case hlsl::UnusualAnnotation::UA_SemanticDecl: {
+    const hlsl::SemanticDecl * semdecl = dyn_cast<hlsl::SemanticDecl>(UA);
+    Out << " : " << semdecl->SemanticName.str();
+    break;
+  }
+  case hlsl::UnusualAnnotation::UA_RegisterAssignment: {
+    const hlsl::RegisterAssignment * ra = dyn_cast<hlsl::RegisterAssignment>(UA);
+    if (ra->RegisterType) {
+      Out << " : register(";
+      if (!ra->ShaderProfile.empty()) {
+        Out << ra->ShaderProfile.str() << ", ";
+      }
+      Out << ra->RegisterType << ra->RegisterNumber;
+    
+      if (ra->RegisterOffset) {
+        Out << "[" << ra->RegisterOffset << "]";
+      }
+      Out << ")";
+    }
+    break;
+  }
+  case hlsl::UnusualAnnotation::UA_ConstantPacking: {
+    const hlsl::ConstantPacking * cp = dyn_cast<hlsl::ConstantPacking>(UA);
+    Out << " : packoffset(c" << cp->Subcomponent; //packing applies to constant registers (c) only
+    if (cp->ComponentOffset) {
+      switch (cp->ComponentOffset) {
+      case 1:
+        Out << ".y";
+        break;
+      case 2:
+        Out << ".z";
+        break;
+      case 3:
+        Out << ".w";
+        break;
+      }
+    }
+    Out << ")";
+    break;
+  }
+  }
+}
+
+void DeclPrinter::PrintHLSLPreAttr(NamedDecl* D) {
+  AttrVec &Attrs = D->getAttrs();
+  std::vector<Attr*> tempVec;
+  for (AttrVec::const_reverse_iterator i = Attrs.rbegin(), e = Attrs.rend(); i != e; ++i) {
+    Attr *A = *i;
+    hlsl::CustomPrintHLSLAttr(A, Out, Policy, Indentation);
+  }
+  
+}
+
+// HLSL Change End

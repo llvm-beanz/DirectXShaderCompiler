@@ -1,4 +1,9 @@
-set(LLVM_LINK_COMPONENTS support)
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
+set(LLVM_LINK_COMPONENTS support
+  mcparser # HLSL Change - needed for 'no target' build
+  hlsl  # HLSL Change
+)
 
 add_clang_executable(clang-format
   ClangFormat.cpp

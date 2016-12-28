@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set(system_libs)
 if( NOT MSVC )
   if( MINGW )
@@ -26,6 +28,9 @@ if( NOT MSVC )
     set(system_libs ${system_libs} m)
   endif( MINGW )
 endif( NOT MSVC )
+
+# HLSL Change - add ignored sources
+set(HLSL_IGNORE_SOURCES DynamicLibrary.cpp PluginLoader.cpp)
 
 add_llvm_library(LLVMSupport
   APFloat.cpp
@@ -67,9 +72,10 @@ add_llvm_library(LLVMSupport
   MathExtras.cpp
   MemoryBuffer.cpp
   MemoryObject.cpp
+  MSFileSystemBasic.cpp
   MD5.cpp
   Options.cpp
-  PluginLoader.cpp
+  # PluginLoader.cpp    # HLSL Change Starts - no support for plug-in loader
   PrettyStackTrace.cpp
   RandomNumberGenerator.cpp
   Regex.cpp
@@ -103,8 +109,9 @@ add_llvm_library(LLVMSupport
   regstrlcpy.c
 
 # System
+  assert.cpp      # HLSL Change
   Atomic.cpp
-  DynamicLibrary.cpp
+  # DynamicLibrary.cpp # HLSL Change - no support for interpreter or jit
   Errno.cpp
   Host.cpp
   Memory.cpp

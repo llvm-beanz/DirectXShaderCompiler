@@ -1,20 +1,20 @@
 //===--- CGExprScalar.cpp - Emit LLVM Code for Scalar Exprs ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Expr nodes with scalar LLVM types as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGExprScalar.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Expr nodes with scalar LLVM types as LLVM code.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCXXABI.h"
 #include "CGDebugInfo.h"
 #include "CGObjCRuntime.h"
+#include "CGHLSLRuntime.h"    // HLSL Change
 #include "CodeGenModule.h"
 #include "TargetInfo.h"
 #include "clang/AST/ASTContext.h"
@@ -198,6 +198,32 @@ public:
 
   Value *Visit(Expr *E) {
     ApplyDebugLocation DL(CGF, E);
+    // HLSL Change Begins
+    // generate matrix operations
+    if (BinaryOperator *BinOp = dyn_cast<BinaryOperator>(E)) {
+      if (hlsl::IsHLSLMatType(E->getType()) ||
+          hlsl::IsHLSLMatType(BinOp->getLHS()->getType())) {
+          if (BinOp->getOpcode() != BO_Assign) {
+              llvm::Value *LHS = CGF.EmitScalarExpr(BinOp->getLHS());
+              llvm::Value *RHS = CGF.EmitScalarExpr(BinOp->getRHS());
+              return CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(
+                  CGF, E, ConvertType(E->getType()), { LHS, RHS });
+          }
+          else {
+              LValue LHS = CGF.EmitLValue(BinOp->getLHS());
+              llvm::Value *RHS = CGF.EmitScalarExpr(BinOp->getRHS());
+              CGF.CGM.getHLSLRuntime().EmitHLSLMatrixStore(CGF, RHS, LHS.getAddress(), BinOp->getLHS()->getType());
+              return RHS;
+          }
+      }
+    } else if (UnaryOperator *UnOp = dyn_cast<UnaryOperator>(E)) {
+      if (hlsl::IsHLSLMatType(E->getType())) {
+        llvm::Value *Oper = CGF.EmitScalarExpr(UnOp->getSubExpr());
+        return CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(
+            CGF, E, Oper->getType(), {Oper});
+      }
+    }
+    // HLSL Change Ends
     return StmtVisitor<ScalarExprEmitter, Value*>::Visit(E);
   }
 
@@ -300,6 +326,8 @@ public:
   Value *VisitConvertVectorExpr(ConvertVectorExpr *E);
   Value *VisitMemberExpr(MemberExpr *E);
   Value *VisitExtVectorElementExpr(Expr *E) { return EmitLoadOfLValue(E); }
+  Value *VisitExtMatrixElementExpr(Expr *E) { return EmitLoadOfLValue(E); } // HLSL Change
+  Value *VisitHLSLVectorElementExpr(Expr *E) { return EmitLoadOfLValue(E); } // HLSL Change
   Value *VisitCompoundLiteralExpr(CompoundLiteralExpr *E) {
     return EmitLoadOfLValue(E);
   }
@@ -323,7 +351,19 @@ public:
   Value *VisitCallExpr(const CallExpr *E) {
     if (E->getCallReturnType(CGF.getContext())->isReferenceType())
       return EmitLoadOfLValue(E);
+    // HLSL Change Starts
+    if (CGF.getContext().getLangOpts().HLSL) {
+      RValue RV = CGF.EmitCallExpr(E);
+      Value *V = nullptr;
+      if (RV.isScalar())
+        V = RV.getScalarVal();
+      else
+        V = RV.getAggregateAddr();
 
+      EmitLValueAlignmentAssumption(E, V);
+      return V;
+    }
+    // HLSL Change Ends
     Value *V = CGF.EmitCallExpr(E).getScalarVal();
 
     EmitLValueAlignmentAssumption(E, V);
@@ -816,6 +856,82 @@ Value *ScalarExprEmitter::EmitScalarConversion(Value *Src, QualType SrcType,
     return Builder.CreateVectorSplat(NumElements, Elt, "splat");
   }
 
+  // HLSL Change Starts
+  if (CGF.getContext().getLangOpts().HLSL) {
+    // A scalar can be splatted to an extended vector of the same element type
+    if (DstTy->isVectorTy() && !SrcTy->isVectorTy()) {
+      // Cast the scalar to element type
+      const ExtVectorType *DstVecType =
+          hlsl::ConvertHLSLVecMatTypeToExtVectorType(CGF.getContext(), DstType);
+      QualType EltTy = DstVecType->getElementType();
+      llvm::Value *Elt = EmitScalarConversion(Src, SrcType, EltTy);
+
+      // Splat the element across to all elements
+      unsigned NumElements = cast<llvm::VectorType>(DstTy)->getNumElements();
+      return Builder.CreateVectorSplat(NumElements, Elt, "splat");
+    }
+    if (SrcTy->isVectorTy() && DstTy->isVectorTy()) {
+      Value *Res = nullptr;
+
+      const ExtVectorType *SrcVecType =
+          hlsl::ConvertHLSLVecMatTypeToExtVectorType(CGF.getContext(), SrcType);
+      const ExtVectorType *DstVecType =
+          hlsl::ConvertHLSLVecMatTypeToExtVectorType(CGF.getContext(), DstType);
+
+      const llvm::VectorType *SrcVecTy = cast<llvm::VectorType>(SrcTy);
+      const llvm::VectorType *DstVecTy = cast<llvm::VectorType>(DstTy);
+
+      if (SrcVecTy->getNumElements() != DstVecTy->getNumElements()) {
+        if (SrcVecTy->getNumElements() == 1) {
+          // Cast the scalar to element type
+          const ExtVectorType *DstVecType =
+              hlsl::ConvertHLSLVecMatTypeToExtVectorType(CGF.getContext(),
+                                                         DstType);
+          QualType EltTy = DstVecType->getElementType();
+          llvm::Value *Elt = EmitScalarConversion(Src, SrcType, EltTy);
+
+          // Splat the element across to all elements
+          unsigned NumElements =
+              cast<llvm::VectorType>(DstTy)->getNumElements();
+          return Builder.CreateVectorSplat(NumElements, Elt, "splat");
+        }
+      }
+
+      if (isa<llvm::IntegerType>(SrcVecTy->getElementType())) {
+        bool InputSigned =
+            SrcVecType->getElementType()->isSignedIntegerOrEnumerationType();
+        if (isa<llvm::IntegerType>(DstVecTy->getElementType()))
+          Res = Builder.CreateIntCast(Src, DstTy, InputSigned, "conv");
+        else if (InputSigned)
+          Res = Builder.CreateSIToFP(Src, DstTy, "conv");
+        else
+          Res = Builder.CreateUIToFP(Src, DstTy, "conv");
+      } else if (isa<llvm::IntegerType>(DstVecTy->getElementType())) {
+        assert(SrcVecTy->getElementType()->isFloatingPointTy() &&
+               "Unknown real conversion");
+        if (DstVecType->getElementType()->isSignedIntegerOrEnumerationType())
+          Res = Builder.CreateFPToSI(Src, DstTy, "conv");
+        else
+          Res = Builder.CreateFPToUI(Src, DstTy, "conv");
+      } else {
+        assert(SrcVecTy->getElementType()->isFloatingPointTy() &&
+               DstVecTy->getElementType()->isFloatingPointTy() &&
+               "Unknown real conversion");
+        if (DstVecTy->getElementType()->getTypeID() <
+            SrcVecTy->getElementType()->getTypeID())
+          Res = Builder.CreateFPTrunc(Src, DstTy, "conv");
+        else
+          Res = Builder.CreateFPExt(Src, DstTy, "conv");
+      }
+
+      return Res;
+    }
+    if (SrcTy->isVectorTy() && !DstTy->isVectorTy()) {
+      return Builder.CreateExtractElement(Src, (uint64_t)0);
+    }
+  }
+  // HLSL Change Ends
+
   // Allow bitcast from vector to integer/fp of the same size.
   if (isa<llvm::VectorType>(SrcTy) ||
       isa<llvm::VectorType>(DstTy))
@@ -846,6 +962,16 @@ Value *ScalarExprEmitter::EmitScalarConversion(Value *Src, QualType SrcType,
     }
     DstTy = CGF.FloatTy;
   }
+
+  // HLSL Change Begins.
+  if (const BuiltinType *BT = SrcType->getAs<BuiltinType>()) {
+    if (BT->getKind() == BuiltinType::Kind::LitInt || BT->getKind() == BuiltinType::Kind::LitFloat) {
+      Res = CGF.CGM.getHLSLRuntime().EmitHLSLLiteralCast(CGF, Src, SrcType, DstType);
+      if (Res)
+        return Res;
+    }
+  }
+  // HLSL Change Ends.
 
   if (isa<llvm::IntegerType>(SrcTy)) {
     bool InputSigned = SrcType->isSignedIntegerOrEnumerationType();
@@ -1189,6 +1315,12 @@ Value *ScalarExprEmitter::VisitInitListExpr(InitListExpr *E) {
     dyn_cast<llvm::VectorType>(ConvertType(E->getType()));
 
   if (!VType) {
+    // HLSL Change Begins
+    if (hlsl::IsHLSLMatType(E->getType())) {
+      // init function for matrix
+      return CGF.CGM.getHLSLRuntime().EmitHLSLInitListExpr(CGF, E, /*DestPtr*/nullptr);
+    }
+    // HLSL Change Ends
     if (NumInitElements == 0) {
       // C++11 value-initialization for the scalar.
       return EmitNullValue(E->getType());
@@ -1196,8 +1328,15 @@ Value *ScalarExprEmitter::VisitInitListExpr(InitListExpr *E) {
     // We have a scalar in braces. Just use the first element.
     return Visit(E->getInit(0));
   }
+  else {
+    if (hlsl::IsHLSLVecType(E->getType())) {
+      return CGF.CGM.getHLSLRuntime().EmitHLSLInitListExpr(CGF, E, /*DestPtr*/nullptr);
+    }
+  }
 
   unsigned ResElts = VType->getNumElements();
+
+  // HLSL Note - Matrix swizzle members emit - Consider handling matrix swizzles here
 
   // Loop over initializers collecting the Value for each, and remembering
   // whether the source was swizzle (ExtVectorElementExpr).  This will allow
@@ -1361,7 +1500,16 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
   Expr *E = CE->getSubExpr();
   QualType DestTy = CE->getType();
   CastKind Kind = CE->getCastKind();
+  // HLSL Change Begins
+  if (hlsl::IsHLSLMatType(E->getType()) || hlsl::IsHLSLMatType(CE->getType())) {
+    llvm::Value *V = CGF.EmitScalarExpr(E);
+    llvm::Type *RetTy = CGF.ConvertType(DestTy);
 
+    if (V->getType() == RetTy)
+      return V;
+    return CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(CGF, CE, RetTy, { V });
+  }
+  // HLSL Change Ends
   if (!DestTy->isVoidType())
     TestAndClearIgnoreResultAssign();
 
@@ -1605,7 +1753,71 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
     assert(DestTy->isEventT() && "CK_ZeroToOCLEvent cast on non-event type");
     return llvm::Constant::getNullValue(ConvertType(DestTy));
   }
+  // HLSL Change Starts
+  case CK_HLSLMatrixTruncationCast:
+  case CK_HLSLVectorTruncationCast: {
+    // must be vector
+    llvm::Value *val = Visit(E);
 
+    if (const ExtVectorType *extVecTy =
+            hlsl::ConvertHLSLVecMatTypeToExtVectorType(CGF.getContext(),
+                                                       CE->getType())) {
+      uint32_t vecSize = extVecTy->getNumElements();
+      SmallVector<llvm::Constant *, 4> Mask;
+      for (unsigned i = 0; i != vecSize; ++i)
+        Mask.push_back(Builder.getInt32(i));
+
+      llvm::Value *MaskV = llvm::ConstantVector::get(Mask);
+
+      return Builder.CreateShuffleVector(
+          val, llvm::UndefValue::get(val->getType()), MaskV);
+    } else if (E->getType()->isScalarType()) {
+      return Builder.CreateExtractElement(val, (uint64_t)0);
+    }
+  }
+  case CK_HLSLCC_FloatingToIntegral:
+  case CK_HLSLCC_FloatingCast: {
+    return EmitScalarConversion(Visit(E), E->getType(), DestTy);
+  }
+  case CK_HLSLVectorToMatrixCast:
+  case CK_HLSLMatrixToVectorCast: {
+    llvm::Value *val = Visit(E);
+    llvm::Type *RetTy = CGF.ConvertType(DestTy);
+    val = CGF.CGM.getHLSLRuntime().EmitHLSLMatrixLoad(CGF, val, E->getType());
+    return CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(CGF, CE, RetTy, { val });
+  }
+  case CK_HLSLCC_IntegralCast:
+  case CK_HLSLCC_IntegralToFloating: {
+    return EmitScalarConversion(Visit(E), E->getType(), DestTy);
+  }
+  case CK_HLSLMatrixSplat: {
+    llvm::Type *DstTy = ConvertType(DestTy);
+    Value *Elt = Visit(const_cast<Expr *>(E));
+    return CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(CGF, CE, DstTy, { Elt });
+  }
+  case CK_HLSLVectorSplat: {
+    llvm::Type *DstTy = ConvertType(DestTy);
+    Value *Elt = Visit(const_cast<Expr *>(E));
+    const ExtVectorType *extVecTy = hlsl::ConvertHLSLVecMatTypeToExtVectorType(
+        CGF.getContext(), CE->getType());
+    Elt = EmitScalarConversion(Elt, E->getType(), extVecTy->getElementType());
+
+    // Splat the element across to all elements
+    unsigned NumElements = cast<llvm::VectorType>(DstTy)->getNumElements();
+    return Builder.CreateVectorSplat(NumElements, Elt, "splat");
+  }
+  case CK_HLSLVectorToScalarCast:
+  case CK_HLSLMatrixToScalarCast: {
+    return Builder.CreateExtractElement(Visit(E), (uint64_t)0);
+  }
+  case CK_FlatConversion: {
+      llvm::Value *val = Visit(E);
+      llvm::Value *elem = Builder.CreateExtractValue(val, (uint64_t)0);
+      return EmitScalarConversion(elem, E->getType(), DestTy);
+  }
+  case CK_HLSLCC_IntegralToBoolean:
+    return EmitIntToBoolConversion(Visit(E));
+  // HLSL Change Ends
   }
 
   llvm_unreachable("unknown scalar cast");
@@ -1778,7 +1990,8 @@ ScalarExprEmitter::EmitScalarPrePostIncDec(const UnaryOperator *E, LValue LV,
     }
 
   // Vector increment/decrement.
-  } else if (type->isVectorType()) {
+  } else if (type->isVectorType() ||
+             hlsl::IsHLSLVecType(type)) { // HLSL Change
     if (type->hasIntegerRepresentation()) {
       llvm::Value *amt = llvm::ConstantInt::get(value->getType(), amount);
 
@@ -1789,6 +2002,20 @@ ScalarExprEmitter::EmitScalarPrePostIncDec(const UnaryOperator *E, LValue LV,
                   llvm::ConstantFP::get(value->getType(), amount),
                   isInc ? "inc" : "dec");
     }
+  // HLSL Change Begins
+  // HLSL matrix
+  } else if (hlsl::IsHLSLMatType(type)) {
+    // generate operator call
+    value = CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(
+        CGF, E, value->getType(), {value});
+    // store updated value
+    CGF.CGM.getHLSLRuntime().EmitHLSLMatrixStore(CGF, value, LV.getAddress(), E->getType());
+
+    // If this is a postinc, return the value read from memory, otherwise use
+    // the
+    // updated value.
+    return isPre ? value : input;
+    // HLSL Change Ends
 
   // Floating point.
   } else if (type->isRealFloatingType()) {
@@ -1906,7 +2133,8 @@ Value *ScalarExprEmitter::VisitUnaryNot(const UnaryOperator *E) {
 
 Value *ScalarExprEmitter::VisitUnaryLNot(const UnaryOperator *E) {
   // Perform vector logical not on comparison with zero vector.
-  if (E->getType()->isExtVectorType()) {
+  if (E->getType()->isExtVectorType() ||
+      hlsl::IsHLSLVecType(E->getType())) { // HLSL Change
     Value *Oper = Visit(E->getSubExpr());
     Value *Zero = llvm::Constant::getNullValue(Oper->getType());
     Value *Result;
@@ -2123,6 +2351,31 @@ LValue ScalarExprEmitter::EmitCompoundAssignLValue(
                                               const CompoundAssignOperator *E,
                         Value *(ScalarExprEmitter::*Func)(const BinOpInfo &),
                                                    Value *&Result) {
+  // HLSL Change Begins
+  if (hlsl::IsHLSLMatType(E->getType())) {
+    const Expr *LHS = E->getLHS();
+    const Expr *RHS = E->getRHS();
+    LValue L = CGF.EmitLValue(LHS);
+    Value *LVal = L.getAddress();
+
+    Value *RVal = CGF.EmitScalarExpr(RHS);
+    SmallVector<Value *, 4> paramList;
+
+    Value *LdLVal =
+        CGF.CGM.getHLSLRuntime().EmitHLSLMatrixLoad(CGF, LVal, LHS->getType());
+
+    paramList.emplace_back(LdLVal);
+    paramList.emplace_back(RVal);
+    // Set return type to be none reference type for Result
+    llvm::Type *RetType = LVal->getType()->getPointerElementType();
+    Result = CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(
+        CGF, E, RetType, paramList);
+    // store result to LVal
+    CGF.CGM.getHLSLRuntime().EmitHLSLMatrixStore(CGF, Result, LVal,
+                                                 LHS->getType());
+    return L;
+  }
+  // HLSL Change Ends
   QualType LHSTy = E->getLHS()->getType();
   BinOpInfo OpInfo;
 
@@ -2324,6 +2577,14 @@ Value *ScalarExprEmitter::EmitRem(const BinOpInfo &Ops) {
     if (Ops.Ty->isIntegerType())
       EmitUndefinedBehaviorIntegerDivAndRemCheck(Ops, Zero, false);
   }
+
+  // HLSL Change Begins.
+  if (CGF.getLangOpts().HLSL) {
+    if (Ops.LHS->getType()->getScalarType()->isFloatingPointTy()) {
+      return Builder.CreateFRem(Ops.LHS, Ops.RHS, "frem");
+    }
+  }
+  // HLSL Change Ends.
 
   if (Ops.Ty->hasUnsignedIntegerRepresentation())
     return Builder.CreateURem(Ops.LHS, Ops.RHS, "rem");
@@ -2818,6 +3079,10 @@ enum IntrinsicType { VCMPEQ, VCMPGT };
 // return corresponding comparison intrinsic for given vector type
 static llvm::Intrinsic::ID GetIntrinsic(IntrinsicType IT,
                                         BuiltinType::Kind ElemKind) {
+  llvm_unreachable("HLSL Does not support altivec vectors");
+  return llvm::Intrinsic::not_intrinsic;  // HLSL Change - remove platform intrinsics
+
+#if 0 // HLSL Change - remove platform intrinsics
   switch (ElemKind) {
   default: llvm_unreachable("unexpected element type");
   case BuiltinType::Char_U:
@@ -2846,6 +3111,7 @@ static llvm::Intrinsic::ID GetIntrinsic(IntrinsicType IT,
     return (IT == VCMPEQ) ? llvm::Intrinsic::ppc_altivec_vcmpeqfp_p :
                             llvm::Intrinsic::ppc_altivec_vcmpgtfp_p;
   }
+#endif // HLSL Change - remove platform intrinsics
 }
 
 Value *ScalarExprEmitter::EmitCompare(const BinaryOperator *E,unsigned UICmpOpc,
@@ -2864,10 +3130,19 @@ Value *ScalarExprEmitter::EmitCompare(const BinaryOperator *E,unsigned UICmpOpc,
   } else if (!LHSTy->isAnyComplexType() && !RHSTy->isAnyComplexType()) {
     Value *LHS = Visit(E->getLHS());
     Value *RHS = Visit(E->getRHS());
+    // HLSL Change Begins
+    if (hlsl::IsHLSLMatType(LHSTy) && hlsl::IsHLSLMatType(RHSTy)) {
+      llvm::Type *RetTy = CGF.ConvertType(E->getType());
+      return CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(CGF, E, RetTy,
+                                                                  {LHS, RHS});
+    }
+    // HLSL Change Ends
 
     // If AltiVec, the comparison results in a numeric type, so we use
     // intrinsics comparing vectors and giving 0 or 1 as a result
     if (LHSTy->isVectorType() && !E->getType()->isVectorType()) {
+      llvm_unreachable("HLSL Does not support altivec vectors");
+#if 0 // HLSL Change - remove platform intrinsics
       // constants for mapping CR6 register bits to predicate result
       enum { CR6_EQ=0, CR6_EQ_REV, CR6_LT, CR6_LT_REV } CR6;
 
@@ -2928,6 +3203,7 @@ Value *ScalarExprEmitter::EmitCompare(const BinaryOperator *E,unsigned UICmpOpc,
       llvm::Function *F = CGF.CGM.getIntrinsic(ID);
       Result = Builder.CreateCall(F, {CR6Param, FirstVecArg, SecondVecArg});
       return EmitScalarConversion(Result, CGF.getContext().BoolTy, E->getType());
+#endif // HLSL Change - remove platform intrinsics
     }
 
     if (LHS->getType()->isFPOrFPVectorTy()) {
@@ -2946,6 +3222,17 @@ Value *ScalarExprEmitter::EmitCompare(const BinaryOperator *E,unsigned UICmpOpc,
     // vector integer type and return it (don't convert to bool).
     if (LHSTy->isVectorType())
       return Builder.CreateSExt(Result, ConvertType(E->getType()), "sext");
+    // HLSL Change Starts
+    if (const ExtVectorType *vecTy = hlsl::ConvertHLSLVecMatTypeToExtVectorType(
+            CGF.getContext(), LHSTy)) {
+      // Return Result directly when E is already a vector.
+      if (hlsl::IsHLSLVecType(E->getType()))
+        return Result;
+      QualType bVecTy = CGF.getContext().getExtVectorType(
+          E->getType(), vecTy->getNumElements());
+      return Builder.CreateSExt(Result, ConvertType(bVecTy), "sext");
+    }
+    // HLSL Change Ends
 
   } else {
     // Complex Comparison: can only be an equality comparison.
@@ -3092,6 +3379,26 @@ Value *ScalarExprEmitter::VisitBinLAnd(const BinaryOperator *E) {
       return llvm::Constant::getNullValue(ResTy);
   }
 
+  // HLSL Change Begins.
+  if (CGF.getLangOpts().HLSL) {
+    // HLSL does not short circuit.
+    Value *LHS = Visit(E->getLHS());
+    Value *RHS = Visit(E->getRHS());
+    if (ResTy->isVectorTy()) {
+      Value *Zero = llvm::ConstantAggregateZero::get(LHS->getType());
+      if (LHS->getType()->isFPOrFPVectorTy()) {
+        LHS = Builder.CreateFCmp(llvm::CmpInst::FCMP_UNE, LHS, Zero, "cmp");
+        RHS = Builder.CreateFCmp(llvm::CmpInst::FCMP_UNE, RHS, Zero, "cmp");
+      } else {
+        LHS = Builder.CreateICmp(llvm::CmpInst::ICMP_NE, LHS, Zero, "cmp");
+        RHS = Builder.CreateICmp(llvm::CmpInst::ICMP_NE, RHS, Zero, "cmp");
+      }
+    }
+    Value *And = Builder.CreateAnd(LHS, RHS);
+    return Builder.CreateSExt(And, ConvertType(E->getType()), "sext");
+  }
+  // HLSL Change Ends.
+
   llvm::BasicBlock *ContBlock = CGF.createBasicBlock("land.end");
   llvm::BasicBlock *RHSBlock  = CGF.createBasicBlock("land.rhs");
 
@@ -3169,6 +3476,26 @@ Value *ScalarExprEmitter::VisitBinLOr(const BinaryOperator *E) {
     if (!CGF.ContainsLabel(E->getRHS()))
       return llvm::ConstantInt::get(ResTy, 1);
   }
+
+  // HLSL Change Begins.
+  if (CGF.getLangOpts().HLSL) {
+    // HLSL does not short circuit.
+    Value *LHS = Visit(E->getLHS());
+    Value *RHS = Visit(E->getRHS());
+    if (ResTy->isVectorTy()) {
+      Value *Zero = llvm::ConstantAggregateZero::get(LHS->getType());
+      if (LHS->getType()->isFPOrFPVectorTy()) {
+        LHS = Builder.CreateFCmp(llvm::CmpInst::FCMP_UNE, LHS, Zero, "cmp");
+        RHS = Builder.CreateFCmp(llvm::CmpInst::FCMP_UNE, RHS, Zero, "cmp");
+      } else {
+        LHS = Builder.CreateICmp(llvm::CmpInst::ICMP_NE, LHS, Zero, "cmp");
+        RHS = Builder.CreateICmp(llvm::CmpInst::ICMP_NE, RHS, Zero, "cmp");
+      }
+    }
+    Value *Or = Builder.CreateOr(LHS, RHS);
+    return Builder.CreateSExt(Or, ConvertType(E->getType()), "sext");
+  }
+  // HLSL Change Ends.
 
   llvm::BasicBlock *ContBlock = CGF.createBasicBlock("lor.end");
   llvm::BasicBlock *RHSBlock = CGF.createBasicBlock("lor.rhs");
@@ -3315,6 +3642,34 @@ VisitAbstractConditionalOperator(const AbstractConditionalOperator *E) {
 
     return tmp5;
   }
+  // HLSL Change Starts
+  if (CGF.getLangOpts().HLSL && hlsl::IsHLSLVecType(E->getType())) {
+    llvm::Value *CondV = CGF.EmitScalarExpr(condExpr);
+    llvm::Value *LHS = Visit(lhsExpr);
+    llvm::Value *RHS = Visit(rhsExpr);
+    if (llvm::VectorType *VT = dyn_cast<llvm::VectorType>(CondV->getType())) {
+      llvm::VectorType *ResultVT = cast<llvm::VectorType>(LHS->getType());
+      llvm::Value *result = llvm::UndefValue::get(ResultVT);
+      for (unsigned i = 0; i < VT->getNumElements(); i++) {
+        llvm::Value *EltCond = Builder.CreateExtractElement(CondV, i);
+        llvm::Value *EltL = Builder.CreateExtractElement(LHS, i);
+        llvm::Value *EltR = Builder.CreateExtractElement(RHS, i);
+        llvm::Value *EltSelect = Builder.CreateSelect(EltCond, EltL, EltR);
+        result = Builder.CreateInsertElement(result, EltSelect, i);
+      }
+      return result;
+    } else {
+      return Builder.CreateSelect(CondV, LHS, RHS);
+    }
+  }
+  if (CGF.getLangOpts().HLSL && hlsl::IsHLSLMatType(E->getType())) {
+    llvm::Value *Cond = CGF.EmitScalarExpr(condExpr);
+    llvm::Value *LHS = Visit(lhsExpr);
+    llvm::Value *RHS = Visit(rhsExpr);
+    return CGF.CGM.getHLSLRuntime().EmitHLSLMatrixOperationCall(
+        CGF, E, LHS->getType(), {Cond, LHS, RHS});
+  }
+  // HLSL Change Ends
 
   // If this is a really simple expression (like x ? 4 : 5), emit this as a
   // select instead of as control flow.  We can only do this if it is cheap and

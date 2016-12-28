@@ -49,8 +49,7 @@ Build Integration
 
 The LLVMBuild files themselves are just a declarative way to describe
 the project structure. The actual building of the LLVM project is
-handled by another build system (currently we support both
-:doc:`Makefiles <MakefileGuide>` and :doc:`CMake <CMake>`).
+handled by another build system.
 
 The build system implementation will load the relevant contents of the
 LLVMBuild files and use that to drive the actual project build.
@@ -64,10 +63,6 @@ of how the LLVMBuild system is integrated into their build. Ideally,
 LLVM developers who are not working on the build system would only ever
 need to modify the contents of the ``LLVMBuild.txt`` description files
 (although we have not reached this goal yet).
-
-For more information on the utility tool we provide to help interfacing
-with the build system, please see the :doc:`llvm-build
-<CommandGuide/llvm-build>` documentation.
 
 Component Overview
 ==================

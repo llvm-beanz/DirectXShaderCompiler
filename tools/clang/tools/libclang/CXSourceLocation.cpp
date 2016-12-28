@@ -1,15 +1,14 @@
 //===- CXSourceLocation.cpp - CXSourceLocations APIs ------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines routines for manipulating CXSourceLocations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXSourceLocation.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines routines for manipulating CXSourceLocations.            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/ASTUnit.h"
 #include "CIndexer.h"
@@ -38,7 +37,7 @@ static bool isASTUnitSourceLocation(const CXSourceLocation &L) {
 // Basic construction and comparison of CXSourceLocations and CXSourceRanges.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {             // HLSL Change -Don't use c linkage.
   
 CXSourceLocation clang_getNullLocation() {
   CXSourceLocation Result = { { nullptr, nullptr }, 0 };
@@ -110,13 +109,13 @@ CXSourceLocation clang_getRangeEnd(CXSourceRange range) {
   return Result;
 }
 
-} // end extern "C"
+// } // end extern "C"           // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 //  Getting CXSourceLocations and CXSourceRanges from a translation unit.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {             // HLSL Change -Don't use c linkage.
   
 CXSourceLocation clang_getLocation(CXTranslationUnit TU,
                                    CXFile file,
@@ -173,7 +172,7 @@ CXSourceLocation clang_getLocationForOffset(CXTranslationUnit TU,
   return cxloc::translateSourceLocation(CXXUnit->getASTContext(), SLoc);
 }
 
-} // end extern "C"
+// } // end extern "C"           // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // Routines for expanding and manipulating CXSourceLocations, regardless
@@ -206,7 +205,7 @@ static void createNullLocation(CXString *filename, unsigned *line,
   return;
 }
 
-extern "C" {
+// extern "C" {              // HLSL Change -Don't use c linkage.
 
 int clang_Location_isInSystemHeader(CXSourceLocation location) {
   const SourceLocation Loc =
@@ -388,4 +387,4 @@ void clang_getFileLocation(CXSourceLocation location,
     *offset = FileOffset;
 }
 
-} // end extern "C"
+// } // end extern "C"          // HLSL Change -Don't use c linkage.

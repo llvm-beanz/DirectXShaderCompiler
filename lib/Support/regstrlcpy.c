@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// regstrlcpy.c                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 /*
  * This code is derived from OpenBSD's libc, original license follows:
  *
@@ -25,12 +34,17 @@
  * will be copied.  Always NUL terminates (unless siz == 0).
  * Returns strlen(src); if retval >= siz, truncation occurred.
  */
+_Use_decl_annotations_
 size_t
 llvm_strlcpy(char *dst, const char *src, size_t siz)
 {
 	char *d = dst;
 	const char *s = src;
 	size_t n = siz;
+
+  // HLSL Change: not strictly needed, but makes OACR recognize that _z_ on outparam is upheld
+  // and makes future changes more resilient
+  if (n) *dst = '\0';
 
 	/* Copy as many bytes as will fit */
 	if (n != 0) {

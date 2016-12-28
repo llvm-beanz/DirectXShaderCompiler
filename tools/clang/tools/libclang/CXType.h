@@ -1,15 +1,14 @@
 //===- CXTypes.h - Routines for manipulating CXTypes ----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines routines for manipulating CXCursors.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXType.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines routines for manipulating CXCursors.                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_TOOLS_LIBCLANG_CXTYPE_H
 #define LLVM_CLANG_TOOLS_LIBCLANG_CXTYPE_H

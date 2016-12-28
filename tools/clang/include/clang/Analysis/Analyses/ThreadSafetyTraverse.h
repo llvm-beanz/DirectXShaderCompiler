@@ -1,18 +1,17 @@
 //===- ThreadSafetyTraverse.h ----------------------------------*- C++ --*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ThreadSafetyTraverse.h                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines a framework for doing generic traversals and rewriting  //
+// operations over the Thread Safety TIL.                                    //
 //
-//                     The LLVM Compiler Infrastructure
+// UNDER CONSTRUCTION.  USE AT YOUR OWN RISK.                                //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines a framework for doing generic traversals and rewriting
-// operations over the Thread Safety TIL.
-//
-// UNDER CONSTRUCTION.  USE AT YOUR OWN RISK.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_ANALYSIS_ANALYSES_THREADSAFETYTRAVERSE_H
 #define LLVM_CLANG_ANALYSIS_ANALYSES_THREADSAFETYTRAVERSE_H

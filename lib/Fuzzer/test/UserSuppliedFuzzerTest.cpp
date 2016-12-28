@@ -1,6 +1,16 @@
-// Simple test for a fuzzer.
-// The fuzzer must find the string "Hi!" preceded by a magic value.
-// Uses UserSuppliedFuzzer which ensures that the magic is present.
+//===- UserSuppliedFuzzerTest.cpp -------------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// UserSuppliedFuzzerTest.cpp                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+// Simple test for a fuzzer.                                                 //
+// The fuzzer must find the string "Hi!" preceded by a magic value.          //
+// Uses UserSuppliedFuzzer which ensures that the magic is present.          //
+
 #include <cstdint>
 #include <cassert>
 #include <cstdlib>

@@ -1,14 +1,14 @@
 //===-- DeclTemplate.h - Classes for representing C++ templates -*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclTemplate.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines the C++ template declaration subclasses.
+/// \file                                                                    //
+/// \brief Defines the C++ template declaration subclasses.                  //
 ///
 //===----------------------------------------------------------------------===//
 
@@ -974,7 +974,8 @@ public:
 
 //===----------------------------------------------------------------------===//
 // Kinds of Template Parameters
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 /// \brief Defines the position of a template parameter within a template
 /// parameter list.
@@ -1603,7 +1604,11 @@ public:
   }
 
   void setPointOfInstantiation(SourceLocation Loc) {
-    assert(Loc.isValid() && "point of instantiation must be valid!");
+    // HLSL Change: comment out the following assertion
+    // When the HLSL type system bootstraps the typedef declarations
+    // to say "typedef int1x1 matrix<int, 1, 1>", the instantiation of
+    // the specialization has no valid location.
+    // assert(Loc.isValid() && "point of instantiation must be valid!");
     PointOfInstantiation = Loc;
   }
 

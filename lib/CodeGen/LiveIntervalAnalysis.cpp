@@ -1,19 +1,18 @@
 //===-- LiveIntervalAnalysis.cpp - Live Interval Analysis -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the LiveInterval analysis pass which is used
-// by the Linear Scan Register allocator. This pass linearizes the
-// basic blocks of the function in DFS order and uses the
-// LiveVariables pass to conservatively compute live intervals for
-// each virtual and physical register.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LiveIntervalAnalysis.cpp                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the LiveInterval analysis pass which is used         //
+// by the Linear Scan Register allocator. This pass linearizes the           //
+// basic blocks of the function in DFS order and uses the                    //
+// LiveVariables pass to conservatively compute live intervals for           //
+// each virtual and physical register.                                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/CodeGen/LiveIntervalAnalysis.h"
 #include "LiveRangeCalc.h"

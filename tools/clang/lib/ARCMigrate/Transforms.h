@@ -1,12 +1,11 @@
 //===-- Transforms.h - Transformations to ARC mode --------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Transforms.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 #ifndef LLVM_CLANG_LIB_ARCMIGRATE_TRANSFORMS_H
 #define LLVM_CLANG_LIB_ARCMIGRATE_TRANSFORMS_H
 
@@ -154,7 +153,8 @@ public:
 
 //===----------------------------------------------------------------------===//
 // Helpers.
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 /// \brief Determine whether we can add weak to the given type.
 bool canApplyWeak(ASTContext &Ctx, QualType type,

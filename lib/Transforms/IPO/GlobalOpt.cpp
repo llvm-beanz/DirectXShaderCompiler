@@ -1,17 +1,16 @@
 //===- GlobalOpt.cpp - Optimize Global Variables --------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This pass transforms simple global variables that never have their address
-// taken.  If obviously true, it marks read/write globals as constant, deletes
-// variables only stored to, etc.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// GlobalOpt.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This pass transforms simple global variables that never have their address//
+// taken.  If obviously true, it marks read/write globals as constant, deletes//
+// variables only stored to, etc.                                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/IPO.h"
 #include "llvm/ADT/DenseMap.h"
@@ -2707,7 +2706,8 @@ static bool EvaluateStaticConstructor(Function *F, const DataLayout &DL,
   return EvalSuccess;
 }
 
-static int compareNames(Constant *const *A, Constant *const *B) {
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl compareNames(Constant *const *A, Constant *const *B) {
   return (*A)->getName().compare((*B)->getName());
 }
 

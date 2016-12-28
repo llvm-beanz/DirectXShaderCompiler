@@ -1,15 +1,14 @@
 //===- lib/Linker/LinkModules.cpp - Module Linker Implementation ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the LLVM module linker.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LinkModules.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the LLVM module linker.                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Linker/Linker.h"
 #include "llvm-c/Linker.h"
@@ -1795,6 +1794,7 @@ bool Linker::LinkModules(Module *Dest, Module *Src) {
 // C API.
 //===----------------------------------------------------------------------===//
 
+_Use_decl_annotations_
 LLVMBool LLVMLinkModules(LLVMModuleRef Dest, LLVMModuleRef Src,
                          LLVMLinkerMode Unused, char **OutMessages) {
   Module *D = unwrap(Dest);
@@ -1807,7 +1807,7 @@ LLVMBool LLVMLinkModules(LLVMModuleRef Dest, LLVMModuleRef Src,
 
   if (OutMessages && Result) {
     Stream.flush();
-    *OutMessages = strdup(Message.c_str());
+    *OutMessages = _strdup(Message.c_str()); // HLSL Change for strdup
   }
   return Result;
 }

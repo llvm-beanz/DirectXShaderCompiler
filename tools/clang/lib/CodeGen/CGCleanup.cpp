@@ -1,21 +1,20 @@
 //===--- CGCleanup.cpp - Bookkeeping and code emission for cleanups -------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains code dealing with the IR generation for cleanups
-// and related information.
-//
-// A "cleanup" is a piece of code which needs to be executed whenever
-// control transfers out of a particular scope.  This can be
-// conditionalized to occur only on exceptional control flow, only on
-// normal control flow, or both.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGCleanup.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains code dealing with the IR generation for cleanups       //
+// and related information.                                                  //
+//                                                                           //
+// A "cleanup" is a piece of code which needs to be executed whenever        //
+// control transfers out of a particular scope.  This can be                 //
+// conditionalized to occur only on exceptional control flow, only on        //
+// normal control flow, or both.                                             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGCleanup.h"
 #include "CodeGenFunction.h"
@@ -590,8 +589,9 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
   bool IsActive = Scope.isActive();
   llvm::Value *NormalActiveFlag =
     Scope.shouldTestFlagInNormalCleanup() ? Scope.getActiveFlag() : nullptr;
-  llvm::Value *EHActiveFlag = 
-    Scope.shouldTestFlagInEHCleanup() ? Scope.getActiveFlag() : nullptr;
+  // HLSL Change - unused
+  // llvm::Value *EHActiveFlag =
+  //  Scope.shouldTestFlagInEHCleanup() ? Scope.getActiveFlag() : nullptr;
 
   // Check whether we need an EH cleanup.  This is only true if we've
   // generated a lazy EH cleanup block.
@@ -888,6 +888,9 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
   assert(EHStack.hasNormalCleanups() || EHStack.getNumBranchFixups() == 0);
 
   // Emit the EH cleanup if required.
+#if 1 // HLSL Change - no support for exception handling
+  assert(!RequiresEHCleanup && "nothing in HLSL requires EH cleanup");
+#else
   if (RequiresEHCleanup) {
     CGBuilderTy::InsertPoint SavedIP = Builder.saveAndClearIP();
 
@@ -907,6 +910,7 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
 
     SimplifyCleanupEntry(*this, EHEntry);
   }
+#endif // HLSL Change - no support for exception handling
 }
 
 /// isObviouslyBranchWithoutCleanups - Return true if a branch to the

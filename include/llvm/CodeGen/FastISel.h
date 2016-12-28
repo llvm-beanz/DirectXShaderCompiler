@@ -1,16 +1,17 @@
 //===-- FastISel.h - Definition of the FastISel class ---*- C++ -*---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FastISel.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// This file defines the FastISel class.
+/// \file                                                                    //
+/// This file defines the FastISel class.                                    //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CODEGEN_FASTISEL_H
 #define LLVM_CODEGEN_FASTISEL_H

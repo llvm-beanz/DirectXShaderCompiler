@@ -2,6 +2,9 @@
 LibTooling
 ==========
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 LibTooling is a library to support writing standalone tools based on Clang.
 This document will provide a basic walkthrough of how to write a tool using
 LibTooling.

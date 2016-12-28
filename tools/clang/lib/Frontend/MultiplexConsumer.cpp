@@ -1,17 +1,16 @@
 //===- MultiplexConsumer.cpp - AST Consumer for PCH Generation --*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the MultiplexConsumer class. It also declares and defines
-//  MultiplexASTDeserializationListener and  MultiplexASTMutationListener, which
-//  are implementation details of MultiplexConsumer.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MultiplexConsumer.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the MultiplexConsumer class. It also declares and defines//
+//  MultiplexASTDeserializationListener and  MultiplexASTMutationListener, which//
+//  are implementation details of MultiplexConsumer.                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/MultiplexConsumer.h"
 #include "clang/AST/ASTMutationListener.h"
@@ -21,6 +20,8 @@
 using namespace clang;
 
 namespace clang {
+
+#if 0 // HLSL Change Starts - no support for serialization
 
 // This ASTDeserializationListener forwards its notifications to a set of
 // child listeners.
@@ -97,6 +98,8 @@ void MultiplexASTDeserializationListener::ModuleRead(
   for (auto &Listener : Listeners)
     Listener->ModuleRead(ID, Mod);
 }
+
+#endif // HLSL Change Ends - no support for serialization
 
 // This ASTMutationListener forwards its notifications to a set of
 // child listeners.
@@ -238,6 +241,21 @@ void MultiplexASTMutationListener::AddedAttributeToRecord(
 
 }  // end namespace clang
 
+#if 1 // HLSL Change Starts - no support for serialization
+MultiplexConsumer::MultiplexConsumer(
+    std::vector<std::unique_ptr<ASTConsumer>> C)
+    : Consumers(std::move(C)), MutationListener() {
+  std::vector<ASTMutationListener*> mutationListeners;
+  for (auto &Consumer : Consumers) {
+    if (auto *mutationListener = Consumer->GetASTMutationListener())
+      mutationListeners.push_back(mutationListener);
+  }
+  if (!mutationListeners.empty()) {
+    MutationListener =
+        llvm::make_unique<MultiplexASTMutationListener>(mutationListeners);
+  }
+}
+#else
 MultiplexConsumer::MultiplexConsumer(
     std::vector<std::unique_ptr<ASTConsumer>> C)
     : Consumers(std::move(C)), MutationListener(), DeserializationListener() {
@@ -261,6 +279,7 @@ MultiplexConsumer::MultiplexConsumer(
             serializationListeners);
   }
 }
+#endif // HLSL Change Ends - no support for serialization
 
 MultiplexConsumer::~MultiplexConsumer() {}
 
@@ -351,7 +370,7 @@ ASTMutationListener *MultiplexConsumer::GetASTMutationListener() {
 }
 
 ASTDeserializationListener *MultiplexConsumer::GetASTDeserializationListener() {
-  return DeserializationListener.get();
+  return nullptr; // return DeserializationListener.get(); // HLSL Change - no support for serialization
 }
 
 void MultiplexConsumer::PrintStats() {

@@ -1,15 +1,14 @@
 //===--- CGDecl.cpp - Emit LLVM Code for declarations ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Decl nodes as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGDecl.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Decl nodes as LLVM code.                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCleanup.h"
@@ -28,6 +27,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Type.h"
+#include "CGHLSLRuntime.h" // HLSL Change
 using namespace clang;
 using namespace CodeGen;
 
@@ -341,6 +341,12 @@ void CodeGenFunction::EmitStaticVarDecl(const VarDecl &D,
                                       llvm::GlobalValue::LinkageTypes Linkage) {
   llvm::Value *&DMEntry = LocalDeclMap[&D];
   assert(!DMEntry && "Decl already exists in localdeclmap!");
+
+  // HLSL Change Begins.
+  if (D.getType()->isIncompleteArrayType() && getLangOpts().HLSL) {
+    CGM.getHLSLRuntime().UpdateHLSLIncompleteArrayType(const_cast<VarDecl&>(D));
+  }
+  // HLSL Change Ends.
 
   // Check to see if we already have a global variable for this
   // declaration.  This can happen when double-emitting function
@@ -858,6 +864,13 @@ llvm::Value *CodeGenFunction::EmitLifetimeStart(uint64_t Size,
   // For now, only in optimized builds.
   if (CGM.getCodeGenOpts().OptimizationLevel == 0)
     return nullptr;
+  // HLSL Change Begins
+  // Don't emit the intrinsic for hlsl for now.
+  // Enable this will require SROA_HLSL to support the intrinsic.
+  // Will do it later when support lifetime marker in HLSL.
+  if (CGM.getLangOpts().HLSL)
+    return nullptr;
+  // HLSL Change Ends
 
   // Disable lifetime markers in msan builds.
   // FIXME: Remove this when msan works with lifetime markers.
@@ -897,6 +910,12 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
   if (Ty->isVariablyModifiedType())
     EmitVariablyModifiedType(Ty);
 
+  // HLSL Change Begins.
+  if (Ty->isIncompleteArrayType() && getLangOpts().HLSL) {
+    Ty = CGM.getHLSLRuntime().UpdateHLSLIncompleteArrayType(const_cast<VarDecl&>(D));
+  }
+  // HLSL Change Ends.
+
   llvm::Value *DeclPtr;
   if (Ty->isConstantSizeType()) {
     bool NRVO = getLangOpts().ElideConstructors &&
@@ -911,6 +930,11 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
     // reference or bitfield members, and a few other cases, and checking
     // for POD-ness protects us from some of these.
     if (D.getInit() && (Ty->isArrayType() || Ty->isRecordType()) &&
+        // HLSL Change Begins.
+        // HLSL will not evaluate constant array init list.
+        // So skip it here.
+        !getLangOpts().HLSL &&
+        // HLSL Change Ends.
         (D.isConstexpr() ||
          ((Ty.isPODType(getContext()) ||
            getContext().getBaseElementType(Ty)->isObjCObjectPointerType()) &&
@@ -962,7 +986,7 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
         LTy = BuildByRefType(&D);
 
       llvm::AllocaInst *Alloc = CreateTempAlloca(LTy);
-      Alloc->setName(D.getName());
+      Alloc->setName(D.getNameForIR()); // HLSL Change: use getNameForIR rather than getName
 
       CharUnits allocaAlignment = alignment;
       if (isByRef)
@@ -1029,7 +1053,7 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
 
   if (D.hasAttr<AnnotateAttr>())
       EmitVarAnnotations(&D, emission.Address);
-
+  CGM.getHLSLRuntime().FinishAutoVar(*this, D, emission.Address); // HLSL Change
   return emission;
 }
 
@@ -1152,6 +1176,23 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     lv.setNonGC(true);
     return EmitStoreThroughLValue(RValue::get(constant), lv, true);
   }
+
+  // HLSL Change Begins
+  if (getLangOpts().HLSL) {
+    // create a temporary global with the initializer then
+    // Store from the global to the alloca.
+    std::string Name = getStaticDeclName(CGM, D);
+    llvm::GlobalVariable *GV =
+      new llvm::GlobalVariable(CGM.getModule(), constant->getType(), true,
+                               llvm::GlobalValue::PrivateLinkage,
+                               constant, Name);
+    GV->setAlignment(alignment.getQuantity());
+    GV->setUnnamedAddr(true);
+    // Don't generate memcpy for hlsl.
+    CGM.getHLSLRuntime().EmitHLSLAggregateCopy(*this, GV, Loc, type);
+    return;
+  }
+  // HLSL Change Ends
 
   // If this is a simple aggregate initialization, we can optimize it
   // in various ways.
@@ -1668,6 +1709,9 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
 
   // Use better IR generation for certain implicit parameters.
   if (isa<ImplicitParamDecl>(D)) {
+#if 1 // HLSL Change - no support for blocks
+    assert(!BlockInfo && "HLSL does not support blocks");
+#else
     // The only implicit argument a block has is its literal.
     if (BlockInfo) {
       LocalDeclMap[&D] = Arg;
@@ -1690,10 +1734,10 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
                                                    LocalAddr, Builder);
         }
       }
-
       return;
     }
-  }
+#endif // HLSL Change - no support for blocks.
+}
 
   llvm::Value *DeclPtr;
   bool DoStore = false;
@@ -1716,12 +1760,28 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
         pushDestroy(QualType::DK_cxx_destructor, DeclPtr, Ty);
     }
   } else {
-    // Otherwise, create a temporary to hold the value.
-    llvm::AllocaInst *Alloc = CreateTempAlloca(ConvertTypeForMem(Ty),
-                                               D.getName() + ".addr");
-    Alloc->setAlignment(Align.getQuantity());
-    DeclPtr = Alloc;
-    DoStore = true;
+    // HLSL Change Starts
+    if (getLangOpts().HLSL && Arg->getType()->isPointerTy()) {
+      // HLSL doesn't have pointer.
+      // Only case pointer type will generated is this pointer for methods.
+      // Don't store this pointer, just use the parameter directly.
+      if (Ty->isPointerType())
+        DoStore = false;
+      // For out parameter, this could happen too.
+      // Because the parameter is reference type.
+      // Just use the Arg directly, not store it to a temp alloca.
+      DoStore = false;
+      DeclPtr = Arg;
+    }
+    // HLSL Change Ends
+    else {
+      // Otherwise, create a temporary to hold the value.
+      llvm::AllocaInst *Alloc =
+          CreateTempAlloca(ConvertTypeForMem(Ty), D.getName() + ".addr");
+      Alloc->setAlignment(Align.getQuantity());
+      DeclPtr = Alloc;
+      DoStore = true;
+    }
   }
 
   LValue lv = MakeAddrLValue(DeclPtr, Ty, Align);
@@ -1795,7 +1855,11 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
   if (CGDebugInfo *DI = getDebugInfo()) {
     if (CGM.getCodeGenOpts().getDebugInfo()
           >= CodeGenOptions::LimitedDebugInfo) {
-      DI->EmitDeclareOfArgVariable(&D, DeclPtr, ArgNo, Builder);
+      // HLSL Change Begins.
+      // Use the Arg directly instead of DeclPtr for HLSL.
+      // The DeclPtr will be promoted in later pass.
+      DI->EmitDeclareOfArgVariable(&D, Arg, ArgNo, Builder);
+      // HLSL Change Ends.
     }
   }
 

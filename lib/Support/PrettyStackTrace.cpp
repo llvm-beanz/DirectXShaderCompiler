@@ -1,16 +1,15 @@
 //===- PrettyStackTrace.cpp - Pretty Crash Handling -----------------------===//
-// 
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-// 
-//===----------------------------------------------------------------------===//
-//
-// This file defines some helpful functions for dealing with the possibility of
-// Unix signals occurring while your program is running.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PrettyStackTrace.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines some helpful functions for dealing with the possibility of//
+// Unix signals occurring while your program is running.                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm-c/Core.h"

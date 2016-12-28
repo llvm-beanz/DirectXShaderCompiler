@@ -1,15 +1,14 @@
 //===---- CGBuiltin.cpp - Emit LLVM Code for builtins ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Builtin calls as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGBuiltin.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Builtin calls as LLVM code.                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGCXXABI.h"
@@ -1694,6 +1693,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     return RValue::get(Load);
   }
 
+#if 0 // HLSL Change Start - no support for exception handling
   case Builtin::BI__exception_code:
   case Builtin::BI_exception_code:
     return RValue::get(EmitSEHExceptionCode());
@@ -1763,6 +1763,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
       return RValue::get(llvm::ConstantExpr::getBitCast(GV, CGM.Int8PtrTy));
     break;
   }
+#endif // HLSL Change Ends - no support for exception handling
   }
 
   // If this is an alias for a lib function (e.g. __builtin_sin), emit
@@ -1858,6 +1859,9 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
 
 Value *CodeGenFunction::EmitTargetBuiltinExpr(unsigned BuiltinID,
                                               const CallExpr *E) {
+#if 1 // HLSL Change Starts
+  return nullptr;
+#else
   switch (getTarget().getTriple().getArch()) {
   case llvm::Triple::arm:
   case llvm::Triple::armeb:
@@ -1885,7 +1889,10 @@ Value *CodeGenFunction::EmitTargetBuiltinExpr(unsigned BuiltinID,
   default:
     return nullptr;
   }
+#endif // HLSL Change Ends
 }
+
+#if 0 // HLSL Change Starts
 
 static llvm::VectorType *GetNeonType(CodeGenFunction *CGF,
                                      NeonTypeFlags TypeFlags,
@@ -1979,6 +1986,8 @@ Value *CodeGenFunction::EmitNeonRShiftImm(Value *Vec, Value *Shift,
     return Builder.CreateAShr(Vec, Shift, name);
 }
 
+#endif // HLSL Change Ends
+
 /// GetPointeeAlignment - Given an expression with a pointer type, find the
 /// alignment of the type referenced by the pointer.  Skip over implicit
 /// casts.
@@ -2033,6 +2042,8 @@ CodeGenFunction::EmitPointerWithAlignment(const Expr *Addr) {
 
   return std::make_pair(EmitScalarExpr(Addr), Align);
 }
+
+#if 0 // HLSL Change Starts
 
 enum {
   AddRetType = (1 << 0),
@@ -7147,3 +7158,5 @@ Value *CodeGenFunction::EmitNVPTXBuiltinExpr(unsigned BuiltinID,
     return nullptr;
   }
 }
+
+#endif // HLSL Change Ends

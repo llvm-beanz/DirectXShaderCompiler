@@ -1,16 +1,15 @@
 //===-- llvm-mc.cpp - Machine Code Hacking Driver -------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This utility is a simple driver that allows command line hacking on machine
-// code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-mc.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This utility is a simple driver that allows command line hacking on machine//
+// code.                                                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Disassembler.h"
 #include "llvm/MC/MCAsmBackend.h"
@@ -365,7 +364,8 @@ static int AssembleInput(const char *ProgName, const Target *TheTarget,
   return Res;
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   // Print a stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);

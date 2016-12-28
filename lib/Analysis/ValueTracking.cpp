@@ -1,16 +1,15 @@
 //===- ValueTracking.cpp - Walk computations to compute properties --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains routines that help analyze properties that chains of
-// computations have.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ValueTracking.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains routines that help analyze properties that chains of   //
+// computations have.                                                        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1357,9 +1356,11 @@ static void computeKnownBitsFromOperator(Operator *I, APInt &KnownZero,
         KnownZero |= APInt::getHighBitsSet(BitWidth, BitWidth - LowBits);
         break;
       }
+#if 0 // HLSL Change - remove platform intrinsics
       case Intrinsic::x86_sse42_crc32_64_64:
         KnownZero |= APInt::getHighBitsSet(64, 32);
         break;
+#endif // HLSL Change - remove platform intrinsics
       }
     }
     break;
@@ -2265,8 +2266,8 @@ bool llvm::CannotBeNegativeZero(const Value *V, unsigned Depth) {
   if (!I) return false;
 
   // Check if the nsz fast-math flag is set
-  if (const FPMathOperator *FPO = dyn_cast<FPMathOperator>(I))
-    if (FPO->hasNoSignedZeros())
+  if (const FPMathOperator *FPOp = dyn_cast<FPMathOperator>(I))   // HLSL Change - FPO -> FPOp (macro collision)
+    if (FPOp->hasNoSignedZeros())   // HLSL Change - FPO -> FPOp (macro collision)
       return true;
 
   // (add x, 0.0) is guaranteed to return +0.0, not -0.0.

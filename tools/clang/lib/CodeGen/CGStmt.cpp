@@ -1,15 +1,14 @@
 //===--- CGStmt.cpp - Emit LLVM Code from Statements ----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Stmt nodes as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGStmt.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Stmt nodes as LLVM code.                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGDebugInfo.h"
@@ -25,6 +24,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
+#include "CGHLSLRuntime.h"    // HLSL Change
 using namespace clang;
 using namespace CodeGen;
 
@@ -136,6 +136,7 @@ void CodeGenFunction::EmitStmt(const Stmt *S) {
   case Stmt::ReturnStmtClass:   EmitReturnStmt(cast<ReturnStmt>(*S));     break;
 
   case Stmt::SwitchStmtClass:   EmitSwitchStmt(cast<SwitchStmt>(*S));     break;
+#if 0 // HLSL Change - no support for assembler, captures, ObjC, exception handling, for-range, openmp
   case Stmt::GCCAsmStmtClass:   // Intentional fall-through.
   case Stmt::MSAsmStmtClass:    EmitAsmStmt(cast<AsmStmt>(*S));           break;
   case Stmt::CapturedStmtClass: {
@@ -246,6 +247,7 @@ void CodeGenFunction::EmitStmt(const Stmt *S) {
   case Stmt::OMPCancelDirectiveClass:
     EmitOMPCancelDirective(cast<OMPCancelDirective>(*S));
     break;
+#endif // HLSL Change - no support for assembler, captures, ObjC, exception handling, for-range, openmp
   }
 }
 
@@ -263,7 +265,12 @@ bool CodeGenFunction::EmitSimpleStmt(const Stmt *S) {
   case Stmt::ContinueStmtClass: EmitContinueStmt(cast<ContinueStmt>(*S)); break;
   case Stmt::DefaultStmtClass:  EmitDefaultStmt(cast<DefaultStmt>(*S));   break;
   case Stmt::CaseStmtClass:     EmitCaseStmt(cast<CaseStmt>(*S));         break;
+  // HLSL Change Begins.
+  case Stmt::DiscardStmtClass:  EmitDiscardStmt(cast<DiscardStmt>(*S));   break;
+  // HLSL Change Ends.
+#if 0 // HLSL Change - no support for exception handling
   case Stmt::SEHLeaveStmtClass: EmitSEHLeaveStmt(cast<SEHLeaveStmt>(*S)); break;
+#endif
   }
 
   return true;
@@ -480,6 +487,14 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
   case Stmt::CXXForRangeStmtClass:
     EmitCXXForRangeStmt(cast<CXXForRangeStmt>(*SubStmt), S.getAttrs());
     break;
+  // HLSL Change Begins.
+  case Stmt::IfStmtClass:
+    EmitIfStmt(cast<IfStmt>(*SubStmt), S.getAttrs());
+    break;
+  case Stmt::SwitchStmtClass:
+    EmitSwitchStmt(cast<SwitchStmt>(*SubStmt), S.getAttrs());
+    break;
+  // HLSL Change Ends.
   default:
     EmitStmt(SubStmt);
   }
@@ -495,6 +510,11 @@ void CodeGenFunction::EmitGotoStmt(const GotoStmt &S) {
   EmitBranchThroughCleanup(getJumpDestForLabel(S.getLabel()));
 }
 
+// HLSL Change Begins.
+void CodeGenFunction::EmitDiscardStmt(const DiscardStmt &S) {
+  CGM.getHLSLRuntime().EmitHLSLDiscard(*this);
+}
+// HLSL Change Ends.
 
 void CodeGenFunction::EmitIndirectGotoStmt(const IndirectGotoStmt &S) {
   if (const LabelDecl *Target = S.getConstantTarget()) {
@@ -517,7 +537,14 @@ void CodeGenFunction::EmitIndirectGotoStmt(const IndirectGotoStmt &S) {
   EmitBranch(IndGotoBB);
 }
 
-void CodeGenFunction::EmitIfStmt(const IfStmt &S) {
+void CodeGenFunction::EmitIfStmt(const IfStmt &S, 
+    ArrayRef<const Attr *> Attrs) { // HLSL Change
+  // HLSL Change Begins
+  // Skip unreachable if.
+  if (!HaveInsertPoint())
+    return;
+  // HLSL Change Ends
+
   // C99 6.8.4.1: The first substatement is executed if the expression compares
   // unequal to 0.  The condition must be a scalar type.
   LexicalScope ConditionScope(*this, S.getCond()->getSourceRange());
@@ -558,6 +585,12 @@ void CodeGenFunction::EmitIfStmt(const IfStmt &S) {
 
   EmitBranchOnBoolExpr(S.getCond(), ThenBlock, ElseBlock,
                        getProfileCount(S.getThen()));
+
+  // HLSL Change Begins
+  llvm::TerminatorInst *TI =
+      cast<llvm::TerminatorInst>(*ThenBlock->user_begin());
+  CGM.getHLSLRuntime().AddControlFlowHint(*this, S, TI, Attrs);
+  // HLSL Change Ends
 
   // Emit the 'then' code.
   EmitBlock(ThenBlock);
@@ -1072,7 +1105,12 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   } else {
     switch (getEvaluationKind(RV->getType())) {
     case TEK_Scalar:
-      Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
+      // HLSL Change Begins.
+      if (hlsl::IsHLSLMatType(RV->getType())) {
+        CGM.getHLSLRuntime().EmitHLSLAggregateStore(*this, EmitScalarExpr(RV), ReturnValue, RV->getType());
+      } else
+        // HLSL Change Ends.
+        Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
       break;
     case TEK_Complex:
       EmitComplexExprIntoLValue(RV,
@@ -1510,7 +1548,14 @@ static bool FindCaseStatementsForValue(const SwitchStmt &S,
          FoundCase;
 }
 
-void CodeGenFunction::EmitSwitchStmt(const SwitchStmt &S) {
+void CodeGenFunction::EmitSwitchStmt(const SwitchStmt &S,
+    ArrayRef<const Attr *> Attrs) { // HLSL Change
+  // HLSL Change Begins
+  // Skip unreachable switch.
+  if (!HaveInsertPoint())
+    return;
+  // HLSL Change Ends
+
   // Handle nested switch statements.
   llvm::SwitchInst *SavedSwitchInsn = SwitchInsn;
   SmallVector<uint64_t, 16> *SavedSwitchWeights = SwitchWeights;
@@ -1565,6 +1610,11 @@ void CodeGenFunction::EmitSwitchStmt(const SwitchStmt &S) {
   // failure.
   llvm::BasicBlock *DefaultBlock = createBasicBlock("sw.default");
   SwitchInsn = Builder.CreateSwitch(CondV, DefaultBlock);
+  // HLSL Change Begins
+  llvm::TerminatorInst *TI = cast<llvm::TerminatorInst>(SwitchInsn);
+  CGM.getHLSLRuntime().AddControlFlowHint(*this, S, TI, Attrs);
+  // HLSL Change Ends
+
   if (PGO.haveRegionCounts()) {
     // Walk the SwitchCase list to find how many there are.
     uint64_t DefaultCount = 0;

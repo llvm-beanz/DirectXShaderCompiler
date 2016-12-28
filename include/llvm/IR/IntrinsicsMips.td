@@ -1,18 +1,16 @@
 //===- IntrinsicsMips.td - Defines Mips intrinsics ---------*- tablegen -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines all of the MIPS-specific intrinsics.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IntrinsicsMips.td                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines all of the MIPS-specific intrinsics.                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+// MIPS DSP data types                                                       //
 
-//===----------------------------------------------------------------------===//
-// MIPS DSP data types
 def mips_v2q15_ty: LLVMType<v2i16>;
 def mips_v4q7_ty: LLVMType<v4i8>;
 def mips_q31_ty: LLVMType<i32>;

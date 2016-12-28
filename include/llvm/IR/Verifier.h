@@ -1,22 +1,21 @@
 //===- Verifier.h - LLVM IR Verifier ----------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Verifier.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the function verifier interface, that can be used for some//
+// sanity checking of input to the system, and for checking that transformations//
+// haven't done something bad.                                               //
 //
-//                     The LLVM Compiler Infrastructure
+// Note that this does not provide full 'java style' security and verifications,//
+// instead it just tries to ensure that code is well formed.                 //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// To see what specifically is checked, look at the top of Verifier.cpp      //
 //
-//===----------------------------------------------------------------------===//
-//
-// This file defines the function verifier interface, that can be used for some
-// sanity checking of input to the system, and for checking that transformations
-// haven't done something bad.
-//
-// Note that this does not provide full 'java style' security and verifications,
-// instead it just tries to ensure that code is well formed.
-//
-// To see what specifically is checked, look at the top of Verifier.cpp
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_IR_VERIFIER_H
 #define LLVM_IR_VERIFIER_H

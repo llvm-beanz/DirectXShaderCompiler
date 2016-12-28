@@ -1,16 +1,15 @@
 //===---- StmtProfile.cpp - Profile implementation for Stmt ASTs ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Stmt::Profile method, which builds a unique bit
-// representation that identifies a statement/expression.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// StmtProfile.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Stmt::Profile method, which builds a unique bit  //
+// representation that identifies a statement/expression.                    //
+//                                                                           //
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
@@ -21,7 +20,8 @@
 #include "clang/AST/StmtVisitor.h"
 #include "llvm/ADT/FoldingSet.h"
 using namespace clang;
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 namespace {
   class StmtProfiler : public ConstStmtVisitor<StmtProfiler> {
     llvm::FoldingSetNodeID &ID;
@@ -84,6 +84,11 @@ void StmtProfiler::VisitDeclStmt(const DeclStmt *S) {
 }
 
 void StmtProfiler::VisitNullStmt(const NullStmt *S) {
+  VisitStmt(S);
+}
+
+// HLSL Change: adding support for HLSL discard stmt.
+void StmtProfiler::VisitDiscardStmt(const DiscardStmt *S) {
   VisitStmt(S);
 }
 
@@ -777,6 +782,16 @@ void StmtProfiler::VisitImplicitValueInitExpr(const ImplicitValueInitExpr *S) {
 }
 
 void StmtProfiler::VisitExtVectorElementExpr(const ExtVectorElementExpr *S) {
+  VisitExpr(S);
+  VisitName(&S->getAccessor());
+}
+
+// HLSL Change
+void StmtProfiler::VisitExtMatrixElementExpr(const ExtMatrixElementExpr *S) {
+  VisitExpr(S);
+  VisitName(&S->getAccessor());
+}
+void StmtProfiler::VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *S) {
   VisitExpr(S);
   VisitName(&S->getAccessor());
 }

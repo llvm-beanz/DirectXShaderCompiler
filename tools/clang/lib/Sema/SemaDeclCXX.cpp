@@ -1,15 +1,14 @@
 //===------ SemaDeclCXX.cpp - Semantic Analysis for C++ Declarations ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for C++ declarations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaDeclCXX.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for C++ declarations.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTConsumer.h"
@@ -41,6 +40,7 @@
 #include "llvm/ADT/SmallString.h"
 #include <map>
 #include <set>
+#include "clang/Basic/Specifiers.h" // HLSL Change
 
 using namespace clang;
 
@@ -1553,12 +1553,29 @@ NoteIndirectBases(ASTContext &Context, IndirectBaseSet &Set,
   }
 }
 
+// HLSL Change Starts
+static bool isConcreteBaseType(const QualType& t)
+{
+  // Other than interfaces, all base types are concrete.
+  const Type* type = t.getTypePtr();
+  if (!type->isRecordType()) return true; // Likely should have been rejected before.
+  return !(type->getAsCXXRecordDecl()->getTagKind() == TagTypeKind::TTK_Interface);
+}
+// HLSL Change Ends
+
 /// \brief Performs the actual work of attaching the given base class
 /// specifiers to a C++ class.
 bool Sema::AttachBaseSpecifiers(CXXRecordDecl *Class, CXXBaseSpecifier **Bases,
                                 unsigned NumBases) {
  if (NumBases == 0)
     return false;
+
+  // HLSL Change Starts
+  if (Class->getTagKind() == TagTypeKind::TTK_Interface) {
+    Diag(Bases[0]->getLocStart(), diag::err_hlsl_interfaces_cannot_inherit);
+    return true;
+  }
+  // HLSL Change Ends
 
   // Used to keep track of which base types we have already seen, so
   // that we can properly diagnose redundant direct base types. Note
@@ -1571,12 +1588,28 @@ bool Sema::AttachBaseSpecifiers(CXXRecordDecl *Class, CXXBaseSpecifier **Bases,
   IndirectBaseSet IndirectBaseTypes;
 
   // Copy non-redundant base specifiers into permanent storage.
+  bool ConcreteBaseTypeFound = false; // HLSL Change
+  bool ConcreteBaseTypeReported = false; // HLSL Change
   unsigned NumGoodBases = 0;
   bool Invalid = false;
   for (unsigned idx = 0; idx < NumBases; ++idx) {
     QualType NewBaseType
       = Context.getCanonicalType(Bases[idx]->getType());
     NewBaseType = NewBaseType.getLocalUnqualifiedType();
+
+    // HLSL Change Starts
+    if (!ConcreteBaseTypeReported) {
+      if (isConcreteBaseType(NewBaseType)) {
+        if (ConcreteBaseTypeFound) {
+          Diag(Bases[idx]->getLocStart(), diag::err_hlsl_multiple_concrete_bases);
+          Invalid = true;
+          ConcreteBaseTypeReported = true;
+        } else {
+          ConcreteBaseTypeFound = true;
+        }
+      }
+    }
+    // HLSL Change Ends
 
     CXXBaseSpecifier *&KnownBase = KnownBaseTypes[NewBaseType];
     if (KnownBase) {
@@ -5189,7 +5222,7 @@ static FunctionProtoType::ExtProtoInfo getImplicitMethodEPI(Sema &S,
   FunctionProtoType::ExtProtoInfo EPI;
 
   // Build an exception specification pointing back at this member.
-  EPI.ExceptionSpec.Type = EST_Unevaluated;
+  EPI.ExceptionSpec.Type = EST_BasicNoexcept; // HLSL Change - EST_Unevaluated to EST_BasicNoexcept
   EPI.ExceptionSpec.SourceDecl = MD;
 
   // Set the calling convention to the default for C++ instance methods.
@@ -5367,7 +5400,7 @@ void Sema::CheckExplicitlyDefaultedSpecialMember(CXXMethodDecl *MD) {
     MD->setType(Context.getFunctionType(ReturnType,
                                         llvm::makeArrayRef(&ArgType,
                                                            ExpectedParams),
-                                        EPI));
+                                        EPI, None)); // HLSL Change - special members are all-in params
   }
 
   if (ShouldDeleteSpecialMember(MD, CSM)) {
@@ -5406,7 +5439,7 @@ void Sema::CheckExplicitlyDefaultedMemberExceptionSpec(
   EPI.ExceptionSpec = computeImplicitExceptionSpec(*this, MD->getLocation(), MD)
                           .getExceptionSpec();
   const FunctionProtoType *ImplicitType = cast<FunctionProtoType>(
-    Context.getFunctionType(Context.VoidTy, None, EPI));
+    Context.getFunctionType(Context.VoidTy, None, EPI, None)); // HLSL Change - special members are all-in params
 
   // Ensure that it matches.
   CheckEquivalentExceptionSpec(
@@ -6707,7 +6740,7 @@ QualType Sema::CheckConstructorDeclarator(Declarator &D, QualType R,
   EPI.TypeQuals = 0;
   EPI.RefQualifier = RQ_None;
 
-  return Context.getFunctionType(Context.VoidTy, Proto->getParamTypes(), EPI);
+  return Context.getFunctionType(Context.VoidTy, Proto->getParamTypes(), EPI, None); // HLSL Change - constructors members are all-in params
 }
 
 /// CheckConstructor - Checks a fully-formed constructor for
@@ -6894,7 +6927,7 @@ QualType Sema::CheckDestructorDeclarator(Declarator &D, QualType R,
   EPI.Variadic = false;
   EPI.TypeQuals = 0;
   EPI.RefQualifier = RQ_None;
-  return Context.getFunctionType(Context.VoidTy, None, EPI);
+  return Context.getFunctionType(Context.VoidTy, None, EPI, None); // HLSL Change - no destructor args
 }
 
 static void extendLeft(SourceRange &R, const SourceRange &Before) {
@@ -7059,7 +7092,7 @@ void Sema::CheckConversionDeclarator(Declarator &D, QualType &R,
   // of the errors above fired) and with the conversion type as the
   // return type.
   if (D.isInvalidType())
-    R = Context.getFunctionType(ConvType, None, Proto->getExtProtoInfo());
+    R = Context.getFunctionType(ConvType, None, Proto->getExtProtoInfo(), None); // HLSL Change
 
   // C++0x explicit conversion operators.
   if (D.getDeclSpec().isExplicitSpecified())
@@ -8924,7 +8957,7 @@ CXXConstructorDecl *Sema::DeclareImplicitDefaultConstructor(
 
   // Build an exception specification pointing back at this constructor.
   FunctionProtoType::ExtProtoInfo EPI = getImplicitMethodEPI(*this, DefaultCon);
-  DefaultCon->setType(Context.getFunctionType(Context.VoidTy, None, EPI));
+  DefaultCon->setType(Context.getFunctionType(Context.VoidTy, None, EPI, None)); // HLSL Change - add param mods
 
   // We don't need to use SpecialMemberIsTrivial here; triviality for default
   // constructors is easy to compute.
@@ -9105,7 +9138,7 @@ private:
       do
         declareCtor(UsingLoc, Ctor,
                     SemaRef.Context.getFunctionType(
-                        Ctor->getReturnType(), ArgTypes.slice(0, Params), EPI));
+                        Ctor->getReturnType(), ArgTypes.slice(0, Params), EPI, None)); // HLSL Change - add param mods
       while (Params > MinParams &&
              Ctor->getParamDecl(--Params)->hasDefaultArg());
     }
@@ -9220,7 +9253,7 @@ private:
     EPI.ExceptionSpec.Type = EST_Unevaluated;
     EPI.ExceptionSpec.SourceDecl = DerivedCtor;
     DerivedCtor->setType(Context.getFunctionType(FPT->getReturnType(),
-                                                 FPT->getParamTypes(), EPI));
+                                                 FPT->getParamTypes(), EPI, None)); // HLSL Change - add param mods
 
     // Build the parameter declarations.
     SmallVector<ParmVarDecl *, 16> ParamDecls;
@@ -9390,7 +9423,7 @@ CXXDestructorDecl *Sema::DeclareImplicitDestructor(CXXRecordDecl *ClassDecl) {
 
   // Build an exception specification pointing back at this destructor.
   FunctionProtoType::ExtProtoInfo EPI = getImplicitMethodEPI(*this, Destructor);
-  Destructor->setType(Context.getFunctionType(Context.VoidTy, None, EPI));
+  Destructor->setType(Context.getFunctionType(Context.VoidTy, None, EPI, None)); // HLSL Change
 
   AddOverriddenMethods(ClassDecl, Destructor);
 
@@ -9527,7 +9560,7 @@ void Sema::AdjustDestructorExceptionSpec(CXXRecordDecl *ClassDecl,
   FunctionProtoType::ExtProtoInfo EPI = DtorType->getExtProtoInfo();
   EPI.ExceptionSpec.Type = EST_Unevaluated;
   EPI.ExceptionSpec.SourceDecl = Destructor;
-  Destructor->setType(Context.getFunctionType(Context.VoidTy, None, EPI));
+  Destructor->setType(Context.getFunctionType(Context.VoidTy, None, EPI, None)); // HLSL Change - add param mods
 
   // FIXME: If the destructor has a body that could throw, and the newly created
   // spec doesn't allow exceptions, we should emit a warning, because this
@@ -10061,7 +10094,7 @@ CXXMethodDecl *Sema::DeclareImplicitCopyAssignment(CXXRecordDecl *ClassDecl) {
   // Build an exception specification pointing back at this member.
   FunctionProtoType::ExtProtoInfo EPI =
       getImplicitMethodEPI(*this, CopyAssignment);
-  CopyAssignment->setType(Context.getFunctionType(RetType, ArgType, EPI));
+  CopyAssignment->setType(Context.getFunctionType(RetType, ArgType, EPI, None)); // HLSL Change - add param mods
 
   // Add the parameter to the operator.
   ParmVarDecl *FromParam = ParmVarDecl::Create(Context, CopyAssignment,
@@ -10452,7 +10485,7 @@ CXXMethodDecl *Sema::DeclareImplicitMoveAssignment(CXXRecordDecl *ClassDecl) {
   // Build an exception specification pointing back at this member.
   FunctionProtoType::ExtProtoInfo EPI =
       getImplicitMethodEPI(*this, MoveAssignment);
-  MoveAssignment->setType(Context.getFunctionType(RetType, ArgType, EPI));
+  MoveAssignment->setType(Context.getFunctionType(RetType, ArgType, EPI, None)); // HLSL Change - add param mods
 
   // Add the parameter to the operator.
   ParmVarDecl *FromParam = ParmVarDecl::Create(Context, MoveAssignment,
@@ -10888,7 +10921,7 @@ CXXConstructorDecl *Sema::DeclareImplicitCopyConstructor(
   FunctionProtoType::ExtProtoInfo EPI =
       getImplicitMethodEPI(*this, CopyConstructor);
   CopyConstructor->setType(
-      Context.getFunctionType(Context.VoidTy, ArgType, EPI));
+      Context.getFunctionType(Context.VoidTy, ArgType, EPI, None)); // HLSL Change - add param mods
 
   // Add the parameter to the constructor.
   ParmVarDecl *FromParam = ParmVarDecl::Create(Context, CopyConstructor,
@@ -11065,7 +11098,7 @@ CXXConstructorDecl *Sema::DeclareImplicitMoveConstructor(
   FunctionProtoType::ExtProtoInfo EPI =
       getImplicitMethodEPI(*this, MoveConstructor);
   MoveConstructor->setType(
-      Context.getFunctionType(Context.VoidTy, ArgType, EPI));
+      Context.getFunctionType(Context.VoidTy, ArgType, EPI, None)); // HLSL Change - all in-args
 
   // Add the parameter to the constructor.
   ParmVarDecl *FromParam = ParmVarDecl::Create(Context, MoveConstructor,
@@ -13614,6 +13647,15 @@ void Sema::checkExceptionSpecification(
     ArrayRef<SourceRange> DynamicExceptionRanges, Expr *NoexceptExpr,
     SmallVectorImpl<QualType> &Exceptions,
     FunctionProtoType::ExceptionSpecInfo &ESI) {
+  // HLSL Change Starts
+  if (LangOpts.HLSL) {
+    assert(DynamicExceptions.size() == 0);
+    assert(DynamicExceptionRanges.size() == 0);
+    assert(NoexceptExpr == nullptr);
+    assert(Exceptions.size() == 0);
+    return;
+  }
+  // HLSL Change Ends
   Exceptions.clear();
   ESI.Type = EST;
   if (EST == EST_Dynamic) {

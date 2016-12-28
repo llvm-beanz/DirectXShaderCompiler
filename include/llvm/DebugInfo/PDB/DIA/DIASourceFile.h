@@ -1,11 +1,12 @@
 //===- DIASourceFile.h - DIA implementation of IPDBSourceFile ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DIASourceFile.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_DEBUGINFO_PDB_DIA_DIASOURCEFILE_H
 #define LLVM_DEBUGINFO_PDB_DIA_DIASOURCEFILE_H

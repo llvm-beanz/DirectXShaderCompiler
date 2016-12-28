@@ -1,15 +1,14 @@
 //===--- ExternalSemaSource.h - External Sema Interface ---------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExternalSemaSource.h                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the ExternalSemaSource interface.                      //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the ExternalSemaSource interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_SEMA_EXTERNALSEMASOURCE_H
 #define LLVM_CLANG_SEMA_EXTERNALSEMASOURCE_H
 
@@ -38,6 +37,8 @@ class TypedefNameDecl;
 class ValueDecl;
 class VarDecl;
 struct LateParsedTemplate;
+class OverloadCandidateSet; // HLSL Change
+class UnresolvedLookupExpr; // HLSL Change
 
 /// \brief A simple structure that captures a vtable use for the purposes of
 /// the \c ExternalSemaSource.
@@ -203,6 +204,21 @@ public:
                                      const ObjCObjectPointerType *OPT) {
     return TypoCorrection();
   }
+
+  // HLSL Change Starts
+  // ExternalSemaSource::AddOverloadedCallCandidates is given the chance to
+  // add call candidates to the given expression. It returns 'true'
+  // if standard overload search should be suppressed; false otherwise.
+  virtual bool AddOverloadedCallCandidates(UnresolvedLookupExpr *ULE,
+    ArrayRef<Expr *> Args,
+    OverloadCandidateSet &CandidateSet,
+    bool PartialOverloading)
+  {
+    return false;
+  }
+
+  // HLSL Change Ends
+
 
   /// \brief Produces a diagnostic note if the external source contains a
   /// complete definition for \p T.

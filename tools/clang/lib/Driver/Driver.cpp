@@ -1,11 +1,12 @@
 //===--- Driver.cpp - Clang GCC Compatible Driver -------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Driver.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Driver/Driver.h"
 #include "InputInfo.h"
@@ -366,6 +367,7 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
   // FIXME: Handle environment options which affect driver behavior, somewhere
   // (client?). GCC_EXEC_PREFIX, LPATH, CC_PRINT_OPTIONS.
 
+#if 0 // HLSL Change - disallow COMPILER_PATH environment setting
   if (char *env = ::getenv("COMPILER_PATH")) {
     StringRef CompilerPath = env;
     while (!CompilerPath.empty()) {
@@ -375,6 +377,7 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
       CompilerPath = Split.second;
     }
   }
+#endif // HLSL Change
 
   // We look for the driver mode option early, because the mode can affect
   // how other options are parsed.
@@ -656,6 +659,7 @@ void Driver::generateCompilationDiagnostics(Compilation &C,
 }
 
 void Driver::setUpResponseFiles(Compilation &C, Command &Cmd) {
+#ifdef MSFT_SUPPORTS_CHILD_PROCESSES  // HLSL Change
   // Since argumentsFitWithinSystemLimits() may underestimate system's capacity
   // if the tool does not support response files, there is a chance/ that things
   // will just work without a response file, so we silently just skip it.
@@ -666,6 +670,7 @@ void Driver::setUpResponseFiles(Compilation &C, Command &Cmd) {
   std::string TmpName = GetTemporaryPath("response", "txt");
   Cmd.setResponseFile(
       C.addTempFile(C.getArgs().MakeArgString(TmpName.c_str())));
+#endif
 }
 
 int Driver::ExecuteCompilation(
@@ -1637,6 +1642,8 @@ void Driver::BuildJobs(Compilation &C) const {
   // Claim --driver-mode, it was handled earlier.
   (void)C.getArgs().hasArg(options::OPT_driver_mode);
 
+  (void)C.getArgs().hasArg(options::OPT_verify);    // HLSL Change - claim -verify
+
   for (Arg *A : C.getArgs()) {
     // FIXME: It would be nice to be able to send the argument to the
     // DiagnosticsEngine, so that extra values, position, and so on could be
@@ -2153,8 +2160,8 @@ std::string Driver::GetTemporaryPath(StringRef Prefix,
 
 const ToolChain &Driver::getToolChain(const ArgList &Args,
                                       const llvm::Triple &Target) const {
-
   ToolChain *&TC = ToolChains[Target.str()];
+#if 0 // HLSL Change - remove toolchains
   if (!TC) {
     switch (Target.getOS()) {
     case llvm::Triple::CloudABI:
@@ -2240,6 +2247,10 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
       break;
     }
   }
+#else // HLSL Change - remove toolchains
+  // TODO: revisit for HLSL proper
+  TC = new toolchains::Generic_GCC(*this, Target, Args);
+#endif
   return *TC;
 }
 

@@ -1,11 +1,12 @@
 //===-- PDBContext.cpp ------------------------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PDBContext.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/DebugInfo/PDB/PDBContext.h"
 #include "llvm/DebugInfo/PDB/IPDBEnumChildren.h"

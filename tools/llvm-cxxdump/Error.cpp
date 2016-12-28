@@ -1,15 +1,14 @@
 //===- Error.cxx - system_error extensions for llvm-cxxdump -----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This defines a new error_category for the llvm-cxxdump tool.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Error.cpp                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This defines a new error_category for the llvm-cxxdump tool.              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Error.h"
 #include "llvm/Support/ErrorHandling.h"

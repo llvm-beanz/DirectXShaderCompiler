@@ -1,15 +1,14 @@
 //===--- ASTContext.cpp - Context to hold long-lived AST nodes ------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the ASTContext interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTContext.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the ASTContext interface.                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/ASTContext.h"
 #include "CXXABI.h"
@@ -57,7 +56,7 @@ unsigned ASTContext::NumImplicitDestructors;
 unsigned ASTContext::NumImplicitDestructorsDeclared;
 
 enum FloatingRank {
-  HalfRank, FloatRank, DoubleRank, LongDoubleRank
+  LitFloatRank, Min10FloatRank, HalfRank, FloatRank, DoubleRank, LongDoubleRank // HLSL Change - adds LitFloatRank and Min10FloatRank
 };
 
 RawComment *ASTContext::getRawCommentForDeclNoCache(const Decl *D) const {
@@ -366,8 +365,8 @@ const RawComment *ASTContext::getRawCommentForAnyRedecl(
       OriginalDeclForRC = I;
       RawCommentAndCacheFlags Raw;
       if (RC) {
-        Raw.setRaw(RC);
         Raw.setKind(RawCommentAndCacheFlags::FromDecl);
+        Raw.setRaw(RC);
       } else
         Raw.setKind(RawCommentAndCacheFlags::NoCommentInDecl);
       Raw.setOriginalDecl(I);
@@ -820,7 +819,14 @@ void ASTContext::PrintStats() const {
 
   for (unsigned i = 0, e = Types.size(); i != e; ++i) {
     Type *T = Types[i];
+    // HLSL Change Starts - guard against overflows; we can probably prove this is fine, but this is not a sensitive (or retail!) codepath
+#if 0
     counts[(unsigned)T->getTypeClass()]++;
+#else
+    unsigned offset = (unsigned)T->getTypeClass();
+    if (offset < _countof(counts)) counts[offset]++;
+#endif
+    // HLSL Change Ends
   }
 
   unsigned Idx = 0;
@@ -1084,6 +1090,16 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target) {
 
   // Builtin type used to help define __builtin_va_list.
   VaListTagTy = QualType();
+
+  // HLSL Change Starts
+  if (LangOpts.HLSL) {
+    InitBuiltinType(Min12IntTy, BuiltinType::Min12Int);
+    InitBuiltinType(Min10FloatTy, BuiltinType::Min10Float);
+    InitBuiltinType(LitIntTy, BuiltinType::LitInt);
+    InitBuiltinType(LitFloatTy, BuiltinType::LitFloat);
+    hlsl::InitializeASTContextForHLSL(*this); // Previously in constructor, guarded by !DelayInitialization
+  }
+  // HLSL Change Ends
 }
 
 DiagnosticsEngine &ASTContext::getDiagnostics() const {
@@ -1299,10 +1315,14 @@ const llvm::fltSemantics &ASTContext::getFloatTypeSemantics(QualType T) const {
   assert(BT && "Not a floating point type!");
   switch (BT->getKind()) {
   default: llvm_unreachable("Not a floating point type!");
+  // HLSL Change Starts
+  case BuiltinType::Min10Float:
+  // HLSL Change Ends
   case BuiltinType::Half:       return Target->getHalfFormat();
   case BuiltinType::Float:      return Target->getFloatFormat();
   case BuiltinType::Double:     return Target->getDoubleFormat();
   case BuiltinType::LongDouble: return Target->getLongDoubleFormat();
+  case BuiltinType::LitFloat:   return Target->getDoubleFormat();     // HLSL Change
   }
 }
 
@@ -1481,6 +1501,14 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
   uint64_t Width = 0;
   unsigned Align = 8;
   bool AlignIsRequired = false;
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    if (const ExtVectorType *Ty =
+            hlsl::ConvertHLSLVecMatTypeToExtVectorType(*this, QualType(T, 0))) {
+      T = Ty;
+    }
+  }
+  // HLSL Change Ends
   switch (T->getTypeClass()) {
 #define TYPE(Class, Base)
 #define ABSTRACT_TYPE(Class, Base)
@@ -1526,6 +1554,13 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     TypeInfo EltInfo = getTypeInfo(VT->getElementType());
     Width = EltInfo.Width * VT->getNumElements();
     Align = Width;
+    // HLSL Change Begins.
+    // Vector align to its element.
+    if (getLangOpts().HLSL) {
+      Align = EltInfo.Align;
+      Width = Align * VT->getNumElements();
+    }
+    // HLSL Change Ends.
     // If the alignment is not a power of 2, round up to the next power of 2.
     // This happens for non-power-of-2 length vectors.
     if (Align & (Align-1)) {
@@ -1609,6 +1644,26 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
       Width = Target->getDoubleWidth();
       Align = Target->getDoubleAlign();
       break;
+    // HLSL Change Starts
+    case BuiltinType::Min10Float:
+      Width = 16;
+      Align = 16;
+      break;
+    case BuiltinType::Min12Int:
+      Width = 16;
+      Align = 16;
+      break;
+    // Treat literals as largest size possible here, as it will be used
+    // to determine MaxWidth in GetExprRange
+    case BuiltinType::LitFloat:
+      Width = 64;
+      Align = 64;
+      break;
+    case BuiltinType::LitInt:
+      Width = 64;
+      Align = 64;
+      break;
+    // HLSL Change Ends
     case BuiltinType::LongDouble:
       Width = Target->getLongDoubleWidth();
       Align = Target->getLongDoubleAlign();
@@ -2166,7 +2221,7 @@ const FunctionType *ASTContext::adjustFunctionType(const FunctionType *T,
     const FunctionProtoType *FPT = cast<FunctionProtoType>(T);
     FunctionProtoType::ExtProtoInfo EPI = FPT->getExtProtoInfo();
     EPI.ExtInfo = Info;
-    Result = getFunctionType(FPT->getReturnType(), FPT->getParamTypes(), EPI);
+    Result = getFunctionType(FPT->getReturnType(), FPT->getParamTypes(), EPI, FPT->getParamMods());
   }
 
   return cast<FunctionType>(Result.getTypePtr());
@@ -2178,7 +2233,7 @@ void ASTContext::adjustDeducedFunctionResultType(FunctionDecl *FD,
   while (true) {
     const FunctionProtoType *FPT = FD->getType()->castAs<FunctionProtoType>();
     FunctionProtoType::ExtProtoInfo EPI = FPT->getExtProtoInfo();
-    FD->setType(getFunctionType(ResultType, FPT->getParamTypes(), EPI));
+    FD->setType(getFunctionType(ResultType, FPT->getParamTypes(), EPI, FPT->getParamMods()));
     if (FunctionDecl *Next = FD->getPreviousDecl())
       FD = Next;
     else
@@ -2213,7 +2268,8 @@ static QualType getFunctionTypeWithExceptionSpec(
   const FunctionProtoType *Proto = cast<FunctionProtoType>(Orig);
   return Context.getFunctionType(
       Proto->getReturnType(), Proto->getParamTypes(),
-      Proto->getExtProtoInfo().withExceptionSpec(ESI));
+      Proto->getExtProtoInfo().withExceptionSpec(ESI),
+      Proto->getParamMods()); // HLSL Change
 }
 
 void ASTContext::adjustExceptionSpec(
@@ -2324,6 +2380,8 @@ QualType ASTContext::getAdjustedType(QualType Orig, QualType New) const {
 QualType ASTContext::getDecayedType(QualType T) const {
   assert((T->isArrayType() || T->isFunctionType()) && "T does not decay");
 
+  if (getLangOpts().HLSL) return T; // HLSL Change - no decay for arrays (or anything for that matter)
+
   QualType Decayed;
 
   // C99 6.7.5.3p7:
@@ -2364,6 +2422,8 @@ QualType ASTContext::getDecayedType(QualType T) const {
 /// a pointer to the specified block.
 QualType ASTContext::getBlockPointerType(QualType T) const {
   assert(T->isFunctionType() && "block of function types only");
+  assert(!getLangOpts().HLSL && "HLSL does not support blocks");
+
   // Unique pointers, to guarantee there is only one block of a particular
   // structure.
   llvm::FoldingSetNodeID ID;
@@ -2958,13 +3018,14 @@ static bool isCanonicalResultType(QualType T) {
 
 QualType
 ASTContext::getFunctionType(QualType ResultTy, ArrayRef<QualType> ArgArray,
-                            const FunctionProtoType::ExtProtoInfo &EPI) const {
+                            const FunctionProtoType::ExtProtoInfo &EPI,
+                            ArrayRef<hlsl::ParameterModifier> ParamMods) const { // HLSL Change - param mods
   size_t NumArgs = ArgArray.size();
 
   // Unique functions, to guarantee there is only one function of a particular
   // structure.
   llvm::FoldingSetNodeID ID;
-  FunctionProtoType::Profile(ID, ResultTy, ArgArray.begin(), NumArgs, EPI,
+  FunctionProtoType::Profile(ID, ResultTy, ArgArray.begin(), NumArgs, EPI, ParamMods, // HLSL Change - param mods
                              *this);
 
   void *InsertPos = nullptr;
@@ -2977,7 +3038,13 @@ ASTContext::getFunctionType(QualType ResultTy, ArrayRef<QualType> ArgArray,
     EPI.ExceptionSpec.Type == EST_None && isCanonicalResultType(ResultTy) &&
     !EPI.HasTrailingReturn;
   for (unsigned i = 0; i != NumArgs && isCanonical; ++i)
-    if (!ArgArray[i].isCanonicalAsParam())
+    if (!ArgArray[i].isCanonicalAsParam() &&
+        // HLSL Change Begins.
+        // Don't decay array to pointer.
+        // But do need to get canonical version of array.
+        !(getLangOpts().HLSL && ArgArray[i]->isArrayType() && 
+          ArgArray[i].isCanonical())) 
+        // HLSL Change Ends.
       isCanonical = false;
 
   // If this type isn't canonical, get the canonical version of it.
@@ -3001,7 +3068,7 @@ ASTContext::getFunctionType(QualType ResultTy, ArrayRef<QualType> ArgArray,
       CanResultTy = getQualifiedType(CanResultTy.getUnqualifiedType(), Qs);
     }
 
-    Canonical = getFunctionType(CanResultTy, CanonicalArgs, CanonicalEPI);
+    Canonical = getFunctionType(CanResultTy, CanonicalArgs, CanonicalEPI, ParamMods); // HLSL Change - param mods
 
     // Get the new insert position for the node we care about.
     FunctionProtoType *NewIP =
@@ -3028,12 +3095,18 @@ ASTContext::getFunctionType(QualType ResultTy, ArrayRef<QualType> ArgArray,
   } else if (EPI.ExceptionSpec.Type == EST_Unevaluated) {
     Size += sizeof(FunctionDecl*);
   }
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    assert((Size == sizeof(FunctionProtoType) + NumArgs * sizeof(QualType)) && "else exception spec was added");
+    Size += NumArgs * sizeof(hlsl::ParameterModifier);
+  }
+  // HLSL Change Ends
   if (EPI.ConsumedParameters)
     Size += NumArgs * sizeof(bool);
 
   FunctionProtoType *FTP = (FunctionProtoType*) Allocate(Size, TypeAlignment);
   FunctionProtoType::ExtProtoInfo newEPI = EPI;
-  new (FTP) FunctionProtoType(ResultTy, ArgArray, Canonical, newEPI);
+  new (FTP) FunctionProtoType(ResultTy, ArgArray, Canonical, newEPI, ParamMods); // HLSL - param mods
   Types.push_back(FTP);
   FunctionProtoTypes.InsertNode(FTP, InsertPos);
   return QualType(FTP, 0);
@@ -3576,7 +3649,7 @@ QualType ASTContext::getPackExpansionType(QualType Pattern,
 
 /// CmpProtocolNames - Comparison predicate for sorting protocols
 /// alphabetically.
-static int CmpProtocolNames(ObjCProtocolDecl *const *LHS,
+static int __cdecl CmpProtocolNames(ObjCProtocolDecl *const *LHS, // HLSL Change - __cdecl
                             ObjCProtocolDecl *const *RHS) {
   return DeclarationName::compare((*LHS)->getDeclName(), (*RHS)->getDeclName());
 }
@@ -4060,7 +4133,12 @@ CanQualType ASTContext::getCanonicalParamType(QualType T) const {
   const Type *Ty = T.getTypePtr();
   QualType Result;
   if (isa<ArrayType>(Ty)) {
-    Result = getArrayDecayedType(QualType(Ty,0));
+    // HLSL Change Starts
+    if (getLangOpts().HLSL)
+      Result = QualType(Ty, 0);
+    else
+      // HLSL Change Ends
+      Result = getArrayDecayedType(QualType(Ty, 0));
   } else if (isa<FunctionType>(Ty)) {
     Result = getPointerType(QualType(Ty, 0));
   } else {
@@ -4521,6 +4599,8 @@ static FloatingRank getFloatingRank(QualType T) {
   case BuiltinType::Float:      return FloatRank;
   case BuiltinType::Double:     return DoubleRank;
   case BuiltinType::LongDouble: return LongDoubleRank;
+  case BuiltinType::Min10Float: return Min10FloatRank; // HLSL Change
+  case BuiltinType::LitFloat:   return LitFloatRank; // HLSL Change
   }
 }
 
@@ -4542,6 +4622,8 @@ QualType ASTContext::getFloatingTypeOfSizeWithinDomain(QualType Size,
 
   assert(Domain->isRealFloatingType() && "Unknown domain!");
   switch (EltRank) {
+  case LitFloatRank:   return LitFloatTy;   // HLSL Change
+  case Min10FloatRank: return Min10FloatTy; // HLSL Change
   case HalfRank:       return HalfTy;
   case FloatRank:      return FloatTy;
   case DoubleRank:     return DoubleTy;
@@ -4583,6 +4665,7 @@ unsigned ASTContext::getIntegerRank(const Type *T) const {
   case BuiltinType::Short:
   case BuiltinType::UShort:
     return 3 + (getIntWidth(ShortTy) << 3);
+  case BuiltinType::LitInt:   // HLSL Change
   case BuiltinType::Int:
   case BuiltinType::UInt:
     return 4 + (getIntWidth(IntTy) << 3);
@@ -6202,7 +6285,7 @@ static TypedefDecl *CreatePNaClABIBuiltinVaListDecl(const ASTContext *Context) {
   llvm::APInt Size(Context->getTypeSize(Context->getSizeType()), 4);
   QualType IntArrayType
     = Context->getConstantArrayType(Context->IntTy,
-				    Size, ArrayType::Normal, 0);
+                    Size, ArrayType::Normal, 0);
   return Context->buildImplicitTypedef(IntArrayType, "__builtin_va_list");
 }
 
@@ -6871,7 +6954,7 @@ bool ASTContext::canAssignObjCInterfacesInBlockPointer(
 
 /// Comparison routine for Objective-C protocols to be used with
 /// llvm::array_pod_sort.
-static int compareObjCProtocolsByName(ObjCProtocolDecl * const *lhs,
+static int __cdecl compareObjCProtocolsByName(ObjCProtocolDecl * const *lhs,  // HLSL Change - __cdecl
                                       ObjCProtocolDecl * const *rhs) {
   return (*lhs)->getName().compare((*rhs)->getName());
 
@@ -7345,9 +7428,11 @@ QualType ASTContext::mergeFunctionTypes(QualType lhs, QualType rhs,
     if (lproto->getTypeQuals() != rproto->getTypeQuals())
       return QualType();
 
+#if 0  // HLSL Change Starts - no ObjC support
     if (LangOpts.ObjCAutoRefCount &&
         !FunctionTypesMatchOnNSConsumedAttrs(rproto, lproto))
       return QualType();
+#endif // HLSL Change Ends - no ObjC support
 
     // Check parameter type compatibility
     SmallVector<QualType, 10> types;
@@ -7379,7 +7464,7 @@ QualType ASTContext::mergeFunctionTypes(QualType lhs, QualType rhs,
 
     FunctionProtoType::ExtProtoInfo EPI = lproto->getExtProtoInfo();
     EPI.ExtInfo = einfo;
-    return getFunctionType(retType, types, EPI);
+    return getFunctionType(retType, types, EPI, lproto->getParamMods());
   }
 
   if (lproto) allRTypes = false;
@@ -7415,7 +7500,7 @@ QualType ASTContext::mergeFunctionTypes(QualType lhs, QualType rhs,
 
     FunctionProtoType::ExtProtoInfo EPI = proto->getExtProtoInfo();
     EPI.ExtInfo = einfo;
-    return getFunctionType(retType, proto->getParamTypes(), EPI);
+    return getFunctionType(retType, proto->getParamTypes(), EPI, proto->getParamMods());
   }
 
   if (allLTypes) return lhs;
@@ -7762,7 +7847,7 @@ QualType ASTContext::mergeObjCGCQualifiers(QualType LHS, QualType RHS) {
         FunctionProtoType::ExtProtoInfo EPI = FPT->getExtProtoInfo();
         EPI.ExtInfo = getFunctionExtInfo(LHS);
         QualType ResultType =
-            getFunctionType(OldReturnType, FPT->getParamTypes(), EPI);
+            getFunctionType(OldReturnType, FPT->getParamTypes(), EPI, ArrayRef<hlsl::ParameterModifier>()); // HLSL Change
         return ResultType;
       }
     }
@@ -7850,6 +7935,8 @@ QualType ASTContext::getCorrespondingUnsignedType(QualType T) const {
     return UnsignedLongLongTy;
   case BuiltinType::Int128:
     return UnsignedInt128Ty;
+  case BuiltinType::LitInt:   // HLSL Change
+    return UnsignedIntTy;
   default:
     llvm_unreachable("Unexpected signed integer type");
   }
@@ -8177,7 +8264,8 @@ QualType ASTContext::GetBuiltinType(unsigned Id,
   EPI.ExtInfo = EI;
   EPI.Variadic = Variadic;
 
-  return getFunctionType(ResType, ArgTypes, EPI);
+  // HLSL Change: add empty parameter modifier; but this should probably be removed altogether
+  return getFunctionType(ResType, ArgTypes, EPI, ArrayRef<hlsl::ParameterModifier>());
 }
 
 static GVALinkage basicGVALinkageForFunction(const ASTContext &Context,
@@ -8257,6 +8345,14 @@ static GVALinkage basicGVALinkageForVariable(const ASTContext &Context,
                                              const VarDecl *VD) {
   if (!VD->isExternallyVisible())
     return GVA_Internal;
+
+  // HLSL Change Starts - samplers, textures and UAVs should be removed if
+  // unused, and fit an 'available externally' model.
+  if (hlsl::DXIL::ResourceClass::Invalid !=
+      hlsl::GetResourceClassForType(Context, VD->getType())) {
+    return GVA_AvailableExternally;
+  }
+  // HLSL Change Ends
 
   if (VD->isStaticLocal()) {
     GVALinkage StaticLocalLinkage = GVA_DiscardableODR;

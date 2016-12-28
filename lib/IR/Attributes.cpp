@@ -1,17 +1,16 @@
 //===-- Attributes.cpp - Implement AttributesList -------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// \file
-// \brief This file implements the Attribute, AttributeImpl, AttrBuilder,
-// AttributeSetImpl, and AttributeSet classes.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Attributes.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// \file                                                                     //
+// \brief This file implements the Attribute, AttributeImpl, AttrBuilder,    //
+// AttributeSetImpl, and AttributeSet classes.                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/Attributes.h"
 #include "AttributeImpl.h"
@@ -580,9 +579,9 @@ uint64_t AttributeSetImpl::Raw(unsigned Index) const {
       Attribute::AttrKind Kind = Attr.getKindAsEnum();
 
       if (Kind == Attribute::Alignment)
-        Mask |= (Log2_32(ASN->getAlignment()) + 1) << 16;
+        Mask |= ((uint64_t)(Log2_32(ASN->getAlignment())) + 1) << 16; // HLSL Change: widen to 64-bits before shift not after
       else if (Kind == Attribute::StackAlignment)
-        Mask |= (Log2_32(ASN->getStackAlignment()) + 1) << 26;
+        Mask |= ((uint64_t)(Log2_32(ASN->getStackAlignment())) + 1) << 26; // HLSL Change: widen to 64-bits before shift not after
       else if (Kind == Attribute::Dereferenceable)
         llvm_unreachable("dereferenceable not supported in bit mask");
       else

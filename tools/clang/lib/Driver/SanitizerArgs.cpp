@@ -1,11 +1,12 @@
 //===--- SanitizerArgs.cpp - Arguments for sanitizer tools  ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SanitizerArgs.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+
 #include "clang/Driver/SanitizerArgs.h"
 #include "Tools.h"
 #include "clang/Basic/Sanitizers.h"
@@ -19,7 +20,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SpecialCaseList.h"
 #include <memory>
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 using namespace clang::SanitizerKind;
 using namespace clang::driver;

@@ -1,16 +1,15 @@
 //===--- RecursiveASTVisitor.h - Recursive AST Visitor ----------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RecursiveASTVisitor.h                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the RecursiveASTVisitor interface, which recursively   //
+//  traverses the entire AST.                                                //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the RecursiveASTVisitor interface, which recursively
-//  traverses the entire AST.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_AST_RECURSIVEASTVISITOR_H
 #define LLVM_CLANG_AST_RECURSIVEASTVISITOR_H
 
@@ -1307,6 +1306,8 @@ DEF_TRAVERSE_DECL(CapturedDecl, {
 
 DEF_TRAVERSE_DECL(EmptyDecl, {})
 
+DEF_TRAVERSE_DECL(HLSLBufferDecl, {}) // HLSL Change
+
 DEF_TRAVERSE_DECL(FileScopeAsmDecl,
                   { TRY_TO(TraverseStmt(D->getAsmString())); })
 
@@ -1968,6 +1969,7 @@ DEF_TRAVERSE_STMT(IndirectGotoStmt, {})
 DEF_TRAVERSE_STMT(LabelStmt, {})
 DEF_TRAVERSE_STMT(AttributedStmt, {})
 DEF_TRAVERSE_STMT(NullStmt, {})
+DEF_TRAVERSE_STMT(DiscardStmt, {}) // HLSL Change: add support for HLSL Discard Stmt
 DEF_TRAVERSE_STMT(ObjCAtCatchStmt, {})
 DEF_TRAVERSE_STMT(ObjCAtFinallyStmt, {})
 DEF_TRAVERSE_STMT(ObjCAtSynchronizedStmt, {})
@@ -2264,6 +2266,8 @@ DEF_TRAVERSE_STMT(UserDefinedLiteral, {})
 DEF_TRAVERSE_STMT(DesignatedInitExpr, {})
 DEF_TRAVERSE_STMT(DesignatedInitUpdateExpr, {})
 DEF_TRAVERSE_STMT(ExtVectorElementExpr, {})
+DEF_TRAVERSE_STMT(ExtMatrixElementExpr, {}) // HLSL Change
+DEF_TRAVERSE_STMT(HLSLVectorElementExpr, {}) // HLSL Change
 DEF_TRAVERSE_STMT(GNUNullExpr, {})
 DEF_TRAVERSE_STMT(ImplicitValueInitExpr, {})
 DEF_TRAVERSE_STMT(NoInitExpr, {})

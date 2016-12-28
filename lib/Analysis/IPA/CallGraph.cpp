@@ -1,11 +1,12 @@
 //===- CallGraph.cpp - Build a Module's call graph ------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CallGraph.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/IR/CallSite.h"
@@ -14,6 +15,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "dxc/HLSL/HLModule.h" // HLSL Change
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -53,7 +55,12 @@ void CallGraph::addToCallGraph(Function *F) {
   // If this function has external linkage, anything could call it.
   if (!F->hasLocalLinkage()) {
     ExternalCallingNode->addCalledFunction(CallSite(), Node);
-
+    // HLSL Change Begins.
+    if (M.HasHLModule()) {
+      if (M.GetHLModule().GetEntryFunction() == F)
+        Root = Node;
+    } else // Make sure Root not overwrite by main.
+    // HLSL Change Ends.
     // Found the entry point?
     if (F->getName() == "main") {
       if (Root) // Found multiple external mains?  Don't pick one.
@@ -136,6 +143,8 @@ Function *CallGraph::removeFunctionFromModule(CallGraphNode *CGN) {
   Function *F = CGN->getFunction(); // Get the function for the call graph node
   delete CGN;                       // Delete the call graph node for this func
   FunctionMap.erase(F);             // Remove the call graph node from the map
+
+  if (M.HasHLModule()) M.GetHLModule().RemoveFunction(F); // HLSL Change
 
   M.getFunctionList().remove(F);
   return F;

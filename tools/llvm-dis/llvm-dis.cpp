@@ -1,20 +1,19 @@
 //===-- llvm-dis.cpp - The low-level LLVM disassembler --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This utility may be invoked in the following manner:
-//  llvm-dis [options]      - Read LLVM bitcode from stdin, write asm to stdout
-//  llvm-dis [options] x.bc - Read LLVM bitcode from the x.bc file, write asm
-//                            to the x.ll file.
-//  Options:
-//      --help   - Output information about command line switches
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-dis.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This utility may be invoked in the following manner:                      //
+//  llvm-dis [options]      - Read LLVM bitcode from stdin, write asm to stdout//
+//  llvm-dis [options] x.bc - Read LLVM bitcode from the x.bc file, write asm//
+//                            to the x.ll file.                              //
+//  Options:                                                                 //
+//      --help   - Output information about command line switches            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Bitcode/ReaderWriter.h"
@@ -132,10 +131,26 @@ static void diagnosticHandler(const DiagnosticInfo &DI, void *Context) {
     exit(1);
 }
 
-int main(int argc, char **argv) {
+// HLSL Change Starts
+#define NOMINMAX
+#include <windows.h>
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MSFileSystem.h"
+// HLSL Change Ends
+
+int __cdecl main(int argc, char **argv) { // HLSL Change - __cdecl
   // Print a stack trace if we signal out.
-  sys::PrintStackTraceOnErrorSignal();
-  PrettyStackTraceProgram X(argc, argv);
+  // sys::PrintStackTraceOnErrorSignal(); // HLSL Change - disable this
+  // PrettyStackTraceProgram X(argc, argv); // HLSL Change - disable this
+  // HLSL Change Starts
+  llvm::sys::fs::MSFileSystem* msfPtr;
+  HRESULT hr;
+  if (!SUCCEEDED(hr = CreateMSFileSystemForDisk(&msfPtr)))
+    return 1;
+  std::unique_ptr<llvm::sys::fs::MSFileSystem> msf(msfPtr);
+  llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
+  llvm::STDStreamCloser stdStreamCloser;
+  // HLSL Change Ends
 
   LLVMContext &Context = getGlobalContext();
   llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.

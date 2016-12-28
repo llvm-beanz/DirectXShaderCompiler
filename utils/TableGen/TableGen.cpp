@@ -1,15 +1,14 @@
 //===- TableGen.cpp - Top-Level TableGen implementation for LLVM ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains the main function for LLVM's TableGen.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TableGen.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains the main function for LLVM's TableGen.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "TableGenBackends.h" // Declares all backends.
 #include "llvm/Support/CommandLine.h"
@@ -19,6 +18,13 @@
 #include "llvm/TableGen/Main.h"
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/SetTheory.h"
+
+// HLSL Change Starts
+#define NOMINMAX
+#include <windows.h>
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MSFileSystem.h"
+// HLSL Change Ends
 
 using namespace llvm;
 
@@ -172,8 +178,19 @@ bool LLVMTableGenMain(raw_ostream &OS, RecordKeeper &Records) {
 }
 
 int main(int argc, char **argv) {
-  sys::PrintStackTraceOnErrorSignal();
-  PrettyStackTraceProgram X(argc, argv);
+  // HLSL Change Starts
+  if (std::error_code ec = llvm::sys::fs::SetupPerThreadFileSystem())
+      return 1;
+  llvm::sys::fs::MSFileSystem* msfPtr;
+  HRESULT hr;
+  if (!SUCCEEDED(hr = CreateMSFileSystemForDisk(&msfPtr)))
+    return 1;
+  std::unique_ptr<llvm::sys::fs::MSFileSystem> msf(msfPtr);
+  llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
+  // HLSL Change Ends
+
+  // sys::PrintStackTraceOnErrorSignal(); // HLSL Change
+  // PrettyStackTraceProgram X(argc, argv); // HLSL Change
   cl::ParseCommandLineOptions(argc, argv);
 
   return TableGenMain(argv[0], &LLVMTableGenMain);

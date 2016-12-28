@@ -1,20 +1,18 @@
 /*===-- llvm-c/Analysis.h - Analysis Library C Interface --------*- C++ -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header declares the C interface to libLLVMAnalysis.a, which           *|
-|* implements various analyses of the LLVM IR.                                *|
-|*                                                                            *|
-|* Many exotic languages can interoperate with C code but have a harder time  *|
-|* with C++ due to name mangling. So in addition to C, this interface enables *|
-|* tools written in such languages.                                           *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Analysis.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header declares the C interface to libLLVMAnalysis.a, which          //
+// implements various analyses of the LLVM IR.                               //
+// Many exotic languages can interoperate with C code but have a harder time //
+// with C++ due to name mangling. So in addition to C, this interface enables//
+// tools written in such languages.                                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_C_ANALYSIS_H
 #define LLVM_C_ANALYSIS_H
@@ -43,7 +41,7 @@ typedef enum {
    Optionally returns a human-readable description of any invalid constructs.
    OutMessage must be disposed with LLVMDisposeMessage. */
 LLVMBool LLVMVerifyModule(LLVMModuleRef M, LLVMVerifierFailureAction Action,
-                          char **OutMessage);
+                          _Outptr_opt_ char **OutMessage);
 
 /* Verifies that a single function is valid, taking the specified action. Useful
    for debugging. */

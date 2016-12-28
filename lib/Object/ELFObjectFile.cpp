@@ -1,15 +1,14 @@
 //===- ELFObjectFile.cpp - ELF object file implementation -------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Part of the ELFObjectFile class implementation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ELFObjectFile.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Part of the ELFObjectFile class implementation.                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/MathExtras.h"

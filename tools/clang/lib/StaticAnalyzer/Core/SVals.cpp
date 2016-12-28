@@ -1,16 +1,15 @@
 //= RValues.cpp - Abstract RValues for Path-Sens. Value Tracking -*- C++ -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines SVal, Loc, and NonLoc, classes that represent
-//  abstract r-values for use with path-sensitive value tracking.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SVals.cpp                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines SVal, Loc, and NonLoc, classes that represent          //
+//  abstract r-values for use with path-sensitive value tracking.            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/StaticAnalyzer/Core/PathSensitive/ProgramState.h"
 #include "clang/AST/ExprObjC.h"

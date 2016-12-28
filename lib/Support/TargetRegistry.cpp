@@ -1,11 +1,12 @@
 //===--- TargetRegistry.cpp - Target registration -------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetRegistry.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/ADT/STLExtras.h"
@@ -111,7 +112,8 @@ void TargetRegistry::RegisterTarget(Target &T,
   T.HasJIT = HasJIT;
 }
 
-static int TargetArraySortFn(const std::pair<StringRef, const Target *> *LHS,
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl TargetArraySortFn(const std::pair<StringRef, const Target *> *LHS,
                              const std::pair<StringRef, const Target *> *RHS) {
   return LHS->first.compare(RHS->first);
 }

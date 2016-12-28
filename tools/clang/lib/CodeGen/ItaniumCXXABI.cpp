@@ -1,22 +1,21 @@
 //===------- ItaniumCXXABI.cpp - Emit LLVM Code from ASTs for a Module ----===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides C++ code generation targeting the Itanium C++ ABI.  The class
-// in this file generates structures that follow the Itanium C++ ABI, which is
-// documented at:
-//  http://www.codesourcery.com/public/cxx-abi/abi.html
-//  http://www.codesourcery.com/public/cxx-abi/abi-eh.html
-//
-// It also supports the closely-related ARM ABI, documented at:
-// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0041c/IHI0041C_cppabi.pdf
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ItaniumCXXABI.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides C++ code generation targeting the Itanium C++ ABI.  The class//
+// in this file generates structures that follow the Itanium C++ ABI, which is//
+// documented at:                                                            //
+//  http://www.codesourcery.com/public/cxx-abi/abi.html                      //
+//  http://www.codesourcery.com/public/cxx-abi/abi-eh.html                   //
+//                                                                           //
+// It also supports the closely-related ARM ABI, documented at:              //
+// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0041c/IHI0041C_cppabi.pdf//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGCXXABI.h"
 #include "CGCleanup.h"
@@ -945,7 +944,10 @@ static llvm::Constant *getThrowFn(CodeGenModule &CGM) {
 }
 
 void ItaniumCXXABI::emitThrow(CodeGenFunction &CGF, const CXXThrowExpr *E) {
-  QualType ThrowType = E->getSubExpr()->getType();
+#if 1 // HLSL Change Starts
+  llvm_unreachable("HLSL does not support throw.");
+#else // HLSL Change Ends
+    QualType ThrowType = E->getSubExpr()->getType();
   // Now allocate the exception object.
   llvm::Type *SizeTy = CGF.ConvertType(getContext().getSizeType());
   uint64_t TypeSize = getContext().getTypeSizeInChars(ThrowType).getQuantity();
@@ -975,6 +977,7 @@ void ItaniumCXXABI::emitThrow(CodeGenFunction &CGF, const CXXThrowExpr *E) {
 
   llvm::Value *args[] = { ExceptionPtr, TypeInfo, Dtor };
   CGF.EmitNoreturnRuntimeCallOrInvoke(getThrowFn(CGM), args);
+#endif // HLSL Change
 }
 
 static llvm::Constant *getItaniumDynamicCastFn(CodeGenFunction &CGF) {
@@ -3645,10 +3648,14 @@ static llvm::Constant *getClangCallTerminateFn(CodeGenModule &CGM) {
 llvm::CallInst *
 ItaniumCXXABI::emitTerminateForUnexpectedException(CodeGenFunction &CGF,
                                                    llvm::Value *Exn) {
+#if 0 // HLSL Change - no support for exceptions
   // In C++, we want to call __cxa_begin_catch() before terminating.
   if (Exn) {
     assert(CGF.CGM.getLangOpts().CPlusPlus);
     return CGF.EmitNounwindRuntimeCall(getClangCallTerminateFn(CGF.CGM), Exn);
   }
   return CGF.EmitNounwindRuntimeCall(CGF.CGM.getTerminateFn());
+#else
+  llvm_unreachable("HLSL does not support exception");
+#endif // HLSL Change - no support for exceptions
 }

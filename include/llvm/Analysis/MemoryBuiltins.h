@@ -1,14 +1,13 @@
 //===- llvm/Analysis/MemoryBuiltins.h- Calls to memory builtins -*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This family of functions identifies calls to builtin functions that allocate
-// or free memory.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MemoryBuiltins.h                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This family of functions identifies calls to builtin functions that allocate//
+// or free memory.                                                           //
 //
 //===----------------------------------------------------------------------===//
 
@@ -128,9 +127,8 @@ const CallInst *isFreeCall(const Value *I, const TargetLibraryInfo *TLI);
 static inline CallInst *isFreeCall(Value *I, const TargetLibraryInfo *TLI) {
   return const_cast<CallInst*>(isFreeCall((const Value*)I, TLI));
 }
-
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 //  Utility functions to compute size of objects.
 //
 

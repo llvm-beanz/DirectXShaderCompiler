@@ -1,17 +1,16 @@
 //=-- ExprEngine.cpp - Path-Sensitive Expression-Level Dataflow ---*- C++ -*-=
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines a meta-engine for path-sensitive dataflow analysis that
-//  is built on GREngine, but provides the boilerplate to execute transfer
-//  functions and build the ExplodedGraph at the expression level.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExprEngine.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines a meta-engine for path-sensitive dataflow analysis that//
+//  is built on GREngine, but provides the boilerplate to execute transfer   //
+//  functions and build the ExplodedGraph at the expression level.           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/StaticAnalyzer/Core/PathSensitive/ExprEngine.h"
 #include "PrettyStackTraceLocationContext.h"
@@ -864,6 +863,8 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::DesignatedInitExprClass:
     case Stmt::DesignatedInitUpdateExprClass:
     case Stmt::ExtVectorElementExprClass:
+    case Stmt::ExtMatrixElementExprClass: // HLSL Change
+    case Stmt::HLSLVectorElementExprClass: // HLSL Change
     case Stmt::ImaginaryLiteralClass:
     case Stmt::ObjCAtCatchStmtClass:
     case Stmt::ObjCAtFinallyStmtClass:

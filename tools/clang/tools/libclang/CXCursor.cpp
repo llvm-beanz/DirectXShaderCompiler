@@ -1,17 +1,16 @@
 //===- CXCursor.cpp - Routines for manipulating CXCursors -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines routines for manipulating CXCursors. It should be the
-// only file that has internal knowledge of the encoding of the data in
-// CXCursor.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXCursor.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines routines for manipulating CXCursors. It should be the   //
+// only file that has internal knowledge of the encoding of the data in      //
+// CXCursor.                                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CXTranslationUnit.h"
 #include "CXCursor.h"
@@ -239,6 +238,8 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
   case Stmt::ExprWithCleanupsClass:
   case Stmt::ExpressionTraitExprClass:
   case Stmt::ExtVectorElementExprClass:
+  case Stmt::ExtMatrixElementExprClass: // HLSL Change
+  case Stmt::HLSLVectorElementExprClass: // HLSL Change
   case Stmt::ImplicitCastExprClass:
   case Stmt::ImplicitValueInitExprClass:
   case Stmt::NoInitExprClass:
@@ -1031,7 +1032,7 @@ bool cxcursor::isFirstInDeclGroup(CXCursor C) {
 // libclang CXCursor APIs
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {               // HLSL Change -Don't use c linkage.
 
 int clang_Cursor_isNull(CXCursor cursor) {
   return clang_equalCursors(cursor, clang_getNullCursor());
@@ -1222,7 +1223,7 @@ unsigned long long clang_Cursor_getTemplateArgumentUnsignedValue(CXCursor C,
   return TA.getAsIntegral().getZExtValue();
 }
 
-} // end: extern "C"
+// } // end: extern "C"               // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // CXCursorSet.
@@ -1257,7 +1258,7 @@ public:
 };
 }
 
-extern "C" {
+// extern "C" {             // HLSL Change -Don't use c linkage.
 CXCursorSet clang_createCXCursorSet() {
   return packCXCursorSet(new CXCursorSet_Impl());
 }
@@ -1320,7 +1321,7 @@ CXCompletionString clang_getCursorCompletionString(CXCursor cursor) {
   }
   return nullptr;
 }
-} // end: extern C.
+// } // end: extern C.   // HLSL Change -Don't use c linkage.
 
 namespace {
   struct OverridenCursorsPool {
@@ -1345,7 +1346,7 @@ void cxcursor::disposeOverridenCXCursorsPool(void *pool) {
   delete static_cast<OverridenCursorsPool*>(pool);
 }
  
-extern "C" {
+// extern "C" {                  // HLSL Change -Don't use c linkage.
 void clang_getOverriddenCursors(CXCursor cursor,
                                 CXCursor **overridden,
                                 unsigned *num_overridden) {
@@ -1468,4 +1469,4 @@ CXType clang_Cursor_getReceiverType(CXCursor C) {
   return cxtype::MakeCXType(QualType(), TU);
 }
 
-} // end: extern "C"
+// } // end: extern "C"            // HLSL Change -Don't use c linkage.

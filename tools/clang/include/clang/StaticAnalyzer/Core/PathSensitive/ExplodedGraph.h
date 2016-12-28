@@ -1,18 +1,17 @@
 //=-- ExplodedGraph.h - Local, Path-Sens. "Exploded Graph" -*- C++ -*-------==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the template classes ExplodedNode and ExplodedGraph,
-//  which represent a path-sensitive, intra-procedural "exploded graph."
-//  See "Precise interprocedural dataflow analysis via graph reachability"
-//  by Reps, Horwitz, and Sagiv
-//  (http://portal.acm.org/citation.cfm?id=199462) for the definition of an
-//  exploded graph.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExplodedGraph.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the template classes ExplodedNode and ExplodedGraph,   //
+//  which represent a path-sensitive, intra-procedural "exploded graph."     //
+//  See "Precise interprocedural dataflow analysis via graph reachability"   //
+//  by Reps, Horwitz, and Sagiv                                              //
+//  (http://portal.acm.org/citation.cfm?id=199462) for the definition of an  //
+//  exploded graph.                                                          //
 //
 //===----------------------------------------------------------------------===//
 
@@ -46,7 +45,8 @@ class ExplodedGraph;
 // ExplodedGraph "implementation" classes.  These classes are not typed to
 // contain a specific kind of state.  Typed-specialized versions are defined
 // on top of these classes.
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 // ExplodedNode is not constified all over the engine because we need to add
 // successors to it at any time after creating it.

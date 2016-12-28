@@ -1,16 +1,15 @@
 //=-- InstrProfReader.cpp - Instrumented profiling reader -------------------=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains support for reading profiling data for clang's
-// instrumentation based PGO and coverage.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InstrProfReader.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains support for reading profiling data for clang's         //
+// instrumentation based PGO and coverage.                                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "InstrProfIndexed.h"

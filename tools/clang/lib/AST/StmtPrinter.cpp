@@ -1,16 +1,15 @@
 //===--- StmtPrinter.cpp - Printing implementation for Stmt ASTs ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Stmt::dumpPretty/Stmt::printPretty methods, which
-// pretty print the AST back out to C code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// StmtPrinter.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Stmt::dumpPretty/Stmt::printPretty methods, which//
+// pretty print the AST back out to C code.                                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -24,6 +23,7 @@
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Format.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 using namespace clang;
 
 //===----------------------------------------------------------------------===//
@@ -133,6 +133,12 @@ void StmtPrinter::VisitNullStmt(NullStmt *Node) {
   Indent() << ";\n";
 }
 
+// HLSL Change: adding support for HLSL discard stmt
+void StmtPrinter::VisitDiscardStmt(DiscardStmt *Node) {
+  Indent();
+  OS << "discard;\n";
+}
+
 void StmtPrinter::VisitDeclStmt(DeclStmt *Node) {
   Indent();
   PrintRawDeclStmt(Node);
@@ -168,6 +174,18 @@ void StmtPrinter::VisitLabelStmt(LabelStmt *Node) {
 }
 
 void StmtPrinter::VisitAttributedStmt(AttributedStmt *Node) {
+  // HLSL Change Begin
+  if (Policy.LangOpts.HLSL) {
+    for (ArrayRef<const Attr*>::reverse_iterator it = Node->getAttrs().rbegin(),
+      end = Node->getAttrs().rend(); it != end; ++it) {
+      hlsl::CustomPrintHLSLAttr((*it), OS, Policy, IndentLevel);
+    }
+
+    PrintStmt(Node->getSubStmt(), 0);
+    return;
+  }
+  // HLSL Change End
+
   for (const auto *Attr : Node->getAttrs()) {
     Attr->printPretty(OS, Policy);
   }
@@ -241,7 +259,9 @@ void StmtPrinter::VisitWhileStmt(WhileStmt *Node) {
   else
     PrintExpr(Node->getCond());
   OS << ")\n";
+  IndentLevel = IndentLevel - 1; // HLSL Change - TODO: Find the root cause of this issue.
   PrintStmt(Node->getBody());
+  IndentLevel = IndentLevel + 1; // HLSL Change  
 }
 
 void StmtPrinter::VisitDoStmt(DoStmt *Node) {
@@ -1081,6 +1101,13 @@ void StmtPrinter::VisitCharacterLiteral(CharacterLiteral *Node) {
     OS << "'\\v'";
     break;
   default:
+    // HLSL Change Begin
+    if (Policy.LangOpts.HLSL && value > 255) {
+      unsigned int truncVal = value & (~0xffffff00);
+      OS << "'\\x" << llvm::format("%02x", truncVal) << "'";
+    }
+    else {
+    // HLSL Change End
     if (value < 256 && isPrintable((unsigned char)value))
       OS << "'" << (char)value << "'";
     else if (value < 256)
@@ -1089,6 +1116,7 @@ void StmtPrinter::VisitCharacterLiteral(CharacterLiteral *Node) {
       OS << "'\\u" << llvm::format("%04x", value) << "'";
     else
       OS << "'\\U" << llvm::format("%08x", value) << "'";
+    }
   }
 }
 
@@ -1104,6 +1132,7 @@ void StmtPrinter::VisitIntegerLiteral(IntegerLiteral *Node) {
   case BuiltinType::UChar:     OS << "Ui8"; break;
   case BuiltinType::Short:     OS << "i16"; break;
   case BuiltinType::UShort:    OS << "Ui16"; break;
+  case BuiltinType::LitInt:    break; // HLSL Change
   case BuiltinType::Int:       break; // no suffix.
   case BuiltinType::UInt:      OS << 'U'; break;
   case BuiltinType::Long:      OS << 'L'; break;
@@ -1116,7 +1145,8 @@ void StmtPrinter::VisitIntegerLiteral(IntegerLiteral *Node) {
 }
 
 static void PrintFloatingLiteral(raw_ostream &OS, FloatingLiteral *Node,
-                                 bool PrintSuffix) {
+                                 bool PrintSuffix,
+                                 bool HLSLSuffix = false) {    // HLSL Change - added HLSLSuffix
   SmallString<16> Str;
   Node->getValue().toString(Str);
   OS << Str;
@@ -1125,6 +1155,22 @@ static void PrintFloatingLiteral(raw_ostream &OS, FloatingLiteral *Node,
 
   if (!PrintSuffix)
     return;
+
+  // Emit suffixes.  Float literals are always a builtin float type.
+  // HLSL Change Starts - override suffixes
+  if (HLSLSuffix) {
+    switch (Node->getType()->getAs<BuiltinType>()->getKind()) {
+    default: llvm_unreachable("Unexpected type for float literal!");
+    case BuiltinType::LitFloat:   break; // HLSL Change -- no suffix
+    case BuiltinType::Min10Float: break; // no suffix, as this is a literal and 'F' would pollute expression
+    case BuiltinType::Half:       OS << 'H'; break; // HLSL Change -- added suffix
+    case BuiltinType::Double:     OS << 'L'; break; // HLSL Change -- added suffix
+    case BuiltinType::Float:      OS << 'F'; break;
+    // Note absence of LongDouble - should not be possible in HLSL
+    }
+    return;
+  }
+  // HLSL Change Ends
 
   // Emit suffixes.  Float literals are always a builtin float type.
   switch (Node->getType()->getAs<BuiltinType>()->getKind()) {
@@ -1137,7 +1183,7 @@ static void PrintFloatingLiteral(raw_ostream &OS, FloatingLiteral *Node,
 }
 
 void StmtPrinter::VisitFloatingLiteral(FloatingLiteral *Node) {
-  PrintFloatingLiteral(OS, Node, /*PrintSuffix=*/true);
+  PrintFloatingLiteral(OS, Node, /*PrintSuffix=*/true, Policy.LangOpts.HLSL);   // HLSL Change
 }
 
 void StmtPrinter::VisitImaginaryLiteral(ImaginaryLiteral *Node) {
@@ -1293,7 +1339,7 @@ void StmtPrinter::VisitMemberExpr(MemberExpr *Node) {
     ? dyn_cast<FieldDecl>(ParentMember->getMemberDecl()) : nullptr;
 
   if (!ParentDecl || !ParentDecl->isAnonymousStructOrUnion())
-    OS << (Node->isArrow() ? "->" : ".");
+    OS << (!Policy.LangOpts.HLSL && Node->isArrow() ? "->" : "."); // HLSL Change
 
   if (FieldDecl *FD = dyn_cast<FieldDecl>(Node->getMemberDecl()))
     if (FD->isAnonymousStructOrUnion())
@@ -1318,6 +1364,18 @@ void StmtPrinter::VisitExtVectorElementExpr(ExtVectorElementExpr *Node) {
   OS << ".";
   OS << Node->getAccessor().getName();
 }
+// HLSL Change Starts
+void StmtPrinter::VisitExtMatrixElementExpr(ExtMatrixElementExpr *Node) {
+  PrintExpr(Node->getBase());
+  OS << ".";
+  OS << Node->getAccessor().getName();
+}
+void StmtPrinter::VisitHLSLVectorElementExpr(HLSLVectorElementExpr *Node) {
+  PrintExpr(Node->getBase());
+  OS << ".";
+  OS << Node->getAccessor().getName();
+}
+// HLSL Change Ends
 void StmtPrinter::VisitCStyleCastExpr(CStyleCastExpr *Node) {
   OS << '(';
   Node->getTypeAsWritten().print(OS, Policy);
@@ -1407,7 +1465,9 @@ void StmtPrinter::VisitInitListExpr(InitListExpr* Node) {
     return;
   }
 
-  OS << "{";
+  if (!Policy.LangOpts.HLSL || (Node->getLBraceLoc().isValid() || Node->getRBraceLoc().isValid())) // HLSL Change
+    OS << "{ "; 
+
   for (unsigned i = 0, e = Node->getNumInits(); i != e; ++i) {
     if (i) OS << ", ";
     if (Node->getInit(i))
@@ -1415,7 +1475,9 @@ void StmtPrinter::VisitInitListExpr(InitListExpr* Node) {
     else
       OS << "{}";
   }
-  OS << "}";
+
+  if (!Policy.LangOpts.HLSL || (Node->getLBraceLoc().isValid() || Node->getRBraceLoc().isValid())) // HLSL Change
+    OS << " }";
 }
 
 void StmtPrinter::VisitParenListExpr(ParenListExpr* Node) {
@@ -1702,7 +1764,7 @@ void StmtPrinter::VisitUserDefinedLiteral(UserDefinedLiteral *Node) {
   case UserDefinedLiteral::LOK_Floating: {
     // Print floating literal without suffix.
     FloatingLiteral *Float = cast<FloatingLiteral>(Node->getCookedLiteral());
-    PrintFloatingLiteral(OS, Float, /*PrintSuffix=*/false);
+    PrintFloatingLiteral(OS, Float, /*PrintSuffix=*/false, Policy.LangOpts.HLSL);   // HLSL Change
     break;
   }
   case UserDefinedLiteral::LOK_String:

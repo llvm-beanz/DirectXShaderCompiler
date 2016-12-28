@@ -1,11 +1,12 @@
 //===---- CGLoopInfo.cpp - LLVM CodeGen for loop metadata -*- C++ -*-------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGLoopInfo.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGLoopInfo.h"
 #include "clang/AST/Attr.h"
@@ -22,6 +23,8 @@ static MDNode *createMetadata(LLVMContext &Ctx, const LoopAttributes &Attrs) {
 
   if (!Attrs.IsParallel && Attrs.VectorizerWidth == 0 &&
       Attrs.VectorizerUnroll == 0 &&
+      Attrs.HlslLoop == false && // HLSL Change
+      Attrs.HlslUnrollCount == 0 && // HLSL Change
       Attrs.VectorizerEnable == LoopAttributes::VecUnspecified)
     return nullptr;
 
@@ -56,6 +59,30 @@ static MDNode *createMetadata(LLVMContext &Ctx, const LoopAttributes &Attrs) {
     Args.push_back(MDNode::get(Ctx, Vals));
   }
 
+  // HLSL Change Begins.
+  if (Attrs.HlslLoop) {
+    // Disable unroll.
+    SmallVector<Metadata *, 1> DisableOperands;
+    DisableOperands.push_back(MDString::get(Ctx, "llvm.loop.unroll.disable"));
+    MDNode *DisableNode = MDNode::get(Ctx, DisableOperands);
+    Args.push_back(DisableNode);
+  }
+  else if (Attrs.HlslUnrollCount) {
+    if (Attrs.HlslUnrollCount == 1) {
+      // Full unroll.
+      SmallVector<Metadata *, 1> FullOperands;
+      FullOperands.push_back(MDString::get(Ctx, "llvm.loop.unroll.full"));
+      MDNode *FullNode = MDNode::get(Ctx, FullOperands);
+      Args.push_back(FullNode);
+    } else {
+      Metadata *Vals[] = {MDString::get(Ctx, "llvm.loop.unroll.count"),
+                          ConstantAsMetadata::get(ConstantInt::get(
+                              Type::getInt32Ty(Ctx), Attrs.HlslUnrollCount))};
+      Args.push_back(MDNode::get(Ctx, Vals));
+    }
+  }
+  // HLSL Change Ends.
+
   // Set the first operand to itself.
   MDNode *LoopID = MDNode::get(Ctx, Args);
   LoopID->replaceOperandWith(0, LoopID);
@@ -64,6 +91,7 @@ static MDNode *createMetadata(LLVMContext &Ctx, const LoopAttributes &Attrs) {
 
 LoopAttributes::LoopAttributes(bool IsParallel)
     : IsParallel(IsParallel), VectorizerEnable(LoopAttributes::VecUnspecified),
+      HlslLoop(false), HlslUnrollCount(0), // HLSL Change
       VectorizerWidth(0), VectorizerUnroll(0) {}
 
 void LoopAttributes::clear() {
@@ -71,6 +99,8 @@ void LoopAttributes::clear() {
   VectorizerWidth = 0;
   VectorizerUnroll = 0;
   VectorizerEnable = LoopAttributes::VecUnspecified;
+  HlslLoop = false; // HLSL Change
+  HlslUnrollCount = 0; // HLSL Change
 }
 
 LoopInfo::LoopInfo(BasicBlock *Header, const LoopAttributes &Attrs)
@@ -82,7 +112,15 @@ void LoopInfoStack::push(BasicBlock *Header,
                          ArrayRef<const clang::Attr *> Attrs) {
   for (const auto *Attr : Attrs) {
     const LoopHintAttr *LH = dyn_cast<LoopHintAttr>(Attr);
-
+    // HLSL Change Begins
+    if (const HLSLLoopAttr *LoopAttr = dyn_cast<HLSLLoopAttr>(Attr)) {
+      setHlslLoop(true);
+    } else if (const HLSLUnrollAttr *UnrollAttr =
+                   dyn_cast<HLSLUnrollAttr>(Attr)) {
+      unsigned count = UnrollAttr->getCount();
+      setHlslUnrollCount(count);
+    }
+    // HLSL Change Ends
     // Skip non loop hint attributes
     if (!LH)
       continue;

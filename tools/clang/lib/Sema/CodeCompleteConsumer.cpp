@@ -1,15 +1,14 @@
 //===--- CodeCompleteConsumer.cpp - Code Completion Interface ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the CodeCompleteConsumer class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeCompleteConsumer.cpp                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the CodeCompleteConsumer class.                     //
+//                                                                           //
+
 #include "clang/Sema/CodeCompleteConsumer.h"
 #include "clang-c/Index.h"
 #include "clang/AST/DeclCXX.h"
@@ -24,7 +23,8 @@
 #include <algorithm>
 #include <cstring>
 #include <functional>
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 
 //===----------------------------------------------------------------------===//
@@ -309,7 +309,7 @@ StringRef CodeCompletionTUInfo::getParentName(const DeclContext *DC) {
         if (!Interface) {
           // Assign an empty StringRef but with non-null data to distinguish
           // between empty because we didn't process the DeclContext yet.
-          CachedParentName = StringRef((const char *)~0U, 0);
+          CachedParentName = StringRef((const char *)~(uintptr_t)0U, 0); // HLSL Change
           return StringRef();
         }
         

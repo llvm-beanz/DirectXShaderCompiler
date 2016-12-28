@@ -1,16 +1,15 @@
 //=-- CoverageMappingReader.cpp - Code coverage mapping reader ----*- C++ -*-=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains support for reading coverage mapping data for
-// instrumentation based coverage.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CoverageMappingReader.cpp                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains support for reading coverage mapping data for          //
+// instrumentation based coverage.                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ProfileData/CoverageMappingReader.h"
 #include "llvm/ADT/DenseSet.h"
@@ -449,6 +448,9 @@ static std::error_code loadBinaryFormat(MemoryBufferRef ObjectBuffer,
                                         uint8_t &BytesInAddress,
                                         support::endianness &Endian,
                                         StringRef Arch) {
+#if 1 // HLSL Change Starts - remove support for object files
+  return std::error_code();
+#else
   auto BinOrErr = object::createBinary(ObjectBuffer);
   if (std::error_code EC = BinOrErr.getError())
     return EC;
@@ -461,7 +463,8 @@ static std::error_code loadBinaryFormat(MemoryBufferRef ObjectBuffer,
     if (std::error_code EC = ObjectFileOrErr.getError())
       return EC;
     OF = std::move(ObjectFileOrErr.get());
-  } else if (isa<object::ObjectFile>(Bin.get())) {
+  } else
+  if (isa<object::ObjectFile>(Bin.get())) {
     // For any other object file, upcast and take ownership.
     OF.reset(cast<object::ObjectFile>(Bin.release()));
     // If we've asked for a particular arch, make sure they match.
@@ -491,6 +494,7 @@ static std::error_code loadBinaryFormat(MemoryBufferRef ObjectBuffer,
     return EC;
 
   return std::error_code();
+#endif // HLSL Change Ends - remove support for object files
 }
 
 ErrorOr<std::unique_ptr<BinaryCoverageReader>>

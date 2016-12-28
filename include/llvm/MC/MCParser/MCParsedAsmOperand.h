@@ -1,12 +1,11 @@
 //===-- llvm/MC/MCParsedAsmOperand.h - Asm Parser Operand -------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MCParsedAsmOperand.h                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 #ifndef LLVM_MC_MCPARSER_MCPARSEDASMOPERAND_H
 #define LLVM_MC_MCPARSER_MCPARSEDASMOPERAND_H
 
@@ -76,8 +75,8 @@ public:
   /// dump - Print to the debug stream.
   virtual void dump() const;
 };
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 // Debugging Support
 
 inline raw_ostream& operator<<(raw_ostream &OS, const MCParsedAsmOperand &MO) {

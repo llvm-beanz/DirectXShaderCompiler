@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXCompilationDatabase.cpp                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 #include "clang-c/CXCompilationDatabase.h"
 #include "CXString.h"
 #include "clang/Tooling/CompilationDatabase.h"
@@ -6,7 +15,7 @@
 using namespace clang;
 using namespace clang::tooling;
 
-extern "C" {
+// extern "C" {               // HLSL Change -Don't use c linkage.
 
 // FIXME: do something more useful with the error message
 CXCompilationDatabase
@@ -171,4 +180,5 @@ clang_CompileCommand_getMappedSourceContent(CXCompileCommand CCmd, unsigned I)
   return cxstring::createRef(Cmd->MappedSources[I].second.c_str());
 }
 
-} // end: extern "C"
+// } // end: extern "C"        // HLSL Change -Don't use c linkage.
+

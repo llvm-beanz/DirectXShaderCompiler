@@ -1,16 +1,15 @@
 //===--- IdentifierTable.cpp - Hash table for identifier lookup -----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the IdentifierInfo, IdentifierVisitor, and
-// IdentifierTable interfaces.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IdentifierTable.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the IdentifierInfo, IdentifierVisitor, and           //
+// IdentifierTable interfaces.                                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -111,6 +110,7 @@ namespace {
     KEYCONCEPTS = 0x10000,
     KEYOBJC2    = 0x20000,
     KEYZVECTOR  = 0x40000,
+    KEYHLSL = 0x80000, // MS Change: Flag for hlsl keywords
     KEYALL = (0x7ffff & ~KEYNOMS18 &
               ~KEYNOOPENCL) // KEYNOMS18 and KEYNOOPENCL are used to exclude.
   };
@@ -141,6 +141,7 @@ static KeywordStatus getKeywordStatus(const LangOptions &LangOpts,
   if (LangOpts.AltiVec && (Flags & KEYALTIVEC)) return KS_Enabled;
   if (LangOpts.OpenCL && (Flags & KEYOPENCL)) return KS_Enabled;
   if (!LangOpts.CPlusPlus && (Flags & KEYNOCXX)) return KS_Enabled;
+  if (LangOpts.HLSL && (Flags & KEYHLSL)) return KS_Enabled; // HLSL Change: Support for HLSL Keywords
   if (LangOpts.C11 && (Flags & KEYC11)) return KS_Enabled;
   // We treat bridge casts as objective-C keywords so we can warn on them
   // in non-arc mode.

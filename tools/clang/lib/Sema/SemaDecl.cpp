@@ -1,15 +1,14 @@
 //===--- SemaDecl.cpp - Semantic Analysis for Declarations ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for declarations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaDecl.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for declarations.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "TypeLocBuilder.h"
@@ -48,6 +47,7 @@
 #include <algorithm>
 #include <cstring>
 #include <functional>
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 using namespace clang;
 using namespace sema;
 
@@ -112,6 +112,12 @@ bool Sema::isSimpleTypeSpecifier(tok::TokenKind Kind) const {
   case tok::kw_bool:
   case tok::kw___underlying_type:
     return true;
+
+  // HLSL Change Starts
+  case tok::kw_min10float:
+  case tok::kw_min12int:
+    return true;
+  // HLSL Change Ends
 
   case tok::annot_typename:
   case tok::kw_char16_t:
@@ -614,8 +620,10 @@ void Sema::DiagnoseUnknownTypeName(IdentifierInfo *&II,
       TemplateName TplName = TemplateResult.get();
       Diag(IILoc, diag::err_template_missing_args) << TplName;
       if (TemplateDecl *TplDecl = TplName.getAsTemplateDecl()) {
-        Diag(TplDecl->getLocation(), diag::note_template_decl_here)
-          << TplDecl->getTemplateParameters()->getSourceRange();
+        if (TplDecl->getLocation().isValid()) { // HLSL Change - ellide location notes for built-ins
+          Diag(TplDecl->getLocation(), diag::note_template_decl_here)
+            << TplDecl->getTemplateParameters()->getSourceRange();
+        }
       }
       return;
     }
@@ -2998,6 +3006,11 @@ bool Sema::MergeFunctionDecl(FunctionDecl *New, NamedDecl *&OldD,
     const FunctionType *OldFuncType = OldQType->getAs<FunctionType>();
     const FunctionType *NewFuncType = NewQType->getAs<FunctionType>();
     const FunctionProtoType *OldProto = nullptr;
+#if 1 // HLSL Change Starts - commenting this out rather than fixing for inout semantics - N/A for HLSL
+    assert(!(MergeTypeWithOld && isa<FunctionNoProtoType>(NewFuncType) &&
+             (OldProto = dyn_cast<FunctionProtoType>(OldFuncType))) &&
+           "else fn with no prototype found");
+#else
     if (MergeTypeWithOld && isa<FunctionNoProtoType>(NewFuncType) &&
         (OldProto = dyn_cast<FunctionProtoType>(OldFuncType))) {
       // The old declaration provided a function prototype, but the
@@ -3024,10 +3037,12 @@ bool Sema::MergeFunctionDecl(FunctionDecl *New, NamedDecl *&OldD,
 
       New->setParams(Params);
     }
+#endif // HLSL Change Ends
 
     return MergeCompatibleFunctionDecls(New, Old, S, MergeTypeWithOld);
   }
 
+#if 0 // HLSL Change Starts - commenting this out rather than fixing for inout semantics - N/A for HLSL
   // GNU C permits a K&R definition to follow a prototype declaration
   // if the declared types of the parameters in the K&R definition
   // match the types in the prototype declaration, even when the
@@ -3091,6 +3106,7 @@ bool Sema::MergeFunctionDecl(FunctionDecl *New, NamedDecl *&OldD,
 
     // Fall through to diagnose conflicting types.
   }
+#endif // HLSL Change Ends
 
   // A function that has already been declared has been redeclared or
   // defined with a different type; show an appropriate diagnostic.
@@ -3202,7 +3218,7 @@ void Sema::mergeObjCMethodDecls(ObjCMethodDecl *newMethod,
 /// to here in AddInitializerToDecl. We can't check them before the initializer
 /// is attached.
 void Sema::MergeVarDeclTypes(VarDecl *New, VarDecl *Old,
-                             bool MergeTypeWithOld) {
+                             bool MergeTypeWithOld, ShadowMergeState& MergeState) { // HLSL Change - add merge state
   if (New->isInvalidDecl() || Old->isInvalidDecl())
     return;
 
@@ -3270,7 +3286,9 @@ void Sema::MergeVarDeclTypes(VarDecl *New, VarDecl *Old,
     //
     // Neither C nor C++ requires a diagnostic for this, but we should still try
     // to diagnose it.
-    Diag(New->getLocation(), New->isThisDeclarationADefinition()
+    // HLSL Change Starts
+    if (MergeState == ShadowMergeState_Disallowed) {
+      Diag(New->getLocation(), New->isThisDeclarationADefinition()
                                  ? diag::err_redefinition_different_type
                                  : diag::err_redeclaration_different_type)
         << New->getDeclName() << New->getType() << Old->getType();
@@ -3281,6 +3299,15 @@ void Sema::MergeVarDeclTypes(VarDecl *New, VarDecl *Old,
         getNoteDiagForInvalidRedeclaration(Old, New);
     Diag(OldLocation, PrevDiag);
     return New->setInvalidDecl();
+  }
+    else if (MergeState == ShadowMergeState_Possible) {
+      Diag(New->getLocation(), diag::warn_hlsl_for_redefinition_different_type)
+        << New->getDeclName() << New->getType() << Old->getType();
+      Diag(Old->getLocation(), diag::note_previous_definition);
+      MergeState = ShadowMergeState_Effective;
+      MergeTypeWithOld = false;
+    }
+    // HLSL Change Ends
   }
 
   // Don't actually update the type on the new declaration if the old
@@ -3326,7 +3353,7 @@ static bool mergeTypeWithPrevious(Sema &S, VarDecl *NewVD, VarDecl *OldVD,
 /// FinalizeDeclaratorGroup. Unfortunately, we can't analyze tentative
 /// definitions here, since the initializer hasn't been attached.
 ///
-void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous) {
+void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous, ShadowMergeState& MergeState) { // HLSL Change - add merge state
   // If the new decl is already invalid, don't do any other checking.
   if (New->isInvalidDecl())
     return;
@@ -3399,12 +3426,12 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous) {
   VarDecl *MostRecent = Old->getMostRecentDecl();
   if (MostRecent != Old) {
     MergeVarDeclTypes(New, MostRecent,
-                      mergeTypeWithPrevious(*this, New, MostRecent, Previous));
+                      mergeTypeWithPrevious(*this, New, MostRecent, Previous), MergeState); // HLSL Change - add MergeState
     if (New->isInvalidDecl())
       return;
   }
 
-  MergeVarDeclTypes(New, Old, mergeTypeWithPrevious(*this, New, Old, Previous));
+  MergeVarDeclTypes(New, Old, mergeTypeWithPrevious(*this, New, Old, Previous), MergeState); // HLSL Change - add MergeState
   if (New->isInvalidDecl())
     return;
 
@@ -3469,9 +3496,18 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous) {
       // Don't complain about out-of-line definitions of static members.
       !(Old->getLexicalDeclContext()->isRecord() &&
         !New->getLexicalDeclContext()->isRecord())) {
-    Diag(New->getLocation(), diag::err_redefinition) << New->getDeclName();
-    Diag(OldLocation, PrevDiag);
-    return New->setInvalidDecl();
+    // HLSL Change Starts
+    if (MergeState == ShadowMergeState_Disallowed) {
+      Diag(New->getLocation(), diag::err_redefinition) << New->getDeclName();
+      Diag(OldLocation, PrevDiag);
+      return New->setInvalidDecl();
+    } else if (MergeState == ShadowMergeState_Possible) {
+      Diag(New->getLocation(), diag::warn_hlsl_for_redefinition)
+          << New->getDeclName();
+      Diag(Old->getLocation(), diag::note_previous_definition);
+      MergeState = ShadowMergeState_Effective;
+    }
+    // HLSL Change Ends
   }
 
   if (New->getTLSKind() != Old->getTLSKind()) {
@@ -3506,10 +3542,19 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous) {
       // The previous definition is hidden, and multiple definitions are
       // permitted (in separate TUs). Form another definition of it.
     } else {
-      Diag(New->getLocation(), diag::err_redefinition) << New;
-      Diag(Def->getLocation(), diag::note_previous_definition);
-      New->setInvalidDecl();
-      return;
+      // HLSL Change Starts
+      if (MergeState == ShadowMergeState_Disallowed) {
+        Diag(New->getLocation(), diag::err_redefinition) << New;
+        Diag(Def->getLocation(), diag::note_previous_definition);
+        New->setInvalidDecl();
+        return;
+      }
+      else if (MergeState == ShadowMergeState_Possible) {
+        Diag(New->getLocation(), diag::warn_hlsl_for_redefinition) << New->getDeclName();
+        Diag(Old->getLocation(), diag::note_previous_definition);
+        MergeState = ShadowMergeState_Effective;
+      }
+      // HLSL Change Ends
     }
   }
 
@@ -3520,6 +3565,7 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous) {
     return;
   }
 
+  if (MergeState != ShadowMergeState_Effective) { // HLSL Change - avoid merging when shadowing
   // Merge "used" flag.
   if (Old->getMostRecentDecl()->isUsed(false))
     New->setIsUsed();
@@ -3533,6 +3579,7 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous) {
   New->setAccess(Old->getAccess());
   if (NewTemplate)
     NewTemplate->setAccess(New->getAccess());
+  } // HLSL Change - close block conditional on shadow merge state
 }
 
 /// ParsedFreeStandingDeclSpec - This method is invoked when a declspec with
@@ -4726,6 +4773,8 @@ NamedDecl *Sema::HandleDeclarator(Scope *S, Declarator &D,
 
   // The scope passed in may not be a decl scope.  Zip up the scope tree until
   // we find one that is.
+  ShadowMergeState MergeState = S->isForDeclScope() ?
+    ShadowMergeState_Possible : ShadowMergeState_Disallowed; // HLSL Change - check on original scope
   while ((S->getFlags() & Scope::DeclScope) == 0 ||
          (S->getFlags() & Scope::TemplateParamScope) != 0)
     S = S->getParent();
@@ -4885,6 +4934,17 @@ NamedDecl *Sema::HandleDeclarator(Scope *S, Declarator &D,
   if (getLangOpts().CPlusPlus)
     CheckExtraCXXDefaultArguments(D);
 
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    const bool IsParameterFalse = false;
+    if (!DiagnoseHLSLDecl(D, DC, TInfo, IsParameterFalse)) {
+      assert(D.isInvalidType() && "otherwise DiagnoseHLSLDecl failed but "
+                                  "didn't invalidate declaration");
+      return 0;
+    }
+  }
+  // HLSL Change Ends
+
   NamedDecl *New;
 
   bool AddToScope = true;
@@ -4901,11 +4961,13 @@ NamedDecl *Sema::HandleDeclarator(Scope *S, Declarator &D,
                                   AddToScope);
   } else {
     New = ActOnVariableDeclarator(S, D, DC, TInfo, Previous, TemplateParamLists,
-                                  AddToScope);
+                                  AddToScope, MergeState); // HLSL Change - add merge state
   }
 
   if (!New)
     return nullptr;
+
+  TransferUnusualAttributes(D, New); // HLSL Change
 
   // If this has an identifier and is not an invalid redeclaration or 
   // function template specialization, add it to the scope stack.
@@ -5591,7 +5653,7 @@ NamedDecl *
 Sema::ActOnVariableDeclarator(Scope *S, Declarator &D, DeclContext *DC,
                               TypeSourceInfo *TInfo, LookupResult &Previous,
                               MultiTemplateParamsArg TemplateParamLists,
-                              bool &AddToScope) {
+                              bool &AddToScope, ShadowMergeState MergeState) { // HLSL Change - add merge state
   QualType R = TInfo->getType();
   DeclarationName Name = GetNameForDeclarator(D).getName();
 
@@ -6070,7 +6132,7 @@ Sema::ActOnVariableDeclarator(Scope *S, Declarator &D, DeclContext *DC,
     }
 
     if (!IsVariableTemplateSpecialization)
-      D.setRedeclaration(CheckVariableDeclaration(NewVD, Previous));
+        D.setRedeclaration(CheckVariableDeclaration(NewVD, Previous, MergeState)); // HLSL Change - add merge state
 
     if (NewTemplate) {
       VarTemplateDecl *PrevVarTemplate =
@@ -6493,7 +6555,7 @@ void Sema::CheckVariableDeclarationType(VarDecl *NewVD) {
 /// Sets NewVD->isInvalidDecl() if an error was encountered.
 ///
 /// Returns true if the variable declaration is a redeclaration.
-bool Sema::CheckVariableDeclaration(VarDecl *NewVD, LookupResult &Previous) {
+bool Sema::CheckVariableDeclaration(VarDecl *NewVD, LookupResult &Previous, ShadowMergeState MergeState) { // HLSL Change - add merge state
   CheckVariableDeclarationType(NewVD);
 
   // If the decl is already known invalid, don't check it.
@@ -6510,7 +6572,7 @@ bool Sema::CheckVariableDeclaration(VarDecl *NewVD, LookupResult &Previous) {
   filterNonConflictingPreviousDecls(*this, NewVD, Previous);
 
   if (!Previous.empty()) {
-    MergeVarDecl(NewVD, Previous);
+    MergeVarDecl(NewVD, Previous, MergeState);    // HLSL Change - add merge state
     return true;
   }
   return false;
@@ -7194,6 +7256,11 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
   DeclarationName Name = NameInfo.getName();
   StorageClass SC = getFunctionStorageClass(*this, D);
 
+  // HLSL Change - reject 'extern' functions
+  if (getLangOpts().HLSL && SC == SC_Extern) {
+    Diag(D.getLocStart(), diag::err_hlsl_varmodifierna) << "'extern'" << "function";
+  }
+
   if (DeclSpec::TSCS TSCS = D.getDeclSpec().getThreadStorageClassSpec())
     Diag(D.getDeclSpec().getThreadStorageClassSpecLoc(),
          diag::err_invalid_thread)
@@ -7405,7 +7472,7 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
       QualType Result =
           SubstAutoType(FPT->getReturnType(), Context.DependentTy);
       NewFD->setType(Context.getFunctionType(Result, FPT->getParamTypes(),
-                                             FPT->getExtProtoInfo()));
+                                             FPT->getExtProtoInfo(), FPT->getParamMods())); // HLSL Change - add param mods
     }
 
     // C++ [dcl.fct.spec]p3:
@@ -7524,7 +7591,8 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
         getLangOpts().CPlusPlus11 && FPT && !FPT->hasExceptionSpec())
       NewFD->setType(Context.getFunctionType(
           FPT->getReturnType(), FPT->getParamTypes(),
-          FPT->getExtProtoInfo().withExceptionSpec(EST_BasicNoexcept)));
+          FPT->getExtProtoInfo().withExceptionSpec(EST_BasicNoexcept),
+          FPT->getParamMods())); // HLSL Change - get param mods
   }
 
   // Filter out previous declarations that don't match the scope.
@@ -7571,6 +7639,19 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
           NewFD->setInvalidDecl();
       }
     }
+
+    // HLSL Change Starts - error on typedef or type alias of void parameter
+    if (getLangOpts().HLSL && FTI.NumParams && FTIHasSingleVoidParameter(FTI)) {
+      ParmVarDecl *Param = cast<ParmVarDecl>(FTI.Params[0].Param);
+      bool IsTypeAlias = false;
+      if (const TypedefType *TT = Param->getType()->getAs<TypedefType>())
+        IsTypeAlias = isa<TypeAliasDecl>(TT->getDecl());
+      else if (const TemplateSpecializationType *TST =
+                 Param->getType()->getAs<TemplateSpecializationType>())
+        IsTypeAlias = TST->isTypeAlias();
+      Diag(Param->getLocation(), diag::err_hlsl_param_typedef_of_void) << IsTypeAlias;
+    }
+    // HLSL Change Ends
 
   } else if (const FunctionProtoType *FT = R->getAs<FunctionProtoType>()) {
     // When we're declaring a function with a typedef, typeof, etc as in the
@@ -7794,10 +7875,10 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
 
     // Perform semantic checking on the function declaration.
     if (!isDependentClassScopeExplicitSpecialization) {
-      if (!NewFD->isInvalidDecl() && NewFD->isMain())
+      if (!getLangOpts().HLSL && !NewFD->isInvalidDecl() && NewFD->isMain()) // HLSL Change: no main() checks in HLSL
         CheckMain(NewFD, D.getDeclSpec());
 
-      if (!NewFD->isInvalidDecl() && NewFD->isMSVCRTEntryPoint())
+      if (!getLangOpts().HLSL && !NewFD->isInvalidDecl() && NewFD->isMSVCRTEntryPoint()) // HLSL Change: no entry point checks in HLSL
         CheckMSVCRTEntryPoint(NewFD);
 
       if (!NewFD->isInvalidDecl())
@@ -7940,7 +8021,7 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
     EPI.Variadic = true;
     EPI.ExtInfo = FT->getExtInfo();
 
-    QualType R = Context.getFunctionType(FT->getReturnType(), None, EPI);
+    QualType R = Context.getFunctionType(FT->getReturnType(), None, EPI, None); // HLSL Change - all defaults are in
     NewFD->setType(R);
   }
 
@@ -8142,6 +8223,10 @@ bool Sema::CheckFunctionDeclaration(Scope *S, FunctionDecl *NewFD,
     }
   }
 
+  // HLSL Change Starts
+  // Rather than fix for inout parameters, comment out - this is N/A for HLSL
+#if 0
+  // HLSL Change Ends
   // C++11 [dcl.constexpr]p8:
   //   A constexpr specifier for a non-static member function that is not
   //   a constructor declares that member function to be const.
@@ -8179,6 +8264,7 @@ bool Sema::CheckFunctionDeclaration(Scope *S, FunctionDecl *NewFD,
       }
     }
   }
+#endif // HLSL Change Ends
 
   if (Redeclaration) {
     // NewFD and OldDecl represent declarations that need to be
@@ -8953,10 +9039,12 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init,
 
     // If this is a redeclaration, check that the type we just deduced matches
     // the previously declared type.
+    assert(!getLangOpts().HLSL && "auto types are not supported - merge type below is inconsequential"); // HLSL Change
     if (VarDecl *Old = VDecl->getPreviousDecl()) {
       // We never need to merge the type, because we cannot form an incomplete
       // array of auto, nor deduce such a type.
-      MergeVarDeclTypes(VDecl, Old, /*MergeTypeWithPrevious*/false);
+      ShadowMergeState MergeState = ShadowMergeState_Disallowed; // HLSL Change - add merge state
+      MergeVarDeclTypes(VDecl, Old, /*MergeTypeWithPrevious*/false, MergeState); // HLSL Change - add merge state
     }
 
     // Check the deduced type is valid for a variable declaration.
@@ -9123,6 +9211,7 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init,
     }
 
     Init = Result.getAs<Expr>();
+    assert(Init != nullptr && "otherwise result should be invalid"); // HLSL Change
   }
 
   // Check for self-references within variable initializers.
@@ -9140,6 +9229,7 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init,
   if (!VDecl->isInvalidDecl() && (DclT != SavT))
     VDecl->setType(DclT);
 
+#if 0 // HLSL Change Starts - no ObjC support
   if (!VDecl->isInvalidDecl()) {
     checkUnsafeAssigns(VDecl->getLocation(), VDecl->getType(), Init);
 
@@ -9158,6 +9248,7 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init,
                          Init->getLocStart()))
         getCurFunction()->markSafeWeakUse(Init);
   }
+#endif // HLSL Change Ends - no ObjC support
 
   // The initialization is usually a full-expression.
   //
@@ -9490,10 +9581,17 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl,
         TentativeDefinitions.push_back(Var);
       return;
     }
-
+    
     // Provide a specific diagnostic for uninitialized variable
     // definitions with incomplete array type.
-    if (Type->isIncompleteArrayType()) {
+    if (Type->isIncompleteArrayType()
+        // HLSL Change Starts
+        // Allow incomplete resource array.
+        && !hlsl::IsIncompleteHLSLResourceArrayType(getASTContext(), Type)
+        // Allow incomplete ConstantBufferView array.
+        && !(IsOnHLSLBufferView())
+        // HLSL Change Ends
+        ) {
       Diag(Var->getLocation(),
            diag::err_typecheck_incomplete_array_needs_initializer);
       Var->setInvalidDecl();
@@ -10172,6 +10270,16 @@ Decl *Sema::ActOnParamDeclarator(Scope *S, Declarator &D) {
     }
   }
 
+  // HLSL Change Starts
+  if (getLangOpts().HLSL) {
+    const bool IsParm = true;
+    if (!DiagnoseHLSLDecl(D, Context.getTranslationUnitDecl(), TInfo, IsParm)) {
+      assert(D.isInvalidType() && "otherwise DiagnoseHLSLDecl failed but "
+                                  "didn't invalidate declaration");
+    }
+  }
+  // HLSL Change Ends
+
   // Temporarily put parameter variables in the translation unit, not
   // the enclosing context.  This prevents them from accidentally
   // looking like class members in C++.
@@ -10179,10 +10287,12 @@ Decl *Sema::ActOnParamDeclarator(Scope *S, Declarator &D) {
                                     D.getLocStart(),
                                     D.getIdentifierLoc(), II,
                                     parmDeclType, TInfo,
-                                    SC);
+                                    SC, hlsl::ParamModFromAttributeList(DS.getAttributes().getList())); // HLSL Change
 
   if (D.isInvalidType())
     New->setInvalidDecl();
+
+  TransferUnusualAttributes(D, New); // HLSL Change
 
   assert(S->isFunctionPrototypeScope());
   assert(S->getFunctionPrototypeDepth() >= 1);
@@ -10271,7 +10381,7 @@ void Sema::DiagnoseSizeOfParametersAndReturnValue(ParmVarDecl * const *Param,
 ParmVarDecl *Sema::CheckParameter(DeclContext *DC, SourceLocation StartLoc,
                                   SourceLocation NameLoc, IdentifierInfo *Name,
                                   QualType T, TypeSourceInfo *TSInfo,
-                                  StorageClass SC) {
+                                  StorageClass SC, hlsl::ParameterModifier ParamMod) { // HLSL Change - add param mod
   // In ARC, infer a lifetime qualifier for appropriate parameter types.
   if (getLangOpts().ObjCAutoRefCount &&
       T.getObjCLifetime() == Qualifiers::OCL_None &&
@@ -10297,7 +10407,7 @@ ParmVarDecl *Sema::CheckParameter(DeclContext *DC, SourceLocation StartLoc,
 
   ParmVarDecl *New = ParmVarDecl::Create(Context, DC, StartLoc, NameLoc, Name,
                                          Context.getAdjustedParameterType(T), 
-                                         TSInfo, SC, nullptr);
+                                         TSInfo, SC, nullptr, ParamMod);
 
   // Parameters can not be abstract class types.
   // For record types, this is done by the AbstractClassUsageDiagnoser once
@@ -10752,7 +10862,9 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
         Context.adjustDeducedFunctionResultType(
             FD, SubstAutoType(ResultType.getType(), Context.VoidTy));
       }
-    } else if (getLangOpts().CPlusPlus11 && isLambdaCallOperator(FD)) {
+    }
+#if 0 // HLSL Change Start - no lambda support
+    else if (getLangOpts().CPlusPlus11 && isLambdaCallOperator(FD)) {
       auto *LSI = getCurLambda();
       if (LSI->HasImplicitReturnType) {
         deduceClosureReturnType(*LSI);
@@ -10770,6 +10882,7 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
                                             Proto->getExtProtoInfo()));
       }
     }
+#endif // HLSL Change Start - no lambda support
 
     // The only way to be included in UndefinedButUsed is if there is an
     // ODR use before the definition. Avoid the expensive map lookup if this
@@ -10864,6 +10977,7 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
 
     assert((FD == getCurFunctionDecl() || getCurLambda()->CallOperator == FD) &&
            "Function parsing confused");
+#if 0 // HLSL Change Starts
   } else if (ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>(dcl)) {
     assert(MD == getCurMethodDecl() && "Method parsing confused");
     MD->setBody(Body);
@@ -10914,6 +11028,7 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
              diag::warn_objc_secondary_init_missing_init_call);
       getCurFunction()->ObjCWarnForNoInitDelegation = false;
     }
+#endif // HLSL Change Ends
   } else {
     return nullptr;
   }
@@ -11588,6 +11703,13 @@ Decl *Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK,
       // Microsoft enums are always of int type.
       EnumUnderlying = Context.IntTy.getTypePtr();
   }
+
+  // HLSL Change Starts
+  if (getLangOpts().HLSL2015 && TUK == TUK_Declaration) {
+    Diag(NameLoc, diag::err_hlsl_unsupported_construct)
+        << "struct declaration without definition";
+  }
+  // HLSL Change Ends
 
   DeclContext *SearchDC = CurContext;
   DeclContext *DC = CurContext;
@@ -12564,6 +12686,17 @@ FieldDecl *Sema::HandleField(Scope *S, RecordDecl *Record,
     }
   }
 
+  // HLSL Changes Start
+  if (getLangOpts().HLSL) {
+    const bool IsParameterFalse = false;
+    if (!DiagnoseHLSLDecl(D, CurContext, TInfo, IsParameterFalse)) {
+      // Let the diagnostic provide errors, don't actually return nullptr here;
+      // compilation will recover, which is helpful because HLSL diagnostics
+      // need not interrupt the declaration processing.
+    }
+  }
+  // HLSL Changes End
+
   // TR 18037 does not allow fields to be declared with address spaces.
   if (T.getQualifiers().hasAddressSpace()) {
     Diag(Loc, diag::err_field_with_address_space);
@@ -12624,6 +12757,8 @@ FieldDecl *Sema::HandleField(Scope *S, RecordDecl *Record,
 
   if (NewFD->isInvalidDecl())
     Record->setInvalidDecl();
+
+  TransferUnusualAttributes(D, NewFD); // HLSL Change
 
   if (D.getDeclSpec().isModulePrivateSpecified())
     NewFD->setModulePrivate();
@@ -14235,6 +14370,9 @@ flagbits:
 Decl *Sema::ActOnFileScopeAsmDecl(Expr *expr,
                                   SourceLocation StartLoc,
                                   SourceLocation EndLoc) {
+#if 1 // HLSL Change
+  llvm_unreachable("HLSL parser does not produce file scope asm decl");
+#else
   StringLiteral *AsmString = cast<StringLiteral>(expr);
 
   FileScopeAsmDecl *New = FileScopeAsmDecl::Create(Context, CurContext,
@@ -14242,6 +14380,7 @@ Decl *Sema::ActOnFileScopeAsmDecl(Expr *expr,
                                                    EndLoc);
   CurContext->addDecl(New);
   return New;
+#endif // HLSL Change
 }
 
 static void checkModuleImportContext(Sema &S, Module *M,
@@ -14465,3 +14604,4 @@ AvailabilityResult Sema::getCurContextAvailability() const {
   // Recover from user error.
   return D ? D->getAvailability() : AR_Available;
 }
+

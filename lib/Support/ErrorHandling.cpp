@@ -1,16 +1,15 @@
 //===- lib/Support/ErrorHandling.cpp - Callbacks for errors ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines an API used to indicate fatal error conditions.  Non-fatal
-// errors (most of them) should be handled through LLVMContext.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ErrorHandling.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines an API used to indicate fatal error conditions.  Non-fatal//
+// errors (most of them) should be handled through LLVMContext.              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm-c/Core.h"
@@ -29,6 +28,8 @@
 #include <cassert>
 #include <cstdlib>
 
+#include "windows.h"  // HLSL Change
+
 #if defined(HAVE_UNISTD_H)
 # include <unistd.h>
 #endif
@@ -39,8 +40,9 @@
 
 using namespace llvm;
 
-static fatal_error_handler_t ErrorHandler = nullptr;
-static void *ErrorHandlerUserData = nullptr;
+// HLSL Change - mark these as thread_local
+thread_local static fatal_error_handler_t ErrorHandler = nullptr;
+thread_local static void *ErrorHandlerUserData = nullptr;
 
 static ManagedStatic<sys::Mutex> ErrorHandlerMutex;
 
@@ -81,6 +83,7 @@ void llvm::report_fatal_error(const Twine &Reason, bool GenCrashDiag) {
     handlerData = ErrorHandlerUserData;
   }
 
+#if 0 // HLSL Change - unwind if necessary, but don't terminate the process
   if (handler) {
     handler(handlerData, Reason.str(), GenCrashDiag);
   } else {
@@ -91,7 +94,7 @@ void llvm::report_fatal_error(const Twine &Reason, bool GenCrashDiag) {
     raw_svector_ostream OS(Buffer);
     OS << "LLVM ERROR: " << Reason << "\n";
     StringRef MessageStr = OS.str();
-    ssize_t written = ::write(2, MessageStr.data(), MessageStr.size());
+    ssize_t written = ::_write(2, MessageStr.data(), MessageStr.size());
     (void)written; // If something went wrong, we deliberately just give up.
   }
 
@@ -101,6 +104,12 @@ void llvm::report_fatal_error(const Twine &Reason, bool GenCrashDiag) {
   sys::RunInterruptHandlers();
 
   exit(1);
+#else
+  if (handler) {
+    handler(handlerData, Reason.str(), GenCrashDiag);
+  }
+  RaiseException(STATUS_LLVM_FATAL, 0, 0, 0);
+#endif
 }
 
 void llvm::llvm_unreachable_internal(const char *msg, const char *file,
@@ -114,11 +123,10 @@ void llvm::llvm_unreachable_internal(const char *msg, const char *file,
   if (file)
     dbgs() << " at " << file << ":" << line;
   dbgs() << "!\n";
+#if 0 // HLSL Change - unwind if necessary, but don't terminate the process
   abort();
-#ifdef LLVM_BUILTIN_UNREACHABLE
-  // Windows systems and possibly others don't declare abort() to be noreturn,
-  // so use the unreachable builtin to avoid a Clang self-host warning.
-  LLVM_BUILTIN_UNREACHABLE;
+#else
+  RaiseException(STATUS_LLVM_UNREACHABLE, 0, 0, 0);
 #endif
 }
 

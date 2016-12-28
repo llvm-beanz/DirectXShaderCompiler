@@ -1,19 +1,18 @@
 //===- ASTBitCodes.h - Enum values for the PCH bitcode format ---*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTBitCodes.h                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header defines Bitcode enum values for Clang serialized AST files.   //
 //
-//                     The LLVM Compiler Infrastructure
+// The enum values defined in this file should be considered permanent.  If  //
+// new features are added, they should have values added at the end of the   //
+// respective lists.                                                         //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This header defines Bitcode enum values for Clang serialized AST files.
-//
-// The enum values defined in this file should be considered permanent.  If
-// new features are added, they should have values added at the end of the
-// respective lists.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_SERIALIZATION_ASTBITCODES_H
 #define LLVM_CLANG_SERIALIZATION_ASTBITCODES_H
 
@@ -1406,7 +1405,11 @@ namespace clang {
       EXPR_OBJC_BRIDGED_CAST,     // ObjCBridgedCastExpr
       
       STMT_MS_DEPENDENT_EXISTS,   // MSDependentExistsStmt
-      EXPR_LAMBDA                 // LambdaExpr
+      EXPR_LAMBDA,                 // LambdaExpr
+
+      // HLSL Change: Add support for hlsl types.
+      // HLSL
+      STMT_DISCARD                // DiscardStmt
     };
 
     /// \brief The kinds of designators that can occur in a

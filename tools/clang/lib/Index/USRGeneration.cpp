@@ -1,11 +1,12 @@
 //===- USRGeneration.cpp - Routines for USR generation --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// USRGeneration.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Index/USRGeneration.h"
 #include "clang/AST/ASTContext.h"
@@ -602,6 +603,16 @@ void USRGenerator::VisitType(QualType T) {
           c = 'd'; break;
         case BuiltinType::LongDouble:
           c = 'D'; break;
+        // HLSL Change Starts
+        case BuiltinType::Min10Float:
+          c = 'r'; break;
+        case BuiltinType::Min12Int:
+          c = 'R'; break;
+        case BuiltinType::LitFloat:
+          c = '?'; break;
+        case BuiltinType::LitInt:
+          c = '?'; break;
+        // HLSL Change Ends
         case BuiltinType::NullPtr:
           c = 'n'; break;
 #define BUILTIN_TYPE(Id, SingletonId)

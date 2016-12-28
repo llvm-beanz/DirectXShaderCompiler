@@ -1,11 +1,12 @@
 //===- DiagnosticNames.h - Defines a table of all builtin diagnostics ------==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DiagnosticNames.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_TOOLS_DIAGTOOL_DIAGNOSTICNAMES_H
 #define LLVM_CLANG_TOOLS_DIAGTOOL_DIAGNOSTICNAMES_H

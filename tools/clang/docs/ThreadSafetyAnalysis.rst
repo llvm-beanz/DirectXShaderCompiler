@@ -6,6 +6,9 @@ Thread Safety Analysis
 Introduction
 ============
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 Clang Thread Safety Analysis is a C++ language extension which warns about
 potential race conditions in code.  The analysis is completely static (i.e.
 compile-time); there is no run-time overhead.  The analysis is still

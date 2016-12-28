@@ -1,16 +1,17 @@
 //===-- ELFDumper.cpp - ELF-specific dumper ---------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ELFDumper.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file implements the ELF-specific dumper for llvm-readobj.
+/// \file                                                                    //
+/// \brief This file implements the ELF-specific dumper for llvm-readobj.    //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm-readobj.h"
 #include "ARMAttributeParser.h"

@@ -1,6 +1,13 @@
-set(SOURCES
-  ARCMigrate.cpp
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
+set(LLVM_OPTIONAL_SOURCES ARCMigrate.cpp) # HLSL Change - ignore file
+
+set (HLSL_IGNORE_SOURCES
   BuildSystem.cpp
+  )
+
+set(SOURCES
+#  ARCMigrate.cpp # HLSL Change - remove ARCMigrate
   CIndex.cpp
   CIndexCXX.cpp
   CIndexCodeCompletion.cpp
@@ -22,6 +29,8 @@ set(SOURCES
   IndexTypeSourceInfo.cpp
   Indexing.cpp
   IndexingContext.cpp
+  dxcisenseimpl.cpp # HLSL Change
+  dxcrewriteunused.cpp # HLSL Change
 
   ADDITIONAL_HEADERS
   CIndexDiagnostic.h
@@ -47,7 +56,7 @@ set(LIBS
   clangTooling
 )
 
-if (CLANG_ENABLE_ARCMT)
+if (0 AND CLANG_ENABLE_ARCMT) # HLSL Change - remove ARC support
   list(APPEND LIBS clangARCMigrate)
 endif ()
 
@@ -68,7 +77,14 @@ if(MSVC)
   set(LLVM_EXPORTED_SYMBOL_FILE)
 endif()
 
-if( LLVM_ENABLE_PIC )
+# HLSL Change Starts
+# Add a definition for the link type.
+add_definitions(-DCINDEX_LINKAGE=)
+add_definitions(-DLIBCLANG_CC=)
+set(ENABLE_STATIC STATIC)
+# HLSL Change Ends
+
+if( 0 AND LLVM_ENABLE_PIC ) # HLSL Change - disable DLL, we only use the static lib
   set(ENABLE_SHARED SHARED)
 endif()
 
@@ -82,6 +98,7 @@ else()
   set(output_name "clang")
 endif()
 
+if(1) # HLSL Change don't build the static target like this
 add_clang_library(libclang ${ENABLE_SHARED} ${ENABLE_STATIC}
   OUTPUT_NAME ${output_name}
   ${SOURCES}
@@ -94,6 +111,7 @@ add_clang_library(libclang ${ENABLE_SHARED} ${ENABLE_STATIC}
   ${LLVM_TARGETS_TO_BUILD}
   Core
   Support
+  MSSupport
   )
 
 if(ENABLE_SHARED)
@@ -120,3 +138,10 @@ if(ENABLE_SHARED)
                  LINK_FLAGS ${LIBCLANG_LINK_FLAGS})
   endif()
 endif()
+endif() # HLSL Change
+
+# HLSL Change Starts
+# add_clang_library(${LIBCLANG_STATIC_TARGET_NAME} STATIC ${SOURCES})
+# target_link_libraries(${LIBCLANG_STATIC_TARGET_NAME} ${LIBS})
+# add_dependencies(${LIBCLANG_STATIC_TARGET_NAME} ${GENERATED_HEADERS} clang-headers)
+# HLSL Change Ends

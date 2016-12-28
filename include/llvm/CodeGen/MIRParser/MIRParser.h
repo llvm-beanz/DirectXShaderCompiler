@@ -1,19 +1,18 @@
 //===- MIRParser.h - MIR serialization format parser ----------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MIRParser.h                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This MIR serialization library is currently a work in progress. It can't  //
+// serialize machine functions at this time.                                 //
 //
-//                     The LLVM Compiler Infrastructure
+// This file declares the functions that parse the MIR serialization format  //
+// files.                                                                    //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This MIR serialization library is currently a work in progress. It can't
-// serialize machine functions at this time.
-//
-// This file declares the functions that parse the MIR serialization format
-// files.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CODEGEN_MIRPARSER_MIRPARSER_H
 #define LLVM_CODEGEN_MIRPARSER_MIRPARSER_H

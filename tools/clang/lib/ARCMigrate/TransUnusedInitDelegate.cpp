@@ -1,24 +1,23 @@
 //===--- TransUnusedInitDelegate.cpp - Transformations to ARC mode --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-// Transformations:
-//===----------------------------------------------------------------------===//
-//
-// rewriteUnusedInitDelegate:
-//
-// Rewrites an unused result of calling a delegate initialization, to assigning
-// the result to self.
-// e.g
-//  [self init];
-// ---->
-//  self = [self init];
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TransUnusedInitDelegate.cpp                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Transformations:                                                          //
+//                                                                           //
+// rewriteUnusedInitDelegate:                                                //
+//                                                                           //
+// Rewrites an unused result of calling a delegate initialization, to assigning//
+// the result to self.                                                       //
+// e.g                                                                       //
+//  [self init];                                                             //
+// ---->                                                                     //
+//  self = [self init];                                                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Transforms.h"
 #include "Internals.h"

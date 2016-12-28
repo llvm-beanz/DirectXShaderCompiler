@@ -1,17 +1,16 @@
 //===- lli.cpp - LLVM Interpreter / Dynamic compiler ----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This utility provides a simple wrapper around the LLVM Execution Engines,
-// which allow the direct execution of LLVM programs through a Just-In-Time
-// compiler, or through an interpreter if no JIT is available for this platform.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// lli.cpp                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This utility provides a simple wrapper around the LLVM Execution Engines, //
+// which allow the direct execution of LLVM programs through a Just-In-Time  //
+// compiler, or through an interpreter if no JIT is available for this platform.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/LLVMContext.h"
 #include "OrcLazyJIT.h"
@@ -24,10 +23,11 @@
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
+// #include "llvm/ExecutionEngine/MCJIT.h"    // HLSL Change
 #include "llvm/ExecutionEngine/ObjectCache.h"
 #include "llvm/ExecutionEngine/OrcMCJITReplacement.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+// #include "llvm/ExecutionEngine/SectionMemoryManager.h" // HLSL Change
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -316,7 +316,8 @@ private:
 static ExecutionEngine *EE = nullptr;
 static LLIObjectCache *CacheManager = nullptr;
 
-static void do_shutdown() {
+// HLSL Change: changed calling convention to __cdecl
+static void __cdecl do_shutdown() {
   // Cygwin-1.5 invokes DLL's dtors before atexit handler.
 #ifndef DO_NOTHING_ATEXIT
   delete EE;
@@ -382,7 +383,8 @@ CodeGenOpt::Level getOptLevel() {
 //===----------------------------------------------------------------------===//
 // main Driver function
 //
-int main(int argc, char **argv, char * const *envp) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv, char * const *envp) {
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);
 
@@ -448,6 +450,7 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Enable MCJIT if desired.
   RTDyldMemoryManager *RTDyldMM = nullptr;
+#if 0 // HLSL Change Starts - disable MCJIT
   if (!ForceInterpreter) {
     if (RemoteMCJIT)
       RTDyldMM = new RemoteMemoryManager();
@@ -463,6 +466,7 @@ int main(int argc, char **argv, char * const *envp) {
               "interpreter.\n";
     exit(1);
   }
+#endif // HLSL Change Ends
 
   builder.setOptLevel(getOptLevel());
 
@@ -601,8 +605,10 @@ int main(int argc, char **argv, char * const *envp) {
     // invalidated will be known.
     (void)EE->getPointerToFunction(EntryFn);
     // Clear instruction cache before code will be executed.
+#if 0 // HLSL Change Starts
     if (RTDyldMM)
       static_cast<SectionMemoryManager*>(RTDyldMM)->invalidateInstructionCache();
+#endif // HLSL Change Ends
 
     // Run main.
     Result = EE->runFunctionAsMain(EntryFn, InputArgv, envp);

@@ -1,15 +1,14 @@
 //===---- CGBuiltin.cpp - Emit LLVM Code for builtins ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Objective-C code as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGObjC.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Objective-C code as LLVM code.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGDebugInfo.h"
 #include "CGObjCRuntime.h"
@@ -27,6 +26,356 @@
 #include "llvm/IR/InlineAsm.h"
 using namespace clang;
 using namespace CodeGen;
+
+// HLSL Change Starts
+// No ObjC codegen support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 1
+
+llvm::Value *
+CodeGenFunction::EmitObjCStringLiteral(const ObjCStringLiteral *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitObjCBoxedExpr(const ObjCBoxedExpr *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitObjCCollectionLiteral(
+    const Expr *E, const ObjCMethodDecl *MethodWithObjects) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitObjCArrayLiteral(const ObjCArrayLiteral *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *
+CodeGenFunction::EmitObjCDictionaryLiteral(const ObjCDictionaryLiteral *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+/// Emit a selector.
+llvm::Value *CodeGenFunction::EmitObjCSelectorExpr(const ObjCSelectorExpr *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitObjCProtocolExpr(const ObjCProtocolExpr *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
+                                            ReturnValueSlot Return) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return RValue();
+}
+
+void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
+                                      const ObjCContainerDecl *CD) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::GenerateObjCGetter(ObjCImplementationDecl *IMP,
+                                         const ObjCPropertyImplDecl *PID) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::generateObjCGetterBody(
+    const ObjCImplementationDecl *classImpl,
+    const ObjCPropertyImplDecl *propImpl,
+    const ObjCMethodDecl *GetterMethodDecl, llvm::Constant *AtomicHelperFn) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::generateObjCSetterBody(
+    const ObjCImplementationDecl *classImpl,
+    const ObjCPropertyImplDecl *propImpl, llvm::Constant *AtomicHelperFn) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::GenerateObjCSetter(ObjCImplementationDecl *IMP,
+                                         const ObjCPropertyImplDecl *PID) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::GenerateObjCCtorDtorMethod(ObjCImplementationDecl *IMP,
+                                                 ObjCMethodDecl *MD,
+                                                 bool ctor) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+bool CodeGenFunction::IndirectObjCSetterArg(const CGFunctionInfo &FI) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return false;
+}
+
+bool CodeGenFunction::IvarTypeWithAggrGCObjects(QualType Ty) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return false;
+}
+
+llvm::Value *CodeGenFunction::LoadObjCSelf() {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+QualType CodeGenFunction::TypeOfSelfObject() {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return QualType();
+}
+
+void CodeGenFunction::EmitObjCForCollectionStmt(
+    const ObjCForCollectionStmt &S) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitObjCAtTryStmt(const ObjCAtTryStmt &S) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitObjCAtThrowStmt(const ObjCAtThrowStmt &S) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitObjCAtSynchronizedStmt(
+    const ObjCAtSynchronizedStmt &S) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+/// Produce the code for a CK_ARCProduceObject.  Just does a
+/// primitive retain.
+llvm::Value *CodeGenFunction::EmitObjCProduceObject(QualType type,
+                                                    llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitObjCConsumeObject(QualType type,
+                                                    llvm::Value *object) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitObjCExtendObjectLifetime(QualType type,
+                                                           llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+void CodeGenFunction::EmitARCIntrinsicUse(ArrayRef<llvm::Value *> values) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *CodeGenFunction::EmitARCRetain(QualType type, llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *CodeGenFunction::EmitARCRetainNonBlock(llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *CodeGenFunction::EmitARCRetainBlock(llvm::Value *value,
+                                                 bool mandatory) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *
+CodeGenFunction::EmitARCRetainAutoreleasedReturnValue(llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitARCRelease(llvm::Value *value,
+                                     ARCPreciseLifetime_t precise) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitARCDestroyStrong(llvm::Value *addr,
+                                           ARCPreciseLifetime_t precise) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *CodeGenFunction::EmitARCStoreStrongCall(llvm::Value *addr,
+                                                     llvm::Value *value,
+                                                     bool ignored) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitARCStoreStrong(LValue dst,
+                                                 llvm::Value *newValue,
+                                                 bool ignored) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitARCAutorelease(llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *
+CodeGenFunction::EmitARCAutoreleaseReturnValue(llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *
+CodeGenFunction::EmitARCRetainAutoreleaseReturnValue(llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitARCRetainAutorelease(QualType type,
+                                                       llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *
+CodeGenFunction::EmitARCRetainAutoreleaseNonBlock(llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitARCLoadWeak(llvm::Value *addr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitARCLoadWeakRetained(llvm::Value *addr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitARCStoreWeak(llvm::Value *addr,
+                                               llvm::Value *value,
+                                               bool ignored) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+void CodeGenFunction::EmitARCInitWeak(llvm::Value *addr, llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitARCDestroyWeak(llvm::Value *addr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitARCMoveWeak(llvm::Value *dst, llvm::Value *src) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitARCCopyWeak(llvm::Value *dst, llvm::Value *src) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *CodeGenFunction::EmitObjCAutoreleasePoolPush() {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitObjCAutoreleasePoolPop(llvm::Value *value) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *CodeGenFunction::EmitObjCMRRAutoreleasePoolPush() {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitObjCMRRAutoreleasePoolPop(llvm::Value *Arg) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::destroyARCStrongPrecise(CodeGenFunction &CGF,
+                                              llvm::Value *addr,
+                                              QualType type) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::destroyARCStrongImprecise(CodeGenFunction &CGF,
+                                                llvm::Value *addr,
+                                                QualType type) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::destroyARCWeak(CodeGenFunction &CGF, llvm::Value *addr,
+                                     QualType type) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitObjCAutoreleasePoolCleanup(llvm::Value *Ptr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Value *CodeGenFunction::EmitARCRetainScalarExpr(const Expr *e) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *
+CodeGenFunction::EmitARCRetainAutoreleaseScalarExpr(const Expr *e) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitARCExtendBlockObject(const Expr *e) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitObjCThrowOperand(const Expr *expr) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+std::pair<LValue, llvm::Value *>
+CodeGenFunction::EmitARCStoreStrong(const BinaryOperator *e, bool ignored) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return std::pair<LValue, llvm::Value *>();
+}
+
+std::pair<LValue, llvm::Value *>
+CodeGenFunction::EmitARCStoreAutoreleasing(const BinaryOperator *e) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return std::pair<LValue, llvm::Value *>();
+}
+
+void CodeGenFunction::EmitObjCAutoreleasePoolStmt(
+    const ObjCAutoreleasePoolStmt &ARPS) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+void CodeGenFunction::EmitExtendGCLifetime(llvm::Value *object) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+llvm::Constant *CodeGenFunction::GenerateObjCAtomicSetterCopyHelperFunction(
+    const ObjCPropertyImplDecl *PID) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Constant *CodeGenFunction::GenerateObjCAtomicGetterCopyHelperFunction(
+    const ObjCPropertyImplDecl *PID) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+llvm::Value *CodeGenFunction::EmitBlockCopyAndAutorelease(llvm::Value *Block,
+                                                          QualType Ty) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+  return nullptr;
+}
+
+#else
+// HLSL Change Ends
 
 typedef llvm::PointerIntPair<llvm::Value*,1,bool> TryEmitResult;
 static TryEmitResult
@@ -3084,3 +3433,5 @@ CodeGenFunction::EmitBlockCopyAndAutorelease(llvm::Value *Block, QualType Ty) {
 
 
 CGObjCRuntime::~CGObjCRuntime() {}
+
+#endif // HLSL Change

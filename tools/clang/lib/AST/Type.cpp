@@ -1,15 +1,14 @@
 //===--- Type.cpp - Type representation and manipulation ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements type-related functionality.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Type.cpp                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements type-related functionality.                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -848,7 +847,8 @@ public:
         !paramChanged && !exceptionChanged)
       return QualType(T, 0);
 
-    return Ctx.getFunctionType(returnType, paramTypes, info);
+    // HLSL Change - the following is incorrect w.r.t param modifiers
+    return Ctx.getFunctionType(returnType, paramTypes, info, T->getParamMods());
   }
 
   QualType VisitParenType(const ParenType *T) { 
@@ -1171,7 +1171,7 @@ QualType QualType::substObjCTypeArgs(
           !paramChanged && !exceptionChanged)
         return type;
 
-      return ctx.getFunctionType(returnType, paramTypes, info);
+      return ctx.getFunctionType(returnType, paramTypes, info, None); // HLSL Change - add param mods
     }
 
     // Substitute into the type arguments of a specialized Objective-C object
@@ -1602,7 +1602,7 @@ bool Type::hasIntegerRepresentation() const {
 bool Type::isIntegralType(ASTContext &Ctx) const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::LitInt; // HLSL Change - LitInt is the last integral, not Int128
 
   // Complete enum types are integral in C.
   if (!Ctx.getLangOpts().CPlusPlus)
@@ -1616,7 +1616,7 @@ bool Type::isIntegralType(ASTContext &Ctx) const {
 bool Type::isIntegralOrUnscopedEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::LitInt; // HLSL Change - LitInt is the last integral, not Int128
 
   // Check for a complete enum type; incomplete enum types are not properly an
   // enumeration type in the sense required here.
@@ -1683,7 +1683,7 @@ bool Type::isAnyCharacterType() const {
 bool Type::isSignedIntegerType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return BT->getKind() >= BuiltinType::Char_S &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::LitInt; // HLSL Change - LitInt is the last integral
   }
 
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -1699,7 +1699,7 @@ bool Type::isSignedIntegerType() const {
 bool Type::isSignedIntegerOrEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return BT->getKind() >= BuiltinType::Char_S &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::LitInt; // HLSL Change - LitInt is the last integral
   }
   
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -1760,7 +1760,7 @@ bool Type::hasUnsignedIntegerRepresentation() const {
 bool Type::isFloatingType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Half &&
-           BT->getKind() <= BuiltinType::LongDouble;
+           BT->getKind() <= BuiltinType::LitFloat; // HLSL Change
   if (const ComplexType *CT = dyn_cast<ComplexType>(CanonicalType))
     return CT->getElementType()->isFloatingType();
   return false;
@@ -1782,7 +1782,7 @@ bool Type::isRealFloatingType() const {
 bool Type::isRealType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::LongDouble;
+           BT->getKind() <= BuiltinType::LitFloat;  // HLSL Change
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
       return ET->getDecl()->isComplete() && !ET->getDecl()->isScoped();
   return false;
@@ -1791,7 +1791,7 @@ bool Type::isRealType() const {
 bool Type::isArithmeticType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::LongDouble;
+           BT->getKind() <= BuiltinType::LitFloat; // HLSL Change
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
     // GCC allows forward declaration of enum types (forbid by C99 6.7.2.3p2).
     // If a body isn't seen by the time we get here, return false.
@@ -2286,6 +2286,8 @@ bool Type::isPromotableIntegerType() const {
     case BuiltinType::WChar_U:
     case BuiltinType::Char16:
     case BuiltinType::Char32:
+    case BuiltinType::Min12Int: // HLSL Change
+    case BuiltinType::LitInt:   // HLSL Change
       return true;
     default:
       return false;
@@ -2516,6 +2518,12 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
   case OCLImage3d:        return "image3d_t";
   case OCLSampler:        return "sampler_t";
   case OCLEvent:          return "event_t";
+  // HLSL Change Starts
+  case Min10Float:        return "min10float";
+  case Min12Int:          return "min12int";
+  case LitFloat:          return "literal float";
+  case LitInt:            return "literal int";
+  // HLSL Change Ends
   }
   
   llvm_unreachable("Invalid builtin type.");
@@ -2559,7 +2567,8 @@ StringRef FunctionType::getNameForCallConv(CallingConv CC) {
 
 FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
                                      QualType canonical,
-                                     const ExtProtoInfo &epi)
+                                     const ExtProtoInfo &epi,
+                                     ArrayRef<hlsl::ParameterModifier> paramModifiers) // HLSL Change
     : FunctionType(FunctionProto, result, canonical,
                    result->isDependentType(),
                    result->isInstantiationDependentType(),
@@ -2589,6 +2598,19 @@ FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
     argSlot[i] = params[i];
   }
 
+  // HLSL Change Starts
+  hlsl::ParameterModifier *paramModifierSlot =
+    reinterpret_cast<hlsl::ParameterModifier *>(argSlot + NumParams);
+  if (paramModifiers.size() == 0) {
+    std::fill(paramModifierSlot, paramModifierSlot + NumParams,
+      hlsl::ParameterModifier(hlsl::ParameterModifier::Kind::In));
+  }
+  else {
+    std::copy(paramModifiers.begin(), paramModifiers.end(), paramModifierSlot);
+  }
+  return;
+  // HLSL Change Ends
+
   if (getExceptionSpecType() == EST_Dynamic) {
     // Fill in the exception array.
     QualType *exnSlot = argSlot + NumParams;
@@ -2604,6 +2626,8 @@ FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
 
       exnSlot[I++] = ExceptionType;
     }
+    paramModifierSlot = reinterpret_cast<hlsl::ParameterModifier *>(// HLSL Change
+        exnSlot + epi.ExceptionSpec.Exceptions.size());
   } else if (getExceptionSpecType() == EST_ComputedNoexcept) {
     // Store the noexcept expression and context.
     Expr **noexSlot = reinterpret_cast<Expr **>(argSlot + NumParams);
@@ -2617,6 +2641,8 @@ FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
       if (epi.ExceptionSpec.NoexceptExpr->containsUnexpandedParameterPack())
         setContainsUnexpandedParameterPack();
     }
+    paramModifierSlot = // HLSL Change
+        reinterpret_cast<hlsl::ParameterModifier *>(noexSlot + 1);
   } else if (getExceptionSpecType() == EST_Uninstantiated) {
     // Store the function decl from which we will resolve our
     // exception specification.
@@ -2626,6 +2652,8 @@ FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
     slot[1] = epi.ExceptionSpec.SourceTemplate;
     // This exception specification doesn't make the type dependent, because
     // it's not instantiated as part of instantiating the type.
+    paramModifierSlot = // HLSL Change
+      reinterpret_cast<hlsl::ParameterModifier *>(slot[2]);
   } else if (getExceptionSpecType() == EST_Unevaluated) {
     // Store the function decl from which we will resolve our
     // exception specification.
@@ -2713,6 +2741,7 @@ bool FunctionProtoType::isTemplateVariadic() const {
 void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID, QualType Result,
                                 const QualType *ArgTys, unsigned NumParams,
                                 const ExtProtoInfo &epi,
+                                ArrayRef<hlsl::ParameterModifier> ParamMods, // HLSL Change
                                 const ASTContext &Context) {
 
   // We have to be careful not to get ambiguous profile encodings.
@@ -2733,8 +2762,15 @@ void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID, QualType Result,
   // whether the following bool is the EH spec or part of the arguments.
 
   ID.AddPointer(Result.getAsOpaquePtr());
-  for (unsigned i = 0; i != NumParams; ++i)
+  for (unsigned i = 0; i != NumParams; ++i) {
     ID.AddPointer(ArgTys[i].getAsOpaquePtr());
+    // HLSL Change Starts
+    if (ParamMods.size() != 0)
+      ID.AddInteger(ParamMods[i].getAsUnsigned());
+    else
+      ID.AddInteger(hlsl::ParameterModifier().getAsUnsigned());
+    // HLSL Change Ends
+  }
   // This method is relatively performance sensitive, so as a performance
   // shortcut, use one AddInteger call instead of four for the next four
   // fields.
@@ -2767,7 +2803,7 @@ void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID, QualType Result,
 
 void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID,
                                 const ASTContext &Ctx) {
-  Profile(ID, getReturnType(), param_type_begin(), NumParams, getExtProtoInfo(),
+  Profile(ID, getReturnType(), param_type_begin(), NumParams, getExtProtoInfo(), getParamMods(), // HLSL Change
           Ctx);
 }
 
@@ -2875,6 +2911,20 @@ bool AttributedType::isMSTypeSpec() const {
   llvm_unreachable("invalid attr kind");
 }
 
+// HLSL Change Starts
+bool AttributedType::isHLSLTypeSpec() const {
+  switch (getAttrKind()) {
+  default:  return false;
+  case attr_hlsl_row_major:
+  case attr_hlsl_column_major:
+  case attr_hlsl_snorm:
+  case attr_hlsl_unorm:
+    return true;
+  }
+  llvm_unreachable("invalid attr kind");
+}
+// HLSL Change Ends
+
 bool AttributedType::isCallingConv() const {
   switch (getAttrKind()) {
   case attr_ptr32:
@@ -2893,6 +2943,12 @@ bool AttributedType::isCallingConv() const {
   case attr_nullable:
   case attr_null_unspecified:
   case attr_objc_kindof:
+  // HLSL Change Starts
+  case attr_hlsl_row_major:
+  case attr_hlsl_column_major:
+  case attr_hlsl_snorm:
+  case attr_hlsl_unorm:
+  // HLSL Change Ends
     return false;
 
   case attr_pcs:

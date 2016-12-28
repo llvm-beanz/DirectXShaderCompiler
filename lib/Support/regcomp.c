@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// regcomp.c                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 /*-
  * This code is derived from OpenBSD's libc/regex, original license follows:
  *
@@ -1092,8 +1101,11 @@ allocset(struct parse *p)
 			goto nomem;
 		p->g->setbits = ptr;
 
-		for (i = 0; i < no; i++)
+		for (i = 0; i < no; i++) {
+			_Analysis_assume_(i < nc); // HLSL Change
 			p->g->sets[i].ptr = p->g->setbits + css*(i/CHAR_BIT);
+		}
+
 
 		(void) memset((char *)p->g->setbits + (nbytes - css), 0, css);
 	}

@@ -1,17 +1,18 @@
 //===--- PartialDiagnostic.h - Diagnostic "closures" ------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PartialDiagnostic.h                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Implements a partial diagnostic that can be emitted anwyhere
-/// in a DiagnosticBuilder stream.
+/// \file                                                                    //
+/// \brief Implements a partial diagnostic that can be emitted anwyhere      //
+/// in a DiagnosticBuilder stream.                                           //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_BASIC_PARTIALDIAGNOSTIC_H
 #define LLVM_CLANG_BASIC_PARTIALDIAGNOSTIC_H
@@ -270,6 +271,7 @@ public:
 
     assert(DiagStorage->NumDiagArgs < Storage::MaxArguments &&
            "Too many arguments to diagnostic!");
+    _Analysis_assume_(DiagStorage->NumDiagArgs < Storage::MaxArguments);
     DiagStorage->DiagArgumentsKind[DiagStorage->NumDiagArgs] = Kind;
     DiagStorage->DiagArgumentsVal[DiagStorage->NumDiagArgs++] = V;
   }
@@ -280,6 +282,7 @@ public:
 
     assert(DiagStorage->NumDiagArgs < Storage::MaxArguments &&
            "Too many arguments to diagnostic!");
+    _Analysis_assume_(DiagStorage->NumDiagArgs < Storage::MaxArguments);
     DiagStorage->DiagArgumentsKind[DiagStorage->NumDiagArgs]
       = DiagnosticsEngine::ak_std_string;
     DiagStorage->DiagArgumentsStr[DiagStorage->NumDiagArgs++] = V;

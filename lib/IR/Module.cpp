@@ -1,15 +1,14 @@
 //===-- Module.cpp - Implement the Module class ---------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Module class for the IR library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Module.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Module class for the IR library.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/Module.h"
 #include "SymbolTableListTraitsImpl.h"
@@ -53,6 +52,10 @@ Module::Module(StringRef MID, LLVMContext &C)
 }
 
 Module::~Module() {
+  // HLSL Change Starts
+  ResetHLModule();
+  ResetDxilModule();
+  // HLSL Change Ends
   Context.removeModule(this);
   dropAllReferences();
   GlobalList.clear();

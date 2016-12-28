@@ -1,15 +1,14 @@
 //==- IntrinsicsXCore.td - XCore intrinsics                 -*- tablegen -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines all of the XCore-specific intrinsics.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IntrinsicsXCore.td                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines all of the XCore-specific intrinsics.                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 let TargetPrefix = "xcore" in {  // All intrinsics start with "llvm.xcore.".
   // Miscellaneous instructions.

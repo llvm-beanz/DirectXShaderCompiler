@@ -1,15 +1,14 @@
 //===-- MachODump.cpp - Object file dumping utility for llvm --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the MachO-specific dumper for llvm-readobj.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MachODumper.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the MachO-specific dumper for llvm-readobj.          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm-readobj.h"
 #include "Error.h"

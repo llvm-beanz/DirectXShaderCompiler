@@ -1,15 +1,14 @@
 //===- DAGISelMatcherOpt.cpp - Optimize a DAG Matcher ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the DAG Matcher optimizer.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DAGISelMatcherOpt.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the DAG Matcher optimizer.                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "DAGISelMatcher.h"
 #include "CodeGenDAGPatterns.h"

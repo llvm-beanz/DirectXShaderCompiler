@@ -1,19 +1,19 @@
 //===--- CGExprAgg.cpp - Emit LLVM Code from Aggregate Expressions --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to emit Aggregate Expr nodes as LLVM code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGExprAgg.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to emit Aggregate Expr nodes as LLVM code.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenFunction.h"
 #include "CGObjCRuntime.h"
 #include "CodeGenModule.h"
+#include "CGHLSLRuntime.h"    // HLSL Change
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
@@ -407,6 +407,14 @@ void AggExprEmitter::EmitArrayInit(llvm::Value *DestPtr, llvm::ArrayType *AType,
   uint64_t NumInitElements = E->getNumInits();
 
   uint64_t NumArrayElements = AType->getNumElements();
+  // HLSL Change Starts
+  if (CGF.getLangOpts().HLSL) {
+    // Generate dx.hl.init for every array, not only matrix array.
+    CGF.CGM.getHLSLRuntime().EmitHLSLInitListExpr(CGF, E, DestPtr);
+    return;
+  }
+  // HLSL Change Ends
+
   assert(NumInitElements <= NumArrayElements);
 
   // DestPtr is an array*.  Construct an elementType* by drilling
@@ -697,7 +705,43 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
            "Implicit cast types must be compatible");
     Visit(E->getSubExpr());
     break;
-      
+  // HLSL Change Begins.
+  case CK_FlatConversion: {
+    QualType Ty = E->getSubExpr()->getType();
+    QualType PtrTy = CGF.getContext().getPointerType(Ty);
+    llvm::Value *DestPtr = Dest.getAddr();
+
+    if (IntegerLiteral *IL = dyn_cast<IntegerLiteral>(E->getSubExpr())) {
+      llvm::Value *SrcVal = llvm::ConstantInt::get(CGF.getLLVMContext(), IL->getValue());
+      CGF.CGM.getHLSLRuntime().EmitHLSLFlatConversionToAggregate(
+          CGF, SrcVal, DestPtr, E->getType(), Ty);
+    } else if (FloatingLiteral *FL =
+                   dyn_cast<FloatingLiteral>(E->getSubExpr())) {
+      llvm::Value *SrcVal = llvm::ConstantFP::get(CGF.getLLVMContext(), FL->getValue());
+      CGF.CGM.getHLSLRuntime().EmitHLSLFlatConversionToAggregate(
+          CGF, SrcVal, DestPtr, E->getType(), Ty);
+    } else {
+      Expr *Src = E->getSubExpr();
+      switch (CGF.getEvaluationKind(Ty)) {
+      case TEK_Aggregate: {
+        LValue LV = CGF.EmitAggExprToLValue(Src);
+        CGF.CGM.getHLSLRuntime().EmitHLSLFlatConversionAggregateCopy(
+            CGF, LV.getAddress(), Src->getType(), DestPtr, E->getType());
+      } break;
+      case TEK_Scalar: {
+        llvm::Value *SrcVal = CGF.EmitScalarExpr(Src);
+        CGF.CGM.getHLSLRuntime().EmitHLSLFlatConversionToAggregate(
+          CGF, SrcVal, DestPtr, E->getType(), Ty);
+      } break;
+      default:
+        assert(0 && "invalid type for flat cast");
+        break;
+      }
+    }
+
+  } break;
+  // HLSL Change Ends.
+
   case CK_LValueBitCast:
     llvm_unreachable("should not be emitting lvalue bitcast as rvalue");
 
@@ -774,7 +818,7 @@ void AggExprEmitter::VisitStmtExpr(const StmtExpr *E) {
 }
 
 void AggExprEmitter::VisitBinaryOperator(const BinaryOperator *E) {
-  if (E->getOpcode() == BO_PtrMemD || E->getOpcode() == BO_PtrMemI)
+  if (E->getOpcode() == BO_PtrMemD || E->getOpcode() == BO_PtrMemI) 
     VisitPointerToDataMemberBinaryOperator(E);
   else
     CGF.ErrorUnsupported(E, "aggregate binary expression");
@@ -888,7 +932,7 @@ void AggExprEmitter::VisitBinAssign(const BinaryOperator *E) {
   }
   
   LValue LHS = CGF.EmitLValue(E->getLHS());
-
+  
   // If we have an atomic type, evaluate into the destination and then
   // do an atomic copy.
   if (LHS.getType()->isAtomicType() ||
@@ -1207,6 +1251,13 @@ void AggExprEmitter::VisitInitListExpr(InitListExpr *E) {
     return;
   }
 
+  // HLSL Change Begins
+  if (CGF.getLangOpts().HLSL) {
+    CGF.CGM.getHLSLRuntime().EmitHLSLInitListExpr(CGF, E, Dest.getAddr());
+    return;
+  }
+  // HLSL Change Ends
+
   // We'll need to enter cleanup scopes in case any of the member
   // initializers throw an exception.
   SmallVector<EHScopeStack::stable_iterator, 16> cleanups;
@@ -1367,6 +1418,12 @@ static void CheckAggExprForMemSetUse(AggValueSlot &Slot, const Expr *E,
         return;
     }
 
+  // HLSL Change Begins
+  // Don't generate memset for hlsl.
+  if (CGF.getLangOpts().HLSL)
+    return;
+  // HLSL Change Ends
+
   // If the type is 16-bytes or smaller, prefer individual stores over memset.
   std::pair<CharUnits, CharUnits> TypeInfo =
     CGF.getContext().getTypeInfoInChars(E->getType());
@@ -1444,7 +1501,15 @@ void CodeGenFunction::EmitAggregateCopy(llvm::Value *DestPtr,
         return;
     }
   }
-  
+
+  // HLSL Change Begins
+  if (getLangOpts().HLSL) {
+    // Don't generate memcpy for hlsl.
+    CGM.getHLSLRuntime().EmitHLSLAggregateCopy(*this, SrcPtr, DestPtr, Ty);
+    return;
+  }
+  // HLSL Change Ends
+
   // Aggregate assignment turns into llvm.memcpy.  This is almost valid per
   // C99 6.5.16.1p3, which states "If the value being stored in an object is
   // read from another object that overlaps in anyway the storage of the first

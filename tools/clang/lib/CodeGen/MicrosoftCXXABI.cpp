@@ -1,18 +1,17 @@
 //===--- MicrosoftCXXABI.cpp - Emit LLVM Code from ASTs for a Module ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides C++ code generation targeting the Microsoft Visual C++ ABI.
-// The class in this file generates structures that follow the Microsoft
-// Visual C++ ABI, which is actually not very well documented at all outside
-// of Microsoft.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MicrosoftCXXABI.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides C++ code generation targeting the Microsoft Visual C++ ABI. //
+// The class in this file generates structures that follow the Microsoft     //
+// Visual C++ ABI, which is actually not very well documented at all outside //
+// of Microsoft.                                                             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGCXXABI.h"
 #include "CGVTables.h"
@@ -2240,7 +2239,7 @@ struct ResetGuardBit : EHScopeStack::Cleanup {
     CGBuilderTy &Builder = CGF.Builder;
     llvm::LoadInst *LI = Builder.CreateLoad(Guard);
     llvm::ConstantInt *Mask =
-        llvm::ConstantInt::get(CGF.IntTy, ~(1U << GuardNum));
+        llvm::ConstantInt::get(CGF.IntTy, ~((uint64_t)1U << (uint64_t)GuardNum)); // HLSL Change - explicit uint64_t
     Builder.CreateStore(Builder.CreateAnd(LI, Mask), Guard);
   }
 };
@@ -2350,7 +2349,7 @@ void MicrosoftCXXABI::EmitGuardedInit(CodeGenFunction &CGF, const VarDecl &D,
     // }
 
     // Test our bit from the guard variable.
-    llvm::ConstantInt *Bit = llvm::ConstantInt::get(GuardTy, 1U << GuardNum);
+    llvm::ConstantInt *Bit = llvm::ConstantInt::get(GuardTy, (uint64_t)(1U) << GuardNum);
     llvm::LoadInst *LI = Builder.CreateLoad(GuardVar);
     llvm::Value *IsInitialized =
         Builder.CreateICmpNE(Builder.CreateAnd(LI, Bit), Zero);

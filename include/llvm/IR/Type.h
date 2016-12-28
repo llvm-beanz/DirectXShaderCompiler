@@ -1,14 +1,13 @@
 //===-- llvm/Type.h - Classes for handling data types -----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains the declaration of the Type class.  For more "Type"
-// stuff, look in DerivedTypes.h.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Type.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains the declaration of the Type class.  For more "Type"    //
+// stuff, look in DerivedTypes.h.                                            //
 //
 //===----------------------------------------------------------------------===//
 
@@ -230,7 +229,7 @@ public:
   /// are valid for types of the same size only where no re-interpretation of 
   /// the bits is done.
   /// @brief Determine if this type could be losslessly bitcast to Ty
-  bool canLosslesslyBitCastTo(Type *Ty) const;
+  bool canLosslesslyBitCastTo(_In_ Type *Ty) const;
 
   /// isEmptyTy - Return true if this type is empty, that is, it has no
   /// elements or all its elements are empty.
@@ -438,9 +437,8 @@ template <> struct isa_impl<PointerType, Type> {
     return Ty.getTypeID() == Type::PointerTyID;
   }
 };
-
-  
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 // Provide specializations of GraphTraits to be able to treat a type as a
 // graph of sub types.
 

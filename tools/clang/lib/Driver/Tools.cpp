@@ -1,11 +1,12 @@
 //===--- Tools.cpp - Tools Implementations --------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Tools.cpp                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Tools.h"
 #include "InputInfo.h"
@@ -3825,6 +3826,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // preprocessed inputs and configure concludes that -fPIC is not supported.
   Args.ClaimAllArgs(options::OPT_D);
 
+  Args.AddLastArg(CmdArgs, options::OPT_hlsl_version); // HLSL Change - add the HLSL version argument
+
   // Manually translate -O4 to -O3; let clang reject others.
   if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
     if (A->getOption().matches(options::OPT_O4)) {
@@ -4767,8 +4770,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       (ShowColors == Colors_Auto && llvm::sys::Process::StandardErrHasColors()))
     CmdArgs.push_back("-fcolor-diagnostics");
 
+#ifdef MSFT_SUPPORTS_ANSI_ESCAPE_CODES
   if (Args.hasArg(options::OPT_fansi_escape_codes))
     CmdArgs.push_back("-fansi-escape-codes");
+#endif
 
   if (!Args.hasFlag(options::OPT_fshow_source_location,
                     options::OPT_fno_show_source_location))

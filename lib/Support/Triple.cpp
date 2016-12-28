@@ -1,11 +1,12 @@
 //===--- Triple.cpp - Target triple helper class --------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Triple.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/STLExtras.h"
@@ -58,6 +59,10 @@ const char *Triple::getArchTypeName(ArchType Kind) {
   case hsail64:     return "hsail64";
   case spir:        return "spir";
   case spir64:      return "spir64";
+  // HLSL Change Begins
+  case dxil:        return "dxil";
+  case dxil64:      return "dxil64";
+  // HLSL Change Ends
   case kalimba:     return "kalimba";
   case shave:       return "shave";
   case wasm32:      return "wasm32";
@@ -122,6 +127,10 @@ const char *Triple::getArchTypePrefix(ArchType Kind) {
 
   case spir:
   case spir64:      return "spir";
+  // HLSL Change Begins
+  case dxil:
+  case dxil64:      return "dxil";
+  // HLSL Change Ends
   case kalimba:     return "kalimba";
   case shave:       return "shave";
   case wasm32:      return "wasm32";
@@ -142,6 +151,7 @@ const char *Triple::getVendorTypeName(VendorType Kind) {
   case IBM: return "ibm";
   case ImaginationTechnologies: return "img";
   case MipsTechnologies: return "mti";
+  case Microsoft: return "ms";   // HLSL Change
   case NVIDIA: return "nvidia";
   case CSR: return "csr";
   }
@@ -176,6 +186,7 @@ const char *Triple::getOSTypeName(OSType Kind) {
   case CUDA: return "cuda";
   case NVCL: return "nvcl";
   case AMDHSA: return "amdhsa";
+  case DirectX: return "dx";    // HLSL Change
   case PS4: return "ps4";
   }
 
@@ -257,6 +268,10 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("hsail64", hsail64)
     .Case("spir", spir)
     .Case("spir64", spir64)
+    // HLSL Change Begins
+    .Case("dxil", dxil)
+    .Case("dxil64", dxil64)
+    // HLSL Change Ends
     .Case("kalimba", kalimba)
     .Case("shave", shave)
     .Case("wasm32", wasm32)
@@ -364,6 +379,10 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("hsail64", Triple::hsail64)
     .Case("spir", Triple::spir)
     .Case("spir64", Triple::spir64)
+    // HLSL Change Begins
+    .Case("dxil", Triple::dxil)
+    .Case("dxil64", Triple::dxil64)
+    // HLSL Change Ends
     .StartsWith("kalimba", Triple::kalimba)
     .Case("shave", Triple::shave)
     .Case("wasm32", Triple::wasm32)
@@ -382,6 +401,7 @@ static Triple::VendorType parseVendor(StringRef VendorName) {
     .Case("ibm", Triple::IBM)
     .Case("img", Triple::ImaginationTechnologies)
     .Case("mti", Triple::MipsTechnologies)
+    .Case("ms",  Triple::Microsoft)    // HLSL Change
     .Case("nvidia", Triple::NVIDIA)
     .Case("csr", Triple::CSR)
     .Default(Triple::UnknownVendor);
@@ -413,6 +433,7 @@ static Triple::OSType parseOS(StringRef OSName) {
     .StartsWith("cuda", Triple::CUDA)
     .StartsWith("nvcl", Triple::NVCL)
     .StartsWith("amdhsa", Triple::AMDHSA)
+    .StartsWith("dx", Triple::DirectX)    // HLSL Change
     .StartsWith("ps4", Triple::PS4)
     .Default(Triple::UnknownOS);
 }
@@ -1015,6 +1036,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::amdil:
   case llvm::Triple::hsail:
   case llvm::Triple::spir:
+  case llvm::Triple::dxil:      // HLSL Change
   case llvm::Triple::kalimba:
   case llvm::Triple::shave:
   case llvm::Triple::wasm32:
@@ -1037,6 +1059,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::amdil64:
   case llvm::Triple::hsail64:
   case llvm::Triple::spir64:
+  case llvm::Triple::dxil64:    // HLSL Change
   case llvm::Triple::wasm64:
     return 64;
   }
@@ -1073,6 +1096,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::amdil:
   case Triple::hsail:
   case Triple::spir:
+  case Triple::dxil:    // HLSL Change
   case Triple::arm:
   case Triple::armeb:
   case Triple::hexagon:
@@ -1105,6 +1129,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::amdil64:   T.setArch(Triple::amdil);   break;
   case Triple::hsail64:   T.setArch(Triple::hsail);   break;
   case Triple::spir64:    T.setArch(Triple::spir);    break;
+  case Triple::dxil64:    T.setArch(Triple::dxil);    break;  // HLSL Change
   case Triple::wasm64:    T.setArch(Triple::wasm32);  break;
   }
   return T;
@@ -1138,6 +1163,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::amdgcn:
   case Triple::hsail64:
   case Triple::spir64:
+  case Triple::dxil64:     // HLSL Change
   case Triple::mips64:
   case Triple::mips64el:
   case Triple::nvptx64:
@@ -1160,6 +1186,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::amdil:   T.setArch(Triple::amdil64);   break;
   case Triple::hsail:   T.setArch(Triple::hsail64);   break;
   case Triple::spir:    T.setArch(Triple::spir64);    break;
+  case Triple::dxil:    T.setArch(Triple::dxil64);    break;   // HLSL Change
   case Triple::wasm32:  T.setArch(Triple::wasm64);    break;
   }
   return T;
@@ -1185,6 +1212,8 @@ Triple Triple::getBigEndianArchVariant() const {
   case Triple::shave:
   case Triple::spir64:
   case Triple::spir:
+  case Triple::dxil:    // HLSL Change
+  case Triple::dxil64:    // HLSL Change
   case Triple::wasm32:
   case Triple::wasm64:
   case Triple::x86:
@@ -1262,6 +1291,8 @@ Triple Triple::getLittleEndianArchVariant() const {
   case Triple::sparcel:
   case Triple::spir64:
   case Triple::spir:
+  case Triple::dxil:    // HLSL Change
+  case Triple::dxil64:    // HLSL Change
   case Triple::thumb:
   case Triple::wasm32:
   case Triple::wasm64:

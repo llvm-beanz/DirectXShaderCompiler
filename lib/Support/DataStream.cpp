@@ -1,18 +1,17 @@
 //===--- llvm/Support/DataStream.cpp - Lazy streamed data -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements DataStreamer, which fetches bytes of Data from
-// a stream source. It provides support for streaming (lazy reading) of
-// bitcode. An example implementation of streaming from a file or stdin
-// is included.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DataStream.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements DataStreamer, which fetches bytes of Data from       //
+// a stream source. It provides support for streaming (lazy reading) of      //
+// bitcode. An example implementation of streaming from a file or stdin      //
+// is included.                                                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/DataStream.h"
 #include "llvm/ADT/Statistic.h"
@@ -55,10 +54,12 @@ class DataFileStreamer : public DataStreamer {
  int Fd;
 public:
   DataFileStreamer() : Fd(0) {}
-  ~DataFileStreamer() override { close(Fd); }
+  virtual ~DataFileStreamer() {
+    llvm::sys::fs::msf_close(Fd);  // HLSL Change - use msf_close
+  }
   size_t GetBytes(unsigned char *buf, size_t len) override {
     NumStreamFetches++;
-    return read(Fd, buf, len);
+    return llvm::sys::fs::msf_read(Fd, buf, len);
   }
 
   std::error_code OpenFile(const std::string &Filename) {

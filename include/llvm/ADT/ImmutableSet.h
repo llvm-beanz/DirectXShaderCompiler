@@ -1,13 +1,12 @@
 //===--- ImmutableSet.h - Immutable (functional) set interface --*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the ImutAVLTree and ImmutableSet classes.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ImmutableSet.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the ImutAVLTree and ImmutableSet classes.               //
 //
 //===----------------------------------------------------------------------===//
 
@@ -952,7 +951,8 @@ struct ImutContainerInfo<T*> : public ImutProfileInfo<T*> {
 
 //===----------------------------------------------------------------------===//
 // Immutable Set
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 template <typename ValT, typename ValInfo = ImutContainerInfo<ValT> >
 class ImmutableSet {

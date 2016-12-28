@@ -1,12 +1,12 @@
-
 //==--- DiagnosticSemaKinds.td - libsema diagnostics ----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DiagnosticsSemaKinds.td                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 //===----------------------------------------------------------------------===//
 // Semantic Analysis
@@ -2075,6 +2075,8 @@ def err_ext_vector_component_exceeds_length : Error<
   "vector component access exceeds type %0">;
 def err_ext_vector_component_name_illegal : Error<
   "illegal vector component name '%0'">;
+def err_ext_vector_component_name_mixedsets : Error<
+  "vector component names cannot mix 'xyzw' and 'rgba'">;
 def err_attribute_address_space_negative : Error<
   "address space is negative">;
 def err_attribute_address_space_too_high : Error<
@@ -2323,7 +2325,11 @@ def warn_attribute_wrong_decl_type : Warning<
   "Objective-C instance methods|init methods of interface or class extension declarations|"
   "variables, functions and classes|Objective-C protocols|"
   "functions and global variables|structs, unions, and typedefs|structs and typedefs|"
-  "interface or protocol declarations|kernel functions}1">,
+  "interface or protocol declarations|kernel functions|"
+  // HLSL Change Starts - add 3 more enum values
+  "varibales and parameters|functions, parameters, and fields|"
+  "functions, variables, parameters, fields, and types}1">,
+  // HLSL Change Ends
   InGroup<IgnoredAttributes>;
 def err_attribute_wrong_decl_type : Error<warn_attribute_wrong_decl_type.Text>;
 def warn_type_attribute_wrong_type : Warning<
@@ -2848,7 +2854,7 @@ def err_ident_list_in_fn_declaration : Error<
 def ext_param_not_declared : Extension<
   "parameter %0 was not declared, defaulting to type 'int'">;
 def err_param_default_argument : Error<
-  "C does not support default arguments">;
+  "default arguments are not supported">; // HLSL Change
 def err_param_default_argument_redefinition : Error<
   "redefinition of default argument">;
 def ext_param_default_argument_redefinition : ExtWarn<
@@ -7149,7 +7155,7 @@ def err_second_argument_to_cwsc_not_pointer : Error<
   "second argument to __builtin_call_with_static_chain must be of pointer type">;
 
 def err_vector_incorrect_num_initializers : Error<
-  "%select{too many|too few}0 elements in vector initialization (expected %1 elements, have %2)">;
+  "%select{too many|too few}0 elements in vector initialization (expected %1 element%s1, have %2)">;
 def err_altivec_empty_initializer : Error<"expected initializer">;
 
 def err_invalid_neon_type_code : Error<
@@ -7423,6 +7429,209 @@ def err_opencl_return_value_with_address_space : Error<
 def err_opencl_constant_no_init : Error<
   "variable in constant address space must be initialized">;
 } // end of sema category
+
+// HLSL Change Starts
+let CategoryName = "HLSL Issue" in {
+def err_hlsl_attribute_expects_string_literal: Error<
+  "attribute %0 must have a string literal argument">;
+def err_hlsl_attribute_expects_string_literal_from_list: Error<
+  "attribute %0 must have one of these values: %1">;
+def err_hlsl_attribute_valid_on_function_only: Error<
+  "attribute is valid only on functions">;
+def err_hlsl_cannot_convert: Error<
+  "cannot %select{implicitly |}0convert %select{|output parameter }1from %2 to %3">;
+def err_hlsl_interfaces_cannot_inherit : Error<
+  "interfaces cannot inherit from other types">;
+def err_hlsl_invalid_range_1_4: Error<
+  "invalid value, valid range is between 1 and 4 inclusive">;
+def err_hlsl_matrix_member_bad_format: Error<
+  "invalid format for matrix subscript '%0'">;
+def err_hlsl_matrix_member_empty: Error<
+  "matrix subscript is empty '%0'">;
+def err_hlsl_matrix_member_four_in_zero_based: Error<
+  "the digit '4' is used in '%0', but the syntax is for zero-based rows and columns">;
+def err_hlsl_matrix_member_mixing_refs: Error<
+  "matrix subscript '%0' mixes one-based and zero-based references">;
+def err_hlsl_matrix_member_out_of_bounds: Error<
+  "matrix subscript '%0' is out of bounds">;
+def err_hlsl_matrix_member_too_many_positions: Error<
+  "more than four positions are referenced in '%0'">;
+def err_hlsl_matrix_member_zero_in_one_based: Error<
+  "the digit '0' is used in '%0', but the syntax is for one-based rows and columns">;
+def err_hlsl_vector_member_bad_format: Error<
+  "invalid format for vector swizzle '%0'">;
+def err_hlsl_vector_member_empty: Error<
+  "vector swizzle is empty '%0'">;
+def err_hlsl_vector_member_out_of_bounds: Error<
+  "vector swizzle '%0' is out of bounds">;
+def err_hlsl_vector_member_too_many_positions: Error<
+  "more than four positions are referenced in '%0'">;
+def err_hlsl_missing_type_specifier : Error< // Patterened after err_missing_type_specifier
+  "HLSL requires a type specifier for all declarations">;
+def err_hlsl_multiple_concrete_bases : Error<
+  "multiple concrete base types specified">;
+def err_hlsl_objectintemplateargument : Error<
+  "%0 is an object and cannot be used as a type parameter">;
+def err_hlsl_packoffset_requires_cbuffer : Error<
+  "packoffset is only allowed in a constant buffer">;
+def err_hlsl_param_typedef_of_void : Error< // Patterned after err_param_typedef_of_void
+  "empty parameter list defined with a %select{typedef|type alias}0 of 'void' not allowed%select{ in HLSL|}0">;
+def err_hlsl_register_semantics_conflicting : Error<
+  "conflicting register semantics">;
+def err_hlsl_register_or_offset_bind_not_valid: Error<
+  "register or offset bind not valid">;
+def err_hlsl_requires_bool_for_not : Error<
+  "logical not requires an operand expression convertible to boolean">;
+def err_hlsl_requires_int_or_uint : Error<
+  "int or unsigned int type required">;
+def err_hlsl_requires_numeric : Error<
+  "numeric type expected">;
+def err_hlsl_requires_non_aggregate : Error<
+  "scalar, vector, or matrix expected">;
+def err_hlsl_require_numeric_base_for_ctor : Error<
+  "constructors only defined for numeric base types">;
+def err_hlsl_typecheck_duplicate_matrix_components_not_mlvalue : Error< // Patterned after err_typecheck_duplicate_matrix_components_not_mlvalue
+  "matrix is not assignable (contains duplicate components)">;
+def err_hlsl_typecheck_subscript_value : Error< // Patterned after err_typecheck_subscript_value
+  "subscripted value is not an array, matrix, or vector">;
+def err_hlsl_typeintemplateargument : Error<
+  "%0 cannot be used as a type parameter">;
+def err_hlsl_typeintemplateargument_requires_scalar : Error<
+  "%0 cannot be used as a type parameter where a scalar is required">;
+def err_hlsl_type_mismatch : Error<
+  "type mismatch">;
+def err_hlsl_unsupported_array_equality_op: Error<
+  "equality operators cannot be used with array types">;
+def err_hlsl_unsupported_array_size: Error<
+  "array dimension must be between 1 and 65536">;
+def err_hlsl_unsupported_bool_lvalue_op : Error<
+  "operator cannot be used with a bool lvalue">;
+def err_hlsl_unsupported_buffer_packoffset : Error<
+  "packoffset is only allowed within a constant buffer, not on the constant buffer declaration">;
+def err_hlsl_unsupported_cbuffer_register : Error<
+  "invalid register specification, expected 'b' binding">;
+def err_hlsl_unsupported_tbuffer_register : Error<
+  "invalid register specification, expected 't' binding">;
+def err_hlsl_unsupported_buffer_slot_target_specific : Error<
+  "user defined constant buffer slots cannot be target specific">;
+def err_hlsl_unsupported_builtin_op: Error<
+  "operator cannot be used with built-in type %0">;
+def err_hlsl_unsupported_char_literal : Error<
+  "unsupported style of char literal - use a single-character char-based literal">;
+def err_hlsl_unsupported_clipplane_argument_expression : Error<
+  "invalid expression for clipplanes argument: must be global reference, member access or array subscript">;
+def err_hlsl_unsupported_clipplane_argument_subscript_expression : Error<
+  "invalid expression for clipplanes argument array subscript: must be numeric literal">;
+def err_hlsl_unsupported_clipplane_argument_type : Error<
+  "clipplanes argument must be a float4 type but is %0">;
+def err_hlsl_unsupported_div_minint : Error<
+  "signed integer division is not supported on minimum-precision types, cast to int to use 32-bit division">;
+def err_hlsl_unsupported_mod_double : Error<
+  "modulo cannot be used with doubles, cast to float first">;
+def err_hlsl_unsupported_nested_struct : Error<
+  "nested class/struct/interfaces are not supported in HLSL">;
+def err_hlsl_unsupported_nested_typedef : Error<
+  "nested typedefs are not supported in HLSL">;
+def err_hlsl_unsupported_operator : Error<
+  "operator is not supported">;
+// This error is unused because the HLSL parser will catch all cases.
+//def err_hlsl_unsupported_string_literal : Error<
+//  "unsupported style of string literal - use a char-based literal">;
+def err_hlsl_unsupported_struct_op: Error<
+  "operator cannot be used with user-defined type %0">;
+def err_hlsl_unsupported_subscript_base_rhs : Error<
+  "HLSL does not support having the base of a subscript operator in brackets">;
+def err_hlsl_unsupported_type_nesting: Error<
+  "compiler failed to analyze type %0, try using types with less nesting">;
+def err_hlsl_unsupported_type_trait: Error<
+	"type trait functions are not supported in HLSL">;
+def err_hlsl_unsupported_longlong : Error<
+  "long long is unsupported in HLSL">;
+def err_hlsl_varmodifierna : Error<
+  "%0 is not a valid modifier for a %1">;
+def err_hlsl_varmodifiersna : Error<
+  "%0 and %1 cannot be used together for a %2">;
+def err_hlsl_vla : Error< // Patterened after err_opencl_vla
+  "variable length arrays are not supported in HLSL">;
+def err_hlsl_type_empty_init : Error<
+  "%0 cannot have an explicit empty initializer">;
+def err_hlsl_unsupportedvectortype : Error<
+  "%0 is declared with type %1, but only primitive scalar values are supported">;
+def err_hlsl_unsupportedvectorsize : Error<
+  "%0 is declared with size %1, but only values 1 through 4 are supported">;
+def err_hlsl_unsupportedmatrixsize : Error<
+  "%0 is declared with size %1x%2, but only values 1 through 4 are supported">;
+def err_hlsl_norm_float_only : Error<
+  "snorm and unorm qualifier can only be used on floating-point types">;
+def err_hlsl_unsupported_conditional_syntax : Error<
+  "x ?: y conditional operator syntax not supported in HLSL">;
+def err_hlsl_conditional_cond_typecheck : Error<
+  "conditional operator only supports condition with scalar, vector, or matrix types convertable to bool.">;
+def err_hlsl_conditional_result_typecheck : Error<
+  "conditional operator only supports results with numeric scalar, vector, or matrix types.">;
+def err_hlsl_conditional_dimensions : Error<
+  "conditional operator condition and result dimensions mismatch.">;
+def err_hlsl_conditional_result_dimensions : Error<
+  "conditional operator result dimensions mismatch.">;
+def err_hlsl_conditional_result_comptype_mismatch : Error<
+  "conditional operator result component types mismatch.">;
+def note_field_type_usage : Note<"usage of %0 found in field %1 of type %2">;
+def warn_hlsl_attribute_expects_uint_literal : Warning<
+  "attribute %0 must have a uint literal argument">;
+def err_hlsl_attribute_expects_float_literal : Error<
+  "attribute %0 must have a float literal argument">;
+def warn_hlsl_comma_in_init : Warning<
+  "comma expression used where a constructor list may have been intended">;
+def warn_hlsl_incorrect_bind_semantic: Warning< // Is an error in fxc in some cases, but is sometimes ignored
+  "invalid register specification, expected %0 binding">;
+def err_hlsl_incorrect_bind_semantic: Error< // Is an error in fxc in some cases, but is sometimes ignored
+  "invalid register specification, expected %0 binding">;
+def warn_hlsl_unary_negate_unsigned : Warning<
+  "unary negate of unsigned value is still unsigned">,
+  InGroup<Conversion>, DefaultWarn;
+def warn_hlsl_narrowing : Warning<
+  "conversion from larger type %0 to smaller type %1, possible loss of data">,
+  InGroup<Conversion>, DefaultWarn;
+def warn_hlsl_sema_minprecision_promotion : Warning <
+  "%0 is promoted to %1">,
+  InGroup<Conversion>, DefaultWarn;
+def warn_hlsl_implicit_vector_truncation  : Warning<
+  "implicit truncation of vector type">,
+  InGroup<Conversion>, DefaultWarn;
+def err_hlsl_nointerpolation_and_linear : Error<
+    "nointerpolation cannot be used with any other interpolation mode specifier">;
+def warn_hlsl_duplicate_specifier : Warning<
+    "duplicate HLSL specifier %0">,
+	InGroup<IgnoredAttributes>, DefaultWarn;
+def err_hlsl_duplicate_parameter_usages : Error<
+    "duplicate HLSL parameter usages %0">;
+def err_hlsl_invalid_resource_type_on_intrinsic : Error<
+    "cannot %0 from resource containing %1">;
+def err_hlsl_usage_not_on_parameter : Error<
+    "HLSL usage %0 is only valid on a parameter">;
+def warn_hlsl_for_redefinition : Warning<"redefinition of %0 shadows declaration in the outer scope; most recent declaration will be used">;
+def warn_hlsl_for_redefinition_different_type : Warning<
+  "redefinition of %0 with a different type%diff{: $ vs $|}1,2 shadows declaration in the outer scope; most recent declaration will be used">;
+def warn_hlsl_specifier_overridden : Warning<
+  "%0 will be overridden by %1">;
+def warn_hlsl_packoffset_overridden : Warning<
+  "packoffset is overridden by another packoffset annotation">;
+def warn_hlsl_unsupported_statement_for_if_switch_attribute : Warning<
+  "attribute %0 can only be applied to 'if' and 'switch' statements">;
+def warn_hlsl_unsupported_statement_for_switch_attribute : Warning<
+  "attribute %0 can only be applied to 'switch' statements">;
+def warn_hlsl_unsupported_statement_for_loop_attribute : Warning<
+  "attribute %0 can only be applied to 'for', 'while' and 'do' loop statements">;
+def err_hlsl_matrix_layout_wrong_type : Error<
+  "%0 can only be used with a matrix type">;
+def warn_hlsl_effect_object : Warning <
+  "effect object ignored - effect syntax is deprecated">,
+  InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_unused_call : Warning<
+  "ignoring return value of function that only reads data">,
+  InGroup<UnusedValue>;
+}
+// HLSL Change Ends
 
 let CategoryName = "OpenMP Issue" in {
 // OpenMP support.

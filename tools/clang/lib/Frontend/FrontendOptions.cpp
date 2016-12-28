@@ -1,11 +1,12 @@
 //===--- FrontendOptions.cpp ----------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FrontendOptions.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/FrontendOptions.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -27,6 +28,7 @@ InputKind FrontendOptions::getInputKindForExtension(StringRef Extension) {
     .Cases("cpp", "CPP", "c++", "cxx", "hpp", IK_CXX)
     .Case("cl", IK_OpenCL)
     .Case("cu", IK_CUDA)
+    .Cases("hlsl", "fx", IK_HLSL) // HLSL Change: Inputkind files for hlsl
     .Cases("ll", "bc", IK_LLVM_IR)
     .Default(IK_C);
 }

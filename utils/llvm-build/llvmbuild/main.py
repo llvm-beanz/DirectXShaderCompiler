@@ -1,3 +1,6 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
+
 from __future__ import absolute_import
 import filecmp
 import os
@@ -287,10 +290,8 @@ subdirectories = %s
             f.write("""\
 %s
 ;
-;                     The LLVM Compiler Infrastructure
-;
-; This file is distributed under the University of Illinois Open Source
-; License. See LICENSE.TXT for details.
+; Copyright (C) Microsoft Corporation. All rights reserved.
+; Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 ;
 ;===------------------------------------------------------------------------===;
 ;
@@ -526,10 +527,8 @@ subdirectories = %s
         f.write("""\
 %s
 #
-#                     The LLVM Compiler Infrastructure
-#
-# This file is distributed under the University of Illinois Open Source
-# License. See LICENSE.TXT for details.
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 #
 #===------------------------------------------------------------------------===#
 #
@@ -656,10 +655,8 @@ set_property(TARGET %s PROPERTY IMPORTED_LINK_INTERFACE_LIBRARIES %s)\n""" % (
         f.write("""\
 %s
 #
-#                     The LLVM Compiler Infrastructure
-#
-# This file is distributed under the University of Illinois Open Source
-# License. See LICENSE.TXT for details.
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 #
 #===------------------------------------------------------------------------===#
 #
@@ -747,6 +744,7 @@ def add_magic_target_components(parser, project, opts):
 
         enable_targets = []
         for name in enable_target_names:
+            if name == "None": continue # HLSL Change
             target = available_targets.get(name)
             if target is None:
                 parser.error("invalid target to enable: %r (not in project)" % (

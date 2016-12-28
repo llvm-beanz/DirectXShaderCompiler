@@ -1,18 +1,17 @@
 //===--- SemaCast.cpp - Semantic Analysis for Casts -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for cast expressions, including
-//  1) C-style casts like '(int) x'
-//  2) C++ functional casts like 'int(x)'
-//  3) C++ named casts like 'static_cast<int>(x)'
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaCast.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for cast expressions, including   //
+//  1) C-style casts like '(int) x'                                          //
+//  2) C++ functional casts like 'int(x)'                                    //
+//  3) C++ named casts like 'static_cast<int>(x)'                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTContext.h"
@@ -24,6 +23,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/Initialization.h"
 #include "llvm/ADT/SmallVector.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 #include <set>
 using namespace clang;
 
@@ -903,7 +903,9 @@ void CastOperation::CheckStaticCast() {
   }
 
   if (ValueKind == VK_RValue && !DestType->isRecordType() &&
-      !isPlaceholder(BuiltinType::Overload)) {
+      !isPlaceholder(BuiltinType::Overload)
+      && !(Self.getLangOpts().HLSL && !hlsl::IsConversionToLessOrEqualElements(&Self, SrcExpr, DestType, true))  // HLSL Change: check for HLSL vector-shrinking.
+      ) {
     SrcExpr = Self.DefaultFunctionArrayLvalueConversion(SrcExpr.get());
     if (SrcExpr.isInvalid()) // if conversion failed, don't report another error
       return;
@@ -1124,6 +1126,17 @@ static TryCastResult TryStaticCast(Sema &Self, ExprResult &SrcExpr,
           DestPointer->getPointeeType()->getAs<RecordType>())
        msg = diag::err_bad_cxx_cast_unrelated_class;
   
+  // HLSL Change Starts
+  if (Self.getLangOpts().HLSL) {
+    const bool SuppressDiagFalse = false;
+    if (hlsl::TryStaticCastForHLSL(&Self, SrcExpr, DestType, CCK, OpRange, msg,
+                                   Kind, BasePath, ListInitialization,
+                                   SuppressDiagFalse, nullptr)) {
+      return TC_Success;
+    }
+  }
+  // HLSL Change Ends
+
   // We tried everything. Everything! Nothing works! :-(
   return TC_NotApplicable;
 }
@@ -2088,6 +2101,18 @@ void CastOperation::CheckCXXCStyleCast(bool FunctionalStyle,
     assert(Kind == CK_Dependent);
     return;
   }
+
+  // HLSL Change Starts
+  // Check for HLSL vector or matrix shrinking.
+  if (ValueKind == VK_RValue && 
+      !isPlaceholder(BuiltinType::Overload) &&
+      Self.getLangOpts().HLSL &&
+      SrcExpr.get()->isLValue() &&
+      hlsl::IsHLSLVecMatType(SrcExpr.get()->getType()) &&
+      hlsl::IsConversionToLessOrEqualElements(&Self, SrcExpr, DestType, true)) {
+    ValueKind = VK_LValue;
+  }
+  // HLSL Change Ends
 
   if (ValueKind == VK_RValue && !DestType->isRecordType() &&
       !isPlaceholder(BuiltinType::Overload)) {

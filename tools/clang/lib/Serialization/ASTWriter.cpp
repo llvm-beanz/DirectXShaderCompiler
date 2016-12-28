@@ -1,15 +1,14 @@
 //===--- ASTWriter.cpp - AST File Writer ----------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the ASTWriter class, which writes AST files.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTWriter.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the ASTWriter class, which writes AST files.           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Serialization/ASTWriter.h"
 #include "ASTCommon.h"
@@ -1269,7 +1268,7 @@ void ASTWriter::WriteControlBlock(Preprocessor &PP, ASTContext &Context,
   Record.push_back(LangOpts.Name);
 #define ENUM_LANGOPT(Name, Type, Bits, Default, Description) \
   Record.push_back(static_cast<unsigned>(LangOpts.get##Name()));
-#include "clang/Basic/LangOptions.def"
+#include "clang/Basic/LangOptions.fixed.def"  
 #define SANITIZER(NAME, ID)                                                    \
   Record.push_back(LangOpts.Sanitize.has(SanitizerKind::ID));
 #include "clang/Basic/Sanitizers.def"
@@ -1748,7 +1747,7 @@ void ASTWriter::WriteHeaderSearch(const HeaderSearch &HS) {
     if (PreparePathForOutput(FilenameTmp)) {
       // If we performed any translation on the file name at all, we need to
       // save this string, since the generator will refer to it later.
-      Filename = strdup(FilenameTmp.c_str());
+      Filename = _strdup(FilenameTmp.c_str());
       SavedStrings.push_back(Filename);
     }
 

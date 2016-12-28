@@ -1,15 +1,14 @@
 //===- llvm/ADT/BitVector.h - Bit vectors -----------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BitVector.h                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the BitVector class.                                 //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the BitVector class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ADT_BITVECTOR_H
 #define LLVM_ADT_BITVECTOR_H
@@ -99,6 +98,7 @@ public:
 
     Capacity = NumBitWords(RHS.size());
     Bits = (BitWord *)std::malloc(Capacity * sizeof(BitWord));
+	if (Bits == nullptr) throw std::bad_alloc(); // HLSL Change
     std::memcpy(Bits, RHS.Bits, Capacity * sizeof(BitWord));
   }
 
@@ -436,6 +436,7 @@ public:
     Capacity = RHSWords;
     assert(Capacity > 0 && "negative capacity?");
     BitWord *NewBits = (BitWord *)std::malloc(Capacity * sizeof(BitWord));
+	if (NewBits == nullptr) throw std::bad_alloc(); // HLSL Change
     std::memcpy(NewBits, RHS.Bits, Capacity * sizeof(BitWord));
 
     // Destroy the old bits.
@@ -531,7 +532,13 @@ private:
   void grow(unsigned NewSize) {
     Capacity = std::max(NumBitWords(NewSize), Capacity * 2);
     assert(Capacity > 0 && "realloc-ing zero space");
-    Bits = (BitWord *)std::realloc(Bits, Capacity * sizeof(BitWord));
+    // HLSL Change Starts: don't lose old buffer while reallocating
+    // Bits = (BitWord *)std::realloc(Bits, Capacity * sizeof(BitWord));
+    BitWord  *newBits = (BitWord *)std::realloc(Bits, Capacity * sizeof(BitWord));
+    if (newBits == nullptr)
+      throw std::bad_alloc();
+    Bits = newBits;
+    // HLSL Change Ends
 
     clear_unused_bits();
   }

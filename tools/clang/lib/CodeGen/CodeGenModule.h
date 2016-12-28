@@ -1,15 +1,14 @@
 //===--- CodeGenModule.h - Per-Module state for LLVM CodeGen ----*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeGenModule.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is the internal per-translation-unit state used for llvm translation.//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is the internal per-translation-unit state used for llvm translation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LIB_CODEGEN_CODEGENMODULE_H
 #define LLVM_CLANG_LIB_CODEGEN_CODEGENMODULE_H
@@ -88,6 +87,7 @@ class CGObjCRuntime;
 class CGOpenCLRuntime;
 class CGOpenMPRuntime;
 class CGCUDARuntime;
+class CGHLSLRuntime;     // HLSL Change
 class BlockFieldFlags;
 class FunctionArgList;
 class CoverageMappingModuleGen;
@@ -306,6 +306,7 @@ private:
   CGOpenCLRuntime* OpenCLRuntime;
   CGOpenMPRuntime* OpenMPRuntime;
   CGCUDARuntime* CUDARuntime;
+  CGHLSLRuntime* HLSLRuntime;    // HLSL Change 
   CGDebugInfo* DebugInfo;
   ARCEntrypoints *ARCData;
   llvm::MDNode *NoObjCARCExceptionsMetadata;
@@ -456,6 +457,7 @@ private:
   void createOpenCLRuntime();
   void createOpenMPRuntime();
   void createCUDARuntime();
+  void createHLSLRuntime();    // HLSL Change
 
   bool isTriviallyRecursive(const FunctionDecl *F);
   bool shouldEmitFunction(GlobalDecl GD);
@@ -533,6 +535,15 @@ public:
     assert(CUDARuntime != nullptr);
     return *CUDARuntime;
   }
+
+  // HLSL Change Starts
+  /// Return a reference to the configured HLSL runtime.
+  CGHLSLRuntime &getHLSLRuntime() {
+    assert(HLSLRuntime != nullptr);
+    return *HLSLRuntime;
+  }
+  void FinishCodeGen();
+  // HLSL Change Ends
 
   ARCEntrypoints &getARCEntrypoints() const {
     assert(getLangOpts().ObjCAutoRefCount && ARCData != nullptr);

@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 add_custom_target(UnitTests)
 set_target_properties(UnitTests PROPERTIES FOLDER "Tests")
 
@@ -17,7 +19,7 @@ add_subdirectory(AsmParser)
 add_subdirectory(Bitcode)
 add_subdirectory(CodeGen)
 add_subdirectory(DebugInfo)
-add_subdirectory(ExecutionEngine)
+# add_subdirectory(ExecutionEngine) - HLSL Change - removed
 add_subdirectory(IR)
 add_subdirectory(LineEditor)
 add_subdirectory(Linker)

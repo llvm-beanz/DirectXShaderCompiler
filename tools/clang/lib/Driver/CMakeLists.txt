@@ -1,14 +1,15 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set(LLVM_LINK_COMPONENTS
   Option
   Support
   )
 
-add_clang_library(clangDriver
+set(HLSL_IGNORE_SOURCES
   Action.cpp
   Compilation.cpp
   CrossWindowsToolChain.cpp
   Driver.cpp
-  DriverOptions.cpp
   Job.cpp
   MinGWToolChain.cpp
   Multilib.cpp
@@ -20,6 +21,10 @@ add_clang_library(clangDriver
   ToolChains.cpp
   Tools.cpp
   Types.cpp
+  )
+
+add_clang_library(clangDriver
+  DriverOptions.cpp
 
   DEPENDS
   ClangDriverOptions

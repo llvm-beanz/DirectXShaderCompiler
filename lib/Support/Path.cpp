@@ -1,15 +1,14 @@
 //===-- Path.cpp - Implement OS Path Concept ------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the operating system Path API.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Path.cpp                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the operating system Path API.                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/COFF.h"
 #include "llvm/Support/Endian.h"
@@ -813,7 +812,7 @@ std::error_code copy_file(const Twine &From, const Twine &To) {
   if (std::error_code EC = openFileForRead(From, ReadFD))
     return EC;
   if (std::error_code EC = openFileForWrite(To, WriteFD, F_None)) {
-    close(ReadFD);
+    msf_close(ReadFD); // HLSL Change
     return EC;
   }
 
@@ -821,11 +820,11 @@ std::error_code copy_file(const Twine &From, const Twine &To) {
   char *Buf = new char[BufSize];
   int BytesRead = 0, BytesWritten = 0;
   for (;;) {
-    BytesRead = read(ReadFD, Buf, BufSize);
+    BytesRead = msf_read(ReadFD, Buf, BufSize); // HLSL Change
     if (BytesRead <= 0)
       break;
     while (BytesRead) {
-      BytesWritten = write(WriteFD, Buf, BytesRead);
+      BytesWritten = msf_write(WriteFD, Buf, BytesRead); // HLSL Change
       if (BytesWritten < 0)
         break;
       BytesRead -= BytesWritten;
@@ -833,8 +832,8 @@ std::error_code copy_file(const Twine &From, const Twine &To) {
     if (BytesWritten < 0)
       break;
   }
-  close(ReadFD);
-  close(WriteFD);
+  msf_close(ReadFD); // HLSL Change
+  msf_close(WriteFD); // HLSL Change
   delete[] Buf;
 
   if (BytesRead < 0 || BytesWritten < 0)
@@ -1051,8 +1050,8 @@ std::error_code identify_magic(const Twine &Path, file_magic &Result) {
     return EC;
 
   char Buffer[32];
-  int Length = read(FD, Buffer, sizeof(Buffer));
-  if (close(FD) != 0 || Length < 0)
+  int Length = msf_read(FD, Buffer, sizeof(Buffer)); // HLSL Change
+  if (msf_close(FD) != 0 || Length < 0) // HLSL Change
     return std::error_code(errno, std::generic_category());
 
   Result = identify_magic(StringRef(Buffer, Length));
@@ -1072,5 +1071,5 @@ std::error_code directory_entry::status(file_status &result) const {
 #include "Unix/Path.inc"
 #endif
 #if defined(LLVM_ON_WIN32)
-#include "Windows/Path.inc"
+#include "Windows/MSFileSystem.inc.cpp"
 #endif

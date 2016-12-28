@@ -1,16 +1,15 @@
 //===-- RegAllocGreedy.cpp - greedy register allocator --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the RAGreedy function pass for register allocation in
-// optimized builds.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RegAllocGreedy.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the RAGreedy function pass for register allocation in   //
+// optimized builds.                                                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/CodeGen/Passes.h"
 #include "AllocationOrder.h"
@@ -979,6 +978,7 @@ void RAGreedy::addThroughConstraints(InterferenceCache::Cursor Intf,
 
     if (!Intf.hasInterference()) {
       assert(T < GroupSize && "Array overflow");
+      _Analysis_assume_(T < GroupSize); // This is reset to zero when it reaches GroupSize
       TBS[T] = Number;
       if (++T == GroupSize) {
         SpillPlacer->addLinks(makeArrayRef(TBS, T));
@@ -988,6 +988,7 @@ void RAGreedy::addThroughConstraints(InterferenceCache::Cursor Intf,
     }
 
     assert(B < GroupSize && "Array overflow");
+    _Analysis_assume_(B < GroupSize); // This is reset to zero when it reaches GroupSize
     BCS[B].Number = Number;
 
     // Interference for the live-in value.

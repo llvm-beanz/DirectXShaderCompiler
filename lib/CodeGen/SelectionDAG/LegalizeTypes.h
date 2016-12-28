@@ -1,15 +1,14 @@
 //===-- LegalizeTypes.h - DAG Type Legalizer class definition ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the DAGTypeLegalizer class.  This is a private interface
-// shared between the code that implements the SelectionDAG::LegalizeTypes
-// method.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LegalizeTypes.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the DAGTypeLegalizer class.  This is a private interface//
+// shared between the code that implements the SelectionDAG::LegalizeTypes   //
+// method.                                                                   //
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,8 +23,8 @@
 #include "llvm/Target/TargetLowering.h"
 
 namespace llvm {
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// DAGTypeLegalizer - This takes an arbitrary SelectionDAG as input and hacks
 /// on it until only value types the target machine can handle are left.  This
 /// involves promoting small sizes to large sizes or splitting up large values

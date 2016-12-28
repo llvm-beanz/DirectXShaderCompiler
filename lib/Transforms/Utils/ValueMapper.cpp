@@ -1,16 +1,15 @@
 //===- ValueMapper.cpp - Interface shared by lib/Transforms/Utils ---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the MapValue function, which is shared by various parts of
-// the lib/Transforms/Utils library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ValueMapper.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the MapValue function, which is shared by various parts of//
+// the lib/Transforms/Utils library.                                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/IR/CallSite.h"

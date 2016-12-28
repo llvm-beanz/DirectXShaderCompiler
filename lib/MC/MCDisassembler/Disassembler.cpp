@@ -1,11 +1,12 @@
 //===-- lib/MC/Disassembler.cpp - Disassembler Public C Interface ---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Disassembler.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "Disassembler.h"
 #include "llvm-c/Disassembler.h"
@@ -238,6 +239,7 @@ static void emitLatency(LLVMDisasmContext *DC, const MCInst &Inst) {
 // returns zero the caller will have to pick how many bytes they want to step
 // over by printing a .byte, .long etc. to continue.
 //
+_Use_decl_annotations_ // HLSL Change
 size_t LLVMDisasmInstruction(LLVMDisasmContextRef DCR, uint8_t *Bytes,
                              uint64_t BytesSize, uint64_t PC, char *OutString,
                              size_t OutStringSize){

@@ -1,21 +1,18 @@
 //===--- FileManager.cpp - File System Probing and Caching ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the FileManager interface.
-//
-//===----------------------------------------------------------------------===//
-//
-// TODO: This should index all interesting directories with dirent calls.
-//  getdirentries ?
-//  opendir/readdir_r/closedir ?
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FileManager.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the FileManager interface.                          //
+//                                                                           //
+// TODO: This should index all interesting directories with dirent calls.    //
+//  getdirentries ?                                                          //
+//  opendir/readdir_r/closedir ?                                             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/FileSystemStatCache.h"
@@ -241,6 +238,7 @@ const FileEntry *FileManager::getFile(StringRef Filename, bool openFile,
   // subdirectory.  This will let us avoid having to waste time on known-to-fail
   // searches when we go to find sys/bar.h, because all the search directories
   // without a 'sys' subdir will get a cached failure result.
+#if 0 // HLSL Change Starts - do not probe for directories
   const DirectoryEntry *DirInfo = getDirectoryFromFile(*this, Filename,
                                                        CacheFailure);
   if (DirInfo == nullptr) { // Directory doesn't exist, file can't exist.
@@ -249,6 +247,9 @@ const FileEntry *FileManager::getFile(StringRef Filename, bool openFile,
 
     return nullptr;
   }
+#else
+  const DirectoryEntry *DirInfo = nullptr;
+#endif // HLSL Change Ends - do not probe for directories
   
   // FIXME: Use the directory info to prune this, before doing the stat syscall.
   // FIXME: This will reduce the # syscalls.
@@ -284,6 +285,17 @@ const FileEntry *FileManager::getFile(StringRef Filename, bool openFile,
              "filename from getStatValue() refers to wrong file");
     InterndFileName = NamedFileEnt.first().data();
   }
+
+  // HLSL Change Starts - do not probe for directories before looking for file
+  // This way the include handler can report all the included files paths as existing.
+  DirInfo = getDirectoryFromFile(*this, Filename, CacheFailure);
+  if (DirInfo == nullptr) { // Directory doesn't exist, file can't exist.
+    if (!CacheFailure)
+      SeenFileEntries.erase(Filename);
+
+    return nullptr;
+  }
+  // HLSL Change Ends - do not probe for directories
 
   if (UFE.isValid()) { // Already have an entry with this inode, return it.
 

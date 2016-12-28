@@ -1,15 +1,14 @@
 //===-- llvm-diff.cpp - Module comparator command-line driver ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the command-line driver for the difference engine.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-diff.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the command-line driver for the difference engine.      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "DiffLog.h"
 #include "DifferenceEngine.h"
@@ -67,7 +66,8 @@ static cl::opt<std::string> RightFilename(cl::Positional,
 static cl::list<std::string> GlobalsToCompare(cl::Positional,
                                               cl::desc("<globals to compare>"));
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
 
   LLVMContext Context;

@@ -1,21 +1,20 @@
 //===- CFGPrinter.cpp - DOT printer for the control flow graph ------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines a '-dot-cfg' analysis pass, which emits the
-// cfg.<fnname>.dot file for each function in the program, with a graph of the
-// CFG for that function.
-//
-// The other main feature of this file is that it implements the
-// Function::viewCFG method, which is useful for debugging passes which operate
-// on the CFG.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CFGPrinter.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines a '-dot-cfg' analysis pass, which emits the             //
+// cfg.<fnname>.dot file for each function in the program, with a graph of the//
+// CFG for that function.                                                    //
+//                                                                           //
+// The other main feature of this file is that it implements the             //
+// Function::viewCFG method, which is useful for debugging passes which operate//
+// on the CFG.                                                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/Pass.h"
@@ -30,6 +29,13 @@ namespace {
     }
 
     bool runOnFunction(Function &F) override {
+      // HLSL Change Starts
+      if (OSOverride != nullptr) {
+        *OSOverride << "\ngraph: " << "cfg" << F.getName() << ".dot\n";
+        llvm::WriteGraph(*OSOverride, (const Function*)&F, false, F.getName());
+        return false;
+      }
+      // HLSL Change Ends
       F.viewCFG();
       return false;
     }
@@ -53,6 +59,13 @@ namespace {
     }
 
     bool runOnFunction(Function &F) override {
+      // HLSL Change Starts
+      if (OSOverride != nullptr) {
+        *OSOverride << "\ngraph: " << "cfg" << F.getName() << ".dot\n";
+        llvm::WriteGraph(*OSOverride, (const Function*)&F, true, F.getName());
+        return false;
+      }
+      // HLSL Change Ends
       F.viewCFGOnly();
       return false;
     }
@@ -77,6 +90,14 @@ namespace {
     }
 
     bool runOnFunction(Function &F) override {
+      // HLSL Change Starts
+      if (OSOverride != nullptr) {
+        *OSOverride << "\ngraph: " << "cfg." << F.getName() << ".dot\n";
+        llvm::WriteGraph(*OSOverride, (const Function*)&F, true, F.getName());
+        return false;
+      }
+      // HLSL Change Ends
+
       std::string Filename = ("cfg." + F.getName() + ".dot").str();
       errs() << "Writing '" << Filename << "'...";
 
@@ -111,6 +132,13 @@ namespace {
     }
 
     bool runOnFunction(Function &F) override {
+      // HLSL Change Starts
+      if (OSOverride != nullptr) {
+        *OSOverride << "\ngraph: " << "cfg." << F.getName() << ".dot\n";
+        llvm::WriteGraph(*OSOverride, (const Function*)&F, true, F.getName());
+        return false;
+      }
+      // HLSL Change Ends
       std::string Filename = ("cfg." + F.getName() + ".dot").str();
       errs() << "Writing '" << Filename << "'...";
 

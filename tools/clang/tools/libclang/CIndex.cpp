@@ -1,16 +1,15 @@
 //===- CIndex.cpp - Clang-C Source Indexing Library -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the main API hooks in the Clang-C Source Indexing
-// library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CIndex.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the main API hooks in the Clang-C Source Indexing    //
+// library.                                                                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CIndexer.h"
 #include "CIndexDiagnostic.h"
@@ -58,6 +57,7 @@
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/AST/HlslTypes.h" // HLSL Change
 
 #if LLVM_ENABLE_THREADS != 0 && defined(__APPLE__)
 #define USE_DARWIN_THREADS
@@ -772,7 +772,7 @@ bool CursorVisitor::VisitDeclaratorDecl(DeclaratorDecl *DD) {
 }
 
 /// \brief Compare two base or member initializers based on their source order.
-static int CompareCXXCtorInitializers(CXXCtorInitializer *const *X,
+static int __cdecl CompareCXXCtorInitializers(CXXCtorInitializer *const *X, // HLSL Change - __cdecl
                                       CXXCtorInitializer *const *Y) {
   return (*X)->getSourceOrder() - (*Y)->getSourceOrder();
 }
@@ -1726,6 +1726,12 @@ bool CursorVisitor::VisitAttributes(Decl *D) {
 
   return false;
 }
+
+// HLSL Change Starts
+bool CursorVisitor::VisitHLSLBufferDecl(HLSLBufferDecl *D) {
+  return VisitDeclContext(D);
+}
+// HLSL Change Ends
 
 //===----------------------------------------------------------------------===//
 // Data-recursive visitor methods.
@@ -2847,6 +2853,7 @@ buildPieces(unsigned NameFlags, bool IsMemberRefExpr,
 // Misc. API hooks.
 //===----------------------------------------------------------------------===//               
 
+// HLSL Change Starts - disable crash recovery
 static void fatal_error_handler(void *user_data, const std::string& reason,
                                 bool gen_crash_diag) {
   // Write the result out to stderr avoiding errs() because raw_ostreams can
@@ -2854,6 +2861,7 @@ static void fatal_error_handler(void *user_data, const std::string& reason,
   fprintf(stderr, "LIBCLANG FATAL ERROR: %s\n", reason.c_str());
   ::abort();
 }
+// HLSL Change Ends - disable crash recovery
 
 namespace {
 struct RegisterFatalErrorHandler {
@@ -2865,18 +2873,18 @@ struct RegisterFatalErrorHandler {
 
 static llvm::ManagedStatic<RegisterFatalErrorHandler> RegisterFatalErrorHandlerOnce;
 
-extern "C" {
+// extern "C" {    // HLSL Change -Don't use c linkage.
 CXIndex clang_createIndex(int excludeDeclarationsFromPCH,
                           int displayDiagnostics) {
   // We use crash recovery to make some of our APIs more reliable, implicitly
   // enable it.
-  if (!getenv("LIBCLANG_DISABLE_CRASH_RECOVERY"))
-    llvm::CrashRecoveryContext::Enable();
+  // if (!getenv("LIBCLANG_DISABLE_CRASH_RECOVERY"))
+  //   llvm::CrashRecoveryContext::Enable(); // HLSL Change: libclang isn't cleaning this up, which will crash if vectored exception handler called after unload
 
   // Look through the managed static to trigger construction of the managed
   // static which registers our fatal error handler. This ensures it is only
   // registered once.
-  (void)*RegisterFatalErrorHandlerOnce;
+  // (void)*RegisterFatalErrorHandlerOnce; // HLSL Change - properly scoped mechanisms should be used
 
   // Initialize targets for clang module support.
   llvm::InitializeAllTargets();
@@ -2905,6 +2913,14 @@ void clang_disposeIndex(CXIndex CIdx) {
   if (CIdx)
     delete static_cast<CIndexer *>(CIdx);
 }
+
+// HLSL Change Starts
+void clang_index_setLangHelper(CXIndex CIdx, void* helper) {
+  if (CIdx)
+    static_cast<CIndexer *>(CIdx)->HlslLangExtensions =
+        (hlsl::DxcLangExtensionsHelperApply *)helper;
+}
+// HLSL Change Ends
 
 void clang_CXIndex_setGlobalOptions(CXIndex CIdx, unsigned options) {
   if (CIdx)
@@ -2938,6 +2954,9 @@ CXTranslationUnit clang_createTranslationUnit(CXIndex CIdx,
 enum CXErrorCode clang_createTranslationUnit2(CXIndex CIdx,
                                               const char *ast_filename,
                                               CXTranslationUnit *out_TU) {
+#if 1 // HLSL Change Starts - no support for serialization
+  return CXError_Failure;
+#else  
   if (out_TU)
     *out_TU = nullptr;
 
@@ -2961,6 +2980,7 @@ enum CXErrorCode clang_createTranslationUnit2(CXIndex CIdx,
       /*UserFilesAreVolatile=*/true);
   *out_TU = MakeCXTranslationUnit(CXXIdx, AU.release());
   return *out_TU ? CXError_Success : CXError_Failure;
+#endif // HLSL Change Ends - no support for serialization
 }
 
 unsigned clang_defaultEditingTranslationUnitOptions() {
@@ -2991,6 +3011,7 @@ struct ParseTranslationUnitInfo {
   unsigned options;
   CXTranslationUnit *out_TU;
   CXErrorCode &result;
+  ::llvm::sys::fs::MSFileSystemRef fsr;
 };
 static void clang_parseTranslationUnit_Impl(void *UserData) {
   const ParseTranslationUnitInfo *PTUI =
@@ -3011,6 +3032,14 @@ static void clang_parseTranslationUnit_Impl(void *UserData) {
     PTUI->result = CXError_InvalidArguments;
     return;
   }
+
+  // HLSL Change Starts
+  if (PTUI->fsr) {
+    // No need to clean up in this case - this means we run in our own thread
+    // (otherwise caller owns the thread and should set this up).
+    ::llvm::sys::fs::SetCurrentThreadFileSystem(PTUI->fsr);
+  }
+  // HLSL Change Ends
 
   CIndexer *CXXIdx = static_cast<CIndexer *>(CIdx);
 
@@ -3086,7 +3115,7 @@ static void clang_parseTranslationUnit_Impl(void *UserData) {
 
   // Do we need the detailed preprocessing record?
   if (options & CXTranslationUnit_DetailedPreprocessingRecord) {
-    Args->push_back("-Xclang");
+    // Args->push_back("-Xclang"); // HLSL Change - command-line now is directly dxc compilation, no longer clang-driver-driven
     Args->push_back("-detailed-preprocessing-record");
   }
   
@@ -3100,7 +3129,8 @@ static void clang_parseTranslationUnit_Impl(void *UserData) {
       /*RemappedFilesKeepOriginalName=*/true, PrecompilePreamble, TUKind,
       CacheCodeCompletionResults, IncludeBriefCommentsInCodeCompletion,
       /*AllowPCHWithCompilerErrors=*/true, SkipFunctionBodies,
-      /*UserFilesAreVolatile=*/true, ForSerialization, &ErrUnit));
+      /*UserFilesAreVolatile=*/true, ForSerialization, &ErrUnit,
+      CXXIdx->HlslLangExtensions)); // HLSL Change - add language extensions
 
   // Early failures in LoadFromCommandLine may return with ErrUnit unset.
   if (!Unit && !ErrUnit) {
@@ -3170,7 +3200,17 @@ enum CXErrorCode clang_parseTranslationUnit2(
       result};
   llvm::CrashRecoveryContext CRC;
 
-  if (!RunSafely(CRC, clang_parseTranslationUnit_Impl, &PTUI)) {
+  // HLSL Change Starts - allow an option to control this behavior.
+  bool runSucceeded;
+  if (options & CXTranslationUnit_UseCallerThread) {
+    PTUI.fsr = nullptr;
+    runSucceeded = CRC.RunSafely(clang_parseTranslationUnit_Impl, &PTUI);
+  } else {
+    PTUI.fsr = ::llvm::sys::fs::GetCurrentThreadFileSystem();
+    runSucceeded = RunSafely(CRC, clang_parseTranslationUnit_Impl, &PTUI);
+  }
+  if (!runSucceeded) {
+  // HLSL Change Ends
     fprintf(stderr, "libclang: crash detected during parsing: {\n");
     fprintf(stderr, "  'source_filename' : '%s'\n", source_filename);
     fprintf(stderr, "  'command_line_args' : [");
@@ -3402,13 +3442,13 @@ CXCursor clang_getTranslationUnitCursor(CXTranslationUnit TU) {
   return MakeCXCursor(CXXUnit->getASTContext().getTranslationUnitDecl(), TU);
 }
 
-} // end: extern "C"
+// } // end: extern "C"  // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // CXFile Operations.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {  // HLSL Change -Don't use c linkage.
 CXString clang_getFileName(CXFile SFile) {
   if (!SFile)
     return cxstring::createNull();
@@ -3477,7 +3517,7 @@ int clang_File_isEqual(CXFile file1, CXFile file2) {
   return FEnt1->getUniqueID() == FEnt2->getUniqueID();
 }
 
-} // end: extern "C"
+// } // end: extern "C"  // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // CXCursor Operations.
@@ -3551,7 +3591,7 @@ static SourceLocation getLocationFromExpr(const Expr *E) {
   return E->getLocStart();
 }
 
-extern "C" {
+// extern "C" {    // HLSL Change -Don't use c linkage.
 
 unsigned clang_visitChildren(CXCursor parent,
                              CXCursorVisitor visitor,
@@ -3578,10 +3618,10 @@ static enum CXChildVisitResult visitWithBlock(CXCursor cursor, CXCursor parent,
 // define and call the block manually, so the 
 typedef struct _CXChildVisitResult
 {
-	void *isa;
-	int flags;
-	int reserved;
-	enum CXChildVisitResult(*invoke)(struct _CXChildVisitResult*, CXCursor,
+  void *isa;
+  int flags;
+  int reserved;
+  enum CXChildVisitResult(*invoke)(struct _CXChildVisitResult*, CXCursor,
                                          CXCursor);
 } *CXCursorVisitorBlock;
 
@@ -3598,7 +3638,7 @@ unsigned clang_visitChildrenWithBlock(CXCursor parent,
   return clang_visitChildren(parent, visitWithBlock, block);
 }
 
-static CXString getDeclSpelling(const Decl *D) {
+static CXString getDeclSpelling(const Decl *D, PrintingPolicy* declPolicy) { // HLSL Change: adds declPolicy param
   if (!D)
     return cxstring::createEmpty();
 
@@ -3630,12 +3670,34 @@ static CXString getDeclSpelling(const Decl *D) {
   
   SmallString<1024> S;
   llvm::raw_svector_ostream os(S);
-  ND->printName(os);
+  // HLSL Change Starts - forward declPolicy if available
+  if (declPolicy)
+  {
+    ND->print(os, *declPolicy);
+  }
+  else
+  {
+    ND->printName(os);
+  }
+  // HLSL Change Ends
   
   return cxstring::createDup(os.str());
 }
 
-CXString clang_getCursorSpelling(CXCursor C) {
+// HLSL Change Starts
+CXString clang_getCursorSpellingWithFormatting(CXCursor C, unsigned options) {
+  if (clang_isInvalid(C.kind)) {
+    return cxstring::createEmpty();
+  }
+  LangOptions LangOpts = (options & CXCursorFormatting_UseLanguageOptions) ?
+    getCursorContext(C).getLangOpts() : LangOptions();
+  PrintingPolicy P(LangOpts);
+  P.SuppressSpecifiers = (options & CXCursorFormatting_SuppressSpecifiers);
+  P.SuppressTagKeyword = (options & CXCursorFormatting_SuppressTagKeyword);
+  
+  // Apply printing policy if anything other than default is specified.
+  PrintingPolicy* declPolicy = (options == CXCursorFormatting_Default) ? nullptr : &P;
+// HLSL Change Ends
   if (clang_isTranslationUnit(C.kind))
     return clang_getTranslationUnitSpelling(getCursorTU(C));
 
@@ -3656,14 +3718,14 @@ CXString clang_getCursorSpelling(CXCursor C) {
     }
     case CXCursor_CXXBaseSpecifier: {
       const CXXBaseSpecifier *B = getCursorCXXBaseSpecifier(C);
-      return cxstring::createDup(B->getType().getAsString());
+      return cxstring::createDup(B->getType().getAsString(P));
     }
     case CXCursor_TypeRef: {
       const TypeDecl *Type = getCursorTypeRef(C).first;
       assert(Type && "Missing type decl");
 
       return cxstring::createDup(getCursorContext(C).getTypeDeclType(Type).
-                              getAsString());
+                              getAsString(P));
     }
     case CXCursor_TemplateRef: {
       const TemplateDecl *Template = getCursorTemplateRef(C).first;
@@ -3676,7 +3738,15 @@ CXString clang_getCursorSpelling(CXCursor C) {
       const NamedDecl *NS = getCursorNamespaceRef(C).first;
       assert(NS && "Missing namespace decl");
       
-      return cxstring::createDup(NS->getNameAsString());
+      // HLSL Change Starts
+      if (options & CXCursorFormatting_IncludeNamespaceKeyword) {
+        std::string s("namespace ");
+        s.append(NS->getNameAsString());
+        return cxstring::createDup(StringRef(s));
+      } else {
+        return cxstring::createDup(NS->getNameAsString());
+      }
+      // HLSL Change Ends
     }
 
     case CXCursor_MemberRef: {
@@ -3740,7 +3810,7 @@ CXString clang_getCursorSpelling(CXCursor C) {
 
     const Decl *D = getDeclFromExpr(getCursorExpr(C));
     if (D)
-      return getDeclSpelling(D);
+      return getDeclSpelling(D, declPolicy);
     return cxstring::createEmpty();
   }
 
@@ -3764,7 +3834,7 @@ CXString clang_getCursorSpelling(CXCursor C) {
     return cxstring::createDup(getCursorInclusionDirective(C)->getFileName());
       
   if (clang_isDeclaration(C.kind))
-    return getDeclSpelling(getCursorDecl(C));
+    return getDeclSpelling(getCursorDecl(C), declPolicy);
 
   if (C.kind == CXCursor_AnnotateAttr) {
     const AnnotateAttr *AA = cast<AnnotateAttr>(cxcursor::getCursorAttr(C));
@@ -3782,6 +3852,12 @@ CXString clang_getCursorSpelling(CXCursor C) {
 
   return cxstring::createEmpty();
 }
+
+// HLSL Change Starts
+CXString clang_getCursorSpelling(CXCursor C) {
+  return clang_getCursorSpellingWithFormatting(C, 0);
+}
+// HLSL Change Ends
 
 CXSourceRange clang_Cursor_getSpellingNameRange(CXCursor C,
                                                 unsigned pieceIndex,
@@ -4753,7 +4829,7 @@ CXSourceLocation clang_getCursorLocation(CXCursor C) {
   return cxloc::translateSourceLocation(getCursorContext(C), Loc);
 }
 
-} // end extern "C"
+// } // end extern "C"  // HLSL Change -Don't use c linkage.
 
 CXCursor cxcursor::getCursor(CXTranslationUnit TU, SourceLocation SLoc) {
   assert(TU);
@@ -4924,7 +5000,7 @@ static SourceRange getFullCursorExtent(CXCursor C, SourceManager &SrcMgr) {
   return getRawCursorExtent(C);
 }
 
-extern "C" {
+// extern "C" {      // HLSL Change -Don't use c linkage.
 
 CXSourceRange clang_getCursorExtent(CXCursor C) {
   SourceRange R = getRawCursorExtent(C);
@@ -5406,7 +5482,7 @@ void clang_executeOnThread(void (*fn)(void*), void *user_data,
   llvm::llvm_execute_on_thread(fn, user_data, stack_size);
 }
 
-} // end: extern "C"
+// } // end: extern "C"   // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // Token-based Operations.
@@ -5420,7 +5496,7 @@ void clang_executeOnThread(void (*fn)(void*), void *user_data,
  *   ptr_data: for identifiers and keywords, an IdentifierInfo*.
  *   otherwise unused.
  */
-extern "C" {
+// extern "C" {     // HLSL Change -Don't use c linkage.
 
 CXTokenKind clang_getTokenKind(CXToken CXTok) {
   return static_cast<CXTokenKind>(CXTok.int_data[0]);
@@ -5430,6 +5506,7 @@ CXString clang_getTokenSpelling(CXTranslationUnit TU, CXToken CXTok) {
   switch (clang_getTokenKind(CXTok)) {
   case CXToken_Identifier:
   case CXToken_Keyword:
+  case CXToken_BuiltInType: // HLSL Change
     // We know we have an IdentifierInfo*, so use that.
     return cxstring::createRef(static_cast<IdentifierInfo *>(CXTok.ptr_data)
                             ->getNameStart());
@@ -5496,6 +5573,43 @@ CXSourceRange clang_getTokenExtent(CXTranslationUnit TU, CXToken CXTok) {
                         SourceLocation::getFromRawEncoding(CXTok.int_data[1]));
 }
 
+// HLSL Change Starts
+static bool IsHLSLBuiltInType(IdentifierInfo* ii)
+{
+  // Checks, purely by name, whether the specified identifier is considered a built-in type.
+  clang::tok::TokenKind tokenKind = ii->getTokenID();
+
+  // Some of the built-in types are keywords.
+  if (tokenKind == clang::tok::kw_bool ||
+      tokenKind == clang::tok::kw_int ||
+      tokenKind == clang::tok::kw_float ||
+      tokenKind == clang::tok::kw_double ||
+      tokenKind == clang::tok::kw_min10float ||
+      tokenKind == clang::tok::kw_min12int) {
+    return true;
+  }
+
+  // Other built-in types are simple typedefs.
+  if (ii->getName().equals("uint") ||
+      ii->getName().equals("dword") ||
+      ii->getName().equals("half")) {
+    return true;
+  }
+
+  // Vectors and matrices can be parsed with internal lookup tables.
+  hlsl::HLSLScalarType scalarType;
+  int count;
+  if (hlsl::TryParseMatrixShorthand(ii->getNameStart(), ii->getLength(), &scalarType, &count, &count)) {
+    return true;
+  }
+  if (hlsl::TryParseVectorShorthand(ii->getNameStart(), ii->getLength(), &scalarType, &count)) {
+    return true;
+  }
+
+  return false;
+}
+// HLSL Change Ends
+
 static void getTokens(ASTUnit *CXXUnit, SourceRange Range,
                       SmallVectorImpl<CXToken> &CXTokens) {
   SourceManager &SourceMgr = CXXUnit->getSourceManager();
@@ -5550,6 +5664,11 @@ static void getTokens(ASTUnit *CXXUnit, SourceRange Range,
       if ((II->getObjCKeywordID() != tok::objc_not_keyword) && previousWasAt) {
         CXTok.int_data[0] = CXToken_Keyword;
       }
+      // HLSL Change Starts - Check for HLSL built-in types
+      else if (IsHLSLBuiltInType(II)) {
+        CXTok.int_data[0] = CXToken_BuiltInType;
+      }
+      // HLSL Change Ends
       else {
         CXTok.int_data[0] = Tok.is(tok::identifier)
           ? CXToken_Identifier
@@ -5610,7 +5729,7 @@ void clang_disposeTokens(CXTranslationUnit TU,
   free(Tokens);
 }
 
-} // end: extern "C"
+//} // end: extern "C"    // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // Token annotation APIs.
@@ -6295,7 +6414,7 @@ static void clang_annotateTokensImpl(void *UserData) {
   }
 }
 
-extern "C" {
+// extern "C" {     // HLSL Change -Don't use c linkage.
 
 void clang_annotateTokens(CXTranslationUnit TU,
                           CXToken *Tokens, unsigned NumTokens,
@@ -6335,13 +6454,13 @@ void clang_annotateTokens(CXTranslationUnit TU,
   }
 }
 
-} // end: extern "C"
+// } // end: extern "C"    // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // Operations for querying linkage of a cursor.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {   // HLSL Change -Don't use c linkage.
 CXLinkageKind clang_getCursorLinkage(CXCursor cursor) {
   if (!clang_isDeclaration(cursor.kind))
     return CXLinkage_Invalid;
@@ -6358,7 +6477,7 @@ CXLinkageKind clang_getCursorLinkage(CXCursor cursor) {
 
   return CXLinkage_Invalid;
 }
-} // end: extern "C"
+// } // end: extern "C"     // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // Operations for querying language of a cursor.
@@ -6414,7 +6533,7 @@ static CXLanguageKind getDeclLanguage(const Decl *D) {
   return CXLanguage_C;
 }
 
-extern "C" {
+// extern "C" {     // HLSL Change -Don't use c linkage.
 
 static CXAvailabilityKind getCursorAvailabilityForDecl(const Decl *D) {
   if (isa<FunctionDecl>(D) && cast<FunctionDecl>(D)->isDeleted())
@@ -6886,13 +7005,13 @@ CXFile clang_Module_getTopLevelHeader(CXTranslationUnit TU,
   return nullptr;
 }
 
-} // end: extern "C"
+// } // end: extern "C"    // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // C++ AST instrospection.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {     // HLSL Change -Don't use c linkage.
 unsigned clang_CXXMethod_isPureVirtual(CXCursor C) {
   if (!clang_isDeclaration(C.kind))
     return 0;
@@ -6932,13 +7051,13 @@ unsigned clang_CXXMethod_isVirtual(CXCursor C) {
       D ? dyn_cast_or_null<CXXMethodDecl>(D->getAsFunction()) : nullptr;
   return (Method && Method->isVirtual()) ? 1 : 0;
 }
-} // end: extern "C"
+// } // end: extern "C"    // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // Attribute introspection.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {             // HLSL Change -Don't use c linkage.
 CXType clang_getIBOutletCollectionType(CXCursor C) {
   if (C.kind != CXCursor_IBOutletCollectionAttr)
     return cxtype::MakeCXType(QualType(), cxcursor::getCursorTU(C));
@@ -6948,7 +7067,7 @@ CXType clang_getIBOutletCollectionType(CXCursor C) {
   
   return cxtype::MakeCXType(A->getInterface(), cxcursor::getCursorTU(C));  
 }
-} // end: extern "C"
+// } // end: extern "C"   // HLSL Change -Don't use c linkage.
 
 //===----------------------------------------------------------------------===//
 // Inspecting memory usage.
@@ -6963,7 +7082,7 @@ static inline void createCXTUResourceUsageEntry(MemUsageEntries &entries,
   entries.push_back(entry);
 }
 
-extern "C" {
+// extern "C" {        // HLSL Change -Don't use c linkage.
 
 const char *clang_getTUResourceUsageName(CXTUResourceUsageKind kind) {
   const char *str = "";
@@ -7158,7 +7277,7 @@ void clang_disposeSourceRangeList(CXSourceRangeList *ranges) {
   }
 }
 
-} // end extern "C"
+//} // end extern "C"  // HLSL Change -Don't use c linkage.
 
 void clang::PrintLibclangResourceUsage(CXTranslationUnit TU) {
   CXTUResourceUsage Usage = clang_getCXTUResourceUsage(TU);
@@ -7323,13 +7442,13 @@ cxindex::checkForMacroInMacroDefinition(const MacroInfo *MI, SourceLocation Loc,
   return checkForMacroInMacroDefinition(MI, Tok, TU);
 }
 
-extern "C" {
+// extern "C" {           // HLSL Change -Don't use c linkage.
 
 CXString clang_getClangVersion() {
   return cxstring::createDup(getClangFullVersion());
 }
 
-} // end: extern "C"
+// } // end: extern "C"   // HLSL Change -Don't use c linkage.
 
 Logger &cxindex::Logger::operator<<(CXTranslationUnit TU) {
   if (TU) {
@@ -7428,7 +7547,99 @@ cxindex::Logger::~Logger() {
   OS << Msg << '\n';
 
   if (Trace) {
-    llvm::sys::PrintStackTrace(OS);
+    // llvm::sys::PrintStackTrace(OS);  // HLSL Change - disable this
     OS << "--------------------------------------------------\n";
   }
 }
+
+// HLSL Change Starts
+unsigned clang_ms_countSkippedRanges(CXTranslationUnit TU, CXFile file)
+{
+  unsigned result = 0;
+
+  ASTUnit *astUnit = cxtu::getASTUnit(TU);
+  PreprocessingRecord *ppRec = astUnit->getPreprocessor().getPreprocessingRecord(); 
+  if (ppRec == nullptr) {
+    return 0;
+  }
+
+  ASTContext &Ctx = astUnit->getASTContext(); 
+  SourceManager &sm = Ctx.getSourceManager(); 
+  FileEntry *fileEntry = static_cast<FileEntry *>(file);
+  FileID wantedFileID = sm.translateFile(fileEntry);
+
+  const std::vector<SourceRange> &SkippedRanges = ppRec->getSkippedRanges(); 
+  for (std::vector<SourceRange>::const_iterator i = SkippedRanges.begin(), ei = SkippedRanges.end();  i != ei; ++i)
+  {
+    if (sm.getFileID(i->getBegin()) == wantedFileID || sm.getFileID(i->getEnd()) == wantedFileID) 
+    {
+      ++result;
+    }
+  } 
+  
+  return result;
+}
+
+void clang_ms_getSkippedRanges(CXTranslationUnit TU, CXFile file, CXSourceRange* ranges, unsigned len)
+{
+  if (len == 0) return;
+
+  assert(ranges != nullptr);
+
+  ASTUnit *astUnit = cxtu::getASTUnit(TU);
+  PreprocessingRecord *ppRec = astUnit->getPreprocessor().getPreprocessingRecord(); 
+  assert(ppRec != nullptr);
+  
+  ASTContext &Ctx = astUnit->getASTContext(); 
+  SourceManager &sm = Ctx.getSourceManager(); 
+  FileEntry *fileEntry = static_cast<FileEntry *>(file);
+  FileID wantedFileID = sm.translateFile(fileEntry);
+
+  const std::vector<SourceRange> &SkippedRanges = ppRec->getSkippedRanges(); 
+  for (std::vector<SourceRange>::const_iterator i = SkippedRanges.begin(), ei = SkippedRanges.end();  i != ei; ++i)
+  {
+    SourceLocation begin = i->getBegin();
+    SourceLocation end = i->getEnd();
+    if (sm.getFileID(begin) == wantedFileID || sm.getFileID(end) == wantedFileID)
+    {
+      // preprocessor token (if,else,endif), so it's adjusted to the end of that line (so the line 
+      // gets colorized). The end position given is at the end of the closing preprocessor token, so
+      // it's adjusted to the beginning of the line (so that line is also colorized).
+      unsigned beginOffset = sm.getFileOffset(begin);
+      unsigned endOffset = sm.getFileOffset(end);
+
+      // Adjust the end position to the beginning of its line (column 1).
+      unsigned endLine = sm.getLineNumber(wantedFileID, endOffset);
+      end = sm.translateLineCol(wantedFileID, endLine, 1);
+
+      // Adjust the start position to the end of its line by scanning the buffer.
+      unsigned beginLine = sm.getLineNumber(wantedFileID, beginOffset);
+      unsigned beginCol = sm.getColumnNumber(wantedFileID, beginOffset);
+      // Move beginCol forward until we see a '\n' or the end of the file.
+      const llvm::MemoryBuffer* memBuffer = sm.getBuffer(wantedFileID);
+      const char* buffer = memBuffer->getBufferStart() + (beginOffset + (beginCol-1));
+      const char* bufferEnd = memBuffer->getBufferEnd();
+      while (buffer < bufferEnd && *buffer != '\n')
+      {
+        ++buffer;
+        ++beginCol;
+      }
+      begin = sm.translateLineCol(wantedFileID, beginLine, beginCol);
+
+      // cxloc::translateSourceRange extends the end of a range, which typically points to the start
+      // of the last token, to the end of that last token for external consumption. However that 
+      // behavior does not apply in this line-based case, so construct the range directly.
+      CXSourceRange Result = {
+          { &sm, &astUnit->getASTContext().getLangOpts() },
+          begin.getRawEncoding(), end.getRawEncoding()
+      };
+      *ranges = Result;
+
+      --len, ranges++;
+      if (len == 0) return;
+    }
+  }
+  assert(len == 0);
+}
+
+// HLSL Change Ends

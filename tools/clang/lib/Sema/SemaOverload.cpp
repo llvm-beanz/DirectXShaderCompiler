@@ -1,15 +1,14 @@
 //===--- SemaOverload.cpp - C++ Overloading -------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file provides Sema routines for C++ overloading.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaOverload.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides Sema routines for C++ overloading.                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/Overload.h"
 #include "clang/AST/ASTContext.h"
@@ -28,6 +27,7 @@
 #include "clang/Sema/SemaInternal.h"
 #include "clang/Sema/Template.h"
 #include "clang/Sema/TemplateDeduction.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -106,7 +106,7 @@ CompareDerivedToBaseConversions(Sema &S,
 /// corresponding to the given implicit conversion kind.
 ImplicitConversionRank clang::GetConversionRank(ImplicitConversionKind Kind) {
   static const ImplicitConversionRank
-    Rank[(int)ICK_Num_Conversion_Kinds] = {
+    Rank[] = {        // HLSL Change (remove explicit size to verify alignment with enum)
     ICR_Exact_Match,
     ICR_Exact_Match,
     ICR_Exact_Match,
@@ -131,14 +131,25 @@ ImplicitConversionRank clang::GetConversionRank(ImplicitConversionKind Kind) {
     ICR_Conversion,
     ICR_Conversion,
     ICR_Writeback_Conversion
+    // HLSL Change Starts: missing from original
+    ,ICR_Conversion,
+    // HLSL Change: new entries
+    ICR_Conversion,
+    ICR_Conversion,
+    ICR_Conversion,
+    ICR_Conversion,
+    ICR_Conversion,
+    // HLSL Change Ends
   };
+  static_assert(_countof(Rank) == ICK_Num_Conversion_Kinds,
+      "Otherwise, GetConversionRank is out of sync with ImplicitConversionKind"); // HLSL Change
   return Rank[(int)Kind];
 }
 
 /// GetImplicitConversionName - Return the name of this kind of
 /// implicit conversion.
 static const char* GetImplicitConversionName(ImplicitConversionKind Kind) {
-  static const char* const Name[(int)ICK_Num_Conversion_Kinds] = {
+  static const char* const Name[] = {   // HLSL Change (remove explicit size to verify alignment with enum)
     "No conversion",
     "Lvalue-to-rvalue",
     "Array-to-pointer",
@@ -163,7 +174,18 @@ static const char* GetImplicitConversionName(ImplicitConversionKind Kind) {
     "Block Pointer conversion",
     "Transparent Union Conversion",
     "Writeback conversion"
+    // HLSL Change Starts
+    ,"Zero constant to event conversion",  // HLSL Change: missing value
+    // HLSL Change: new values
+    "HLSLVector/Matrix to scalar",
+    "HLSLVector/Matrix conversion",
+    "Flat assignment conversion",
+    "HLSLVector/Matrix splat",
+    "HLSLVector/Matrix truncation",
+    // HLSL Change Ends
   };
+  static_assert(_countof(Name) == ICK_Num_Conversion_Kinds,
+    "Otherwise, GetImplicitConversionName is out of sync with ImplicitConversionKind"); // HLSL Change
   return Name[Kind];
 }
 
@@ -194,6 +216,8 @@ ImplicitConversionRank StandardConversionSequence::getRank() const {
     Rank = GetConversionRank(First);
   if  (GetConversionRank(Second) > Rank)
     Rank = GetConversionRank(Second);
+  if  (GetConversionRank(ComponentConversion) > Rank) // HLSL Change
+    Rank = GetConversionRank(ComponentConversion);
   if  (GetConversionRank(Third) > Rank)
     Rank = GetConversionRank(Third);
   return Rank;
@@ -448,6 +472,16 @@ void StandardConversionSequence::dump() const {
     }
     PrintedSomething = true;
   }
+
+  // HLSL Change Starts
+  if (ComponentConversion != ICK_Identity) {
+    if (PrintedSomething) {
+      OS << " -> ";
+    }
+    OS << GetImplicitConversionName(ComponentConversion);
+    PrintedSomething = true;
+  }
+  // HLSL Change Ends
 
   if (Third != ICK_Identity) {
     if (PrintedSomething) {
@@ -1094,7 +1128,7 @@ TryUserDefinedConversion(Sema &S, Expr *From, QualType ToType,
                          bool AllowObjCConversionOnExplicit) {
   ImplicitConversionSequence ICS;
 
-  if (SuppressUserConversions) {
+  if (SuppressUserConversions || S.getLangOpts().HLSL) { // HLSL Change - no user conversions
     // We're not in the case above, so there is no conversion that
     // we can perform.
     ICS.setBad(BadConversionSequence::no_conversion, From, ToType);
@@ -1409,6 +1443,12 @@ static bool IsStandardConversion(Sema &S, Expr* From, QualType ToType,
   SCS.setFromType(FromType);
   SCS.CopyConstructor = nullptr;
 
+  // HLSL Change Begins
+  if (S.getLangOpts().HLSL) {
+    return hlsl::CanConvert(&S, SourceLocation(), From, ToType, /*explicitConversion=*/false, &SCS);
+  }
+  // HLSL Change Ends
+
   // There are no standard conversions for class types in C++, so
   // abort early. When overloading in C, however, we do permit
   if (FromType->isRecordType() || ToType->isRecordType()) {
@@ -1479,7 +1519,7 @@ static bool IsStandardConversion(Sema &S, Expr* From, QualType ToType,
   //   be converted to a prvalue.
   bool argIsLValue = From->isGLValue();
   if (argIsLValue &&
-      !FromType->isFunctionType() && !FromType->isArrayType() &&
+      !FromType->isFunctionType() && (!FromType->isArrayType() || S.getLangOpts().HLSL) && // HLSL Change - HLSL allows arrays
       S.Context.getCanonicalType(FromType) != S.Context.OverloadTy) {
     SCS.First = ICK_Lvalue_To_Rvalue;
 
@@ -1873,6 +1913,22 @@ bool Sema::IsFloatingPointPromotion(QualType FromType, QualType ToType) {
            FromBuiltin->getKind() == BuiltinType::Half &&
           ToBuiltin->getKind() == BuiltinType::Float)
         return true;
+
+      // HLSL Change Starts
+      if (getLangOpts().HLSL) {
+        if (FromBuiltin->getKind() == BuiltinType::LitFloat &&
+            (ToBuiltin->getKind() == BuiltinType::Min10Float ||
+             ToBuiltin->getKind() == BuiltinType::Float ||
+             ToBuiltin->getKind() == BuiltinType::Half ||
+             ToBuiltin->getKind() == BuiltinType::Double))
+          return true;
+        if (FromBuiltin->getKind() == BuiltinType::Min10Float &&
+            (ToBuiltin->getKind() == BuiltinType::Float ||
+             ToBuiltin->getKind() == BuiltinType::Half ||
+             ToBuiltin->getKind() == BuiltinType::Double))
+          return true;
+      }
+      // HLSL Change Ends
     }
 
   return false;
@@ -2563,12 +2619,15 @@ void Sema::HandleFunctionTypeMismatch(PartialDiagnostic &PDiag,
 bool Sema::FunctionParamTypesAreEqual(const FunctionProtoType *OldType,
                                       const FunctionProtoType *NewType,
                                       unsigned *ArgPos) {
+  int index = 0;
   for (FunctionProtoType::param_type_iterator O = OldType->param_type_begin(),
                                               N = NewType->param_type_begin(),
                                               E = OldType->param_type_end();
        O && (O != E); ++O, ++N) {
     if (!Context.hasSameType(O->getUnqualifiedType(),
-                             N->getUnqualifiedType())) {
+                             N->getUnqualifiedType())
+        || OldType->getParamMods()[index] != NewType->getParamMods()[index]) { // HLSL Change - check param mods
+      index++;
       if (ArgPos)
         *ArgPos = O - OldType->param_type_begin();
       return false;
@@ -3307,6 +3366,14 @@ CompareImplicitConversionSequences(Sema &S,
     return hasDeprecatedStringLiteralToCharPtrConversion(ICS1)
                ? ImplicitConversionSequence::Worse
                : ImplicitConversionSequence::Better;
+
+  // HLSL Change Starts
+  // This ranking happens in HLSL as part of diagnostics; otherwise the specific ranking is used.
+  if (S.getLangOpts().HLSL) {
+    if (!ICS1.isInitialized() || !ICS2.isInitialized())
+      return ImplicitConversionSequence::Indistinguishable;
+  }
+  // HLSL Change Ends
 
   if (ICS1.getKindRank() < ICS2.getKindRank())
     return ImplicitConversionSequence::Better;
@@ -4691,6 +4758,32 @@ TryCopyInitialization(Sema &S, Expr *From, QualType ToType,
     return TryListConversion(S, FromInitList, ToType, SuppressUserConversions,
                              InOverloadResolution,AllowObjCWritebackConversion);
 
+  // HLSL Change Starts
+  if (S.getLangOpts().HLSL) {
+    // Note that this is incorrect. Copy initialization isn't syntactically
+    // allowed in HLSL, but C++ uses it to perform matching for argments to
+    // parameters.
+    //
+    // The correct fix should go to implicit conversions, but because the type
+    // system isn't currently up to spec, it's easier to isolate the behavior by
+    // putting this only on this path.
+    const bool ListInitFalse = false;
+    const bool SuppressDiagTrue = true;
+    const Sema::CheckedConversionKind kind = Sema::CCK_ImplicitConversion;
+    ImplicitConversionSequence ICS;
+    ICS.setStandard();
+    unsigned msg;
+    CastKind castKind;
+    CXXCastPath castPath;
+    ExprResult E(From);
+    if (::hlsl::TryStaticCastForHLSL(
+            &S, E, ToType, kind, From->getSourceRange(), msg, castKind,
+            castPath, ListInitFalse, SuppressDiagTrue, &ICS.Standard)) {
+      return ICS;
+    }
+  }
+  // HLSL Change Ends
+
   if (ToType->isReferenceType())
     return TryReferenceInit(S, From, ToType,
                             /*FIXME:*/From->getLocStart(),
@@ -4768,13 +4861,18 @@ TryObjectArgumentInitialization(Sema &S, QualType FromType,
 
   // First check the qualifiers.
   QualType FromTypeCanon = S.Context.getCanonicalType(FromType);
-  if (ImplicitParamType.getCVRQualifiers()
-                                    != FromTypeCanon.getLocalCVRQualifiers() &&
-      !ImplicitParamType.isAtLeastAsQualifiedAs(FromTypeCanon)) {
-    ICS.setBad(BadConversionSequence::bad_qualifiers,
-               FromType, ImplicitParamType);
-    return ICS;
-  }
+  // HLSL Change Starts - for calls other than subscript overloads, disregard const
+  if (!S.getLangOpts().HLSL ||
+     (Method != nullptr && Method->getDeclName() == S.Context.DeclarationNames.getCXXOperatorName(OO_Subscript))) {
+  // HLSL Change Ends
+    if (ImplicitParamType.getCVRQualifiers()
+                                      != FromTypeCanon.getLocalCVRQualifiers() &&
+        !ImplicitParamType.isAtLeastAsQualifiedAs(FromTypeCanon)) {
+      ICS.setBad(BadConversionSequence::bad_qualifiers,
+                 FromType, ImplicitParamType);
+      return ICS;
+    }
+  } // HLSL Change - end branch
 
   // Check that we have either the same type or a derived type. It
   // affects the conversion rank.
@@ -4830,6 +4928,41 @@ TryObjectArgumentInitialization(Sema &S, QualType FromType,
     = (Method->getRefQualifier() == RQ_None);
   return ICS;
 }
+
+// HLSL Change Starts
+static void
+InitCallParamConversions(Sema &S, const FunctionProtoType *Proto,
+                         ParmVarDecl *Param, unsigned ArgIdx, Expr *Arg,
+                         bool SuppressUserConversions,
+                         bool InOverloadResolution, bool AllowExplicit,
+                         ImplicitConversionSequence &InConversion,
+                         ImplicitConversionSequence &OutConversion) {
+  hlsl::ParameterModifier paramMods = Proto->getParamMods()[ArgIdx];
+  QualType ParamType = Proto->getParamType(ArgIdx);
+  if (paramMods.isAnyIn()) {
+    InConversion =
+        TryCopyInitialization(S, Arg, ParamType, SuppressUserConversions,
+                              InOverloadResolution, false, AllowExplicit);
+  }
+  if (paramMods.isAnyOut()) {
+    // TryCopyInitialization takes an expression but there isn't one at this
+    // point - we're just trying to figure out whether the result value can be
+    // converted back into the argument.
+    if (Arg->getType().isConstant(S.getASTContext()) || !Arg->isLValue()) {
+      OutConversion.setBad(
+          BadConversionSequence::FailureKind::rvalue_ref_to_lvalue, ParamType,
+          Arg->getType());
+      return;
+    }
+    Expr *OutFrom = DeclRefExpr::Create(
+        S.getASTContext(), NestedNameSpecifierLoc(), SourceLocation(), Param,
+        true, Param->getLocation(), ParamType.getNonReferenceType(), VK_RValue, nullptr);
+    OutConversion = TryCopyInitialization(
+        S, OutFrom, Arg->getType(), SuppressUserConversions,
+        InOverloadResolution, false, AllowExplicit);
+  }
+}
+// HLSL Change Ends
 
 /// PerformObjectArgumentInitialization - Perform initialization of
 /// the implicit object parameter for the given Method with the given
@@ -4969,6 +5102,7 @@ static bool CheckConvertedConstantConversions(Sema &S,
   case ICK_TransparentUnionConversion:
   case ICK_Writeback_Conversion:
   case ICK_Zero_Event_Conversion:
+  case ICK_Flat_Conversion: // HLSL Change
     return false;
 
   case ICK_Lvalue_To_Rvalue:
@@ -5693,15 +5827,25 @@ Sema::AddOverloadCandidate(FunctionDecl *Function,
       // exist for each argument an implicit conversion sequence
       // (13.3.3.1) that converts that argument to the corresponding
       // parameter of F.
-      QualType ParamType = Proto->getParamType(ArgIdx);
-      Candidate.Conversions[ArgIdx]
-        = TryCopyInitialization(*this, Args[ArgIdx], ParamType,
-                                SuppressUserConversions,
-                                /*InOverloadResolution=*/true,
-                                /*AllowObjCWritebackConversion=*/
-                                  getLangOpts().ObjCAutoRefCount,
-                                AllowExplicit);
-      if (Candidate.Conversions[ArgIdx].isBad()) {
+      // HLSL Change Starts
+      if (getLangOpts().HLSL) {
+        InitCallParamConversions(
+            *this, Proto, Function->getParamDecl(ArgIdx), ArgIdx, Args[ArgIdx],
+            SuppressUserConversions, true, AllowExplicit,
+            Candidate.Conversions[ArgIdx], Candidate.OutConversions[ArgIdx]);
+      } else {
+        QualType ParamType = Proto->getParamType(ArgIdx);
+        Candidate.Conversions[ArgIdx]
+          = TryCopyInitialization(*this, Args[ArgIdx], ParamType,
+                                  SuppressUserConversions,
+                                  /*InOverloadResolution=*/true,
+                                  /*AllowObjCWritebackConversion=*/
+                                    getLangOpts().ObjCAutoRefCount,
+                                  AllowExplicit);
+      }
+      // HLSL Change Ends
+      if (Candidate.Conversions[ArgIdx].isInitialized() && Candidate.Conversions[ArgIdx].isBad()
+          || Candidate.OutConversions[ArgIdx].isInitialized() && Candidate.OutConversions[ArgIdx].isBad()) { // HLSL Change - add out conversion, check initialized
         Candidate.Viable = false;
         Candidate.FailureKind = ovl_fail_bad_conversion;
         return;
@@ -6055,12 +6199,22 @@ Sema::AddMethodCandidate(CXXMethodDecl *Method, DeclAccessPair FoundDecl,
       // (13.3.3.1) that converts that argument to the corresponding
       // parameter of F.
       QualType ParamType = Proto->getParamType(ArgIdx);
+
+      // HLSL Change Starts
+      if (getLangOpts().HLSL && Method->getDeclName() == Context.DeclarationNames.getCXXOperatorName(OO_Subscript)) {
+        Candidate.Conversions[ArgIdx + 1] = hlsl::TrySubscriptIndexInitialization(
+          this, Args[ArgIdx], ParamType);
+        goto EvaluateCandidate;
+      }
+      // HLSL Change Ends
+
       Candidate.Conversions[ArgIdx + 1]
         = TryCopyInitialization(*this, Args[ArgIdx], ParamType,
                                 SuppressUserConversions,
                                 /*InOverloadResolution=*/true,
                                 /*AllowObjCWritebackConversion=*/
                                   getLangOpts().ObjCAutoRefCount);
+      EvaluateCandidate:// HLSL Change - present alterantive to TryCopyInitialization
       if (Candidate.Conversions[ArgIdx + 1].isBad()) {
         Candidate.Viable = false;
         Candidate.FailureKind = ovl_fail_bad_conversion;
@@ -8497,6 +8651,17 @@ OverloadingResult
 OverloadCandidateSet::BestViableFunction(Sema &S, SourceLocation Loc,
                                          iterator &Best,
                                          bool UserDefinedConversion) {
+  // HLSL Change Starts
+  // Function calls should use HLSL-style overloading. operator[] overloads
+  // (used for const support) aren't supported by the defined rules, so
+  // use C++ overload resolution for those.
+  if (S.getLangOpts().HLSL && !empty() && begin()->Function != nullptr &&
+      (begin()->Function->getDeclName() !=
+            S.Context.DeclarationNames.getCXXOperatorName(OO_Subscript))) {
+    return ::hlsl::GetBestViableFunction(S, Loc, *this, Best);
+  }
+  // HLSL Change Ends
+
   // Find the best viable function.
   Best = end();
   for (iterator Cand = begin(); Cand != end(); ++Cand) {
@@ -8578,6 +8743,7 @@ OverloadCandidateKind ClassifyOverloadCandidate(Sema &S,
   }
 
   if (CXXMethodDecl *Meth = dyn_cast<CXXMethodDecl>(Fn)) {
+    if (S.getLangOpts().HLSL) return isTemplate ? oc_method_template : oc_method; // HLSL Change - all intrinsics are implicit, doesn't imply conversion
     // This actually gets spelled 'candidate function' for now, but
     // it doesn't hurt to split it out.
     if (!Meth->isImplicit())
@@ -8666,8 +8832,8 @@ void ImplicitConversionSequence::DiagnoseAmbiguousConversion(
 }
 
 static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
-                                  unsigned I) {
-  const ImplicitConversionSequence &Conv = Cand->Conversions[I];
+                                  unsigned I, const ImplicitConversionSequence &Conv, SourceLocation OpLoc) { // HLSL Change: add OpLoc and Conv
+  // const ImplicitConversionSequence &Conv = Cand->Conversions[I];
   assert(Conv.isBad());
   assert(Cand->Function && "for now, candidate must be a function");
   FunctionDecl *Fn = Cand->Function;
@@ -8690,6 +8856,10 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
   QualType FromTy = Conv.Bad.getFromType();
   QualType ToTy = Conv.Bad.getToType();
 
+  // HLSL Change: replace Fn->getLocation() in diagnostics with FnDiagLocation
+  // and avoid notes that try to point to built-in targets
+  SourceLocation FnDiagLocation = Fn->getLocation().isValid() ? Fn->getLocation() : OpLoc;
+
   if (FromTy == S.Context.OverloadTy) {
     assert(FromExpr && "overload set argument came from implicit argument?");
     Expr *E = FromExpr->IgnoreParens();
@@ -8697,7 +8867,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
       E = cast<UnaryOperator>(E)->getSubExpr()->IgnoreParens();
     DeclarationName Name = cast<OverloadExpr>(E)->getName();
 
-    S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_overload)
+    S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_overload) // HLSL Change - FnDiagLocation
       << (unsigned) FnKind << FnDesc
       << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
       << ToTy << Name << I+1;
@@ -8724,7 +8894,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
     Qualifiers ToQs = CToTy.getQualifiers();
 
     if (FromQs.getAddressSpace() != ToQs.getAddressSpace()) {
-      S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_addrspace)
+      S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_addrspace)
         << (unsigned) FnKind << FnDesc
         << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
         << FromTy
@@ -8735,7 +8905,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
     }
 
     if (FromQs.getObjCLifetime() != ToQs.getObjCLifetime()) {
-      S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_ownership)
+      S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_ownership)
         << (unsigned) FnKind << FnDesc
         << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
         << FromTy
@@ -8746,7 +8916,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
     }
 
     if (FromQs.getObjCGCAttr() != ToQs.getObjCGCAttr()) {
-      S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_gc)
+      S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_gc)
       << (unsigned) FnKind << FnDesc
       << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
       << FromTy
@@ -8760,12 +8930,12 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
     assert(CVR && "unexpected qualifiers mismatch");
 
     if (isObjectArgument) {
-      S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_cvr_this)
+      S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_cvr_this)
         << (unsigned) FnKind << FnDesc
         << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
         << FromTy << (CVR - 1);
     } else {
-      S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_cvr)
+      S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_cvr)
         << (unsigned) FnKind << FnDesc
         << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
         << FromTy << (CVR - 1) << I+1;
@@ -8777,7 +8947,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
   // Special diagnostic for failure to convert an initializer list, since
   // telling the user that it has type void is not useful.
   if (FromExpr && isa<InitListExpr>(FromExpr)) {
-    S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_list_argument)
+    S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_list_argument)
       << (unsigned) FnKind << FnDesc
       << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
       << FromTy << ToTy << (unsigned) isObjectArgument << I+1;
@@ -8792,7 +8962,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
   if (const PointerType *PTy = TempFromTy->getAs<PointerType>())
     TempFromTy = PTy->getPointeeType();
   if (TempFromTy->isIncompleteType()) {
-    S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_conv_incomplete)
+    S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_conv_incomplete)
       << (unsigned) FnKind << FnDesc
       << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
       << FromTy << ToTy << (unsigned) isObjectArgument << I+1;
@@ -8831,7 +9001,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
     } else if (ToTy->isLValueReferenceType() && !FromExpr->isLValue() &&
                ToTy.getNonReferenceType().getCanonicalType() ==
                FromTy.getNonReferenceType().getCanonicalType()) {
-      S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_lvalue)
+      S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_lvalue)
         << (unsigned) FnKind << FnDesc
         << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
         << (unsigned) isObjectArgument << I + 1;
@@ -8841,7 +9011,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
   }
 
   if (BaseToDerivedConversion) {
-    S.Diag(Fn->getLocation(),
+    S.Diag(FnDiagLocation,
            diag::note_ovl_candidate_bad_base_to_derived_conv)
       << (unsigned) FnKind << FnDesc
       << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
@@ -8856,7 +9026,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
       Qualifiers FromQs = CFromTy.getQualifiers();
       Qualifiers ToQs = CToTy.getQualifiers();
       if (FromQs.getObjCLifetime() != ToQs.getObjCLifetime()) {
-        S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_arc_conv)
+        S.Diag(FnDiagLocation, diag::note_ovl_candidate_bad_arc_conv)
         << (unsigned) FnKind << FnDesc
         << (FromExpr ? FromExpr->getSourceRange() : SourceRange())
         << FromTy << ToTy << (unsigned) isObjectArgument << I+1;
@@ -8876,7 +9046,7 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
   for (std::vector<FixItHint>::iterator HI = Cand->Fix.Hints.begin(),
        HE = Cand->Fix.Hints.end(); HI != HE; ++HI)
     FDiag << *HI;
-  S.Diag(Fn->getLocation(), FDiag);
+  S.Diag(FnDiagLocation, FDiag);
 
   MaybeEmitInheritedConstructorNote(S, Fn);
 }
@@ -8912,7 +9082,7 @@ static bool CheckArityMismatch(Sema &S, OverloadCandidate *Cand,
 }
 
 /// General arity mismatch diagnosis over a candidate in a candidate set.
-static void DiagnoseArityMismatch(Sema &S, Decl *D, unsigned NumFormalArgs) {
+static void DiagnoseArityMismatch(Sema &S, Decl *D, unsigned NumFormalArgs, SourceLocation OpLoc) { // HLSL Change - add OpLoc
   assert(isa<FunctionDecl>(D) &&
       "The templated declaration should at least be a function"
       " when diagnosing bad template argument deduction due to too many"
@@ -8943,23 +9113,26 @@ static void DiagnoseArityMismatch(Sema &S, Decl *D, unsigned NumFormalArgs) {
 
   std::string Description;
   OverloadCandidateKind FnKind = ClassifyOverloadCandidate(S, Fn, Description);
-
+  // HLSL Change Starts - fallback for built-ins
+  SourceLocation DiagLoc = Fn->getLocation();
+  if (DiagLoc.isInvalid()) DiagLoc = OpLoc;
   if (modeCount == 1 && Fn->getParamDecl(0)->getDeclName())
-    S.Diag(Fn->getLocation(), diag::note_ovl_candidate_arity_one)
+    S.Diag(DiagLoc, diag::note_ovl_candidate_arity_one)
       << (unsigned) FnKind << (Fn->getDescribedFunctionTemplate() != nullptr)
       << mode << Fn->getParamDecl(0) << NumFormalArgs;
   else
-    S.Diag(Fn->getLocation(), diag::note_ovl_candidate_arity)
+    S.Diag(DiagLoc, diag::note_ovl_candidate_arity)
       << (unsigned) FnKind << (Fn->getDescribedFunctionTemplate() != nullptr)
       << mode << modeCount << NumFormalArgs;
+  // HLSL Change Ends
   MaybeEmitInheritedConstructorNote(S, Fn);
 }
 
 /// Arity mismatch diagnosis specific to a function overload candidate.
 static void DiagnoseArityMismatch(Sema &S, OverloadCandidate *Cand,
-                                  unsigned NumFormalArgs) {
+                                  unsigned NumFormalArgs, SourceLocation OpLoc) { // HLSL Change - add OpLoc
   if (!CheckArityMismatch(S, Cand, NumFormalArgs))
-    DiagnoseArityMismatch(S, Cand->Function, NumFormalArgs);
+    DiagnoseArityMismatch(S, Cand->Function, NumFormalArgs, OpLoc);
 }
 
 static TemplateDecl *getDescribedTemplate(Decl *Templated) {
@@ -8975,7 +9148,7 @@ static TemplateDecl *getDescribedTemplate(Decl *Templated) {
 /// Diagnose a failed template-argument deduction.
 static void DiagnoseBadDeduction(Sema &S, Decl *Templated,
                                  DeductionFailureInfo &DeductionFailure,
-                                 unsigned NumArgs) {
+                                 unsigned NumArgs, SourceLocation OpLoc) { // HLSL Change - add OpLoc
   TemplateParameter Param = DeductionFailure.getTemplateParameter();
   NamedDecl *ParamD;
   (ParamD = Param.dyn_cast<TemplateTypeParmDecl*>()) ||
@@ -9062,7 +9235,7 @@ static void DiagnoseBadDeduction(Sema &S, Decl *Templated,
 
   case Sema::TDK_TooManyArguments:
   case Sema::TDK_TooFewArguments:
-    DiagnoseArityMismatch(S, Templated, NumArgs);
+    DiagnoseArityMismatch(S, Templated, NumArgs, OpLoc);
     return;
 
   case Sema::TDK_InstantiationDepth:
@@ -9143,6 +9316,13 @@ static void DiagnoseBadDeduction(Sema &S, Decl *Templated,
         }
       }
     }
+    // HLSL Change Starts
+    // The implementation for template argument deducation does not yet provide
+    // FirstArg and SecondArg information for failure cases; ellide the note in
+    // this case.
+    if (FirstTA.isNull() || SecondTA.isNull()) return;
+    // HLSL Change Ends
+
     // FIXME: For generic lambda parameters, check if the function is a lambda
     // call operator, and if so, emit a prettier and more informative 
     // diagnostic that mentions 'auto' and lambda in addition to 
@@ -9163,14 +9343,14 @@ static void DiagnoseBadDeduction(Sema &S, Decl *Templated,
 
 /// Diagnose a failed template-argument deduction, for function calls.
 static void DiagnoseBadDeduction(Sema &S, OverloadCandidate *Cand,
-                                 unsigned NumArgs) {
+                                 unsigned NumArgs, SourceLocation OpLoc) {  // HLSL Change - add OpLoc
   unsigned TDK = Cand->DeductionFailure.Result;
   if (TDK == Sema::TDK_TooFewArguments || TDK == Sema::TDK_TooManyArguments) {
     if (CheckArityMismatch(S, Cand, NumArgs))
       return;
   }
   DiagnoseBadDeduction(S, Cand->Function, // pattern
-                       Cand->DeductionFailure, NumArgs);
+                       Cand->DeductionFailure, NumArgs, OpLoc); // HLSL Change - add OpLoc
 }
 
 /// CUDA: diagnose an invalid call across targets.
@@ -9251,7 +9431,7 @@ static void DiagnoseFailedEnableIfAttr(Sema &S, OverloadCandidate *Cand) {
 /// more richly for those diagnostic clients that cared, but we'd
 /// still have to be just as careful with the default diagnostics.
 static void NoteFunctionCandidate(Sema &S, OverloadCandidate *Cand,
-                                  unsigned NumArgs) {
+                                  unsigned NumArgs, SourceLocation OpLoc) { // HLSL Change: add OpLoc
   FunctionDecl *Fn = Cand->Function;
 
   // Note deleted candidates, but only if they're viable.
@@ -9276,10 +9456,10 @@ static void NoteFunctionCandidate(Sema &S, OverloadCandidate *Cand,
   switch (Cand->FailureKind) {
   case ovl_fail_too_many_arguments:
   case ovl_fail_too_few_arguments:
-    return DiagnoseArityMismatch(S, Cand, NumArgs);
+    return DiagnoseArityMismatch(S, Cand, NumArgs, OpLoc); // HLSL Change - add OpLoc
 
   case ovl_fail_bad_deduction:
-    return DiagnoseBadDeduction(S, Cand, NumArgs);
+    return DiagnoseBadDeduction(S, Cand, NumArgs, OpLoc); // HLSL Change - add OpLoc
 
   case ovl_fail_illegal_constructor: {
     S.Diag(Fn->getLocation(), diag::note_ovl_candidate_illegal_constructor)
@@ -9296,8 +9476,10 @@ static void NoteFunctionCandidate(Sema &S, OverloadCandidate *Cand,
   case ovl_fail_bad_conversion: {
     unsigned I = (Cand->IgnoreObjectArgument ? 1 : 0);
     for (unsigned N = Cand->NumConversions; I != N; ++I)
-      if (Cand->Conversions[I].isBad())
-        return DiagnoseBadConversion(S, Cand, I);
+      if (Cand->Conversions[I].isInitialized() && Cand->Conversions[I].isBad()) // HLSL Change: check in and out, check out conversions
+        return DiagnoseBadConversion(S, Cand, I, Cand->Conversions[I], OpLoc); // HLSL Change: add OpLoc
+    if (Cand->OutConversions[I].isInitialized() && Cand->OutConversions[I].isBad()) // HLSL Change: check in and out, check out conversions
+      return DiagnoseBadConversion(S, Cand, I, Cand->OutConversions[I], OpLoc); // HLSL Change: add OpLoc
 
     // FIXME: this currently happens when we're called from SemaInit
     // when user-conversion overload fails.  Figure out how to handle
@@ -9561,10 +9743,17 @@ static void CompleteNonViableCandidate(Sema &S, OverloadCandidate *Cand,
   while (true) {
     assert(ConvIdx != ConvCount && "no bad conversion in candidate");
     ConvIdx++;
-    if (Cand->Conversions[ConvIdx - 1].isBad()) {
+    if (Cand->Conversions[ConvIdx - 1].isInitialized() && Cand->Conversions[ConvIdx - 1].isBad()) { // HLSL Change - check defined
       Unfixable = !Cand->TryToFixBadConversion(ConvIdx - 1, S);
       break;
     }
+    // HLSL Change Starts - check out conversions
+    if (Cand->OutConversions[ConvIdx - 1].isInitialized() && Cand->OutConversions[ConvIdx - 1].isBad()) { // HLSL Change - check defined
+      // Unfixable = !Cand->TryToFixBadConversion(ConvIdx - 1, S); - consider suggesting a fix
+      Unfixable = true;
+      break;
+    }
+    // HLSL Change End
   }
 
   if (ConvIdx == ConvCount)
@@ -9595,7 +9784,7 @@ static void CompleteNonViableCandidate(Sema &S, OverloadCandidate *Cand,
   } else {
     // Builtin binary operator with a bad first conversion.
     assert(ConvCount <= 3);
-    for (; ConvIdx != ConvCount; ++ConvIdx)
+    for (; ConvIdx != ConvCount && ConvIdx < 3; ++ConvIdx) // HLSL Change: explicit about ConvIdx < 3
       Cand->Conversions[ConvIdx]
         = TryCopyInitialization(S, Args[ConvIdx],
                                 Cand->BuiltinTypes.ParamTypes[ConvIdx],
@@ -9668,7 +9857,7 @@ void OverloadCandidateSet::NoteCandidates(Sema &S,
     ++CandsShown;
 
     if (Cand->Function)
-      NoteFunctionCandidate(S, Cand, Args.size());
+      NoteFunctionCandidate(S, Cand, Args.size(), OpLoc); // HLSL Change: add OpLoc
     else if (Cand->IsSurrogate)
       NoteSurrogateCandidate(S, Cand);
     else {
@@ -9738,7 +9927,7 @@ struct CompareTemplateSpecCandidatesForDisplay {
 /// deductions.
 void TemplateSpecCandidate::NoteDeductionFailure(Sema &S) {
   DiagnoseBadDeduction(S, Specialization, // pattern
-                       DeductionFailure, /*NumArgs=*/0);
+                       DeductionFailure, /*NumArgs=*/0, SourceLocation()); // HLSL Change - add OpLoc
 }
 
 void TemplateSpecCandidateSet::destroyCandidates() {
@@ -10446,6 +10635,12 @@ void Sema::AddOverloadedCallCandidates(UnresolvedLookupExpr *ULE,
     }
   }
 #endif
+
+  // HLSL Change - allow ExternalSource the ability to add the overloads for a call.
+  if (ExternalSource &&
+    ExternalSource->AddOverloadedCallCandidates(ULE, Args, CandidateSet, PartialOverloading)) {
+    return;
+  }
 
   // It would be nice to avoid this copy.
   TemplateArgumentListInfo TABuffer;
@@ -11683,7 +11878,7 @@ Sema::BuildCallToMemberFunction(Scope *S, Expr *MemExprE,
       Diag(UnresExpr->getMemberLoc(),
            diag::err_ovl_no_viable_member_function_in_call)
         << DeclName << MemExprE->getSourceRange();
-      CandidateSet.NoteCandidates(*this, OCD_AllCandidates, Args);
+      CandidateSet.NoteCandidates(*this, OCD_AllCandidates, Args, StringRef(), UnresExpr->getMemberLoc()); // HLSL Change - add member loc
       // FIXME: Leaking incoming expressions!
       return ExprError();
 

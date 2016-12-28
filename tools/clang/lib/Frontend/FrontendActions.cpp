@@ -1,11 +1,12 @@
 //===--- FrontendActions.cpp ----------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FrontendActions.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/AST/ASTConsumer.h"
@@ -55,7 +56,8 @@ ASTPrintAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
 
 std::unique_ptr<ASTConsumer>
 ASTDumpAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
-  return CreateASTDumper(CI.getFrontendOpts().ASTDumpFilter,
+  return CreateASTDumper(CI.getOutStream(), // HLSL Change - explicit out stream
+                         CI.getFrontendOpts().ASTDumpFilter,
                          CI.getFrontendOpts().ASTDumpDecls,
                          CI.getFrontendOpts().ASTDumpLookups);
 }
@@ -75,6 +77,8 @@ DeclContextPrintAction::CreateASTConsumer(CompilerInstance &CI,
                                           StringRef InFile) {
   return CreateDeclContextPrinter();
 }
+
+#if 0 // HLSL Change Starts - no support for modules or PCH
 
 std::unique_ptr<ASTConsumer>
 GeneratePCHAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
@@ -394,6 +398,8 @@ raw_pwrite_stream *GenerateModuleAction::ComputeASTConsumerArguments(
   return OS;
 }
 
+#endif // HLSL Change Ends - no support for modules or PCH
+
 std::unique_ptr<ASTConsumer>
 SyntaxOnlyAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
   return llvm::make_unique<ASTConsumer>();
@@ -409,6 +415,8 @@ std::unique_ptr<ASTConsumer>
 VerifyPCHAction::CreateASTConsumer(CompilerInstance &CI, StringRef InFile) {
   return llvm::make_unique<ASTConsumer>();
 }
+
+#if 0 // HLSL Change Starts - no support for modules or PCH
 
 void VerifyPCHAction::ExecuteAction() {
   CompilerInstance &CI = getCompilerInstance();
@@ -469,7 +477,7 @@ namespace {
       Out.indent(4) << Description << ": " << LangOpts.Name << "\n";
 #define BENIGN_LANGOPT(Name, Bits, Default, Description)
 #define BENIGN_ENUM_LANGOPT(Name, Type, Bits, Default, Description)
-#include "clang/Basic/LangOptions.def"
+#include "clang/Basic/LangOptions.fixed.def"  // HLSL Change
 
       if (!LangOpts.ModuleFeatures.empty()) {
         Out.indent(4) << "Module features:\n";
@@ -581,6 +589,8 @@ void DumpModuleInfoAction::ExecuteAction() {
       getCompilerInstance().getPCHContainerReader(), Listener);
 }
 
+#endif // HLSL Change Ends - no support for modules or PCH
+
 //===----------------------------------------------------------------------===//
 // Preprocessor Actions
 //===----------------------------------------------------------------------===//
@@ -667,7 +677,7 @@ void PrintPreprocessedAction::ExecuteAction() {
     // file.  This is mostly a sanity check in case the file has no 
     // newlines whatsoever.
     if (end - cur > 256) end = cur + 256;
-	  
+
     while (next < end) {
       if (*cur == 0x0D) {  // CR
         if (*next == 0x0A)  // CRLF

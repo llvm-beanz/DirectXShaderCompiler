@@ -1,11 +1,12 @@
 //===--- CompilerInstance.cpp ---------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CompilerInstance.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/AST/ASTConsumer.h"
@@ -54,10 +55,14 @@ using namespace clang;
 CompilerInstance::CompilerInstance(
     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
     bool BuildingModule)
+#if 1 // HLSL Change Starts - no support for modules
+    : Invocation(new CompilerInvocation()), ThePCHContainerOperations(PCHContainerOps) {}
+#else
     : ModuleLoader(BuildingModule), Invocation(new CompilerInvocation()),
       ModuleManager(nullptr), ThePCHContainerOperations(PCHContainerOps),
       BuildGlobalModuleIndex(false), HaveFullGlobalModuleIndex(false),
       ModuleBuildFailed(false) {}
+#endif // HLSL Change Ends - no support for modules
 
 CompilerInstance::~CompilerInstance() {
   assert(OutputFiles.empty() && "Still output files in flight?");
@@ -68,10 +73,14 @@ void CompilerInstance::setInvocation(CompilerInvocation *Value) {
 }
 
 bool CompilerInstance::shouldBuildGlobalModuleIndex() const {
+#if 1 // HLSL Change Starts - no support for modules
+  return false;
+#else
   return (BuildGlobalModuleIndex ||
           (ModuleManager && ModuleManager->isGlobalIndexUnavailable() &&
            getFrontendOpts().GenerateGlobalModuleIndex)) &&
          !ModuleBuildFailed;
+#endif // HLSL Change Ends - no support for modules
 }
 
 void CompilerInstance::setDiagnostics(DiagnosticsEngine *Value) {
@@ -114,6 +123,8 @@ std::unique_ptr<Sema> CompilerInstance::takeSema() {
   return std::move(TheSema);
 }
 
+#if 0 // HLSL Change Ends - no support for modules
+
 IntrusiveRefCntPtr<ASTReader> CompilerInstance::getModuleManager() const {
   return ModuleManager;
 }
@@ -130,6 +141,8 @@ void CompilerInstance::setModuleDepCollector(
     std::shared_ptr<ModuleDependencyCollector> Collector) {
   ModuleDepCollector = Collector;
 }
+
+#endif // HLSL Change Ends - no support for modules
 
 // Diagnostics
 static void SetUpDiagnosticLog(DiagnosticOptions *DiagOpts,
@@ -290,6 +303,8 @@ static void InitializeFileRemapping(DiagnosticsEngine &Diags,
 void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
   const PreprocessorOptions &PPOpts = getPreprocessorOpts();
 
+  if (HlslLangExtensions) HlslLangExtensions->SetupPreprocessorOptions(getPreprocessorOpts()); // HLSL Change
+
   // Create a PTH manager if we are using some form of a token cache.
   PTHManager *PTHMgr = nullptr;
   if (!PPOpts.TokenCache.empty())
@@ -331,8 +346,10 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
 
   PP->setPreprocessedOutput(getPreprocessorOutputOpts().ShowCPP);
 
+// HLSL Change Starts - no support for modules
   if (PP->getLangOpts().Modules)
     PP->getHeaderSearchInfo().setModuleCachePath(getSpecificModuleCachePath());
+// HLSL Change Ends - no support for modules
 
   // Handle generating dependencies, if requested.
   const DependencyOutputOptions &DepOpts = getDependencyOutputOpts();
@@ -346,11 +363,13 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
   for (auto &Listener : DependencyCollectors)
     Listener->attachToPreprocessor(*PP);
 
+#if 0 // HLSL Change Starts - no support for modules
   // If we don't have a collector, but we are collecting module dependencies,
   // then we're the top level compiler instance and need to create one.
   if (!ModuleDepCollector && !DepOpts.ModuleDependencyOutputDir.empty())
     ModuleDepCollector = std::make_shared<ModuleDependencyCollector>(
         DepOpts.ModuleDependencyOutputDir);
+#endif // HLSL Change Ends - no support for modules
 
   // Handle generating header include information, if requested.
   if (DepOpts.ShowHeaderIncludes)
@@ -372,12 +391,16 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
 std::string CompilerInstance::getSpecificModuleCachePath() {
   // Set up the module path, including the hash for the
   // module-creation options.
+#if 1 // HLSL Change Starts - no support for modules
+  return std::string();
+#else
   SmallString<256> SpecificModuleCache(
                            getHeaderSearchOpts().ModuleCachePath);
   if (!getHeaderSearchOpts().DisableModuleHash)
     llvm::sys::path::append(SpecificModuleCache,
                             getInvocation().getModuleHash());
   return SpecificModuleCache.str();
+#endif // HLSL Change Ends - no support for modules
 }
 
 // ASTContext
@@ -395,6 +418,7 @@ void CompilerInstance::createASTContext() {
 void CompilerInstance::createPCHExternalASTSource(
     StringRef Path, bool DisablePCHValidation, bool AllowPCHWithCompilerErrors,
     void *DeserializationListener, bool OwnDeserializationListener) {
+#if 0 // HLSL Change Starts - no support for PCH
   bool Preamble = getPreprocessorOpts().PrecompiledPreambleBytes.first != 0;
   ModuleManager = createPCHExternalASTSource(
       Path, getHeaderSearchOpts().Sysroot, DisablePCHValidation,
@@ -402,6 +426,7 @@ void CompilerInstance::createPCHExternalASTSource(
       getPCHContainerReader(), DeserializationListener,
       OwnDeserializationListener, Preamble,
       getFrontendOpts().UseGlobalModuleIndex);
+#endif // HLSL Change Ends - no support for PCH
 }
 
 IntrusiveRefCntPtr<ASTReader> CompilerInstance::createPCHExternalASTSource(
@@ -410,6 +435,7 @@ IntrusiveRefCntPtr<ASTReader> CompilerInstance::createPCHExternalASTSource(
     const PCHContainerReader &PCHContainerRdr,
     void *DeserializationListener, bool OwnDeserializationListener,
     bool Preamble, bool UseGlobalModuleIndex) {
+#if 0 // HLSL Change Starts - no support for PCH
   HeaderSearchOptions &HSOpts = PP.getHeaderSearchInfo().getHeaderSearchOpts();
 
   IntrusiveRefCntPtr<ASTReader> Reader(new ASTReader(
@@ -450,6 +476,7 @@ IntrusiveRefCntPtr<ASTReader> CompilerInstance::createPCHExternalASTSource(
   }
 
   Context.setExternalSource(nullptr);
+#endif // HLSL Change Starts - no support for PCH
   return nullptr;
 }
 
@@ -520,6 +547,7 @@ void CompilerInstance::createSema(TranslationUnitKind TUKind,
                                   CodeCompleteConsumer *CompletionConsumer) {
   TheSema.reset(new Sema(getPreprocessor(), getASTContext(), getASTConsumer(),
                          TUKind, CompletionConsumer));
+  if (HlslLangExtensions) HlslLangExtensions->SetupSema(getSema()); // HLSL Change
 }
 
 // Output Files
@@ -564,7 +592,7 @@ CompilerInstance::createDefaultOutputFile(bool Binary, StringRef InFile,
                                           StringRef Extension) {
   return createOutputFile(getFrontendOpts().OutputFile, Binary,
                           /*RemoveFileOnSignal=*/true, InFile, Extension,
-                          /*UseTemporary=*/true);
+                          /*UseTemporary=*/!WriteDefaultOutputDirectly); // HLSL Change
 }
 
 llvm::raw_null_ostream *CompilerInstance::createNullOutputFile() {
@@ -852,6 +880,8 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
 /// \brief Determine the appropriate source input kind based on language
 /// options.
 static InputKind getSourceInputKindFromOptions(const LangOptions &LangOpts) {
+  if (LangOpts.HLSL) // HLSL Change: HLSL specific input kind
+    return IK_HLSL;
   if (LangOpts.OpenCL)
     return IK_OpenCL;
   if (LangOpts.CUDA)
@@ -860,6 +890,17 @@ static InputKind getSourceInputKindFromOptions(const LangOptions &LangOpts) {
     return LangOpts.CPlusPlus? IK_ObjCXX : IK_ObjC;
   return LangOpts.CPlusPlus? IK_CXX : IK_C;
 }
+
+#if 1 // HLSL Change Starts - no support for modules
+
+bool CompilerInstance::lookupMissingImports(StringRef, SourceLocation) { return false; }
+GlobalModuleIndex *CompilerInstance::loadGlobalModuleIndex(SourceLocation) { return nullptr; }
+void CompilerInstance::makeModuleVisible(Module *, Module::NameVisibilityKind, SourceLocation) { }
+ModuleLoadResult CompilerInstance::loadModule(SourceLocation, ModuleIdPath, Module::NameVisibilityKind, bool) { return ModuleLoadResult(); }
+bool CompilerInstance::loadModuleFile(StringRef) { return false; }
+void CompilerInstance::createModuleManager() { }
+
+#else
 
 /// \brief Compile a module file for the given module, using the options 
 /// provided by the importing compiler instance. Returns true if the module
@@ -1685,9 +1726,9 @@ GlobalModuleIndex *CompilerInstance::loadGlobalModuleIndex(
       if (!Entry) {
         SmallVector<std::pair<IdentifierInfo *, SourceLocation>, 2> Path;
         Path.push_back(std::make_pair(
-				  getPreprocessor().getIdentifierInfo(TheModule->Name), TriggerLoc));
+                  getPreprocessor().getIdentifierInfo(TheModule->Name), TriggerLoc));
         std::reverse(Path.begin(), Path.end());
-		    // Load a module as hidden.  This also adds it to the global index.
+            // Load a module as hidden.  This also adds it to the global index.
         loadModule(TheModule->DefinitionLoc, Path,
                                              Module::Hidden, false);
         RecreateIndex = true;
@@ -1731,4 +1772,6 @@ CompilerInstance::lookupMissingImports(StringRef Name,
 
   return false;
 }
+#endif // HLSL Change Ends - no support for modules
+
 void CompilerInstance::resetAndLeakSema() { BuryPointer(takeSema()); }

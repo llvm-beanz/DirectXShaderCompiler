@@ -1,16 +1,15 @@
 //== TraversalChecker.cpp -------------------------------------- -*- C++ -*--=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// These checkers print various aspects of the ExprEngine's traversal of the CFG
-// as it builds the ExplodedGraph.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TraversalChecker.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// These checkers print various aspects of the ExprEngine's traversal of the CFG//
+// as it builds the ExplodedGraph.                                           //
+//                                                                           //
+
 #include "ClangSACheckers.h"
 #include "clang/AST/ParentMap.h"
 #include "clang/AST/StmtObjC.h"
@@ -19,7 +18,8 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "llvm/Support/raw_ostream.h"
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 using namespace ento;
 

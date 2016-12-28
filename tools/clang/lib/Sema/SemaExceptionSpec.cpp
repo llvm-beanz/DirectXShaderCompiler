@@ -1,15 +1,14 @@
 //===--- SemaExceptionSpec.cpp - C++ Exception Specifications ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file provides Sema routines for C++ exception specification testing.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaExceptionSpec.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides Sema routines for C++ exception specification testing. //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTMutationListener.h"
@@ -204,6 +203,11 @@ static bool hasImplicitExceptionSpec(FunctionDecl *Decl) {
 }
 
 bool Sema::CheckEquivalentExceptionSpec(FunctionDecl *Old, FunctionDecl *New) {
+  // HLSL Change Starts
+  // Rather than fixing for param modifiers, comment out - this is N/A for HLSL
+  return false;
+#if 0
+  // HLSL Change Ends
   OverloadedOperatorKind OO = New->getDeclName().getCXXOverloadedOperator();
   bool IsOperatorNew = OO == OO_New || OO == OO_Array_New;
   bool MissingExceptionSpecification = false;
@@ -342,6 +346,7 @@ bool Sema::CheckEquivalentExceptionSpec(FunctionDecl *Old, FunctionDecl *New) {
     Diag(Old->getLocation(), diag::note_previous_declaration);
 
   return false;
+#endif // HLSL Change
 }
 
 /// CheckEquivalentExceptionSpec - Check if the two types have equivalent
@@ -1052,6 +1057,8 @@ CanThrowResult Sema::canThrow(const Expr *E) {
   case Expr::DesignatedInitUpdateExprClass:
   case Expr::ExprWithCleanupsClass:
   case Expr::ExtVectorElementExprClass:
+  case Expr::ExtMatrixElementExprClass: // HLSL Change
+  case Expr::HLSLVectorElementExprClass: // HLSL Change
   case Expr::InitListExprClass:
   case Expr::MemberExprClass:
   case Expr::ObjCIsaExprClass:

@@ -1,16 +1,15 @@
 //===- LexicalScopes.cpp - Collecting lexical scope info -*- C++ -*--------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LexicalScopes.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements LexicalScopes analysis.                              //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements LexicalScopes analysis.
-//
-// This pass collects lexical scope information and maps machine instructions
-// to respective lexical scopes.
+// This pass collects lexical scope information and maps machine instructions//
+// to respective lexical scopes.                                             //
 //
 //===----------------------------------------------------------------------===//
 
@@ -100,7 +99,7 @@ public:
   }
 
   /// dominates - Return true if current scope dominates given lexical scope.
-  bool dominates(const LexicalScope *S) const {
+  bool dominates(_In_ const LexicalScope *S) const {
     if (S == this)
       return true;
     if (DFSIn < S->getDFSIn() && DFSOut > S->getDFSOut())
@@ -132,8 +131,8 @@ private:
   unsigned DFSIn, DFSOut;        // In & Out Depth use to determine
                                  // scope nesting.
 };
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// LexicalScopes -  This class provides interface to collect and use lexical
 /// scoping information from machine instruction.
 ///

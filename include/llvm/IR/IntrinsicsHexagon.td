@@ -1,19 +1,18 @@
 //===- IntrinsicsHexagon.td - Defines Hexagon intrinsics ---*- tablegen -*-===//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines all of the Hexagon-specific intrinsics.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IntrinsicsHexagon.td                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines all of the Hexagon-specific intrinsics.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+// Definitions for all Hexagon intrinsics.                                   //
+//                                                                           //
+// All Hexagon intrinsics start with "llvm.hexagon.".                        //
 
-//===----------------------------------------------------------------------===//
-// Definitions for all Hexagon intrinsics.
-//
-// All Hexagon intrinsics start with "llvm.hexagon.".
 let TargetPrefix = "hexagon" in {
   /// Hexagon_Intrinsic - Base class for all Hexagon intrinsics.
   class Hexagon_Intrinsic<string GCCIntSuffix, list<LLVMType> ret_types,

@@ -1,18 +1,19 @@
 //===--- Registry.h - Matcher registry -----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Registry.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Registry of all known matchers.
+/// \file                                                                    //
+/// \brief Registry of all known matchers.                                   //
 ///
-/// The registry provides a generic interface to construct any matcher by name.
+/// The registry provides a generic interface to construct any matcher by name.//
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_ASTMATCHERS_DYNAMIC_REGISTRY_H
 #define LLVM_CLANG_ASTMATCHERS_DYNAMIC_REGISTRY_H

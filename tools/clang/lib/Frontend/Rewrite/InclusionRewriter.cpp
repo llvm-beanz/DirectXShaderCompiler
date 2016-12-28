@@ -1,16 +1,15 @@
 //===--- InclusionRewriter.cpp - Rewrite includes into their expansions ---===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This code rewrites include invocations into their expansions.  This gives you
-// a file with all included files merged into it.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InclusionRewriter.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This code rewrites include invocations into their expansions.  This gives you//
+// a file with all included files merged into it.                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Basic/SourceManager.h"

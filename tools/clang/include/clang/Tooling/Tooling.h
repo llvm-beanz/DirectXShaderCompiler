@@ -1,31 +1,30 @@
 //===--- Tooling.h - Framework for standalone Clang tools -------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Tooling.h                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements functions to run clang tools standalone instead     //
+//  of running them as a plugin.                                             //
 //
-//                     The LLVM Compiler Infrastructure
+//  A ClangTool is initialized with a CompilationDatabase and a set of files //
+//  to run over. The tool will then run a user-specified FrontendAction over //
+//  all TUs in which the given files are compiled.                           //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+//  It is also possible to run a FrontendAction over a snippet of code by    //
+//  calling runToolOnCode, which is useful for unit testing.                 //
 //
-//===----------------------------------------------------------------------===//
+//  Applications that need more fine grained control over how to run         //
+//  multiple FrontendActions over code can use ToolInvocation.               //
 //
-//  This file implements functions to run clang tools standalone instead
-//  of running them as a plugin.
+//  Example tools:                                                           //
+//  - running clang -fsyntax-only over source code from an editor to get     //
+//    fast syntax checks                                                     //
+//  - running match/replace tools over C++ code                              //
 //
-//  A ClangTool is initialized with a CompilationDatabase and a set of files
-//  to run over. The tool will then run a user-specified FrontendAction over
-//  all TUs in which the given files are compiled.
-//
-//  It is also possible to run a FrontendAction over a snippet of code by
-//  calling runToolOnCode, which is useful for unit testing.
-//
-//  Applications that need more fine grained control over how to run
-//  multiple FrontendActions over code can use ToolInvocation.
-//
-//  Example tools:
-//  - running clang -fsyntax-only over source code from an editor to get
-//    fast syntax checks
-//  - running match/replace tools over C++ code
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_TOOLING_TOOLING_H
 #define LLVM_CLANG_TOOLING_TOOLING_H

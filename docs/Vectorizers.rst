@@ -5,6 +5,9 @@ Auto-Vectorization in LLVM
 .. contents::
    :local:
 
+NOTE: This document describes the Auto-Vectorization as used for the original
+LLVM project, not the DirectX Compiler.
+
 LLVM has two vectorizers: The :ref:`Loop Vectorizer <loop-vectorizer>`,
 which operates on Loops, and the :ref:`SLP Vectorizer
 <slp-vectorizer>`. These vectorizers
@@ -362,23 +365,6 @@ to be used simultaneously.
 
 The Loop Vectorizer uses a cost model to decide when it is profitable to unroll loops.
 The decision to unroll the loop depends on the register pressure and the generated code size. 
-
-Performance
------------
-
-This section shows the execution time of Clang on a simple benchmark:
-`gcc-loops <http://llvm.org/viewvc/llvm-project/test-suite/trunk/SingleSource/UnitTests/Vectorizer/>`_.
-This benchmarks is a collection of loops from the GCC autovectorization
-`page <http://gcc.gnu.org/projects/tree-ssa/vectorization.html>`_ by Dorit Nuzman.
-
-The chart below compares GCC-4.7, ICC-13, and Clang-SVN with and without loop vectorization at -O3, tuned for "corei7-avx", running on a Sandybridge iMac.
-The Y-axis shows the time in msec. Lower is better. The last column shows the geomean of all the kernels.
-
-.. image:: gcc-loops.png
-
-And Linpack-pc with the same configuration. Result is Mflops, higher is better.
-
-.. image:: linpack-pc.png
 
 .. _slp-vectorizer:
 

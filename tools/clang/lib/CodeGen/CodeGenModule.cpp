@@ -1,15 +1,14 @@
 //===--- CodeGenModule.cpp - Emit LLVM Code from ASTs for a Module --------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This coordinates the per-module state used while generating code.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeGenModule.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This coordinates the per-module state used while generating code.         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenModule.h"
 #include "CGCUDARuntime.h"
@@ -18,6 +17,7 @@
 #include "CGDebugInfo.h"
 #include "CGObjCRuntime.h"
 #include "CGOpenCLRuntime.h"
+#include "CGHLSLRuntime.h"  // HLSL Change
 #include "CGOpenMPRuntime.h"
 #include "CodeGenFunction.h"
 #include "CodeGenPGO.h"
@@ -52,6 +52,7 @@
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "dxc/HLSL/DxilConstants.h"    // HLSL Change
 
 using namespace clang;
 using namespace CodeGen;
@@ -86,7 +87,7 @@ CodeGenModule::CodeGenModule(ASTContext &C, const HeaderSearchOptions &HSO,
       VMContext(M.getContext()), TBAA(nullptr), TheTargetCodeGenInfo(nullptr),
       Types(*this), VTables(*this), ObjCRuntime(nullptr),
       OpenCLRuntime(nullptr), OpenMPRuntime(nullptr), CUDARuntime(nullptr),
-      DebugInfo(nullptr), ARCData(nullptr),
+      HLSLRuntime(nullptr), DebugInfo(nullptr), ARCData(nullptr),  // HLSL Change
       NoObjCARCExceptionsMetadata(nullptr), RRData(nullptr), PGOReader(nullptr),
       CFConstantStringClassRef(nullptr), ConstantStringClassRef(nullptr),
       NSConstantStringType(nullptr), NSConcreteGlobalBlock(nullptr),
@@ -123,6 +124,8 @@ CodeGenModule::CodeGenModule(ASTContext &C, const HeaderSearchOptions &HSO,
     createOpenMPRuntime();
   if (LangOpts.CUDA)
     createCUDARuntime();
+  if (LangOpts.HLSL)         // HLSL Change 
+    createHLSLRuntime();     // HLSL Change
 
   // Enable TBAA unless it's suppressed. ThreadSanitizer needs TBAA even at O0.
   if (LangOpts.Sanitize.has(SanitizerKind::Thread) ||
@@ -166,6 +169,7 @@ CodeGenModule::~CodeGenModule() {
   delete OpenCLRuntime;
   delete OpenMPRuntime;
   delete CUDARuntime;
+  delete HLSLRuntime;  // HLSL Change
   delete TheTargetCodeGenInfo;
   delete TBAA;
   delete DebugInfo;
@@ -174,6 +178,7 @@ CodeGenModule::~CodeGenModule() {
 }
 
 void CodeGenModule::createObjCRuntime() {
+#if 0 // HLSL Change - no ObjC support
   // This is just isGNUFamily(), but we want to force implementors of
   // new ABIs to decide how best to do this.
   switch (LangOpts.ObjCRuntime.getKind()) {
@@ -190,19 +195,36 @@ void CodeGenModule::createObjCRuntime() {
     return;
   }
   llvm_unreachable("bad runtime kind");
+#endif // HLSL Change - no ObjC support
 }
 
 void CodeGenModule::createOpenCLRuntime() {
+#if 0 // HLSL Change - no OpenCL support
   OpenCLRuntime = new CGOpenCLRuntime(*this);
+#endif // HLSL Change - no OpenCL support
 }
 
 void CodeGenModule::createOpenMPRuntime() {
+#if 0 // HLSL Change - no OpenMP support
   OpenMPRuntime = new CGOpenMPRuntime(*this);
+#endif // HLSL Change - no OpenMP support
 }
 
 void CodeGenModule::createCUDARuntime() {
+#if 0 // HLSL Change - no CUDA support
   CUDARuntime = CreateNVCUDARuntime(*this);
+#endif // HLSL Change - no CUDA support
 }
+
+// HLSL Change Starts
+void CodeGenModule::createHLSLRuntime() {
+  HLSLRuntime = CreateMSHLSLRuntime(*this);
+}
+
+void CodeGenModule::FinishCodeGen() {
+  HLSLRuntime->FinishCodeGen();
+}
+// HLSL Change Ends
 
 void CodeGenModule::addReplacement(StringRef Name, llvm::Constant *C) {
   Replacements[Name] = C;
@@ -399,6 +421,12 @@ void CodeGenModule::Release() {
     getModule().addModuleFlag(llvm::Module::Error, "min_enum_size", EnumWidth);
   }
 
+  // HLSL Change Starts
+  if (Context.getLangOpts().HLSL) {
+    FinishCodeGen();
+  }
+  // HLSL Change Ends
+
   if (uint32_t PLevel = Context.getLangOpts().PICLevel) {
     llvm::PICLevel::Level PL = llvm::PICLevel::Default;
     switch (PLevel) {
@@ -563,6 +591,12 @@ StringRef CodeGenModule::getMangledName(GlobalDecl GD) {
     return FoundStr;
 
   const auto *ND = cast<NamedDecl>(GD.getDecl());
+  // HLSL Change Starts
+  if (ND->getKind() == Decl::Function &&
+      ND->getNameAsString() == CodeGenOpts.HLSLEntryFunction) {
+    return CodeGenOpts.HLSLEntryFunction;
+  }
+  // HLSL Change Ends
   SmallString<256> Buffer;
   StringRef Str;
   if (getCXXABI().getMangleContext().shouldMangleDeclName(ND)) {
@@ -705,6 +739,10 @@ void CodeGenModule::SetLLVMFunctionAttributes(const Decl *D,
   ConstructAttributeList(Info, D, AttributeList, CallingConv, false);
   F->setAttributes(llvm::AttributeSet::get(getLLVMContext(), AttributeList));
   F->setCallingConv(static_cast<llvm::CallingConv::ID>(CallingConv));
+  // HLSL Change Begins
+  if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D))
+    getHLSLRuntime().AddHLSLFunctionInfo(F, FD);
+  // HLSL Change Ends
 }
 
 /// Determines whether the language options require us to model
@@ -1262,6 +1300,8 @@ bool CodeGenModule::MayBeEmittedEagerly(const ValueDecl *Global) {
       // Implicit template instantiations may change linkage if they are later
       // explicitly instantiated, so they should not be emitted eagerly.
       return false;
+// OACR error 6287
+#pragma prefast(disable: __WARNING_ZEROLOGICALANDLOSINGSIDEEFFECTS, "language options are constants, by design")
   // If OpenMP is enabled and threadprivates must be generated like TLS, delay
   // codegen for global variables, because they may be marked as threadprivate.
   if (LangOpts.OpenMP && LangOpts.OpenMPUseTLS &&
@@ -1747,6 +1787,11 @@ CodeGenModule::GetOrCreateLLVMGlobal(StringRef MangledName,
 
     // Make sure the result is of the correct type.
     if (Entry->getType()->getAddressSpace() != Ty->getAddressSpace())
+      // HLSL Change Begins
+      // TODO: do we put address space in type?
+      if (LangOpts.HLSL) return Entry;
+      else
+      // HLSL Change Ends
       return llvm::ConstantExpr::getAddrSpaceCast(Entry, Ty);
 
     return llvm::ConstantExpr::getBitCast(Entry, Ty);
@@ -1799,7 +1844,7 @@ CodeGenModule::GetOrCreateLLVMGlobal(StringRef MangledName,
       GV->setSection(".cp.rodata");
   }
 
-  if (AddrSpace != Ty->getAddressSpace())
+  if (AddrSpace != Ty->getAddressSpace() && !LangOpts.HLSL) // HLSL Change -TODO: do we put address space in type?
     return llvm::ConstantExpr::getAddrSpaceCast(GV, Ty);
 
   return GV;
@@ -1907,7 +1952,12 @@ unsigned CodeGenModule::GetGlobalVarAddressSpace(const VarDecl *D,
     else
       AddrSpace = getContext().getTargetAddressSpace(LangAS::cuda_device);
   }
-
+  // HLSL Change Begins
+  if (LangOpts.HLSL) {
+    if (D->hasAttr<HLSLGroupSharedAttr>())
+      AddrSpace = getContext().getTargetAddressSpace(hlsl::DXIL::kTGSMAddrSpace);
+  }
+  // HLSL Change Ends
   return AddrSpace;
 }
 
@@ -1986,6 +2036,12 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D) {
   const VarDecl *InitDecl;
   const Expr *InitExpr = D->getAnyInitializer(InitDecl);
 
+  // HLSL Change Begins.
+  if (D->getType()->isIncompleteArrayType() && getLangOpts().HLSL) {
+    getHLSLRuntime().UpdateHLSLIncompleteArrayType(const_cast<VarDecl&>(*D));
+  }
+  // HLSL Change Ends.
+
   if (!InitExpr) {
     // This is a tentative definition; tentative definitions are
     // implicitly initialized with { 0 }.
@@ -1996,6 +2052,23 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D) {
     // never attempt to emit a tentative definition if a real one
     // exists. A use may still exists, however, so we still may need
     // to do a RAUW.
+    // HLSL Change Starts
+    // Allow incomplete type.
+    if (getLangOpts().HLSL && ASTTy->isIncompleteType()) {
+      if (hlsl::IsIncompleteHLSLResourceArrayType(getContext(), ASTTy)) {
+        llvm::Type *Ty = getTypes().ConvertTypeForMem(D->getType());
+        llvm::Constant *Entry = GetAddrOfGlobalVar(D, Ty);
+        // Entry is now either a Function or GlobalVariable.
+        auto *GV = dyn_cast<llvm::GlobalVariable>(Entry);
+        // Emit global variable debug information.
+        if (CGDebugInfo *DI = getModuleDebugInfo())
+          if (getCodeGenOpts().getDebugInfo() >=
+              CodeGenOptions::LimitedDebugInfo)
+            DI->EmitGlobalVariable(GV, D);
+        return;
+      }
+    }
+    // HLSL Change Ends
     assert(!ASTTy->isIncompleteType() && "Unexpected incomplete type");
     Init = EmitNullConstant(D->getType());
   } else {
@@ -2010,6 +2083,18 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D) {
       if (getLangOpts().CPlusPlus) {
         Init = EmitNullConstant(T);
         NeedsGlobalCtor = true;
+        // HLSL Change Begins.
+        if (getLangOpts().HLSL && D->isExternallyVisible()) {
+          // For global constant with init, the init will be ignored.
+          // Warning here.
+          unsigned DiagID = Diags.getCustomDiagID(
+              DiagnosticsEngine::Warning,
+              "Initializer of external global will be ignored");
+          Diags.Report(D->getLocation(), DiagID);
+          // Don't create global ctor for it.
+          NeedsGlobalCtor = false;
+        }
+        // HLSL Change Ends.
       } else {
         ErrorUnsupported(D, "static initializer");
         Init = llvm::UndefValue::get(getTypes().ConvertType(T));
@@ -2020,6 +2105,16 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D) {
       // also don't need to register a destructor.
       if (getLangOpts().CPlusPlus && !NeedsGlobalDtor)
         DelayedCXXInitPosition.erase(D);
+      // HLSL Change Begins.
+      if (getLangOpts().HLSL && D->isExternallyVisible()) {
+        // For global constant with init, the init will be ignored.
+        Init = EmitNullConstant(D->getType());
+        unsigned DiagID = Diags.getCustomDiagID(
+            DiagnosticsEngine::Warning,
+            "Initializer of external global will be ignored");
+        Diags.Report(D->getLocation(), DiagID);
+      }
+      // HLSL Change Ends.
     }
   }
 
@@ -2124,6 +2219,11 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D) {
   // Emit the initializer function if necessary.
   if (NeedsGlobalCtor || NeedsGlobalDtor)
     EmitCXXGlobalVarDeclInitFunc(D, GV, NeedsGlobalCtor);
+
+  // HLSL Change Begin.
+  if (NeedsGlobalCtor)
+    GV->setInitializer(llvm::UndefValue::get(InitType));
+  // HLSL Change End.
 
   SanitizerMD->reportGlobalToASan(GV, *D, NeedsGlobalCtor);
 
@@ -2394,6 +2494,18 @@ void CodeGenModule::EmitGlobalFunctionDefinition(GlobalDecl GD,
 
   // Compute the function info and LLVM type.
   const CGFunctionInfo &FI = getTypes().arrangeGlobalDeclaration(GD);
+
+  // HLSL Change Begins.
+  // Out parameter is not ByVal.
+  auto I = const_cast<CGFunctionInfo&>(FI).arg_begin();
+  for (const ParmVarDecl *Param : D->params()) {
+    if (Param->isModifierOut() && I->info.isIndirect()) {
+      I->info.setIndirectByVal(false);
+    }
+    I++;
+  }
+  // HLSL Change Ends.
+
   llvm::FunctionType *Ty = getTypes().GetFunctionType(FI);
 
   // Get or create the prototype for the function.
@@ -3107,6 +3219,7 @@ llvm::Constant *CodeGenModule::GetAddrOfGlobalTemporary(
 /// properties for an implementation.
 void CodeGenModule::EmitObjCPropertyImplementations(const
                                                     ObjCImplementationDecl *D) {
+#if 0 // HLSL Change - no ObjC support
   for (const auto *PID : D->property_impls()) {
     // Dynamic is just for type-checking.
     if (PID->getPropertyImplementation() == ObjCPropertyImplDecl::Synthesize) {
@@ -3126,6 +3239,7 @@ void CodeGenModule::EmitObjCPropertyImplementations(const
                                  const_cast<ObjCImplementationDecl *>(D), PID);
     }
   }
+#endif 0 // HLSL Change - no ObjC support
 }
 
 static bool needsDestructMethod(ObjCImplementationDecl *impl) {
@@ -3154,6 +3268,7 @@ static bool AllTrivialInitializers(CodeGenModule &CGM,
 /// EmitObjCIvarInitializations - Emit information for ivar initialization
 /// for an implementation.
 void CodeGenModule::EmitObjCIvarInitializations(ObjCImplementationDecl *D) {
+#if 0 // HLSL Change - no ObjC support
   // We might need a .cxx_destruct even if we don't have any ivar initializers.
   if (needsDestructMethod(D)) {
     IdentifierInfo *II = &getContext().Idents.get(".cxx_destruct");
@@ -3192,6 +3307,7 @@ void CodeGenModule::EmitObjCIvarInitializations(ObjCImplementationDecl *D) {
   D->addInstanceMethod(CTORMethod);
   CodeGenFunction(*this).GenerateObjCCtorDtorMethod(D, CTORMethod, true);
   D->setHasNonZeroConstructors(true);
+#endif // HLSL Change - no ObjC support
 }
 
 /// EmitNamespace - Emit all declarations in a namespace.
@@ -3251,6 +3367,7 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
       return;
   case Decl::VarTemplateSpecialization:
     EmitGlobal(cast<VarDecl>(D));
+    getHLSLRuntime().addResource(D); // HLSL Change - add resource for global variables
     break;
 
   // Indirect fields from global anonymous structs and unions can be
@@ -3303,6 +3420,7 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
     break;
 
   // Objective-C Decls
+#if 0 // HLSL Change Starts - no ObjC support
 
   // Forward declarations, no (immediate) code generation.
   case Decl::ObjCInterface:
@@ -3344,11 +3462,12 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
   case Decl::ObjCCompatibleAlias:
     ObjCRuntime->RegisterAlias(cast<ObjCCompatibleAliasDecl>(D));
     break;
-
+#endif // HLSL Change Ends - no ObjC support
   case Decl::LinkageSpec:
     EmitLinkageSpec(cast<LinkageSpecDecl>(D));
     break;
 
+#if 0 // HLSL Change Starts - no asm, import or openmp support
   case Decl::FileScopeAsm: {
     // File-scope asm is ignored during device-side CUDA compilation.
     if (LangOpts.CUDA && LangOpts.CUDAIsDevice)
@@ -3377,7 +3496,7 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
   case Decl::OMPThreadPrivate:
     EmitOMPThreadPrivateDecl(cast<OMPThreadPrivateDecl>(D));
     break;
-
+#endif // HLSL Change Ends - no asm, import or openmp support
   case Decl::ClassTemplateSpecialization: {
     const auto *Spec = cast<ClassTemplateSpecializationDecl>(D);
     if (DebugInfo &&
@@ -3386,7 +3505,14 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
       DebugInfo->completeTemplateDefinition(*Spec);
     break;
   }
-
+  // HLSL Change Starts
+  case Decl::HLSLBuffer: {
+    // TODO: add resource to HLSLRuntime
+    HLSLBufferDecl *BD = cast<HLSLBufferDecl>(D);
+    getHLSLRuntime().addResource(BD);
+    break;
+  }
+  // HLSL Change Ends
   default:
     // Make sure we handled everything we should, every other kind is a
     // non-top-level decl.  FIXME: Would be nice to have an isTopLevelDeclKind
@@ -3578,6 +3704,21 @@ void CodeGenModule::EmitVersionIdentMetadata() {
 
   llvm::Metadata *IdentNode[] = {llvm::MDString::get(Ctx, Version)};
   IdentMetadata->addOperand(llvm::MDNode::get(Ctx, IdentNode));
+
+  // HLSL Change Starts
+  if (getCodeGenOpts().HLSLValidatorMajorVer != 0 ||
+      getCodeGenOpts().HLSLValidatorMinorVer != 0) {
+    llvm::NamedMDNode *VerMetadata =
+        TheModule.getOrInsertNamedMetadata("dx.valver");
+    llvm::Metadata *VerValues[] = {
+        llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
+            Ctx, llvm::APInt(32, getCodeGenOpts().HLSLValidatorMajorVer))),
+        llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
+            Ctx, llvm::APInt(32, getCodeGenOpts().HLSLValidatorMinorVer)))};
+    llvm::MDTuple *VerNode = llvm::MDTuple::get(Ctx, VerValues);
+    VerMetadata->addOperand(VerNode);
+  }
+  // HLSL Change Ends
 }
 
 void CodeGenModule::EmitTargetMetadata() {
@@ -3660,6 +3801,7 @@ llvm::Constant *CodeGenModule::GetAddrOfRTTIDescriptor(QualType Ty,
 }
 
 void CodeGenModule::EmitOMPThreadPrivateDecl(const OMPThreadPrivateDecl *D) {
+#if 0 // HLSL Change - no OpenMP support
   for (auto RefExpr : D->varlists()) {
     auto *VD = cast<VarDecl>(cast<DeclRefExpr>(RefExpr)->getDecl());
     bool PerformInit =
@@ -3670,6 +3812,7 @@ void CodeGenModule::EmitOMPThreadPrivateDecl(const OMPThreadPrivateDecl *D) {
             VD, GetAddrOfGlobalVar(VD), RefExpr->getLocStart(), PerformInit))
       CXXGlobalInits.push_back(InitFunction);
   }
+#endif
 }
 
 llvm::MDTuple *CodeGenModule::CreateVTableBitSetEntry(

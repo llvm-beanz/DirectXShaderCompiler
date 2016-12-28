@@ -1,16 +1,17 @@
 //===--- SemaExprCXX.cpp - Semantic Analysis for Expressions --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaExprCXX.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Implements semantic analysis for C++ expressions.
+/// \file                                                                    //
+/// \brief Implements semantic analysis for C++ expressions.                 //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "TreeTransform.h"
@@ -38,6 +39,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "clang/Sema/SemaHLSL.h"      // HLSL Change
 using namespace clang;
 using namespace sema;
 
@@ -968,6 +970,16 @@ ExprResult Sema::ActOnCXXThis(SourceLocation Loc) {
   if (ThisTy.isNull()) return Diag(Loc, diag::err_invalid_this_use);
 
   CheckCXXThisCapture(Loc);
+  // HLSL Change Starts - adjust this from T* to T&-like
+  if (getLangOpts().HLSL && ThisTy.getTypePtr()->isPointerType()) {
+    // Expressions cannot be of reference type - instead, they yield
+    // an lvalue on the underlying type.
+    CXXThisExpr* ResultExpr = new (Context)CXXThisExpr(
+      Loc, ThisTy.getTypePtr()->getPointeeType(), /*isImplicit=*/false);
+    ResultExpr->setValueKind(ExprValueKind::VK_LValue);
+    return ResultExpr;
+  }
+  // HLSL Change Ends
   return new (Context) CXXThisExpr(Loc, ThisTy, /*isImplicit=*/false);
 }
 
@@ -1057,7 +1069,10 @@ Sema::BuildCXXTypeConstructExpr(TypeSourceInfo *TInfo,
   InitializationSequence InitSeq(*this, Entity, Kind, Exprs);
   ExprResult Result = InitSeq.Perform(*this, Entity, Kind, Exprs);
 
-  if (Result.isInvalid() || !ListInitialization)
+  // HLSL Change: ListInitialization may be false here, but we may produce an expression
+  // of that type for vector constructors
+  bool HLSLException = getLangOpts().HLSL && !Result.isInvalid() && isa<InitListExpr>(Result.get());
+  if (Result.isInvalid() || (!ListInitialization && !HLSLException))
     return Result;
 
   Expr *Inner = Result.get();
@@ -1716,6 +1731,11 @@ bool Sema::FindAllocationFunctions(SourceLocation StartLoc, SourceRange Range,
                                    bool IsArray, MultiExprArg PlaceArgs,
                                    FunctionDecl *&OperatorNew,
                                    FunctionDecl *&OperatorDelete) {
+  // HLSL Change Starts Here
+  // No support for new and delete operators.
+  return false;
+#if 0
+  // HLSL Change Ends Here
   // --- Choosing an allocation function ---
   // C++ 5.3.4p8 - 14 & 18
   // 1) If UseGlobal is true, only look in the global scope. Else, also look
@@ -1929,6 +1949,7 @@ bool Sema::FindAllocationFunctions(SourceLocation StartLoc, SourceRange Range,
   }
 
   return false;
+#endif // HLSL Change
 }
 
 /// \brief Find an fitting overload for the allocation function
@@ -2134,7 +2155,11 @@ void Sema::DeclareGlobalAllocationFunction(DeclarationName Name,
                                            QualType Return,
                                            QualType Param1, QualType Param2,
                                            bool AddRestrictAttr) {
-  DeclContext *GlobalCtx = Context.getTranslationUnitDecl();
+  // HLSL Change Starts Here
+  // No support for new and delete operators.
+  llvm_unreachable("no support for new and delete in HLSL");
+#if 0
+  // HLSL Change Ends Here  DeclContext *GlobalCtx = Context.getTranslationUnitDecl();
   unsigned NumParams = Param2.isNull() ? 1 : 2;
 
   // Check if this function is already declared.
@@ -2217,6 +2242,7 @@ void Sema::DeclareGlobalAllocationFunction(DeclarationName Name,
 
   Context.getTranslationUnitDecl()->addDecl(Alloc);
   IdResolver.tryAddTopLevelDecl(Alloc, Name);
+#endif // HLSL Change
 }
 
 FunctionDecl *Sema::FindUsualDeallocationFunction(SourceLocation StartLoc,
@@ -3405,6 +3431,16 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
                              VK_RValue, /*BasePath=*/nullptr, CCK).get();
     break;
   }
+      
+  // HLSL Change Starts
+  case ICK_Flat_Conversion:
+  case ICK_HLSLVector_Splat:
+  case ICK_HLSLVector_Scalar:
+  case ICK_HLSLVector_Truncation:
+  case ICK_HLSLVector_Conversion:
+    From = hlsl::PerformHLSLConversion(this, From, ToType.getUnqualifiedType(), SCS, CCK).get();
+    break;
+  // HLSL Change Ends
       
   case ICK_TransparentUnionConversion: {
     ExprResult FromRes = From;
@@ -5572,6 +5608,15 @@ ExprResult Sema::ActOnStartCXXMemberReference(Scope *S, Expr *Base,
   Result = CheckPlaceholderExpr(Base);
   if (Result.isInvalid()) return ExprError();
   Base = Result.get();
+
+  // HLSL Change Starts
+  assert(OpKind == tok::arrow || OpKind == tok::period);
+  if (getLangOpts().HLSL && OpKind != tok::period) {
+    // continue processing as if it was a period accessor
+    Diag(OpLoc, diag::err_hlsl_unsupported_operator);
+    OpKind = tok::period;
+  }
+  // HLSL Change Ends
 
   QualType BaseType = Base->getType();
   MayBePseudoDestructor = false;

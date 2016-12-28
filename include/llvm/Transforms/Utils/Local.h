@@ -1,14 +1,13 @@
 //===-- Local.h - Functions to perform local transformations ----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This family of functions perform various local transformations to the
-// program.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Local.h                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This family of functions perform various local transformations to the     //
+// program.                                                                  //
 //
 //===----------------------------------------------------------------------===//
 
@@ -91,8 +90,8 @@ bool RecursivelyDeleteDeadPHINode(PHINode *PN,
 /// instructions in other blocks as well in this block.
 bool SimplifyInstructionsInBlock(BasicBlock *BB,
                                  const TargetLibraryInfo *TLI = nullptr);
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 //  Control Flow Graph Restructuring.
 //
 

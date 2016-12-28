@@ -1,18 +1,17 @@
 //===-- llvm/CodeGen/SelectionDAGNodes.h - SelectionDAG Nodes ---*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SelectionDAGNodes.h                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file declares the SDNode class and derived classes, which are used to//
+// represent the nodes and operations present in a SelectionDAG.  These nodes//
+// and operations are machine code level operations, with some similarities to//
+// the GCC RTL representation.                                               //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file declares the SDNode class and derived classes, which are used to
-// represent the nodes and operations present in a SelectionDAG.  These nodes
-// and operations are machine code level operations, with some similarities to
-// the GCC RTL representation.
-//
-// Clients should include the SelectionDAG.h file instead of this file directly.
+// Clients should include the SelectionDAG.h file instead of this file directly.//
 //
 //===----------------------------------------------------------------------===//
 
@@ -90,8 +89,8 @@ namespace ISD {
   /// and all operands of the specified node are ISD::UNDEF.
   bool allOperandsUndef(const SDNode *N);
 }  // end llvm:ISD namespace
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// Unlike LLVM values, Selection DAG nodes may return multiple
 /// values as the result of a computation.  Many nodes return multiple values,
 /// from loads (which define a token and a return value) to ADDC (which returns

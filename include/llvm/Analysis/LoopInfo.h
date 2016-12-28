@@ -1,29 +1,28 @@
 //===- llvm/Analysis/LoopInfo.h - Natural Loop Calculator -------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LoopInfo.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the LoopInfo class that is used to identify natural loops//
+// and determine the loop depth of various nodes of the CFG.  A natural loop //
+// has exactly one entry-point, which is called the header. Note that natural//
+// loops may actually be several loops that share the same header node.      //
 //
-//                     The LLVM Compiler Infrastructure
+// This analysis calculates the nesting structure of loops in a function.  For//
+// each natural loop identified, this analysis identifies natural loops      //
+// contained entirely within the loop and the basic blocks the make up the loop.//
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// It can calculate on the fly various bits of information, for example:     //
 //
-//===----------------------------------------------------------------------===//
-//
-// This file defines the LoopInfo class that is used to identify natural loops
-// and determine the loop depth of various nodes of the CFG.  A natural loop
-// has exactly one entry-point, which is called the header. Note that natural
-// loops may actually be several loops that share the same header node.
-//
-// This analysis calculates the nesting structure of loops in a function.  For
-// each natural loop identified, this analysis identifies natural loops
-// contained entirely within the loop and the basic blocks the make up the loop.
-//
-// It can calculate on the fly various bits of information, for example:
-//
-//  * whether there is a preheader for the loop
-//  * the number of back edges to the header
-//  * whether or not a particular block branches out of the loop
-//  * the successor blocks of the loop
-//  * the loop depth
-//  * etc...
+//  * whether there is a preheader for the loop                              //
+//  * the number of back edges to the header                                 //
+//  * whether or not a particular block branches out of the loop             //
+//  * the successor blocks of the loop                                       //
+//  * the loop depth                                                         //
+//  * etc...                                                                 //
 //
 //===----------------------------------------------------------------------===//
 
@@ -105,7 +104,10 @@ public:
   bool contains(const LoopT *L) const {
     if (L == this) return true;
     if (!L)        return false;
+#pragma warning(push)
+#pragma warning(suppress: 6011) // HLSL Change - suppress incorrect warning about null dereference
     return contains(L->getParentLoop());
+#pragma warning(pop)
   }
 
   /// contains - Return true if the specified basic block is in this loop.
@@ -478,8 +480,8 @@ private:
   friend class LoopInfoBase<BasicBlock, Loop>;
   explicit Loop(BasicBlock *BB) : LoopBase<BasicBlock, Loop>(BB) {}
 };
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// LoopInfo - This class builds and contains all of the top level loop
 /// structures in the specified function.
 ///

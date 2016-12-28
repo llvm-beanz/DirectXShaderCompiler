@@ -1,5 +1,15 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set(LLVM_LINK_COMPONENTS
   Support
+  )
+
+# HLSL Change - add ignored sources
+set(HLSL_IGNORE_SOURCES
+  CocoaConventions.cpp
+  FormatString.cpp
+  PrintfFormatString.cpp
+  ScanfFormatString.cpp
   )
 
 add_clang_library(clangAnalysis
@@ -9,19 +19,15 @@ add_clang_library(clangAnalysis
   CFGReachabilityAnalysis.cpp
   CFGStmtMap.cpp
   CallGraph.cpp
-  CocoaConventions.cpp
   Consumed.cpp
   CodeInjector.cpp
   Dominators.cpp
-  FormatString.cpp
   LiveVariables.cpp
   ObjCNoReturn.cpp
   PostOrderCFGView.cpp
-  PrintfFormatString.cpp
   ProgramPoint.cpp
   PseudoConstantAnalysis.cpp
   ReachableCode.cpp
-  ScanfFormatString.cpp
   ThreadSafety.cpp
   ThreadSafetyCommon.cpp
   ThreadSafetyLogical.cpp

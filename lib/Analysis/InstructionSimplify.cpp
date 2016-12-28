@@ -1,21 +1,20 @@
 //===- InstructionSimplify.cpp - Fold instruction operands ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements routines for folding instructions into simpler forms
-// that do not require creating new instructions.  This does constant folding
-// ("add i32 1, 1" -> "2") but can also handle non-constant operands, either
-// returning a constant ("and i32 %x, 0" -> "0") or an already existing value
-// ("and i32 %x, %x" -> "%x").  All operands are assumed to have already been
-// simplified: This is usually true and assuming it simplifies the logic (if
-// they have not been simplified then results are correct but maybe suboptimal).
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InstructionSimplify.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements routines for folding instructions into simpler forms //
+// that do not require creating new instructions.  This does constant folding//
+// ("add i32 1, 1" -> "2") but can also handle non-constant operands, either //
+// returning a constant ("and i32 %x, 0" -> "0") or an already existing value//
+// ("and i32 %x, %x" -> "%x").  All operands are assumed to have already been//
+// simplified: This is usually true and assuming it simplifies the logic (if //
+// they have not been simplified then results are correct but maybe suboptimal).//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/ADT/SetVector.h"
@@ -793,10 +792,19 @@ static Value *SimplifyFAddInst(Value *Op0, Value *Op1, FastMathFlags FMF,
       return ConstantFoldInstOperands(Instruction::FAdd, CLHS->getType(),
                                       Ops, Q.DL, Q.TLI);
     }
-
+    // HLSL Change Begins.
+    if (ConstantFP *FP = dyn_cast<ConstantFP>(Op0))
+      if (FP->getValueAPF().isNaN())
+        return Op0;
+    // HLSL Change Ends.
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
   }
+  // HLSL Change Begins.
+  if (ConstantFP *FP = dyn_cast<ConstantFP>(Op0))
+    if (FP->getValueAPF().isNaN())
+      return Op0;
+  // HLSL Change Ends.
 
   // fadd X, -0 ==> X
   if (match(Op1, m_NegZero()))
@@ -835,7 +843,17 @@ static Value *SimplifyFSubInst(Value *Op0, Value *Op1, FastMathFlags FMF,
       return ConstantFoldInstOperands(Instruction::FSub, CLHS->getType(),
                                       Ops, Q.DL, Q.TLI);
     }
+    // HLSL Change Begins.
+    if (ConstantFP *FP = dyn_cast<ConstantFP>(Op0))
+      if (FP->getValueAPF().isNaN())
+        return Op0;
+    // HLSL Change Ends.
   }
+  // HLSL Change Begins.
+  if (ConstantFP *FP = dyn_cast<ConstantFP>(Op1))
+    if (FP->getValueAPF().isNaN())
+      return Op1;
+  // HLSL Change Ends.
 
   // fsub X, 0 ==> X
   if (match(Op1, m_Zero()))
@@ -867,26 +885,34 @@ static Value *SimplifyFMulInst(Value *Op0, Value *Op1,
                                FastMathFlags FMF,
                                const Query &Q,
                                unsigned MaxRecurse) {
- if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
+  if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
     if (Constant *CRHS = dyn_cast<Constant>(Op1)) {
-      Constant *Ops[] = { CLHS, CRHS };
-      return ConstantFoldInstOperands(Instruction::FMul, CLHS->getType(),
-                                      Ops, Q.DL, Q.TLI);
+      Constant *Ops[] = {CLHS, CRHS};
+      return ConstantFoldInstOperands(Instruction::FMul, CLHS->getType(), Ops,
+                                      Q.DL, Q.TLI);
     }
-
+    // HLSL Change Begins.
+    if (ConstantFP *FP = dyn_cast<ConstantFP>(Op0))
+      if (FP->getValueAPF().isNaN())
+        return Op0;
+    // HLSL Change Ends.
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
- }
+  }
+  // HLSL Change Begins.
+  if (ConstantFP *FP = dyn_cast<ConstantFP>(Op0))
+    if (FP->getValueAPF().isNaN())
+      return Op0;
+  // HLSL Change Ends.
+  // fmul X, 1.0 ==> X
+  if (match(Op1, m_FPOne()))
+    return Op0;
 
- // fmul X, 1.0 ==> X
- if (match(Op1, m_FPOne()))
-   return Op0;
+  // fmul nnan nsz X, 0 ==> 0
+  if (FMF.noNaNs() && FMF.noSignedZeros() && match(Op1, m_AnyZero()))
+    return Op1;
 
- // fmul nnan nsz X, 0 ==> 0
- if (FMF.noNaNs() && FMF.noSignedZeros() && match(Op1, m_AnyZero()))
-   return Op1;
-
- return nullptr;
+  return nullptr;
 }
 
 /// SimplifyMulInst - Given operands for a Mul, see if we can
@@ -1113,6 +1139,22 @@ Value *llvm::SimplifyUDivInst(Value *Op0, Value *Op1, const DataLayout &DL,
 
 static Value *SimplifyFDivInst(Value *Op0, Value *Op1, FastMathFlags FMF,
                                const Query &Q, unsigned) {
+  // HLSL Change Begins.
+  if (Constant *C0 = dyn_cast<Constant>(Op0)) {
+    if (Constant *C1 = dyn_cast<Constant>(Op1)) {
+      Constant *Ops[] = {C0, C1};
+      return ConstantFoldInstOperands(Instruction::FDiv, C0->getType(), Ops,
+                                      Q.DL, Q.TLI);
+    }
+    if (ConstantFP *FP = dyn_cast<ConstantFP>(C0))
+      if (FP->getValueAPF().isNaN())
+        return Op0;
+  }
+  if (ConstantFP *FP = dyn_cast<ConstantFP>(Op1))
+    if (FP->getValueAPF().isNaN())
+      return Op1;
+  // HLSL Change Ends.
+
   // undef / X -> undef    (the undef could be a snan).
   if (match(Op0, m_Undef()))
     return Op0;
@@ -1252,7 +1294,22 @@ Value *llvm::SimplifyURemInst(Value *Op0, Value *Op1, const DataLayout &DL,
 }
 
 static Value *SimplifyFRemInst(Value *Op0, Value *Op1, FastMathFlags FMF,
-                               const Query &, unsigned) {
+                               const Query &Q, unsigned) {
+  // HLSL Change Begins.
+  if (Constant *C0 = dyn_cast<Constant>(Op0)) {
+    if (Constant *C1 = dyn_cast<Constant>(Op1)) {
+      Constant *Ops[] = {C0, C1};
+      return ConstantFoldInstOperands(Instruction::FRem, C0->getType(), Ops,
+                                      Q.DL, Q.TLI);
+    }
+    if (ConstantFP *FP = dyn_cast<ConstantFP>(C0))
+      if (FP->getValueAPF().isNaN())
+        return Op0;
+  }
+  if (ConstantFP *FP = dyn_cast<ConstantFP>(Op1))
+    if (FP->getValueAPF().isNaN())
+      return Op1;
+  // HLSL Change Ends.
   // undef % X -> undef    (the undef could be a snan).
   if (match(Op0, m_Undef()))
     return Op0;

@@ -1,16 +1,15 @@
 //===--- Targets.cpp - Implement -arch option and targets -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements construction of a TargetInfo object from a
-// target triple.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Targets.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements construction of a TargetInfo object from a           //
+// target triple.                                                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Builtins.h"
@@ -84,6 +83,7 @@ public:
 };
 } // end anonymous namespace
 
+#if 0 // HLSL Change Starts - remove unsupported targets
 
 static void getDarwinDefines(MacroBuilder &Builder, const LangOptions &Opts,
                              const llvm::Triple &Triple,
@@ -6975,12 +6975,77 @@ public:
 };
 } // end anonymous namespace
 
+#endif // HLSL Change - remove unsupported targets
+
+namespace {
+class DXILTargetInfo : public TargetInfo {
+  static const Builtin::Info BuiltinInfo[];
+
+public:
+  DXILTargetInfo(const llvm::Triple &Triple) : TargetInfo(Triple) {
+    BigEndian = false;
+    TLSSupported = false;
+    LongWidth = LongAlign = 64;
+
+    // using the Microsoft ABI.
+    TheCXXABI.set(TargetCXXABI::Microsoft);
+  }
+  void getTargetDefines(const LangOptions &Opts,
+                        MacroBuilder &Builder) const override {
+    // add target defines
+  }
+  void getTargetBuiltins(const Builtin::Info *&Records,
+                         unsigned &NumRecords) const override {
+    Records = BuiltinInfo;
+    NumRecords = clang::DXIL::LastTSBuiltin - Builtin::FirstTSBuiltin;
+  }
+  bool hasFeature(StringRef Feature) const override {
+    return Feature == "dxil";
+  }
+  const char *getClobbers() const override { return ""; }
+  void getGCCRegNames(const char *const *&Names,
+                      unsigned &NumNames) const override {}
+  bool validateAsmConstraint(const char *&Name,
+                             TargetInfo::ConstraintInfo &info) const override {
+    return true;
+  }
+  void getGCCRegAliases(const GCCRegAlias *&Aliases,
+                        unsigned &NumAliases) const override {}
+  BuiltinVaListKind getBuiltinVaListKind() const override {
+    return TargetInfo::CharPtrBuiltinVaList;
+  }
+};
+
+const Builtin::Info DXILTargetInfo::BuiltinInfo[] = {
+#define BUILTIN(ID, TYPE, ATTRS) {#ID, TYPE, ATTRS, 0, ALL_LANGUAGES},
+#define LIBBUILTIN(ID, TYPE, ATTRS, HEADER)                                    \
+  {#ID, TYPE, ATTRS, HEADER, ALL_LANGUAGES},
+#include "clang/Basic/BuiltinsDXIL.def"
+};
+
+// DXIL 32 target
+class DXIL_32TargetInfo : public DXILTargetInfo {
+
+public:
+  DXIL_32TargetInfo(const llvm::Triple &Triple) : DXILTargetInfo(Triple) {
+    LongDoubleWidth = LongDoubleAlign = 64;
+    LongDoubleFormat = &llvm::APFloat::IEEEdouble;
+    // TODO: Update Description for DXIL
+    DescriptionString = "e-m:e-p:32:32-i64:64-f80:32-n8:16:32-a:0:32-S32";
+  }
+};
+}
+// HLSL Change Ends
+
 
 //===----------------------------------------------------------------------===//
 // Driver code
 //===----------------------------------------------------------------------===//
 
 static TargetInfo *AllocateTarget(const llvm::Triple &Triple) {
+#if 1 // HLSL Change
+  return new DXIL_32TargetInfo(Triple);
+#else // HLSL Change
   llvm::Triple::OSType os = Triple.getOS();
 
   switch (Triple.getArch()) {
@@ -7379,6 +7444,7 @@ static TargetInfo *AllocateTarget(const llvm::Triple &Triple) {
     return new SPIR64TargetInfo(Triple);
   }
   }
+#endif // HLSL Change
 }
 
 /// CreateTargetInfo - Return the target info object for the specified target

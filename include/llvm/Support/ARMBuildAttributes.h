@@ -1,20 +1,19 @@
 //===-- ARMBuildAttributes.h - ARM Build Attributes -------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ARMBuildAttributes.h                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains enumerations and support routines for ARM build attributes//
+// as defined in ARM ABI addenda document (ABI release 2.08).                //
 //
-//                     The LLVM Compiler Infrastructure
+// ELF for the ARM Architecture r2.09 - November 30, 2012                    //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0044e/IHI0044E_aaelf.pdf//
 //
-//===----------------------------------------------------------------------===//
-//
-// This file contains enumerations and support routines for ARM build attributes
-// as defined in ARM ABI addenda document (ABI release 2.08).
-//
-// ELF for the ARM Architecture r2.09 - November 30, 2012
-//
-// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0044e/IHI0044E_aaelf.pdf
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_ARMBUILDATTRIBUTES_H
 #define LLVM_SUPPORT_ARMBUILDATTRIBUTES_H

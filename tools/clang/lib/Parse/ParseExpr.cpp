@@ -1,25 +1,26 @@
 //===--- ParseExpr.cpp - Expression Parsing -------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseExpr.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Provides the Expression parsing implementation.
+/// \file                                                                    //
+/// \brief Provides the Expression parsing implementation.                   //
 ///
-/// Expressions in C99 basically consist of a bunch of binary operators with
-/// unary operators and other random stuff at the leaves.
+/// Expressions in C99 basically consist of a bunch of binary operators with //
+/// unary operators and other random stuff at the leaves.                    //
 ///
-/// In the C99 grammar, these unary operators bind tightest and are represented
-/// as the 'cast-expression' production.  Everything else is either a binary
-/// operator (e.g. '/') or a ternary operator ("?:").  The unary leaves are
-/// handled by ParseCastExpression, the higher level pieces are handled by
-/// ParseBinaryExpression.
+/// In the C99 grammar, these unary operators bind tightest and are represented//
+/// as the 'cast-expression' production.  Everything else is either a binary //
+/// operator (e.g. '/') or a ternary operator ("?:").  The unary leaves are  //
+/// handled by ParseCastExpression, the higher level pieces are handled by   //
+/// ParseBinaryExpression.                                                   //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "RAIIObjectsForParser.h"
@@ -129,6 +130,7 @@ ExprResult Parser::ParseExpression(TypeCastState isTypeCast) {
 ///
 ExprResult
 Parser::ParseExpressionWithLeadingAt(SourceLocation AtLoc) {
+  assert(!getLangOpts().HLSL && "@ for obj-c is unsupported in HLSL"); // HLSL Change
   ExprResult LHS(ParseObjCAtExpression(AtLoc));
   return ParseRHSOfBinaryExpression(LHS, prec::Comma);
 }
@@ -161,8 +163,15 @@ ExprResult Parser::ParseAssignmentExpression(TypeCastState isTypeCast) {
     return ExprError();
   }
 
-  if (Tok.is(tok::kw_throw))
+  if (Tok.is(tok::kw_throw)) {
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      return ExprError();
+    }
+    // HLSL Change Ends
     return ParseThrowExpression();
+  }
 
   ExprResult LHS = ParseCastExpression(/*isUnaryExpression=*/false,
                                        /*isAddressOfOperand=*/false,
@@ -184,6 +193,7 @@ Parser::ParseAssignmentExprWithObjCMessageExprStart(SourceLocation LBracLoc,
                                                     SourceLocation SuperLoc,
                                                     ParsedType ReceiverType,
                                                     Expr *ReceiverExpr) {
+  assert(!getLangOpts().HLSL && "obj-c constructs unsupported in HLSL"); // HLSL Change
   ExprResult R
     = ParseObjCMessageExpressionBody(LBracLoc, SuperLoc,
                                      ReceiverType, ReceiverExpr);
@@ -303,7 +313,12 @@ Parser::ParseRHSOfBinaryExpression(ExprResult LHS, prec::Level MinPrec) {
         // Special case handling of "X ? Y : Z" where Y is empty:
         //   logical-OR-expression '?' ':' conditional-expression   [GNU]
         TernaryMiddle = nullptr;
-        Diag(Tok, diag::ext_gnu_conditional_expr);
+        // HLSL Change Starts - provide an alternate message
+        if (getLangOpts().HLSL)
+          Diag(Tok, diag::err_hlsl_unsupported_construct) << "use of GNU ?: conditional expression extension, omitting middle operand";
+        else
+          Diag(Tok, diag::ext_gnu_conditional_expr);
+        // HLSL Change Ends
       }
 
       if (!TryConsumeToken(tok::colon, ColonLoc)) {
@@ -737,9 +752,20 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   
   case tok::kw___objc_yes:
   case tok::kw___objc_no:
+    // HLSL Change Starts
+HLSLReservedKeyword:
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      return ExprError();
+    }
+    // HLSL Change Ends
       return ParseObjCBoolLiteral();
 
   case tok::kw_nullptr:
+    // HLSL Change Starts
+    assert(!getLangOpts().HLSL && "nullptr is not a keyword in HLSL");
+    if (getLangOpts().HLSL) goto tok_default_case;
+    // HLSL Change Ends
     Diag(Tok, diag::warn_cxx98_compat_nullptr);
     return Actions.ActOnCXXNullPtrLiteral(ConsumeToken());
 
@@ -751,6 +777,10 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
 
   case tok::kw___super:
   case tok::kw_decltype:
+    // HLSL Change Starts
+    assert(!getLangOpts().HLSL && "decltype is not a keyword in HLSL");
+    if (getLangOpts().HLSL) goto tok_default_case;
+    // HLSL Change Ends
     // Annotate the token and tail recurse.
     if (TryAnnotateTypeOrScopeToken())
       return ExprError();
@@ -770,7 +800,7 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
       // If this identifier was reverted from a token ID, and the next token
       // is a parenthesis, this is likely to be a use of a type trait. Check
       // those tokens.
-      if (Next.is(tok::l_paren) &&
+      if (Next.is(tok::l_paren) && !getLangOpts().HLSL && // HLSL Change - no type trait support in HLSL
           Tok.is(tok::identifier) &&
           Tok.getIdentifierInfo()->hasRevertedTokenIDToIdentifier()) {
         IdentifierInfo *II = Tok.getIdentifierInfo();
@@ -970,6 +1000,13 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::utf8_char_constant:
   case tok::utf16_char_constant:
   case tok::utf32_char_constant:
+    // HLSL Change Starts
+    // Character constants become 32-bit unsigned ints. That will happen in Sema.
+    if (getLangOpts().HLSL && Tok.getKind() != tok::char_constant) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << "non-ASCII/multiple-char character constant";
+      return ExprError();
+    }
+    // HLSL Change Ends
     Res = Actions.ActOnCharacterConstant(Tok, /*UDLScope*/getCurScope());
     ConsumeToken();
     break;
@@ -979,6 +1016,12 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw___FUNCSIG__:     // primary-expression: __FUNCSIG__ [MS]
   case tok::kw_L__FUNCTION__:   // primary-expression: L__FUNCTION__ [MS]
   case tok::kw___PRETTY_FUNCTION__:  // primary-expression: __P..Y_F..N__ [GNU]
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      return ExprError();
+    }
+    // HLSL Change Ends
     Res = Actions.ActOnPredefinedExpr(Tok.getLocation(), SavedKind);
     ConsumeToken();
     break;
@@ -987,9 +1030,21 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::utf8_string_literal:
   case tok::utf16_string_literal:
   case tok::utf32_string_literal:
+    // HLSL Change Starts
+    if (getLangOpts().HLSL && Tok.getKind() != tok::string_literal) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << "non-ASCII string constant";
+      return ExprError();
+    }
+    // HLSL Change Ends
     Res = ParseStringLiteralExpression(true);
     break;
   case tok::kw__Generic:   // primary-expression: generic-selection [C11 6.5.1]
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      return ExprError();
+    }
+    // HLSL Change Ends
     Res = ParseGenericSelectionExpression();
     break;
   case tok::kw___builtin_va_arg:
@@ -997,8 +1052,10 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw___builtin_choose_expr:
   case tok::kw___builtin_astype: // primary-expression: [OCL] as_type()
   case tok::kw___builtin_convertvector:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - not supported
     return ParseBuiltinPrimaryExpression();
   case tok::kw___null:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - not supported
     return Actions.ActOnGNUNullExpr(ConsumeToken());
 
   case tok::plusplus:      // unary-expression: '++' unary-expression [C99]
@@ -1034,6 +1091,11 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::exclaim:       // unary-expression: '!' cast-expression
   case tok::kw___real:     // unary-expression: '__real' cast-expression [GNU]
   case tok::kw___imag: {   // unary-expression: '__imag' cast-expression [GNU]
+    // HLSL Change Starts
+    if (getLangOpts().HLSL && Tok.getKind() == tok::kw___real || Tok.getKind() == tok::kw___imag) {
+      goto HLSLReservedKeyword;
+    }
+    // HLSL Change Ends
     SourceLocation SavedLoc = ConsumeToken();
     Res = ParseCastExpression(false);
     if (!Res.isInvalid())
@@ -1062,8 +1124,15 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw_vec_step:   // unary-expression: OpenCL 'vec_step' expression
   // unary-expression: '__builtin_omp_required_simd_align' '(' type-name ')'
   case tok::kw___builtin_omp_required_simd_align:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - not supported
     return ParseUnaryExprOrTypeTraitExpression();
   case tok::ampamp: {      // unary-expression: '&&' identifier
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << "address of label";
+      return ExprError();
+    }
+    // HLSL Change Ends
     SourceLocation AmpAmpLoc = ConsumeToken();
     if (Tok.isNot(tok::identifier))
       return ExprError(Diag(Tok, diag::err_expected) << tok::identifier);
@@ -1082,12 +1151,23 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw_dynamic_cast:
   case tok::kw_reinterpret_cast:
   case tok::kw_static_cast:
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << "C++-style cast";
+      return ExprError();
+    }
+    // HLSL Change Ends
     Res = ParseCXXCasts();
     break;
   case tok::kw_typeid:
+    if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - not supported
     Res = ParseCXXTypeid();
     break;
   case tok::kw___uuidof:
+    // HLSL Change Starts
+    assert(!getLangOpts().HLSL && "__uuidof is not a keyword in HLSL");
+    if (getLangOpts().HLSL) goto tok_default_case;
+    // HLSL Change Ends
     Res = ParseCXXUuidof();
     break;
   case tok::kw_this:
@@ -1132,6 +1212,14 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw_long:
   case tok::kw___int64:
   case tok::kw___int128:
+  // HLSL Change Starts
+  case tok::kw_min10float:
+  case tok::kw_min12int:
+  case tok::kw_column_major:
+  case tok::kw_row_major:
+  case tok::kw_snorm:
+  case tok::kw_unorm:
+  // HLSL Change Ends
   case tok::kw_signed:
   case tok::kw_unsigned:
   case tok::kw_half:
@@ -1141,6 +1229,15 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw_typename:
   case tok::kw_typeof:
   case tok::kw___vector: {
+    // HLSL Change Starts
+    if (getLangOpts().HLSL && (
+        SavedKind == tok::kw_wchar_t || SavedKind == tok::kw_char || SavedKind == tok::kw_char16_t || SavedKind == tok::kw_char32_t ||
+        SavedKind == tok::kw_short || SavedKind == tok::kw_long || SavedKind == tok::kw___int64 || SavedKind == tok::kw___int128 ||
+        SavedKind == tok::kw_typename || SavedKind == tok::kw_typeof)) {
+      // the vector/image/sampler/event keywords aren't returned by the lexer for HLSL
+      goto HLSLReservedKeyword;
+    }
+    // HLSL Change Ends
     if (!getLangOpts().CPlusPlus) {
       Diag(Tok, diag::err_expected_expression);
       return ExprError();
@@ -1221,6 +1318,7 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   }
 
   case tok::kw_operator: // [C++] id-expression: operator/conversion-function-id
+    if (getLangOpts().HLSL && SavedKind == tok::kw_operator) goto HLSLReservedKeyword; // HLSL Change - 'operator' is reserved
     Res = ParseCXXIdExpression(isAddressOfOperand);
     break;
 
@@ -1235,10 +1333,14 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
     // ::new -> [C++] new-expression
     // ::delete -> [C++] delete-expression
     SourceLocation CCLoc = ConsumeToken();
-    if (Tok.is(tok::kw_new))
+    if (Tok.is(tok::kw_new)) {
+      if (getLangOpts().HLSL) goto HLSLReservedKeyword; // HLSL Change - 'new' is reserved
       return ParseCXXNewExpression(true, CCLoc);
-    if (Tok.is(tok::kw_delete))
+    }
+    if (Tok.is(tok::kw_delete)) {
+      if (getLangOpts().HLSL) goto HLSLReservedKeyword; // HLSL Change - 'delete' is reserved
       return ParseCXXDeleteExpression(true, CCLoc);
+    }
 
     // This is not a type name or scope specifier, it is an invalid expression.
     Diag(CCLoc, diag::err_expected_expression);
@@ -1246,12 +1348,15 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   }
 
   case tok::kw_new: // [C++] new-expression
+    if (getLangOpts().HLSL) goto HLSLReservedKeyword; // HLSL Change - 'new' is reserved
     return ParseCXXNewExpression(false, Tok.getLocation());
 
   case tok::kw_delete: // [C++] delete-expression
+    if (getLangOpts().HLSL) goto HLSLReservedKeyword; // HLSL Change - 'delete' is reserved
     return ParseCXXDeleteExpression(false, Tok.getLocation());
 
   case tok::kw_noexcept: { // [C++0x] 'noexcept' '(' expression ')'
+    if (getLangOpts().HLSL) goto HLSLReservedKeyword; // HLSL Change - reserved keyword
     Diag(Tok, diag::warn_cxx98_compat_noexcept_expr);
     SourceLocation KeyLoc = ConsumeToken();
     BalancedDelimiterTracker T(*this, tok::l_paren);
@@ -1286,10 +1391,20 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
     return ParseExpressionTrait();
       
   case tok::at: {
+    // HLSL Change Starts
+    assert(!getLangOpts().HLSL && "HLSL does not recognize '@' as a token");
+    if (getLangOpts().HLSL) goto tok_default_case;
+    // HLSL Change Ends
     SourceLocation AtLoc = ConsumeToken();
     return ParseObjCAtExpression(AtLoc);
   }
   case tok::caret:
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << "block";
+      return ExprError();
+    }
+    // HLSL Change Ends
     Res = ParseBlockLiteralExpression();
     break;
   case tok::code_completion: {
@@ -1318,6 +1433,7 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
       break;
     }
     // FALL THROUGH.
+  tok_default_case: // HLSL Change - add to target cases dead-code'd by HLSL
   default:
     NotCastExpr = true;
     return ExprError();
@@ -1430,7 +1546,7 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
 
       BalancedDelimiterTracker PT(*this, tok::l_paren);
 
-      if (OpKind == tok::lesslessless) {
+      if (getLangOpts().HLSL && OpKind == tok::lesslessless) { // HLSL Change: <<< is not supported in HLSL
         ExprVector ExecConfigExprs;
         CommaLocsTy ExecConfigCommaLocs;
         SourceLocation OpenLoc = ConsumeToken();
@@ -1562,6 +1678,14 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
           ObjectType = ParsedType();
       }
 
+      // HLSL Change Starts
+      // At this point, if we have an arrow, a diagnostic has been emitted, and
+      // we recover parsing by treating this as a period.
+      if (getLangOpts().HLSL) {
+        OpKind = tok::period;
+      }
+      // HLSL Change Ends
+
       if (Tok.is(tok::code_completion)) {
         // Code completion for a member access expression.
         Actions.CodeCompleteMemberReferenceExpr(getCurScope(), LHS.get(),
@@ -1576,6 +1700,18 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
                                        ObjectType);
         break;
       }
+
+      // HLSL Change Starts
+      // 'sample' is a keyword when used as an interpolation modifier, but it is
+      // also a built-in field of some types. By the time we're considering a
+      // field access, update the token if necessary to reflect this.
+      if (getLangOpts().HLSL) {
+        if (Tok.is(tok::kw_sample)) {
+          Tok.setKind(tok::identifier);
+          Tok.setIdentifierInfo(PP.getIdentifierInfo(StringRef("sample")));
+        }
+      }
+      // HLSL Change Ends
 
       // Either the action has told us that this cannot be a
       // pseudo-destructor expression (based on the type of base
@@ -1655,6 +1791,7 @@ Parser::ParseExprAfterUnaryExprOrTypeTrait(const Token &OpTok,
                                            bool &isCastExpr,
                                            ParsedType &CastTy,
                                            SourceRange &CastRange) {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
 
   assert(OpTok.isOneOf(tok::kw_typeof, tok::kw_sizeof, tok::kw___alignof,
                        tok::kw_alignof, tok::kw__Alignof, tok::kw_vec_step,
@@ -1742,6 +1879,7 @@ Parser::ParseExprAfterUnaryExprOrTypeTrait(const Token &OpTok,
 /// [C++11] 'alignof' '(' type-id ')'
 /// \endverbatim
 ExprResult Parser::ParseUnaryExprOrTypeTraitExpression() {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
   assert(Tok.isOneOf(tok::kw_sizeof, tok::kw___alignof, tok::kw_alignof,
                      tok::kw__Alignof, tok::kw_vec_step,
                      tok::kw___builtin_omp_required_simd_align) &&
@@ -1854,6 +1992,7 @@ ExprResult Parser::ParseUnaryExprOrTypeTraitExpression() {
 /// [GNU]   offsetof-member-designator '[' expression ']'
 /// \endverbatim
 ExprResult Parser::ParseBuiltinPrimaryExpression() {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
   ExprResult Res;
   const IdentifierInfo *BuiltinII = Tok.getIdentifierInfo();
 
@@ -2250,6 +2389,13 @@ Parser::ParseParenExpression(ParenParseOption &ExprType, bool stopIfCastExpr,
       ColonProtection.restore();
       RParenLoc = T.getCloseLocation();
       if (Tok.is(tok::l_brace)) {
+        // HLSL Change Starts
+        if (getLangOpts().HLSL) {
+          // (type-name) { initializer-list }
+          Diag(Tok, diag::err_hlsl_unsupported_construct) << "compound literal";
+          return ExprError();
+        }
+        // HLSL Change Ends
         ExprType = CompoundLiteral;
         TypeResult Ty;
         {
@@ -2367,6 +2513,7 @@ ExprResult
 Parser::ParseCompoundLiteralExpression(ParsedType Ty,
                                        SourceLocation LParenLoc,
                                        SourceLocation RParenLoc) {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::l_brace) && "Not a compound literal!");
   if (!getLangOpts().C99)   // Compound literals don't exist in C90.
     Diag(LParenLoc, diag::ext_c99_compound_literal);
@@ -2416,6 +2563,7 @@ ExprResult Parser::ParseStringLiteralExpression(bool AllowUserDefinedLiteral) {
 ///           default : assignment-expression
 /// \endverbatim
 ExprResult Parser::ParseGenericSelectionExpression() {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::kw__Generic) && "_Generic keyword expected");
   SourceLocation KeyLoc = ConsumeToken();
 
@@ -2651,6 +2799,7 @@ Parser::ParseSimpleExpressionList(SmallVectorImpl<Expr*> &Exprs,
 /// [clang]   specifier-qualifier-list block-declarator
 /// \endverbatim
 void Parser::ParseBlockId(SourceLocation CaretLoc) {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
   if (Tok.is(tok::code_completion)) {
     Actions.CodeCompleteOrdinaryName(getCurScope(), Sema::PCC_Type);
     return cutOffParsing();
@@ -2681,6 +2830,7 @@ void Parser::ParseBlockId(SourceLocation CaretLoc) {
 /// [clang]   '(' parameter-list ')'
 /// \endverbatim
 ExprResult Parser::ParseBlockLiteralExpression() {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::caret) && "block literal starts with ^");
   SourceLocation CaretLoc = ConsumeToken();
 
@@ -2786,6 +2936,7 @@ ExprResult Parser::ParseBlockLiteralExpression() {
 ///         '__objc_yes'
 ///         '__objc_no'
 ExprResult Parser::ParseObjCBoolLiteral() {
+  assert(!getLangOpts().HLSL && "not supported for HLSL - unreachable"); // HLSL Change
   tok::TokenKind Kind = Tok.getKind();
   return Actions.ActOnObjCBoolLiteral(ConsumeToken(), Kind);
 }

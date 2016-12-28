@@ -1,11 +1,12 @@
 //===--- CodeGenAction.cpp - LLVM Code Generation Frontend Action ---------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeGenAction.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CoverageMappingGen.h"
 #include "clang/AST/ASTConsumer.h"
@@ -621,6 +622,8 @@ GetOutputStream(CompilerInstance &CI, StringRef InFile, BackendAction Action) {
     return CI.createDefaultOutputFile(false, InFile, "ll");
   case Backend_EmitBC:
     return CI.createDefaultOutputFile(true, InFile, "bc");
+  case Backend_EmitPasses:
+    return CI.createDefaultOutputFile(true, InFile, "passes.txt");
   case Backend_EmitNothing:
     return nullptr;
   case Backend_EmitMCNull:
@@ -769,3 +772,9 @@ EmitCodeGenOnlyAction::EmitCodeGenOnlyAction(llvm::LLVMContext *_VMContext)
 void EmitObjAction::anchor() { }
 EmitObjAction::EmitObjAction(llvm::LLVMContext *_VMContext)
   : CodeGenAction(Backend_EmitObj, _VMContext) {}
+
+// HLSL Change Starts
+void EmitOptDumpAction::anchor() { }
+EmitOptDumpAction::EmitOptDumpAction(llvm::LLVMContext *_VMContext)
+  : CodeGenAction(Backend_EmitPasses, _VMContext) {}
+// HLSL Change Ends

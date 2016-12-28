@@ -1,15 +1,14 @@
 //===--- TypePrinter.cpp - Pretty-Print Clang Types -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This contains code to print types from Clang's type system.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TypePrinter.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This contains code to print types from Clang's type system.               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/ASTContext.h"
@@ -149,6 +148,21 @@ void TypePrinter::print(const Type *T, Qualifiers Quals, raw_ostream &OS,
   }
 
   SaveAndRestore<bool> PHVal(HasEmptyPlaceHolder, PlaceHolder.empty());
+
+  // HLSL Change Starts
+  // Print 'char *' as 'string' and 'const char *' as 'const string'
+  if (Policy.LangOpts.HLSL && T->isPointerType()) {
+    QualType Pointee = T->getPointeeType();
+    if (const BuiltinType* BIT = Pointee->getAs<BuiltinType>()) {
+      if (BIT->getKind() == BuiltinType::Char_S) {
+        Quals = Pointee.getQualifiers();
+        Quals.print(OS, Policy, /*appendSpaceIfNonEmpty=*/true);
+        OS << "string";
+        return;
+      }
+    }
+  }
+  // HLSL Change Ends
 
   printBefore(T, Quals, OS);
   OS << PlaceHolder;
@@ -900,7 +914,8 @@ void TypePrinter::printTag(TagDecl *D, raw_ostream &OS) {
 
   // We don't print tags unless this is an elaborated type.
   // In C, we just assume every RecordType is an elaborated type.
-  if (!(Policy.LangOpts.CPlusPlus || Policy.SuppressTagKeyword ||
+  // if (!(Policy.LangOpts.CPlusPlus || Policy.SuppressTagKeyword ||
+  if (!(Policy.SuppressTagKeyword || // HLSL Change - let SuppressTagKeyword control this in every instance
         D->getTypedefNameForAnonDecl())) {
     HasKindDecoration = true;
     OS << D->getKindName();
@@ -1129,6 +1144,17 @@ void TypePrinter::printAttributedBefore(const AttributedType *T,
       T->getAttrKind() == AttributedType::attr_objc_ownership)
     return printBefore(T->getEquivalentType(), OS);
 
+  // HLSL Change Starts
+  if (T->isHLSLTypeSpec()) {
+    switch (T->getAttrKind()) {
+    case AttributedType::attr_hlsl_row_major: OS << "row_major "; break;
+    case AttributedType::attr_hlsl_column_major: OS << "column_major "; break;
+    case AttributedType::attr_hlsl_unorm: OS << "unorm "; break;
+    case AttributedType::attr_hlsl_snorm: OS << "snorm "; break;
+    }
+  }
+  // HLSL Change Ends
+
   if (T->getAttrKind() == AttributedType::attr_objc_kindof)
     OS << "__kindof ";
 
@@ -1174,6 +1200,8 @@ void TypePrinter::printAttributedAfter(const AttributedType *T,
   // TODO: not all attributes are GCC-style attributes.
   if (T->isMSTypeSpec())
     return;
+  if (T->isHLSLTypeSpec())   // HLSL Change
+    return;    
 
   // Nothing to print after.
   if (T->getAttrKind() == AttributedType::attr_nonnull ||
@@ -1393,7 +1421,7 @@ TemplateSpecializationType::PrintTemplateArgumentList(
                                                 unsigned NumArgs,
                                                   const PrintingPolicy &Policy,
                                                       bool SkipBrackets) {
-  if (!SkipBrackets)
+  if (!SkipBrackets && !(Policy.LangOpts.HLSL && NumArgs == 0)) // HLSL Change
     OS << '<';
   
   bool needSpace = false;
@@ -1432,7 +1460,7 @@ TemplateSpecializationType::PrintTemplateArgumentList(
   if (needSpace)
     OS << ' ';
 
-  if (!SkipBrackets)
+  if (!SkipBrackets && !(Policy.LangOpts.HLSL && NumArgs == 0)) // HLSL Change
     OS << '>';
 }
 
@@ -1441,7 +1469,8 @@ void TemplateSpecializationType::
 PrintTemplateArgumentList(raw_ostream &OS,
                           const TemplateArgumentLoc *Args, unsigned NumArgs,
                           const PrintingPolicy &Policy) {
-  OS << '<';
+  if (!(Policy.LangOpts.HLSL && NumArgs == 0)) // HLSL Change
+    OS << '<';
 
   bool needSpace = false;
   for (unsigned Arg = 0; Arg < NumArgs; ++Arg) {
@@ -1478,7 +1507,8 @@ PrintTemplateArgumentList(raw_ostream &OS,
   if (needSpace)
     OS << ' ';
 
-  OS << '>';
+  if (!(Policy.LangOpts.HLSL && NumArgs == 0)) // HLSL Change
+    OS << '>';
 }
 
 std::string Qualifiers::getAsString() const {

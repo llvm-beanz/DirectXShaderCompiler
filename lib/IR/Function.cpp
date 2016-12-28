@@ -1,15 +1,14 @@
 //===-- Function.cpp - Implement the Global object classes ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Function class for the IR library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Function class for the IR library.               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/Function.h"
 #include "LLVMContextImpl.h"
@@ -27,6 +26,7 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "dxc/HLSL/HLModule.h" // HLSL Change
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/RWMutex.h"
 #include "llvm/Support/StringPool.h"
@@ -235,10 +235,12 @@ Type *Function::getReturnType() const {
 }
 
 void Function::removeFromParent() {
+  if (getParent()->HasHLModule()) getParent()->GetHLModule().RemoveFunction(this); // HLSL Change
   getParent()->getFunctionList().remove(this);
 }
 
 void Function::eraseFromParent() {
+  if (getParent()->HasHLModule()) getParent()->GetHLModule().RemoveFunction(this); // HLSL Change
   getParent()->getFunctionList().erase(this);
 }
 
@@ -497,7 +499,7 @@ static std::string getMangledTypeStr(Type* Ty) {
   return Result;
 }
 
-std::string Intrinsic::getName(ID id, ArrayRef<Type*> Tys) {
+std::string Intrinsic::getName(_In_range_(0, num_intrinsics-1) ID id, ArrayRef<Type*> Tys) {
   assert(id < num_intrinsics && "Invalid intrinsic ID!");
   static const char * const Table[] = {
     "not_intrinsic",
@@ -513,7 +515,6 @@ std::string Intrinsic::getName(ID id, ArrayRef<Type*> Tys) {
   }
   return Result;
 }
-
 
 /// IIT_Info - These are enumerators that describe the entries returned by the
 /// getIntrinsicInfoTableEntries function.
@@ -766,7 +767,7 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
   case IITDescriptor::Struct: {
     Type *Elts[5];
     assert(D.Struct_NumElements <= 5 && "Can't handle this yet");
-    for (unsigned i = 0, e = D.Struct_NumElements; i != e; ++i)
+    for (unsigned i = 0, e = D.Struct_NumElements; i != e && i < _countof(Elts); ++i) // HLSL Change - add extra check to help SAL
       Elts[i] = DecodeFixedType(Infos, Tys, Context);
     return StructType::get(Context, makeArrayRef(Elts,D.Struct_NumElements));
   }
@@ -813,7 +814,7 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
     return VectorType::get(PointerType::getUnqual(EltTy),
                            VTy->getNumElements());
   }
- }
+  }
   llvm_unreachable("unhandled");
 }
 
@@ -872,9 +873,11 @@ Function *Intrinsic::getDeclaration(Module *M, ID id, ArrayRef<Type*> Tys) {
 }
 
 // This defines the "Intrinsic::getIntrinsicForGCCBuiltin()" method.
+//#pragma optimize("", off) // HLSL Change - comment out pragma optimize directive
 #define GET_LLVM_INTRINSIC_FOR_GCC_BUILTIN
 #include "llvm/IR/Intrinsics.gen"
 #undef GET_LLVM_INTRINSIC_FOR_GCC_BUILTIN
+//#pragma optimize("", on)  // HLSL Change - comment out pragma optimize directive
 
 // This defines the "Intrinsic::getIntrinsicForMSBuiltin()" method.
 #define GET_LLVM_INTRINSIC_FOR_MS_BUILTIN

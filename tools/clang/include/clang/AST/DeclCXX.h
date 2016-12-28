@@ -1,17 +1,18 @@
 //===-- DeclCXX.h - Classes for representing C++ declarations -*- C++ -*-=====//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclCXX.h                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines the C++ Decl subclasses, other than those for templates
-/// (found in DeclTemplate.h) and friends (in DeclFriend.h).
+/// \file                                                                    //
+/// \brief Defines the C++ Decl subclasses, other than those for templates   //
+/// (found in DeclTemplate.h) and friends (in DeclFriend.h).                 //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_AST_DECLCXX_H
 #define LLVM_CLANG_AST_DECLCXX_H

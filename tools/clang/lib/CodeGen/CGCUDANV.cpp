@@ -1,16 +1,15 @@
 //===----- CGCUDANV.cpp - Interface to NVIDIA CUDA Runtime ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides a class for CUDA code generation targeting the NVIDIA CUDA
-// runtime library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGCUDANV.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides a class for CUDA code generation targeting the NVIDIA CUDA  //
+// runtime library.                                                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CGCUDARuntime.h"
 #include "CodeGenFunction.h"

@@ -1,15 +1,14 @@
 //===--- SemaStmtAttr.cpp - Statement Attribute Handling ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements stmt-related attribute processing.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaStmtAttr.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements stmt-related attribute processing.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTContext.h"
@@ -19,6 +18,7 @@
 #include "clang/Sema/LoopHint.h"
 #include "clang/Sema/ScopeInfo.h"
 #include "llvm/ADT/StringExtras.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 
 using namespace clang;
 using namespace sema;
@@ -205,6 +205,14 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const AttributeList &A,
   case AttributeList::AT_LoopHint:
     return handleLoopHintAttr(S, St, A, Range);
   default:
+    // HLSL Change Starts
+    {
+      bool Handled = false;
+      Attr* hlslResult = hlsl::ProcessStmtAttributeForHLSL(S, St, A, Range, Handled);
+      if (Handled) return hlslResult;
+    }
+    // HLSL Change Ends
+
     // if we're here, then we parsed a known attribute, but didn't recognize
     // it as a statement attribute => it is declaration attribute
     S.Diag(A.getRange().getBegin(), diag::err_attribute_invalid_on_stmt)

@@ -1,11 +1,12 @@
 //===-- DWARFAbbreviationDeclaration.h --------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DWARFAbbreviationDeclaration.h                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_LIB_DEBUGINFO_DWARFABBREVIATIONDECLARATION_H
 #define LLVM_LIB_DEBUGINFO_DWARFABBREVIATIONDECLARATION_H

@@ -1,14 +1,13 @@
 //===--- CFG.h - Classes for representing and building CFGs------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the CFG and CFGBuilder classes for representing and
-//  building Control-Flow Graphs (CFGs) from ASTs.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CFG.h                                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the CFG and CFGBuilder classes for representing and    //
+//  building Control-Flow Graphs (CFGs) from ASTs.                           //
 //
 //===----------------------------------------------------------------------===//
 
@@ -983,7 +982,8 @@ private:
 
 //===----------------------------------------------------------------------===//
 // GraphTraits specializations for CFG basic block graphs (source-level CFGs)
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 namespace llvm {
 

@@ -1,11 +1,12 @@
 //===-- LangStandards.def - Language Standard Data --------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LangStandards.def                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LANGSTANDARD
 #error "LANGSTANDARD must be defined before including this file"
@@ -130,6 +131,11 @@ LANGSTANDARD(gnucxx1z, "gnu++1z",
              "Working draft for ISO C++ 2017 with GNU extensions",
              LineComment | CPlusPlus | CPlusPlus11 | CPlusPlus14 | CPlusPlus1z |
              Digraphs | GNUMode)
+
+// HLSL Change: HLSL Language standard declaration
+LANGSTANDARD(hlsl, "hlsl",
+             "HLSL",
+             LineComment | CPlusPlus | Digraphs)
 
 // OpenCL
 LANGSTANDARD(opencl, "cl",

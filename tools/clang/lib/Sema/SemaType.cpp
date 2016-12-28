@@ -1,15 +1,14 @@
 //===--- SemaType.cpp - Semantic Analysis for Types -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements type-related semantic analysis.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaType.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements type-related semantic analysis.                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "TypeLocBuilder.h"
@@ -30,6 +29,9 @@
 #include "clang/Sema/DeclSpec.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
+#include "clang/Sema/Scope.h"       // HLSL Change
+#include "dxc/Support/Global.h"     // HLSL Change
+#include "clang/Sema/SemaHLSL.h"    // HLSL Change
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/Template.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -149,6 +151,11 @@ namespace {
     /// Whether we saved the attributes in the decl spec.
     bool hasSavedAttrs;
 
+    // HLSL Change: add Scope
+
+    /// The scope for the declarator
+    Scope* scope;
+
     /// The original set of attributes on the DeclSpec.
     SmallVector<AttributeList*, 2> savedAttrs;
 
@@ -157,10 +164,15 @@ namespace {
     SmallVector<AttributeList*, 2> ignoredTypeAttrs;
 
   public:
-    TypeProcessingState(Sema &sema, Declarator &declarator)
-      : sema(sema), declarator(declarator),
+    TypeProcessingState(Sema &sema, Declarator &declarator, Scope* S = nullptr) // HLSL Change: add Scope
+      : sema(sema), declarator(declarator), scope(S), // HLSL Change: add Scope
         chunkIndex(declarator.getNumTypeObjects()),
         trivial(true), hasSavedAttrs(false) {}
+
+    // HLSL Change: add getScope
+    Scope* getScope() const {
+      return scope;
+    }
 
     Sema &getSema() const {
       return sema;
@@ -1253,7 +1265,7 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
       // specifiers in each declaration, and in the specifier-qualifier list in
       // each struct declaration and type name."
       if (S.getLangOpts().CPlusPlus) {
-        S.Diag(DeclLoc, diag::err_missing_type_specifier)
+        S.Diag(DeclLoc, S.getLangOpts().HLSL ? diag::err_hlsl_missing_type_specifier : diag::err_missing_type_specifier)  // HLSL Change
           << DS.getSourceRange();
 
         // When this occurs in C++ code, often something is very broken with the
@@ -1319,6 +1331,10 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
     break;
   case DeclSpec::TST_half: Result = Context.HalfTy; break;
   case DeclSpec::TST_float: Result = Context.FloatTy; break;
+    // HLSL Change Starts
+  case DeclSpec::TST_min10float: Result = Context.Min10FloatTy; break;
+  case DeclSpec::TST_min12int: Result = Context.Min12IntTy; break;
+    // HLSL Change Ends
   case DeclSpec::TST_double:
     if (DS.getTypeSpecWidth() == DeclSpec::TSW_long)
       Result = Context.LongDoubleTy;
@@ -2063,6 +2079,12 @@ QualType Sema::BuildArrayType(QualType T, ArrayType::ArraySizeModifier ASM,
           << ArraySize->getSourceRange();
       return QualType();
     }
+    // HLSL Change Starts
+    // Always report zero-sized arrays as errors as well as > 65536
+    if (getLangOpts().HLSL && (ConstVal == 0 || ConstVal.getLimitedValue() > 65536)) {
+      Diag(ArraySize->getLocStart(), diag::err_hlsl_unsupported_array_size);
+    } else
+    // HLSL Change Ends
     if (ConstVal == 0) {
       // GCC accepts zero sized static arrays. We allow them when
       // we're not in a SFINAE context.
@@ -2093,6 +2115,13 @@ QualType Sema::BuildArrayType(QualType T, ArrayType::ArraySizeModifier ASM,
     T = Context.getConstantArrayType(T, ConstVal, ASM, Quals);
   }
 
+  // HLSL Change Starts
+  if (getLangOpts().HLSL && T->isVariableArrayType()) {
+    Diag(Loc, diag::err_hlsl_vla);
+    return QualType();
+  }
+  // HLSL Change Stops
+
   // OpenCL v1.2 s6.9.d: variable length arrays are not supported.
   if (getLangOpts().OpenCL && T->isVariableArrayType()) {
     Diag(Loc, diag::err_opencl_vla);
@@ -2119,7 +2148,7 @@ QualType Sema::BuildArrayType(QualType T, ArrayType::ArraySizeModifier ASM,
       // Just extwarn about VLAs.
       else
         Diag(Loc, diag::ext_vla);
-    } else if (ASM != ArrayType::Normal || Quals != 0)
+    } else if ((ASM != ArrayType::Normal || Quals != 0) && ! getLangOpts().HLSL) // HLSL Change: already fails in HLSL
       Diag(Loc,
            getLangOpts().CPlusPlus? diag::err_c99_array_usage_cxx
                                      : diag::ext_c99_array_usage) << ASM;
@@ -2228,7 +2257,8 @@ QualType Sema::BuildFunctionType(QualType T,
   if (Invalid)
     return QualType();
 
-  return Context.getFunctionType(T, ParamTypes, EPI);
+  // HLSL Change - FIX - current contexts specialize templates with always-in parameters
+  return Context.getFunctionType(T, ParamTypes, EPI, None);
 }
 
 /// \brief Build a member pointer type \c T Class::*.
@@ -3605,6 +3635,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         // FIXME: This check isn't quite right: it allows star in prototypes
         // for function definitions, and disallows some edge cases detailed
         // in http://gcc.gnu.org/ml/gcc-patches/2009-02/msg00133.html
+        if (!S.getLangOpts().HLSL) // HLSL Change: this already errors at parse time
         S.Diag(DeclType.Loc, diag::err_array_star_outside_prototype);
         ASM = ArrayType::Normal;
         D.setInvalidType(true);
@@ -3613,6 +3644,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       // C99 6.7.5.2p1: The optional type qualifiers and the keyword static
       // shall appear only in a declaration of a function parameter with an
       // array type, ...
+      if (!S.getLangOpts().HLSL) // HLSL Change - these already error at parse time
       if (ASM == ArrayType::Static || ATI.TypeQuals) {
         if (!(D.isPrototypeContext() ||
               D.getContext() == Declarator::KNRTypeListContext)) {
@@ -3789,7 +3821,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       // Objective-C ARC ownership qualifiers are ignored on the function
       // return type (by type canonicalization). Complain if this attribute
       // was written here.
-      if (T.getQualifiers().hasObjCLifetime()) {
+      if (!LangOpts.HLSL && T.getQualifiers().hasObjCLifetime()) { // HLSL Change - no checks needed
         SourceLocation AttrLoc;
         if (chunkIndex + 1 < D.getNumTypeObjects()) {
           DeclaratorChunk ReturnTypeChunk = D.getTypeObject(chunkIndex + 1);
@@ -3892,6 +3924,11 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         SmallVector<QualType, 16> ParamTys;
         ParamTys.reserve(FTI.NumParams);
 
+        // HLSL Change Starts
+        SmallVector<hlsl::ParameterModifier, 16> ParamMods;
+        ParamMods.reserve(FTI.NumParams);
+        // HLSL Change Ends
+
         SmallVector<bool, 16> ConsumedParameters;
         ConsumedParameters.reserve(FTI.NumParams);
         bool HasAnyConsumedParameters = false;
@@ -3959,6 +3996,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
           }
 
           ParamTys.push_back(ParamTy);
+          ParamMods.push_back(Param->getParamModifiers());
         }
 
         if (HasAnyConsumedParameters)
@@ -3991,7 +4029,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
                                       Exceptions,
                                       EPI.ExceptionSpec);
 
-        T = Context.getFunctionType(T, ParamTys, EPI);
+        T = Context.getFunctionType(T, ParamTys, EPI, ParamMods);
       }
 
       break;
@@ -4145,7 +4183,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       EPI.RefQualifier = RQ_None;
 
       T = Context.getFunctionType(FnTy->getReturnType(), FnTy->getParamTypes(),
-                                  EPI);
+                                  EPI, FnTy->getParamMods());
       // Rebuild any parens around the identifier in the function type.
       for (unsigned i = 0, e = D.getNumTypeObjects(); i != e; ++i) {
         if (D.getTypeObject(i).Kind != DeclaratorChunk::Paren)
@@ -4259,7 +4297,7 @@ TypeSourceInfo *Sema::GetTypeForDeclarator(Declarator &D, Scope *S) {
   // Determine the type of the declarator. Not all forms of declarator
   // have a type.
 
-  TypeProcessingState state(*this, D);
+  TypeProcessingState state(*this, D, S);   // MS Change - add scope
 
   TypeSourceInfo *ReturnTypeInfo = nullptr;
   QualType T = GetDeclSpecTypeForDeclarator(state, ReturnTypeInfo);
@@ -4442,6 +4480,16 @@ static AttributeList::Kind getAttrListKind(AttributedType::Kind kind) {
     return AttributeList::AT_TypeNullUnspecified;
   case AttributedType::attr_objc_kindof:
     return AttributeList::AT_ObjCKindOf;
+  // HLSL Change Begins
+  case AttributedType::attr_hlsl_unorm:
+    return AttributeList::AT_HLSLUnorm;
+  case AttributedType::attr_hlsl_snorm:
+    return AttributeList::AT_HLSLSnorm;
+  case AttributedType::attr_hlsl_row_major:
+    return AttributeList::AT_HLSLRowMajor;
+  case AttributedType::attr_hlsl_column_major:
+    return AttributeList::AT_HLSLColumnMajor;
+  // HLSL Change Ends
   }
   llvm_unreachable("unexpected attribute kind!");
 }
@@ -5668,6 +5716,89 @@ static bool distributeNullabilityTypeAttr(TypeProcessingState &state,
   return false;
 }
 
+// HLSL Change Starts
+static bool isHLSLTypeAttr(AttributeList::Kind Kind) {
+  switch (Kind) {
+  case AttributeList::AT_HLSLRowMajor:
+  case AttributeList::AT_HLSLColumnMajor:
+  case AttributeList::AT_HLSLSnorm:
+  case AttributeList::AT_HLSLUnorm:
+    return true;
+  }
+  return false;
+}
+
+static bool handleHLSLTypeAttr(TypeProcessingState &State,
+                               AttributeList &Attr,
+                               QualType &Type) {
+  // Return true on error
+  Sema &S = State.getSema();
+
+  AttributeList::Kind Kind = Attr.getKind();
+
+  // Check for attributes on incorrect types
+  if ((Kind == AttributeList::AT_HLSLColumnMajor ||
+       Kind == AttributeList::AT_HLSLRowMajor) &&
+      !hlsl::IsMatrixType(&S, Type)) {
+    S.Diag(Attr.getLoc(), diag::err_hlsl_matrix_layout_wrong_type) << Attr.getName() << Attr.getRange();
+    return true;
+  } else if ((Kind == AttributeList::AT_HLSLSnorm ||
+              Kind == AttributeList::AT_HLSLUnorm) &&
+              !hlsl::GetOriginalElementType(&S, Type)->isFloatingType()) {
+    S.Diag(Attr.getLoc(), diag::err_hlsl_norm_float_only) << Attr.getRange();
+    return true;
+  }
+
+  const AttributedType *pMatrixOrientation = nullptr;
+  const AttributedType *pNorm = nullptr;
+  hlsl::GetHLSLAttributedTypes(&S, Type, &pMatrixOrientation, &pNorm);
+
+  if (pMatrixOrientation &&
+    (Kind == AttributeList::AT_HLSLColumnMajor ||
+    Kind == AttributeList::AT_HLSLRowMajor))
+  {
+    AttributedType::Kind CurAttrKind = pMatrixOrientation->getAttrKind();
+    if (Kind == getAttrListKind(CurAttrKind))
+    {
+      S.Diag(Attr.getLoc(), diag::warn_duplicate_attribute_exact)
+        << Attr.getName() << Attr.getRange();
+    } else {
+      S.Diag(Attr.getLoc(), diag::err_attributes_are_not_compatible)
+        << "'row_major'" << "'column_major'" << Attr.getRange();
+    }
+    return true;
+  }
+
+  if (pNorm &&
+    (Kind == AttributeList::AT_HLSLSnorm ||
+    Kind == AttributeList::AT_HLSLUnorm))
+  {
+    AttributedType::Kind CurAttrKind = pNorm->getAttrKind();
+    if (Kind == getAttrListKind(CurAttrKind))
+    {
+      S.Diag(Attr.getLoc(), diag::warn_duplicate_attribute_exact)
+        << Attr.getName() << Attr.getRange();
+    } else {
+      S.Diag(Attr.getLoc(), diag::err_attributes_are_not_compatible)
+        << "'unorm'" << "'snorm'" << Attr.getRange();
+    }
+    return true;
+  }
+
+  AttributedType::Kind TAK;
+  switch (Kind) {
+  default: llvm_unreachable("Unknown attribute kind");
+  case AttributeList::AT_HLSLRowMajor:    TAK = AttributedType::attr_hlsl_row_major; break;
+  case AttributeList::AT_HLSLColumnMajor: TAK = AttributedType::attr_hlsl_column_major; break;
+  case AttributeList::AT_HLSLUnorm:       TAK = AttributedType::attr_hlsl_unorm; break;
+  case AttributeList::AT_HLSLSnorm:       TAK = AttributedType::attr_hlsl_snorm; break;
+  }
+
+  Type = S.Context.getAttributedType(TAK, Type, Type);
+  return false;
+}
+// HLSL Change Ends
+
 static AttributedType::Kind getCCTypeAttrKind(AttributeList &Attr) {
   assert(!Attr.isInvalid());
   switch (Attr.getKind()) {
@@ -6097,6 +6228,14 @@ static void processTypeAttrs(TypeProcessingState &state, QualType &type,
               << attr.getName();
           continue;
         }
+      // HLSL Change Starts
+      } else if (isHLSLTypeAttr(attr.getKind())) {
+        if (!handleHLSLTypeAttr(state, attr, type))
+          attr.setUsedAsTypeAttr();
+        else
+          attr.setInvalid(true);
+        continue;
+      // HLSL Change Ends
       } else if (TAL != TAL_DeclChunk) {
         // Otherwise, only consider type processing for a C++11 attribute if
         // it's actually been applied to a type.

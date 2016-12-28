@@ -1,11 +1,12 @@
 //===--- LockFileManager.cpp - File-level Locking Utility------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LockFileManager.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+
 #include "llvm/Support/LockFileManager.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Errc.h"
@@ -21,7 +22,8 @@
 #if LLVM_ON_UNIX
 #include <unistd.h>
 #endif
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #if defined(__APPLE__) && defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && (__MAC_OS_X_VERSION_MIN_REQUIRED > 1050)
 #define USE_OSX_GETHOSTUUID 1
 #else

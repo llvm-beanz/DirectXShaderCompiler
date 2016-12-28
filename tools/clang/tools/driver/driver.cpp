@@ -1,16 +1,15 @@
 //===-- driver.cpp - Clang GCC-Compatible Driver --------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is the entry point to the clang driver; it is a thin wrapper
-// for functionality in the Driver clang library.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// driver.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is the entry point to the clang driver; it is a thin wrapper         //
+// for functionality in the Driver clang library.                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -50,6 +49,12 @@
 #include "llvm/Support/raw_ostream.h"
 #include <memory>
 #include <system_error>
+
+// HLSL Change Starts
+#include <windows.h>
+#include "llvm/Support/MSFileSystem.h"
+// HLSL Change Ends
+
 using namespace clang;
 using namespace clang::driver;
 using namespace llvm::opt;
@@ -364,7 +369,18 @@ static int ExecuteCC1Tool(ArrayRef<const char *> argv, StringRef Tool) {
   return 1;
 }
 
-int main(int argc_, const char **argv_) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc_, const char **argv_) {
+  // HLSL Change Starts
+  llvm::sys::fs::MSFileSystem* msfPtr;
+  HRESULT hr;
+  if (!SUCCEEDED(hr = CreateMSFileSystemForDisk(&msfPtr)))
+    return 1;
+  std::unique_ptr<llvm::sys::fs::MSFileSystem> msf(msfPtr);
+  llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
+  llvm::STDStreamCloser stdStreamCloser;
+  // HLSL Change Ends
+
   llvm::sys::PrintStackTraceOnErrorSignal();
   llvm::PrettyStackTraceProgram X(argc_, argv_);
 

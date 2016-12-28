@@ -1,14 +1,13 @@
 //===--- SemaTemplateInstantiateDecl.cpp - C++ Template Decl Instantiation ===/
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//===----------------------------------------------------------------------===/
-//
-//  This file implements C++ template instantiation for declarations.
-//
-//===----------------------------------------------------------------------===/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaTemplateInstantiateDecl.cpp                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
@@ -319,6 +318,13 @@ Decl *
 TemplateDeclInstantiator::VisitTranslationUnitDecl(TranslationUnitDecl *D) {
   llvm_unreachable("Translation units cannot be instantiated");
 }
+
+// HLSL Change Starts
+Decl *
+TemplateDeclInstantiator::VisitHLSLBufferDecl(HLSLBufferDecl *Decl) {
+  llvm_unreachable("HLSL buffer declarations cannot be instantiated");
+}
+// HLSL Change Ends
 
 Decl *
 TemplateDeclInstantiator::VisitExternCContextDecl(ExternCContextDecl *D) {
@@ -1341,7 +1347,7 @@ static QualType adjustFunctionTypeForInstantiation(ASTContext &Context,
   FunctionProtoType::ExtProtoInfo NewEPI = NewFunc->getExtProtoInfo();
   NewEPI.ExtInfo = OrigFunc->getExtInfo();
   return Context.getFunctionType(NewFunc->getReturnType(),
-                                 NewFunc->getParamTypes(), NewEPI);
+                                 NewFunc->getParamTypes(), NewEPI, NewFunc->getParamMods()); // HLSL Change
 }
 
 /// Normal class members are of more specific types and therefore
@@ -3272,7 +3278,7 @@ TemplateDeclInstantiator::InitFunctionInstantiation(FunctionDecl *New,
       EPI.ExceptionSpec.SourceDecl = New;
       EPI.ExceptionSpec.SourceTemplate = ExceptionSpecTemplate;
       New->setType(SemaRef.Context.getFunctionType(
-          NewProto->getReturnType(), NewProto->getParamTypes(), EPI));
+          NewProto->getReturnType(), NewProto->getParamTypes(), EPI, NewProto->getParamMods())); // HLSL Change
     } else {
       SemaRef.SubstExceptionSpec(New, Proto, TemplateArgs);
     }
@@ -3977,7 +3983,8 @@ void Sema::InstantiateVariableDefinition(SourceLocation PointOfInstantiation,
       LookupResult R(*this, Var->getDeclName(), Var->getLocation(),
                      LookupOrdinaryName, ForRedeclaration);
       R.addDecl(OldVar);
-      MergeVarDecl(Var, R);
+      ShadowMergeState MergeState = ShadowMergeState_Disallowed; // HLSL Change - add merge state
+      MergeVarDecl(Var, R, MergeState); // HLSL Change - add merge state
 
       // Attach the initializer.
       InstantiateVariableInitializer(Var, Def, TemplateArgs);

@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 add_subdirectory(Rewrite)
 
 set(LLVM_LINK_COMPONENTS
@@ -6,13 +8,16 @@ set(LLVM_LINK_COMPONENTS
   Support
   )
 
+# HLSL Change - add ignored sources
+set(HLSL_IGNORE_SOURCES ChainedIncludesSource.cpp)
+
 add_clang_library(clangFrontend
   ASTConsumers.cpp
   ASTMerge.cpp
   ASTUnit.cpp
   CacheTokens.cpp
   ChainedDiagnosticConsumer.cpp
-  ChainedIncludesSource.cpp
+  # ChainedIncludesSource.cpp      # HLSL Change
   CodeGenOptions.cpp
   CompilerInstance.cpp
   CompilerInvocation.cpp
@@ -51,5 +56,5 @@ add_clang_library(clangFrontend
   clangLex
   clangParse
   clangSema
-  clangSerialization
+#  clangSerialization # HLSL Change
   )

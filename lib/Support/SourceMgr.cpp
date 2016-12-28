@@ -1,17 +1,16 @@
 //===- SourceMgr.cpp - Manager for Simple Source Buffers & Diagnostics ----===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the SourceMgr class.  This class is used as a simple
-// substrate for diagnostics, #include handling, and other low level things for
-// simple parsers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SourceMgr.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the SourceMgr class.  This class is used as a simple //
+// substrate for diagnostics, #include handling, and other low level things for//
+// simple parsers.                                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/Twine.h"
@@ -35,12 +34,20 @@ static LineNoCacheTy *getCache(void *Ptr) {
   return (LineNoCacheTy*)Ptr;
 }
 
-
+// HLSL Change Starts: add a Reset version of the destructor
 SourceMgr::~SourceMgr() {
-  // Delete the line # cache if allocated.
-  if (LineNoCacheTy *Cache = getCache(LineNoCache))
-    delete Cache;
+  Reset();
 }
+void SourceMgr::Reset() {
+  // Delete the line # cache if allocated.
+  if (LineNoCacheTy *Cache = getCache(LineNoCache)) {
+    delete Cache;
+    LineNoCache = nullptr;  // MS Change
+  }
+  Buffers.clear();
+  IncludeDirectories.clear();
+}
+// HLSL Change Ends: add a Reset version of the destructor
 
 unsigned SourceMgr::AddIncludeFile(const std::string &Filename,
                                    SMLoc IncludeLoc,

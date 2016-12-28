@@ -1,11 +1,12 @@
 //===--- BackendUtil.h - LLVM Backend Utilities -----------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BackendUtil.h                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_CODEGEN_BACKENDUTIL_H
 #define LLVM_CLANG_CODEGEN_BACKENDUTIL_H
@@ -28,7 +29,8 @@ namespace clang {
     Backend_EmitLL,        ///< Emit human-readable LLVM assembly
     Backend_EmitNothing,   ///< Don't emit anything (benchmarking mode)
     Backend_EmitMCNull,    ///< Run CodeGen, but don't emit anything
-    Backend_EmitObj        ///< Emit native object files
+    Backend_EmitObj,       ///< Emit native object files
+    Backend_EmitPasses     ///< Emit pass configuration - HLSL Change
   };
 
   void EmitBackendOutput(DiagnosticsEngine &Diags, const CodeGenOptions &CGOpts,

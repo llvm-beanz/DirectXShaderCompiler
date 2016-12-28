@@ -1,15 +1,14 @@
 //===--- AnalysisConsumer.cpp - ASTConsumer for running Analyses ----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// "Meta" ASTConsumer for running different source analyses.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// AnalysisConsumer.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// "Meta" ASTConsumer for running different source analyses.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/StaticAnalyzer/Frontend/AnalysisConsumer.h"
 #include "ModelInjector.h"
@@ -789,6 +788,7 @@ UbigraphViz::UbigraphViz(std::unique_ptr<raw_ostream> Out, StringRef Filename)
 UbigraphViz::~UbigraphViz() {
   Out.reset();
   llvm::errs() << "Running 'ubiviz' program... ";
+#ifdef MSFT_SUPPORTS_CHILD_PROCESSES
   std::string ErrMsg;
   std::string Ubiviz;
   if (auto Path = llvm::sys::findProgramByName("ubiviz"))
@@ -805,4 +805,5 @@ UbigraphViz::~UbigraphViz() {
 
   // Delete the file.
   llvm::sys::fs::remove(Filename);
+#endif // MSFT_SUPPORTS_CHILD_PROCESSES
 }

@@ -1,15 +1,14 @@
 //===--- ASTUnit.h - ASTUnit utility ----------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTUnit.h                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// ASTUnit utility class.                                                    //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// ASTUnit utility class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_FRONTEND_ASTUNIT_H
 #define LLVM_CLANG_FRONTEND_ASTUNIT_H
@@ -38,6 +37,12 @@
 #include <sys/types.h>
 #include <utility>
 #include <vector>
+
+// HLSL Change Starts
+namespace hlsl {
+  class DxcLangExtensionsHelperApply;
+}
+// HLSL Change Ends
 
 namespace llvm {
   class MemoryBuffer;
@@ -98,8 +103,10 @@ private:
   IntrusiveRefCntPtr<ASTReader> Reader;
   bool HadModuleLoaderFatalFailure;
 
+#if 0  // HLSL Change Starts - no support for serialization
   struct ASTWriterData;
   std::unique_ptr<ASTWriterData> WriterData;
+#endif // HLSL Change Ends - no support for serialization
 
   FileSystemOptions FileSystemOpts;
 
@@ -185,6 +192,7 @@ private:
   unsigned PreambleRebuildCounter;
 
 public:
+  hlsl::DxcLangExtensionsHelperApply *HlslLangExtensions; // HLSL Change
   class PreambleData {
     const FileEntry *File;
     std::vector<char> Buffer;
@@ -308,7 +316,8 @@ private:
   LangOptions ASTFileLangOpts;
 
   static void ConfigureDiags(IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
-                             ASTUnit &AST, bool CaptureDiagnostics);
+                             ASTUnit &AST, bool CaptureDiagnostics,
+                             bool VerifyDiagnostics = false); // HLSL Change
 
   void TranslateStoredDiagnostics(FileManager &FileMgr,
                                   SourceManager &SrcMan,
@@ -715,6 +724,12 @@ public:
                          bool CaptureDiagnostics,
                          bool UserFilesAreVolatile);
 
+  // HLSL Change: Create a ASTUnit from an AST llvm::MemoryBuffer.
+  static ASTUnit *LoadFromASTMemoryBuffer(const std::string &Filename,
+    IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+    const FileSystemOptions &FileSystemOpts,
+    llvm::MemoryBuffer *astBuffer);
+
   /// \brief Create a ASTUnit from an AST file.
   ///
   /// \param Filename - The AST file to load.
@@ -845,7 +860,8 @@ public:
       bool IncludeBriefCommentsInCodeCompletion = false,
       bool AllowPCHWithCompilerErrors = false, bool SkipFunctionBodies = false,
       bool UserFilesAreVolatile = false, bool ForSerialization = false,
-      std::unique_ptr<ASTUnit> *ErrAST = nullptr);
+      std::unique_ptr<ASTUnit> *ErrAST = nullptr,
+      hlsl::DxcLangExtensionsHelperApply *HlslLangExtensions = nullptr); // HLSL Change
 
   /// \brief Reparse the source files using the same command-line options that
   /// were originally used to produce this translation unit.

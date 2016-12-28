@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 if (WIN32)
   # CPack will install a registry key in this format that we wish to reference.
   set(REG_KEY "${CPACK_PACKAGE_INSTALL_REGISTRY_KEY}")

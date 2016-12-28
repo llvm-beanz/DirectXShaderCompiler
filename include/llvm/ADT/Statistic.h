@@ -1,27 +1,26 @@
 //===-- llvm/ADT/Statistic.h - Easy way to expose stats ---------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Statistic.h                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the 'Statistic' class, which is designed to be an easy way//
+// to expose various metrics from passes.  These statistics are printed at the//
+// end of a run (from llvm_shutdown), when the -stats command line option is //
+// passed on the command line.                                               //
 //
-//                     The LLVM Compiler Infrastructure
+// This is useful for reporting information like the number of instructions  //
+// simplified, optimized or removed by various transformations, like this:   //
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// static Statistic NumInstsKilled("gcse", "Number of instructions killed"); //
 //
-//===----------------------------------------------------------------------===//
+// Later, in the code: ++NumInstsKilled;                                     //
 //
-// This file defines the 'Statistic' class, which is designed to be an easy way
-// to expose various metrics from passes.  These statistics are printed at the
-// end of a run (from llvm_shutdown), when the -stats command line option is
-// passed on the command line.
+// NOTE: Statistics *must* be declared as global variables.                  //
 //
-// This is useful for reporting information like the number of instructions
-// simplified, optimized or removed by various transformations, like this:
-//
-// static Statistic NumInstsKilled("gcse", "Number of instructions killed");
-//
-// Later, in the code: ++NumInstsKilled;
-//
-// NOTE: Statistics *must* be declared as global variables.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ADT_STATISTIC_H
 #define LLVM_ADT_STATISTIC_H

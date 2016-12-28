@@ -1,15 +1,14 @@
 //===-- TargetLibraryInfo.cpp - Runtime library information ----------------==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the TargetLibraryInfo class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetLibraryInfo.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the TargetLibraryInfo class.                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/ADT/Triple.h"
@@ -64,6 +63,8 @@ static void initialize(TargetLibraryInfoImpl &TLI, const Triple &T,
   // There are no library implementations of mempcy and memset for AMD gpus and
   // these can be difficult to lower in the backend.
   if (T.getArch() == Triple::r600 ||
+      T.getArch() == Triple::dxil || // HLSL Change
+      T.getArch() == Triple::dxil64 || // HLSL Change
       T.getArch() == Triple::amdgcn) {
     TLI.setUnavailable(LibFunc::memcpy);
     TLI.setUnavailable(LibFunc::memset);

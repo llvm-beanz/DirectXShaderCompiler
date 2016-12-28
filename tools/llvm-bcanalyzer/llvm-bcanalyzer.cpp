@@ -1,31 +1,30 @@
 //===-- llvm-bcanalyzer.cpp - Bitcode Analyzer --------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This tool may be invoked in the following manner:
-//  llvm-bcanalyzer [options]      - Read LLVM bitcode from stdin
-//  llvm-bcanalyzer [options] x.bc - Read LLVM bitcode from the x.bc file
-//
-//  Options:
-//      --help      - Output information about command line switches
-//      --dump      - Dump low-level bitcode structure in readable format
-//
-// This tool provides analytical information about a bitcode file. It is
-// intended as an aid to developers of bitcode reading and writing software. It
-// produces on std::out a summary of the bitcode file that shows various
-// statistics about the contents of the file. By default this information is
-// detailed and contains information about individual bitcode blocks and the
-// functions in the module.
-// The tool is also able to print a bitcode file in a straight forward text
-// format that shows the containment and relationships of the information in
-// the bitcode file (-dump option).
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-bcanalyzer.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This tool may be invoked in the following manner:                         //
+//  llvm-bcanalyzer [options]      - Read LLVM bitcode from stdin            //
+//  llvm-bcanalyzer [options] x.bc - Read LLVM bitcode from the x.bc file    //
+//                                                                           //
+//  Options:                                                                 //
+//      --help      - Output information about command line switches         //
+//      --dump      - Dump low-level bitcode structure in readable format    //
+//                                                                           //
+// This tool provides analytical information about a bitcode file. It is     //
+// intended as an aid to developers of bitcode reading and writing software. It//
+// produces on std::out a summary of the bitcode file that shows various     //
+// statistics about the contents of the file. By default this information is //
+// detailed and contains information about individual bitcode blocks and the //
+// functions in the module.                                                  //
+// The tool is also able to print a bitcode file in a straight forward text  //
+// format that shows the containment and relationships of the information in //
+// the bitcode file (-dump option).                                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/ADT/Optional.h"
@@ -43,6 +42,12 @@
 #include <cctype>
 #include <map>
 #include <system_error>
+// HLSL Change Starts
+#include "dxc/Support/Global.h"
+#include "dxc/Support/WinIncludes.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MSFileSystem.h"
+// HLSL Change Ends
 using namespace llvm;
 
 static cl::opt<std::string>
@@ -712,10 +717,19 @@ static int AnalyzeBitcode() {
 }
 
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
+  // HLSL Change Starts
+#if 1
+  llvm::sys::fs::MSFileSystem* msfPtr;
+  if (FAILED(CreateMSFileSystemForDisk(&msfPtr))) return 1;
+  std::unique_ptr<llvm::sys::fs::MSFileSystem> msf(msfPtr);
+  llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
+#else
   // Print a stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);
+#endif // HLSL Change Ends
   llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
   cl::ParseCommandLineOptions(argc, argv, "llvm-bcanalyzer file analyzer\n");
 

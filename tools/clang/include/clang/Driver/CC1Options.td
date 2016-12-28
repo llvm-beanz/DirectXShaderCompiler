@@ -1,15 +1,14 @@
 //===--- CC1Options.td - Options for clang -cc1 ---------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the options accepted by clang -cc1 and clang -cc1as.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CC1Options.td                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the options accepted by clang -cc1 and clang -cc1as.   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 let Flags = [CC1Option, NoDriverOption] in {
 
@@ -299,8 +298,10 @@ def fspell_checking_limit : Separate<["-"], "fspell-checking-limit">, MetaVarNam
   HelpText<"Set the maximum number of times to perform spell checking on unrecognized identifiers (0 = no limit).">;
 def fmessage_length : Separate<["-"], "fmessage-length">, MetaVarName<"<N>">,
   HelpText<"Format message diagnostics so that they fit within N columns or fewer, when possible.">;
-def verify : Flag<["-"], "verify">,
-  HelpText<"Verify diagnostic output using comment directives">;
+// HLSL Change Starts - move verify out of Flags context
+//def verify : Flag<["-"], "verify">,
+//  HelpText<"Verify diagnostic output using comment directives">;
+// HLSL Change Ends
 def verify_ignore_unexpected : Flag<["-"], "verify-ignore-unexpected">,
   HelpText<"Ignore unexpected diagnostic messages">;
 def verify_ignore_unexpected_EQ : CommaJoined<["-"], "verify-ignore-unexpected=">,
@@ -649,6 +650,17 @@ def fcuda_disable_target_call_checks : Flag<["-"],
 def fcuda_include_gpubinary : Separate<["-"], "fcuda-include-gpubinary">,
   HelpText<"Incorporate CUDA device-side binary into host object file.">;
 
+// HLSL Change Starts
+//===----------------------------------------------------------------------===//
+// HLSL Options
+//===----------------------------------------------------------------------===//
+
+def hlsl_entry : Separate<["-"], "hlsl-entry">,
+  HelpText<"Entry point of hlsl shader.">;
+def hlsl_profile : Separate<["-"], "hlsl-profile">,
+  HelpText<"Shader model to target for hlsl shader.">;
+// HLSL Change Ends
+
 } // let Flags = [CC1Option]
 
 
@@ -679,3 +691,14 @@ def dwarf_debug_producer : Separate<["-"], "dwarf-debug-producer">,
   HelpText<"The string to embed in the Dwarf debug AT_producer record.">;
 
 } // let Flags = [CC1AsOption]
+
+
+// HLSL Change Starts - allow DriverOption for -verify
+//===----------------------------------------------------------------------===//
+// cc1 Options (verify) allowed through driver
+//===----------------------------------------------------------------------===//
+//let Flags = [CC1Option] in {
+def verify : Flag<["-"], "verify">,
+  HelpText<"Verify diagnostic output using comment directives">;
+//} // let Flags = [CC1Option]
+// HLSL Change Ends

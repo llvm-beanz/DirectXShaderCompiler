@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclNodes.td                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 class AttrSubject;
 
 class Decl<bit abstract = 0> : AttrSubject {
@@ -71,6 +80,7 @@ def Named : Decl<1>;
       def ObjCImplementation : DDecl<ObjCImpl>;
   def ObjCProperty : DDecl<Named>;
   def ObjCCompatibleAlias : DDecl<Named>;
+  def HLSLBuffer : DDecl<Named>, DeclContext; // HLSL Change
 def LinkageSpec : Decl, DeclContext;
 def ObjCPropertyImpl : Decl;
 def FileScopeAsm : Decl;

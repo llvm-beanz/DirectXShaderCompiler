@@ -1,15 +1,14 @@
 //===- ObjectFile.cpp - File format independent object file -----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines a file format independent ObjectFile class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ObjectFile.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines a file format independent ObjectFile class.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Object/COFF.h"
 #include "llvm/Object/MachO.h"
@@ -77,7 +76,7 @@ ObjectFile::createObjectFile(MemoryBufferRef Object, sys::fs::file_magic Type) {
   case sys::fs::file_magic::elf_executable:
   case sys::fs::file_magic::elf_shared_object:
   case sys::fs::file_magic::elf_core:
-    return createELFObjectFile(Object);
+    // return createELFObjectFile(Object); // HLSL Change - remove support for ELF files
   case sys::fs::file_magic::macho_object:
   case sys::fs::file_magic::macho_executable:
   case sys::fs::file_magic::macho_fixed_virtual_memory_shared_lib:
@@ -89,7 +88,8 @@ ObjectFile::createObjectFile(MemoryBufferRef Object, sys::fs::file_magic Type) {
   case sys::fs::file_magic::macho_dynamically_linked_shared_lib_stub:
   case sys::fs::file_magic::macho_dsym_companion:
   case sys::fs::file_magic::macho_kext_bundle:
-    return createMachOObjectFile(Object);
+    // return createMachOObjectFile(Object); // HLSL Change - remove support for Mach-O files
+    return object_error::invalid_file_type;  // HLSL Change
   case sys::fs::file_magic::coff_object:
   case sys::fs::file_magic::coff_import_library:
   case sys::fs::file_magic::pecoff_executable:

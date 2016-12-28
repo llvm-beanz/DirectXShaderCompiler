@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// regexec.c                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 /*-
  * This code is derived from OpenBSD's libc/regex, original license follows:
  *
@@ -78,7 +87,7 @@
 #define	ISSETBACK(v, n)		(((v) & ((unsigned long)here >> (n))) != 0)
 /* function names */
 #define SNAMES			/* engine.inc looks after details */
-
+#define _states_param_          /* define to nothing when not a pointer */
 #include "regengine.inc"
 
 /* now undo things */
@@ -101,6 +110,7 @@
 #undef	BACK
 #undef	ISSETBACK
 #undef	SNAMES
+#undef _states_param_
 
 /* macros for manipulating states, large version */
 #define	states	char *
@@ -127,6 +137,7 @@
 #define	ISSETBACK(v, n)	((v)[here - (n)])
 /* function names */
 #define	LNAMES			/* flag */
+#define _states_param_ __inexpressible_readableTo(stopmarker)
 
 #include "regengine.inc"
 

@@ -1,15 +1,16 @@
 //===- PDBInterfaceAnchors.h - defines class anchor funcions ----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-// Class anchors are necessary per the LLVM Coding style guide, to ensure that
-// the vtable is only generated in this object file, and not in every object
-// file that incldues the corresponding header.
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PDBInterfaceAnchors.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Class anchors are necessary per the LLVM Coding style guide, to ensure that//
+// the vtable is only generated in this object file, and not in every object //
+// file that incldues the corresponding header.                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/DebugInfo/PDB/IPDBDataStream.h"
 #include "llvm/DebugInfo/PDB/IPDBLineNumber.h"

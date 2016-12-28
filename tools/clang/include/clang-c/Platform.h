@@ -1,16 +1,12 @@
 /*===-- clang-c/Platform.h - C Index platform decls   -------------*- C -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header provides platform specific macros (dllimport, deprecated, ...) *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Platform.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_C_PLATFORM_H
 #define LLVM_CLANG_C_PLATFORM_H
 
@@ -19,6 +15,8 @@ extern "C" {
 #endif
 
 /* MSVC DLL import/export. */
+#ifndef CINDEX_LINKAGE
+
 #ifdef _MSC_VER
   #ifdef _CINDEX_LIB_
     #define CINDEX_LINKAGE __declspec(dllexport)
@@ -28,6 +26,21 @@ extern "C" {
 #else
   #define CINDEX_LINKAGE
 #endif
+
+#endif
+
+// HLSL Change starts.
+// This includes the LIBCLANG_CC inclusion in this file to be explicit
+// about the calling convenion in use.
+#ifndef LIBCLANG_CC
+#ifdef _MSC_VER
+// DLL APIs should use the standard call convention like other WINAPI APIs.
+#define LIBCLANG_CC __stdcall
+#else
+#define LIBCLANG_CC
+#endif
+#endif
+// HLSL Change ends.
 
 #ifdef __GNUC__
   #define CINDEX_DEPRECATED __attribute__((deprecated))

@@ -1,16 +1,15 @@
 //===----- CGCall.h - Encapsulate calling convention details ----*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGCall.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// These classes wrap the information about a call or function               //
+// definition used to handle ABI compliancy.                                 //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// These classes wrap the information about a call or function
-// definition used to handle ABI compliancy.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LIB_CODEGEN_CGCALL_H
 #define LLVM_CLANG_LIB_CODEGEN_CGCALL_H
@@ -84,17 +83,25 @@ namespace CodeGen {
 
     void addFrom(const CallArgList &other) {
       insert(end(), other.begin(), other.end());
+#if 0 // HLSL Change - no ObjC support
       Writebacks.insert(Writebacks.end(),
                         other.Writebacks.begin(), other.Writebacks.end());
+#else
+      assert(!other.hasWritebacks() && "writeback is unreachable in HLSL");
+#endif // HLSL Change - no ObjC support
     }
 
     void addWriteback(LValue srcLV, llvm::Value *temporary,
                       llvm::Value *toUse) {
+#if 0 // HLSL Change - no ObjC support
       Writeback writeback;
       writeback.Source = srcLV;
       writeback.Temporary = temporary;
       writeback.ToUse = toUse;
       Writebacks.push_back(writeback);
+#else
+      llvm_unreachable("addWriteback is unreachable in HLSL");
+#endif // HLSL Change - no ObjC support
     }
 
     bool hasWritebacks() const { return !Writebacks.empty(); }

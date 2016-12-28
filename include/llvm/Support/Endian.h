@@ -1,15 +1,14 @@
 //===- Endian.h - Utilities for IO with endian specific data ----*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Endian.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file declares generic functions to read and write endian specific data.//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file declares generic functions to read and write endian specific data.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_ENDIAN_H
 #define LLVM_SUPPORT_ENDIAN_H
@@ -17,6 +16,9 @@
 #include "llvm/Support/AlignOf.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/SwapByteOrder.h"
+
+#pragma warning( push )           // HLSL Change - constant comparisons are done for portability
+#pragma warning( disable : 6326 ) // 'Potential comparison of a constant with another constant.'
 
 namespace llvm {
 namespace support {
@@ -224,5 +226,7 @@ inline void write64be(void *p, uint64_t v) { *(ubig64_t *)p = v; }
 } // end namespace endian
 } // end namespace support
 } // end namespace llvm
+
+#pragma warning( pop ) // HLSL Change - pop warning level
 
 #endif

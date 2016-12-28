@@ -1,16 +1,15 @@
 //===-- llvm/Operator.h - Operator utility subclass -------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Operator.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines various classes for working with Instructions and       //
+// ConstantExprs.                                                            //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines various classes for working with Instructions and
-// ConstantExprs.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_IR_OPERATOR_H
 #define LLVM_IR_OPERATOR_H
@@ -83,11 +82,11 @@ private:
   friend class ConstantExpr;
   void setHasNoUnsignedWrap(bool B) {
     SubclassOptionalData =
-      (SubclassOptionalData & ~NoUnsignedWrap) | (B * NoUnsignedWrap);
+      (SubclassOptionalData & ~NoUnsignedWrap) | (B ? NoUnsignedWrap : 0); // HLSL Change - fix bool arithmetic operator
   }
   void setHasNoSignedWrap(bool B) {
     SubclassOptionalData =
-      (SubclassOptionalData & ~NoSignedWrap) | (B * NoSignedWrap);
+      (SubclassOptionalData & ~NoSignedWrap) | (B ? NoSignedWrap : 0); // HLSL Change - fix bool arithmetic operator
   }
 
 public:
@@ -133,7 +132,7 @@ private:
   friend class BinaryOperator;
   friend class ConstantExpr;
   void setIsExact(bool B) {
-    SubclassOptionalData = (SubclassOptionalData & ~IsExact) | (B * IsExact);
+    SubclassOptionalData = (SubclassOptionalData & ~IsExact) | (B ? IsExact : 0); // HLSL Change - fix bool arithmetic operator
   }
 
 public:
@@ -204,6 +203,15 @@ public:
     setNoSignedZeros();
     setAllowReciprocal();
   }
+  // HLSL Change Begins.
+  void setUnsafeAlgebraHLSL() {
+    Flags |= UnsafeAlgebra;
+    // HLSL has NaNs.
+    setNoInfs();
+    setNoSignedZeros();
+    setAllowReciprocal();
+  }
+  // HLSL Change Ends.
 
   void operator&=(const FastMathFlags &OtherFlags) {
     Flags &= OtherFlags.Flags;
@@ -220,7 +228,7 @@ private:
   void setHasUnsafeAlgebra(bool B) {
     SubclassOptionalData =
       (SubclassOptionalData & ~FastMathFlags::UnsafeAlgebra) |
-      (B * FastMathFlags::UnsafeAlgebra);
+      (B ? FastMathFlags::UnsafeAlgebra : 0); // HLSL Change - fix bool arithmetic operator
 
     // Unsafe algebra implies all the others
     if (B) {
@@ -233,22 +241,22 @@ private:
   void setHasNoNaNs(bool B) {
     SubclassOptionalData =
       (SubclassOptionalData & ~FastMathFlags::NoNaNs) |
-      (B * FastMathFlags::NoNaNs);
+      (B ? FastMathFlags::NoNaNs : 0); // HLSL Change - fix bool arithmetic operator
   }
   void setHasNoInfs(bool B) {
     SubclassOptionalData =
       (SubclassOptionalData & ~FastMathFlags::NoInfs) |
-      (B * FastMathFlags::NoInfs);
+      (B ? FastMathFlags::NoInfs : 0); // HLSL Change - fix bool arithmetic operator
   }
   void setHasNoSignedZeros(bool B) {
     SubclassOptionalData =
       (SubclassOptionalData & ~FastMathFlags::NoSignedZeros) |
-      (B * FastMathFlags::NoSignedZeros);
+      (B ? FastMathFlags::NoSignedZeros : 0); // HLSL Change - fix bool arithmetic operator
   }
   void setHasAllowReciprocal(bool B) {
     SubclassOptionalData =
       (SubclassOptionalData & ~FastMathFlags::AllowReciprocal) |
-      (B * FastMathFlags::AllowReciprocal);
+      (B ? FastMathFlags::AllowReciprocal : 0); // HLSL Change - fix bool arithmetic operator
   }
 
   /// Convenience function for setting multiple fast-math flags.

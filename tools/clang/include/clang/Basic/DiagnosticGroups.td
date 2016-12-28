@@ -1,11 +1,12 @@
 //==--- DiagnosticGroups.td - Diagnostic Group Definitions ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DiagnosticGroups.td                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 def ImplicitFunctionDeclare : DiagGroup<"implicit-function-declaration">;
 def ImplicitInt : DiagGroup<"implicit-int">;
@@ -777,3 +778,7 @@ def CudaCompat : DiagGroup<"cuda-compat">;
 
 // A warning group for things that will change semantics in the future.
 def FutureCompat : DiagGroup<"future-compat">;
+
+// HLSL Change Starts - HLSL diagnostic groups
+def HLSLEffectsSyntax : DiagGroup<"effects-syntax">;
+// HLSL Change Ends

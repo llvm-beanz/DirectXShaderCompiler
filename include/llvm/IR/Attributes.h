@@ -1,15 +1,15 @@
 //===-- llvm/Attributes.h - Container for Attributes ------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Attributes.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file contains the simple types necessary to represent the
-/// attributes associated with functions and their calls.
+/// \file                                                                    //
+/// \brief This file contains the simple types necessary to represent the    //
+/// attributes associated with functions and their calls.                    //
 ///
 //===----------------------------------------------------------------------===//
 
@@ -425,8 +425,8 @@ template<> struct DenseMapInfo<AttributeSet> {
   }
   static bool isEqual(AttributeSet LHS, AttributeSet RHS) { return LHS == RHS; }
 };
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// \class
 /// \brief This class is used in conjunction with the Attribute::get method to
 /// create an Attribute object. The object itself is uniquified. The Builder's

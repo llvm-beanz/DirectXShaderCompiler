@@ -1,15 +1,14 @@
 //===--- Type.h - C Language Family Type Representation ---------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Type.h                                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Type interface and subclasses.                     //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Type interface and subclasses.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_AST_TYPE_H
 #define LLVM_CLANG_AST_TYPE_H
@@ -2016,11 +2015,11 @@ public:
   QualType desugar() const { return QualType(this, 0); }
 
   bool isInteger() const {
-    return getKind() >= Bool && getKind() <= Int128;
+    return getKind() >= Bool && getKind() <= LitInt; // HLSL Change: last int in list is LitInt, not Int128
   }
 
   bool isSignedInteger() const {
-    return getKind() >= Char_S && getKind() <= Int128;
+    return getKind() >= Char_S && getKind() <= LitInt; // HLSL Change: last signed int in list is LitInt, not Int128
   }
 
   bool isUnsignedInteger() const {
@@ -2028,7 +2027,7 @@ public:
   }
 
   bool isFloatingPoint() const {
-    return getKind() >= Half && getKind() <= LongDouble;
+    return getKind() >= Half && getKind() <= LitFloat; // HLSL Change: last floating point in list is LitFloat, not LongDouble
   }
 
   /// Determines whether the given kind corresponds to a placeholder type.
@@ -2761,15 +2760,31 @@ class ExtVectorType : public VectorType {
     VectorType(ExtVector, vecType, nElements, canonType, GenericVector) {}
   friend class ASTContext;  // ASTContext creates these.
 public:
+  // HLSL Change Starts - HLSL specific rules for vector member access
+  enum AccessorSet {
+    AccessorSetUnknown,
+    AccessorSetXyzw,
+    AccessorSetRgba
+  };
+  static AccessorSet getPointAccessorSet(char c) {
+    if (c == 'x' || c == 'y' || c == 'z' || c == 'w') {
+      return AccessorSetXyzw;
+    }
+    else if (c == 'r' || c == 'g' || c == 'b' || c == 'a') {
+      return AccessorSetRgba;
+    }
+    return AccessorSetUnknown;
+  }
   static int getPointAccessorIdx(char c) {
     switch (c) {
-    default: return -1;
-    case 'x': return 0;
-    case 'y': return 1;
-    case 'z': return 2;
-    case 'w': return 3;
+      default: return -1;
+      case 'r': case 'x': return 0;
+      case 'g': case 'y': return 1;
+      case 'b': case 'z': return 2;
+      case 'a': case 'w': return 3;
     }
   }
+  // HLSL Change Ends - HLSL specific rules for vector member access
   static int getNumericAccessorIdx(char c) {
     switch (c) {
       default: return -1;
@@ -3076,7 +3091,8 @@ private:
   }
 
   FunctionProtoType(QualType result, ArrayRef<QualType> params,
-                    QualType canonical, const ExtProtoInfo &epi);
+                    QualType canonical, const ExtProtoInfo &epi,
+                    ArrayRef<hlsl::ParameterModifier> paramMods);
 
   /// The number of parameters this function has, not counting '...'.
   unsigned NumParams : 15;
@@ -3113,6 +3129,8 @@ private:
   // ConsumedParameters - A variable size array, following Exceptions
   // and of length NumParams, holding flags indicating which parameters
   // are consumed.  This only appears if HasAnyConsumedParams is true.
+
+  // ParameterModifiers - A variable sized array of hlsl::ParameterModifier.
 
   friend class ASTContext;  // ASTContext creates these.
 
@@ -3273,6 +3291,20 @@ public:
     return exception_begin() + NumExceptions;
   }
 
+  // HLSL Change Starts
+  ArrayRef<hlsl::ParameterModifier> getParamMods() const {
+    return llvm::makeArrayRef(parammods_begin(), parammods_end());
+  }
+  const hlsl::ParameterModifier *parammods_begin() const {
+    // param modifiers begin where exceptions end
+    return (hlsl::ParameterModifier*)exception_end();
+  }
+  const hlsl::ParameterModifier *parammods_end() const {
+    // modifiers begin where arguments end (in place of exceptions, in HLSL)
+    return parammods_begin() + NumParams;
+  }
+  // HLSL Change Ends
+
   bool hasAnyConsumedParams() const { return HasAnyConsumedParams; }
   bool isParamConsumed(unsigned I) const {
     assert(I < getNumParams() && "parameter index out of range");
@@ -3294,9 +3326,10 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Ctx);
   static void Profile(llvm::FoldingSetNodeID &ID, QualType Result,
                       param_type_iterator ArgTys, unsigned NumArgs,
-                      const ExtProtoInfo &EPI, const ASTContext &Context);
+                      const ExtProtoInfo &EPI,
+                      ArrayRef<hlsl::ParameterModifier> ParamMods, // HLSL Change
+                      const ASTContext &Context);
 };
-
 
 /// \brief Represents the dependent type named by a dependently-scoped
 /// typename using declaration, e.g.
@@ -3612,6 +3645,12 @@ public:
     attr_nullable,
     attr_null_unspecified,
     attr_objc_kindof,
+    // HLSL Change Begins
+    attr_hlsl_unorm,
+    attr_hlsl_snorm,
+    attr_hlsl_row_major,
+    attr_hlsl_column_major
+    // HLSL Change Ends    
   };
 
 private:
@@ -3642,6 +3681,8 @@ public:
   QualType desugar() const { return getEquivalentType(); }
 
   bool isMSTypeSpec() const;
+  
+  bool isHLSLTypeSpec() const;    // HLSL Change  
 
   bool isCallingConv() const;
 
@@ -3903,7 +3944,7 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDeducedType(), isDecltypeAuto(), 
-		    isDependentType());
+            isDependentType());
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, QualType Deduced,
@@ -5448,7 +5489,7 @@ extern bool IsEnumDeclScoped(EnumDecl *);
 inline bool Type::isIntegerType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::LitInt; // HLSL Change Int128 to LitInt
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
     // Incomplete enum types are not treated as integer types.
     // FIXME: In C++, enum types are never integer types.
@@ -5476,7 +5517,7 @@ inline bool Type::isScalarType() const {
 inline bool Type::isIntegralOrEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::LitInt; // HLSL Change - Int128 to LitInt
 
   // Check for a complete enum type; incomplete enum types are not properly an
   // enumeration type in the sense required here.

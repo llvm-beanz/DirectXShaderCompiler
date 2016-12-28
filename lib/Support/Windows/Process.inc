@@ -1,15 +1,14 @@
 //===- Win32/Process.cpp - Win32 Process Implementation ------- -*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file provides the Win32 specific implementation of the Process class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Process.inc                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file provides the Win32 specific implementation of the Process class.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -22,7 +21,7 @@
 #include <direct.h>
 #include <io.h>
 #include <psapi.h>
-#include <shellapi.h>
+// #include <shellapi.h>  // HLSL Change
 
 #ifdef __MINGW32__
  #if (HAVE_LIBPSAPI != 1)
@@ -32,8 +31,8 @@
   #error "libshell32.a should be present"
  #endif
 #else
- #pragma comment(lib, "psapi.lib")
- #pragma comment(lib, "shell32.lib")
+// #pragma comment(lib, "psapi.lib") // HLSL Change
+// #pragma comment(lib, "shell32.lib") // HLSL Change
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -225,8 +224,9 @@ WildcardExpand(const wchar_t *Arg, SmallVectorImpl<const char *> &Args,
 
 std::error_code
 Process::GetArgumentVector(SmallVectorImpl<const char *> &Args,
-                           ArrayRef<const char *>,
+                           ArrayRef<const char *> ArgsIn,
                            SpecificBumpPtrAllocator<char> &ArgAllocator) {
+#if 0 // HLSL Change - use the arguments from the C library and avoid pulling in shell32
   int ArgCount;
   wchar_t **UnicodeCommandLine =
       CommandLineToArgvW(GetCommandLineW(), &ArgCount);
@@ -243,6 +243,20 @@ Process::GetArgumentVector(SmallVectorImpl<const char *> &Args,
   }
 
   LocalFree(UnicodeCommandLine);
+#else
+  std::error_code ec;
+  Args.reserve(ArgsIn.size());
+  for (size_t i = 0; i < ArgsIn.size(); ++i) {
+    SmallVector<char, MAX_PATH> NewArgString;
+    ec = windows::ACPToUTF8(ArgsIn[i], strlen(ArgsIn[i]), NewArgString);
+    if (ec)
+      break;
+
+    char *Buffer = ArgAllocator.Allocate(NewArgString.size() + 1);
+    ::memcpy(Buffer, NewArgString.data(), NewArgString.size() + 1);
+    Args.push_back(Buffer);
+  }
+#endif
   return ec;
 }
 
@@ -251,7 +265,7 @@ std::error_code Process::FixupStandardFileDescriptors() {
 }
 
 std::error_code Process::SafelyCloseFileDescriptor(int FD) {
-  if (::close(FD) < 0)
+  if (llvm::sys::fs::msf_close(FD) < 0) // HLSL Change
     return std::error_code(errno, std::generic_category());
   return std::error_code();
 }
@@ -324,7 +338,7 @@ class DefaultColors
     WORD operator()() const { return defaultColor; }
 };
 
-DefaultColors defaultColors;
+// DefaultColors defaultColors; // HLSL Change - remove global initialized at DLL load time
 
 WORD fg_color(WORD color) {
   return color & (FOREGROUND_BLUE | FOREGROUND_GREEN |
@@ -338,11 +352,17 @@ WORD bg_color(WORD color) {
 }
 
 bool Process::ColorNeedsFlush() {
+#ifdef MSFT_SUPPORTS_ANSI_ESCAPE_CODES
   return !UseANSI;
+#else
+  return true;
+#endif
 }
 
 const char *Process::OutputBold(bool bg) {
+#ifdef MSFT_SUPPORTS_ANSI_ESCAPE_CODES
   if (UseANSI) return "\033[1m";
+#endif
 
   WORD colors = DefaultColors::GetCurrentColor();
   if (bg)
@@ -354,7 +374,9 @@ const char *Process::OutputBold(bool bg) {
 }
 
 const char *Process::OutputColor(char code, bool bold, bool bg) {
+#ifdef MSFT_SUPPORTS_ANSI_ESCAPE_CODES
   if (UseANSI) return colorcodes[bg?1:0][bold?1:0][code&7];
+#endif
 
   WORD current = DefaultColors::GetCurrentColor();
   WORD colors;
@@ -384,7 +406,9 @@ static WORD GetConsoleTextAttribute(HANDLE hConsoleOutput) {
 }
 
 const char *Process::OutputReverse() {
+#ifdef MSFT_SUPPORTS_ANSI_ESCAPE_CODES
   if (UseANSI) return "\033[7m";
+#endif
 
   const WORD attributes
    = GetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE));
@@ -412,12 +436,15 @@ const char *Process::OutputReverse() {
 }
 
 const char *Process::ResetColor() {
+#ifdef MSFT_SUPPORTS_ANSI_ESCAPE_CODES
   if (UseANSI) return "\033[0m";
-  SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), defaultColors());
+#endif
+  ::llvm::sys::fs::GetCurrentThreadFileSystem()->ResetConsoleOutputTextAttributes();
   return 0;
 }
 
 unsigned Process::GetRandomNumber() {
+#if 0 // HLSL Change Starts
   HCRYPTPROV HCPC;
   if (!::CryptAcquireContextW(&HCPC, NULL, NULL, PROV_RSA_FULL,
                               CRYPT_VERIFYCONTEXT))
@@ -429,4 +456,7 @@ unsigned Process::GetRandomNumber() {
                         reinterpret_cast<BYTE *>(&Ret)))
     report_fatal_error("Could not generate a random number");
   return Ret;
+#else
+  return rand();
+#endif // HLSL Change Ends
 }

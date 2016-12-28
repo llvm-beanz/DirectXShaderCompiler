@@ -1,16 +1,15 @@
 //===- TargetCallingConv.td - Target Calling Conventions ---*- tablegen -*-===//
-// 
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-// 
-//===----------------------------------------------------------------------===//
-//
-// This file defines the target-independent interfaces with which targets
-// describe their calling conventions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetCallingConv.td                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the target-independent interfaces with which targets    //
+// describe their calling conventions.                                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 class CCAction;
 class CallingConv;

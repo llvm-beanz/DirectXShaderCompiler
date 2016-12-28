@@ -1,15 +1,14 @@
 //===- SimplifyCFG.cpp - Code to perform CFG simplification ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Peephole optimize the CFG.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SimplifyCFG.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Peephole optimize the CFG.                                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
@@ -759,7 +758,8 @@ namespace {
   };
 }
 
-static int ConstantIntSortPredicate(ConstantInt *const *P1,
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl ConstantIntSortPredicate(ConstantInt *const *P1,
                                     ConstantInt *const *P2) {
   const ConstantInt *LHS = *P1;
   const ConstantInt *RHS = *P2;
@@ -818,6 +818,7 @@ static void FitWeights(MutableArrayRef<uint64_t> Weights) {
 /// on the same value.  If so, and if safe to do so, fold them together.
 bool SimplifyCFGOpt::FoldValueComparisonIntoPredecessors(TerminatorInst *TI,
                                                          IRBuilder<> &Builder) {
+#if 0 // HLSL Change - fold to switch will not help hlsl.
   BasicBlock *BB = TI->getParent();
   Value *CV = isValueEqualityComparison(TI);  // CondVal
   assert(CV && "Not a comparison?");
@@ -1020,6 +1021,9 @@ bool SimplifyCFGOpt::FoldValueComparisonIntoPredecessors(TerminatorInst *TI,
     }
   }
   return Changed;
+#else  // HLSL Change Begin.  // fold to switch will not help hlsl.
+  return false;
+#endif // HLSL Change End.
 }
 
 // If we would need to insert a select that uses the value of this invoke
@@ -1048,6 +1052,12 @@ static bool passingValueIsAlwaysUndefined(Value *V, Instruction *I);
 /// guarantees that BI's block dominates BB1 and BB2.
 static bool HoistThenElseCodeToIf(BranchInst *BI,
                                   const TargetTransformInfo &TTI) {
+  // HLSL Change Begins.
+  // Skip block with control flow hint.
+  if (BI->hasMetadata())
+    return false;
+  // HLSL Change Ends.
+
   // This does very trivial matching, with limited scanning, to find identical
   // instructions in the two blocks.  In particular, we don't want to get into
   // O(M*N) situations here where M and N are the sizes of BB1 and BB2.  As
@@ -1314,6 +1324,13 @@ static bool SinkThenElseCodeToEnd(BranchInst *BI1) {
       DifferentOp2 = I2->getOperand(I);
     }
 
+    // HLSL Change Begin.
+    // Don't sink struct type which will generate struct PhiNode to make sure
+    // struct type value only used by Extract/InsertValue.
+    if (DifferentOp1->getType()->isStructTy())
+      return Changed;
+    // HLSL Change End.
+
     DEBUG(dbgs() << "SINK common instructions " << *I1 << "\n");
     DEBUG(dbgs() << "                         " << *I2 << "\n");
 
@@ -1461,6 +1478,13 @@ static Value *isSafeToSpeculateStore(Instruction *I, BasicBlock *BrBB,
 /// \returns true if the conditional block is removed.
 static bool SpeculativelyExecuteBB(BranchInst *BI, BasicBlock *ThenBB,
                                    const TargetTransformInfo &TTI) {
+  // HLSL Change Begins.
+  // Skip block with control flow hint.
+  if (BI->hasMetadata()) {
+    return false;
+  }
+  // HLSL Change Ends.
+
   // Be conservative for now. FP select instruction can often be expensive.
   Value *BrCond = BI->getCondition();
   if (isa<FCmpInst>(BrCond))
@@ -1877,6 +1901,12 @@ static bool FoldTwoEntryPHINode(PHINode *PN, const TargetTransformInfo &TTI,
   // If we can still promote the PHI nodes after this gauntlet of tests,
   // do all of the PHI's now.
   Instruction *InsertPt = DomBlock->getTerminator();
+  // HLSL Change Begins.
+  // Skip block with control flow hint.
+  if (InsertPt->hasMetadata()) {
+    return false;
+  }
+  // HLSL Change Ends.
   IRBuilder<true, NoFolder> Builder(InsertPt);
 
   // Move all 'aggressive' instructions, which are defined in the
@@ -4489,9 +4519,11 @@ bool SimplifyCFGOpt::SimplifyCondBranch(BranchInst *BI, IRBuilder<> &Builder) {
     }
   }
 
+#if 0  // HLSL Change Begins. This will not help for hlsl.
   // Try to turn "br (X == 0 | X == 1), T, F" into a switch instruction.
   if (SimplifyBranchOnICmpChain(BI, Builder, DL))
     return true;
+#endif  // HLSL Change Ends.
 
   // If this basic block is ONLY a compare and a branch, and if a predecessor
   // branches to us and one of our successors, fold the comparison into the

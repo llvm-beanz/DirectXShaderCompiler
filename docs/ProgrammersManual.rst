@@ -2040,8 +2040,6 @@ sequence of instructions that form a ``BasicBlock``:
     CallInst* callTwo = Builder.CreateCall(...);
     Value* result = Builder.CreateMul(callOne, callTwo);
 
-  See :doc:`tutorial/LangImpl3` for a practical use of the ``IRBuilder``.
-
 
 .. _schanges_deleting:
 

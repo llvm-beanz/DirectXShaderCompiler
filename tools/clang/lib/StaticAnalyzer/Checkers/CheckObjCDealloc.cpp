@@ -1,17 +1,16 @@
 //==- CheckObjCDealloc.cpp - Check ObjC -dealloc implementation --*- C++ -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines a CheckObjCDealloc, a checker that
-//  analyzes an Objective-C class's implementation to determine if it
-//  correctly implements -dealloc.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CheckObjCDealloc.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines a CheckObjCDealloc, a checker that                     //
+//  analyzes an Objective-C class's implementation to determine if it        //
+//  correctly implements -dealloc.                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "ClangSACheckers.h"
 #include "clang/AST/Attr.h"

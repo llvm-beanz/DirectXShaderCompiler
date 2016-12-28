@@ -1,15 +1,14 @@
 //===--- SemaStmt.cpp - Semantic Analysis for Statements ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for statements.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaStmt.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for statements.                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTContext.h"
@@ -56,6 +55,7 @@ StmtResult Sema::ActOnExprStmt(ExprResult FE) {
   // Same thing in for stmt first clause (when expr) and third clause.
   return StmtResult(FE.getAs<Stmt>());
 }
+
 
 
 StmtResult Sema::ActOnExprStmtError() {
@@ -249,7 +249,7 @@ void Sema::DiagnoseUnusedExprResult(const Stmt *S) {
       if (ShouldSuppress)
         return;
       if (FD->hasAttr<PureAttr>()) {
-        Diag(Loc, diag::warn_unused_call) << R1 << R2 << "pure";
+        Diag(Loc, diag::warn_hlsl_unused_call) << R1 << R2 << "pure"; // HLSL Change: rather than warn_unused_call
         return;
       }
       if (FD->hasAttr<ConstAttr>()) {
@@ -474,6 +474,25 @@ Sema::ActOnLabelStmt(SourceLocation IdentLoc, LabelDecl *TheDecl,
 StmtResult Sema::ActOnAttributedStmt(SourceLocation AttrLoc,
                                      ArrayRef<const Attr*> Attrs,
                                      Stmt *SubStmt) {
+  // HLSL Change - Validate inconsistent attributes being set on statemetns.
+  if (getLangOpts().HLSL) {
+    bool loopFound = false;
+    bool unrollFound = false;
+    bool fastOptFound = false;
+    for (const Attr* a : Attrs) {
+      unrollFound = unrollFound || (a->getKind() == attr::HLSLUnroll);
+      fastOptFound = fastOptFound || (a->getKind() == attr::HLSLFastOpt);
+      loopFound = loopFound || (a->getKind() == attr::HLSLLoop);
+    }
+    if (loopFound && unrollFound) {
+      Diag(AttrLoc, diag::err_attributes_are_not_compatible) << "loop" << "unroll";
+    }
+    if (fastOptFound && unrollFound) {
+      Diag(AttrLoc, diag::err_attributes_are_not_compatible) << "fastopt" << "unroll";
+    }
+  }
+  // HLSL Change Ends
+
   // Fill in the declaration and return it.
   AttributedStmt *LS = AttributedStmt::Create(Context, AttrLoc, Attrs, SubStmt);
   return LS;
@@ -593,6 +612,17 @@ Sema::ActOnStartOfSwitchStmt(SourceLocation SwitchLoc, Expr *Cond,
 
   if (!Cond)
     return StmtError();
+
+  // HLSL Change Begins.
+  if (Cond->getType()->isFloatingType()) {
+    // Cast float to int for switch.
+    QualType intTy = Context.getIntTypeForBitwidth(32, /*isSigned*/true);
+
+    ExprResult Res = ImplicitCastExpr::Create(Context, intTy, CK_FloatingToIntegral, Cond,
+                                            nullptr, Cond->getValueKind());
+    Cond = Res.get();
+  }
+  // HLSL Change Ends.
 
   class SwitchConvertDiagnoser : public ICEConvertDiagnoser {
     Expr *Cond;
@@ -3895,4 +3925,10 @@ StmtResult Sema::ActOnCapturedRegionEnd(Stmt *S) {
   PopFunctionScopeInfo();
 
   return Res;
+}
+
+// HLSL Change:  adding hlsl support
+StmtResult Sema::ActOnHlslDiscardStmt(SourceLocation Loc)
+{
+  return new (Context)DiscardStmt(Loc);
 }

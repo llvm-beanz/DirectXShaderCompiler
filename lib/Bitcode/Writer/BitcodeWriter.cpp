@@ -1,15 +1,14 @@
 //===--- Bitcode/Writer/BitcodeWriter.cpp - Bitcode Writer ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Bitcode writer implementation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BitcodeWriter.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Bitcode writer implementation.                                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "ValueEnumerator.h"
@@ -668,7 +667,7 @@ static void WriteModuleInfo(const Module *M, const ValueEnumerator &VE,
     //             unnamed_addr, externally_initialized, dllstorageclass,
     //             comdat]
     Vals.push_back(VE.getTypeID(GV.getValueType()));
-    Vals.push_back(GV.getType()->getAddressSpace() << 2 | 2 | GV.isConstant());
+    Vals.push_back(GV.getType()->getAddressSpace() << 2 | 2 | (GV.isConstant() ? 1 : 0));  // HLSL Change - bitwise | was used with unsigned int and bool
     Vals.push_back(GV.isDeclaration() ? 0 :
                    (VE.getValueID(GV.getInitializer()) + 1));
     Vals.push_back(getEncodedLinkage(GV));

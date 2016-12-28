@@ -8,6 +8,10 @@ Clang Compiler User's Manual
 Introduction
 ============
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only. The recommended
+APIs for the library are available via dxcapi.h
+
 The Clang Compiler is an open-source compiler for the C family of
 programming languages, aiming to be the best in class implementation of
 these languages. Clang builds on the LLVM optimizer and code generator,

@@ -1,20 +1,19 @@
 //===-- DataLayout.cpp - Data size & alignment routines --------------------==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines layout properties related to datatype size/offset/alignment
-// information.
-//
-// This structure should be created once, filled in if the defaults are not
-// correct and then passed around by const&.  None of the members functions
-// require modification to the object.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DataLayout.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines layout properties related to datatype size/offset/alignment//
+// information.                                                              //
+//                                                                           //
+// This structure should be created once, filled in if the defaults are not  //
+// correct and then passed around by const&.  None of the members functions  //
+// require modification to the object.                                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/DataLayout.h"
 #include "llvm/ADT/DenseMap.h"
@@ -178,11 +177,11 @@ void DataLayout::reset(StringRef Desc) {
   StackNaturalAlign = 0;
   ManglingMode = MM_None;
 
-  // Default alignments
   for (const LayoutAlignElem &E : DefaultAlignments) {
     setAlignment((AlignTypeEnum)E.AlignType, E.ABIAlign, E.PrefAlign,
                  E.TypeBitWidth);
   }
+
   setPointerAlignment(0, 8, 8, 8);
 
   parseSpecifier(Desc);
@@ -662,6 +661,9 @@ unsigned DataLayout::getAlignment(Type *Ty, bool abi_or_pref) const {
   case Type::X86_MMXTyID:
   case Type::VectorTyID:
     AlignType = VECTOR_ALIGN;
+    // HLSL Change Begins.
+    return getAlignment(Ty->getVectorElementType(), abi_or_pref);
+    // HLSL Change Ends.
     break;
   default:
     llvm_unreachable("Bad type for getAlignment!!!");

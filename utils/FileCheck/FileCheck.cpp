@@ -1,20 +1,19 @@
 //===- FileCheck.cpp - Check that File's Contents match what is expected --===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// FileCheck does a line-by line check of a file that validates whether it
-// contains the expected content.  This is useful for regression tests etc.
-//
-// This program exits with an error status of 2 on error, exit status of 0 if
-// the file matched the expected contents, and exit status of 1 if it did not
-// contain the expected contents.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FileCheck.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// FileCheck does a line-by line check of a file that validates whether it   //
+// contains the expected content.  This is useful for regression tests etc.  //
+//                                                                           //
+// This program exits with an error status of 2 on error, exit status of 0 if//
+// the file matched the expected contents, and exit status of 1 if it did not//
+// contain the expected contents.                                            //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -34,6 +33,12 @@
 #include <system_error>
 #include <vector>
 using namespace llvm;
+
+// HLSL Change
+#define NOMINMAX
+#include <windows.h>
+#include "llvm/Support/MSFileSystem.h"
+// End HLSL Change
 
 static cl::opt<std::string>
 CheckFilename(cl::Positional, cl::desc("<check-file>"), cl::Required);
@@ -1279,9 +1284,28 @@ static void AddCheckPrefixIfNeeded() {
 }
 
 int main(int argc, char **argv) {
+  // HLSL Change Starts
+  llvm::sys::fs::MSFileSystem* msfPtr;
+  HRESULT hr;
+  if(!SUCCEEDED(hr = CreateMSFileSystemForDisk(&msfPtr)))
+    return 1;
+  std::unique_ptr<llvm::sys::fs::MSFileSystem> msf(msfPtr);
+  llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
+  STDStreamCloser stdStreamCloser;
+  // HLSL Change Ends
+  
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);
+  // HLSL Change Starts - protect ParseCommandLineOptions
+  try
+  {
   cl::ParseCommandLineOptions(argc, argv);
+  }
+  catch (...)
+  {
+    return 2;
+  }
+  // HLSL Change Ends - protect ParseCommandLineOptions
 
   if (!ValidateCheckPrefixes()) {
     errs() << "Supplied check-prefix is invalid! Prefixes must be unique and "

@@ -1,15 +1,14 @@
 //===--- Parser.h - C Language Parser ---------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Parser.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the Parser interface.                                  //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the Parser interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_PARSE_PARSER_H
 #define LLVM_CLANG_PARSE_PARSER_H
@@ -28,6 +27,8 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include <memory>
 #include <stack>
+
+#include "llvm/Support/OacrIgnoreCond.h" // HLSL Change - all parser use is heavily language-dependant
 
 namespace clang {
   class PragmaHandler;
@@ -527,6 +528,11 @@ private:
   /// \brief Handle the annotation token produced for
   /// #pragma clang loop and #pragma unroll.
   bool HandlePragmaLoopHint(LoopHint &Hint);
+
+  // HLSL Change Starts
+  /// \brief Handle the hlsl discard keyword
+  StmtResult HandleHLSLDiscardStmt(Expr *Fn);
+  // HLSL Change Ends
 
   /// GetLookAheadToken - This peeks ahead N tokens and returns that token
   /// without consuming any tokens.  LookAhead(0) returns 'Tok', LookAhead(1)
@@ -2087,6 +2093,14 @@ private:
                            IdentifierInfo *ScopeName, SourceLocation ScopeLoc,
                            AttributeList::Syntax Syntax);
 
+  // HLSL Change Starts: Parse HLSL Attributes and append them to Declarator Object
+  bool MaybeParseHLSLAttributes(std::vector<hlsl::UnusualAnnotation *> &target);
+  inline bool MaybeParseHLSLAttributes(Declarator &D) {
+    return MaybeParseHLSLAttributes(D.UnusualAnnotations);
+  }
+  void MaybeParseHLSLDeclarationSpecifiers(std::vector<InheritableAttr *> &attrs);
+  // HLSL Change Ends
+
   void MaybeParseGNUAttributes(Declarator &D,
                                LateParsedAttrList *LateAttrs = nullptr) {
     if (Tok.is(tok::kw___attribute)) {
@@ -2151,6 +2165,27 @@ private:
                                ParsedAttributes &Attrs, SourceLocation *EndLoc,
                                IdentifierInfo *ScopeName,
                                SourceLocation ScopeLoc);
+
+  // HLSL Change Starts
+  IdentifierInfo *TryParseHLSLAttributeIdentifier(SourceLocation &Loc);
+  void MaybeParseHLSLAttributes(ParsedAttributes &attrs,
+    SourceLocation *endLoc = 0) {
+    if (getLangOpts().HLSL && Tok.is(tok::l_square)) {
+      ParsedAttributesWithRange attrsWithRange(AttrFactory);
+      ParseHLSLAttributes(attrsWithRange, endLoc);
+      attrs.takeAllFrom(attrsWithRange);
+    }
+  }
+  void MaybeParseHLSLAttributes(ParsedAttributesWithRange &attrs,
+    SourceLocation *endLoc = 0) {
+    if (getLangOpts().HLSL && Tok.is(tok::l_square))
+      ParseHLSLAttributes(attrs, endLoc);
+  }
+  void ParseHLSLAttributeSpecifier(ParsedAttributes &attrs,
+    SourceLocation *EndLoc = 0);
+  void ParseHLSLAttributes(ParsedAttributesWithRange &attrs,
+    SourceLocation *EndLoc = 0);
+  // HLSL Change Ends
 
   IdentifierInfo *TryParseCXX11AttributeIdentifier(SourceLocation &Loc);
 
@@ -2333,6 +2368,13 @@ private:
                             bool OuterMightBeMessageSend = false);
 
   void DiagnoseUnexpectedNamespace(NamedDecl *Context);
+
+  // HLSL Change Starts
+  Decl *ParseCTBuffer(unsigned Context, SourceLocation &DeclEnd,
+    SourceLocation InlineLoc = SourceLocation());
+  Decl *ParseConstBuffer(unsigned Context, SourceLocation &DeclEnd,
+    SourceLocation InlineLoc = SourceLocation());
+  // HLSL Change Ends
 
   Decl *ParseNamespace(unsigned Context, SourceLocation &DeclEnd,
                        SourceLocation InlineLoc = SourceLocation());

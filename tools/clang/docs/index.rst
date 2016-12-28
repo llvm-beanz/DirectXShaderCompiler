@@ -8,32 +8,23 @@
 .. toctree::
    :maxdepth: 1
 
-   ReleaseNotes
-
 Using Clang as a Compiler
 =========================
 
 .. toctree::
    :maxdepth: 1
 
+   UsingDxc
    UsersManual
    LanguageExtensions
    AttributeReference
-   CrossCompilation
    ThreadSafetyAnalysis
-   AddressSanitizer
    ThreadSanitizer
-   MemorySanitizer
    DataFlowSanitizer
-   LeakSanitizer
    SanitizerCoverage
    SanitizerSpecialCaseList
-   ControlFlowIntegrity
-   SafeStack
    Modules
-   MSVCCompatibility
    CommandGuide/index
-   FAQ
 
 Using Clang as a Library
 ========================
@@ -42,7 +33,6 @@ Using Clang as a Library
    :maxdepth: 1
 
    Tooling
-   ExternalClangExamples
    IntroductionToTheClangAST
    LibTooling
    LibFormat

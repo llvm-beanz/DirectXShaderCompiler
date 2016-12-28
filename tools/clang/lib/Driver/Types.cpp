@@ -1,11 +1,12 @@
 //===--- Types.cpp - Driver input & temporary type information ------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Types.cpp                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Driver/Types.h"
 #include "llvm/ADT/STLExtras.h"
@@ -97,6 +98,7 @@ bool types::isAcceptedByClang(ID Id) {
   case TY_ObjCXXHeader: case TY_PP_ObjCXXHeader:
   case TY_AST: case TY_ModuleFile:
   case TY_LLVM_IR: case TY_LLVM_BC:
+  case TY_HLSL: // HLSL Change
     return true;
   }
 }
@@ -147,6 +149,7 @@ types::ID types::lookupTypeForExtension(const char *Ext) {
            .Case("m", TY_ObjC)
            .Case("M", TY_ObjCXX)
            .Case("h", TY_CHeader)
+           .Case("hlsl", TY_HLSL) // HLSL Change
            .Case("C", TY_CXX)
            .Case("H", TY_CXXHeader)
            .Case("f", TY_PP_Fortran)

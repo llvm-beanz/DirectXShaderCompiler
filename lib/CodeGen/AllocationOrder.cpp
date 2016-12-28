@@ -1,18 +1,17 @@
 //===-- llvm/CodeGen/AllocationOrder.cpp - Allocation Order ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements an allocation order for virtual registers.
-//
-// The preferred allocation order for a virtual register depends on allocation
-// hints and target hooks. The AllocationOrder class encapsulates all of that.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// AllocationOrder.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements an allocation order for virtual registers.           //
+//                                                                           //
+// The preferred allocation order for a virtual register depends on allocation//
+// hints and target hooks. The AllocationOrder class encapsulates all of that.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "AllocationOrder.h"
 #include "llvm/CodeGen/MachineFunction.h"

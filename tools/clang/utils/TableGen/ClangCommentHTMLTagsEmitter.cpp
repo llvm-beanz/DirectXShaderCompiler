@@ -1,16 +1,15 @@
 //===--- ClangCommentHTMLTagsEmitter.cpp - Generate HTML tag list for Clang -=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This tablegen backend emits efficient matchers for HTML tags that are used
-// in documentation comments.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ClangCommentHTMLTagsEmitter.cpp                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This tablegen backend emits efficient matchers for HTML tags that are used//
+// in documentation comments.                                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "TableGenBackends.h"
 #include "llvm/TableGen/Record.h"

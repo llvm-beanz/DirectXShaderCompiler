@@ -1,15 +1,14 @@
 //===--- Expr.cpp - Expression AST Node Implementation --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Expr class and subclasses.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Expr.cpp                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Expr class and subclasses.                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/APValue.h"
 #include "clang/AST/ASTContext.h"
@@ -1682,6 +1681,38 @@ const char *CastExpr::getCastKindName() const {
     return "ZeroToOCLEvent";
   case CK_AddressSpaceConversion:
     return "AddressSpaceConversion";
+  // HLSL Change Starts
+  case CK_FlatConversion:
+    return "FlatConversion";
+  case CK_HLSLVectorSplat:
+    return "HLSLVectorSplat";
+  case CK_HLSLMatrixSplat:
+    return "HLSLMatrixSplat";
+  case CK_HLSLVectorToScalarCast:
+    return "HLSLVectorToScalarCast";
+  case CK_HLSLMatrixToScalarCast:
+    return "HLSLMatrixToScalarCast";
+  case CK_HLSLVectorTruncationCast:
+    return "HLSLVectorTruncationCast";
+  case CK_HLSLMatrixTruncationCast:
+    return "HLSLMatrixTruncationCast";
+  case CK_HLSLVectorToMatrixCast:
+    return "HLSLVectorToMatrixCast";
+  case CK_HLSLMatrixToVectorCast:
+    return "HLSLMatrixToVectorCast";
+  case CK_HLSLCC_IntegralCast:
+    return "HLSLCC_IntegralCast";
+  case CK_HLSLCC_IntegralToBoolean:
+    return "HLSLCC_IntegralToBoolean";
+  case CK_HLSLCC_IntegralToFloating:
+    return "HLSLCC_IntegralToFloating";
+  case CK_HLSLCC_FloatingToIntegral:
+    return "HLSLCC_FloatingToIntegral";
+  case CK_HLSLCC_FloatingToBoolean:
+    return "HLSLCC_FloatingToBoolean";
+  case CK_HLSLCC_FloatingCast:
+    return "HLSLCC_FloatingCast";
+  // HLSL Change Ends
   }
 
   llvm_unreachable("Unhandled cast kind!");
@@ -3017,6 +3048,8 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
   case BinaryConditionalOperatorClass:
   case CompoundLiteralExprClass:
   case ExtVectorElementExprClass:
+  case ExtMatrixElementExprClass: // HLSL Change
+  case HLSLVectorElementExprClass: // HLSL Change
   case DesignatedInitExprClass:
   case DesignatedInitUpdateExprClass:
   case ParenListExprClass:

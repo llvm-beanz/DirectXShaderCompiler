@@ -1,16 +1,15 @@
 //===--- PrintPreprocessedOutput.cpp - Implement the -E mode --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This code simply runs the preprocessor on the input file and prints out the
-// result.  This is the traditional behavior of the -E option.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PrintPreprocessedOutput.cpp                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This code simply runs the preprocessor on the input file and prints out the//
+// result.  This is the traditional behavior of the -E option.               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Frontend/Utils.h"
 #include "clang/Basic/CharInfo.h"
@@ -271,7 +270,21 @@ void PrintPPOutputPPCallbacks::FileChanged(SourceLocation Loc,
     // off by one. We can do better by simply incrementing NewLine here.
     NewLine += 1;
   }
-  
+
+  // HLSL Change Starts - do not report the same location multiple times
+  if (PP.getLangOpts().HLSL && CurLine == NewLine &&
+      CurFilename == UserLoc.getFilename()) {
+    assert(FileType == NewFileType && "else same file has different file type");
+    return;
+  }
+  if (PP.getLangOpts().HLSL) {
+    if (0 == strcmp(UserLoc.getFilename(), "<built-in>")) {
+      assert(NewLine == 1 && "else built-in is generating preprocessor output");
+      return;
+    }
+  }
+  // HLSL Change Ends
+
   CurLine = NewLine;
 
   CurFilename.clear();
@@ -679,7 +692,8 @@ static void PrintPreprocessedTokens(Preprocessor &PP, Token &Tok,
 }
 
 typedef std::pair<const IdentifierInfo *, MacroInfo *> id_macro_pair;
-static int MacroIDCompare(const id_macro_pair *LHS, const id_macro_pair *RHS) {
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl MacroIDCompare(const id_macro_pair *LHS, const id_macro_pair *RHS) {
   return LHS->first->getName().compare(RHS->first->getName());
 }
 

@@ -1,16 +1,15 @@
 //=-- CoverageMappingWriter.cpp - Code coverage mapping writer -------------=//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains support for writing coverage mapping data for
-// instrumentation based coverage.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CoverageMappingWriter.cpp                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains support for writing coverage mapping data for          //
+// instrumentation based coverage.                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ProfileData/CoverageMappingWriter.h"
 #include "llvm/Support/LEB128.h"
@@ -165,7 +164,7 @@ void CoverageMappingWriter::write(raw_ostream &OS) {
     }
     case CounterMappingRegion::SkippedRegion:
       assert(Count.isZero());
-      encodeULEB128(unsigned(I->Kind)
+      encodeULEB128(uint64_t(I->Kind)
                         << Counter::EncodingCounterTagAndExpansionRegionTagBits,
                     OS);
       break;

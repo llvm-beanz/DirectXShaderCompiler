@@ -1,15 +1,14 @@
 //===-- CodeGenFunction.h - Per-Function state for LLVM CodeGen -*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeGenFunction.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is the internal per-function state used for llvm translation.        //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is the internal per-function state used for llvm translation.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LIB_CODEGEN_CODEGENFUNCTION_H
 #define LLVM_CLANG_LIB_CODEGEN_CODEGENFUNCTION_H
@@ -620,6 +619,40 @@ public:
     }
   };
 
+  // HLSL Change Begins
+  /// \brief The scope used to add temp variables for out parameter in HLSL.
+  class HLSLOutParamScope : public RunCleanupsScope {
+    typedef llvm::DenseSet<const VarDecl *> VarDeclSetTy;
+    VarDeclSetTy SavedLocals;
+
+  private:
+    HLSLOutParamScope(const HLSLOutParamScope &) = delete;
+    void operator=(const HLSLOutParamScope &) = delete;
+
+    void ForceCleanup() {
+      RunCleanupsScope::ForceCleanup();
+      // Remap vars back to the original values.
+      for (auto I : SavedLocals) {
+        CGF.LocalDeclMap.erase(I);
+      }
+      SavedLocals.clear();
+    }
+
+  public:
+    /// \brief Enter a new OpenMP private scope.
+    explicit HLSLOutParamScope(CodeGenFunction &CGF) : RunCleanupsScope(CGF) {}
+
+    /// \brief Registers \a LocalVD variable as TmpArg
+    void addTemp(const VarDecl *LocalVD, llvm::Value *TmpArg) {
+      CGF.LocalDeclMap[LocalVD] = TmpArg;
+      SavedLocals.insert(LocalVD);
+    }
+
+    /// \brief Exit scope - all the mapped variables are restored.
+    ~HLSLOutParamScope() { ForceCleanup(); }
+  };
+  // HLSL Change Ends
+
   /// \brief Takes the old cleanup stack size and emits the cleanup blocks
   /// that have been added.
   void PopCleanupBlocks(EHScopeStack::stable_iterator OldCleanupStackSize);
@@ -1105,8 +1138,12 @@ public:
   }
 
   llvm::BasicBlock *getInvokeDest() {
+#if 0 // HLSL Change - no exception handling
     if (!EHStack.requiresLandingPad()) return nullptr;
     return getInvokeDestImpl();
+#else
+    return nullptr;
+#endif // HLSL Change - no exception handling
   }
 
   bool currentFunctionUsesSEHTry() const {
@@ -2015,8 +2052,10 @@ public:
   void EmitLabelStmt(const LabelStmt &S);
   void EmitAttributedStmt(const AttributedStmt &S);
   void EmitGotoStmt(const GotoStmt &S);
+  void EmitDiscardStmt(const DiscardStmt &S); // HLSL Change
   void EmitIndirectGotoStmt(const IndirectGotoStmt &S);
-  void EmitIfStmt(const IfStmt &S);
+  void EmitIfStmt(const IfStmt &S,
+                   ArrayRef<const Attr *> Attrs = None); // HLSL Change
 
   void EmitCondBrHints(llvm::LLVMContext &Context, llvm::BranchInst *CondBr,
                        ArrayRef<const Attr *> Attrs);
@@ -2029,7 +2068,8 @@ public:
   void EmitDeclStmt(const DeclStmt &S);
   void EmitBreakStmt(const BreakStmt &S);
   void EmitContinueStmt(const ContinueStmt &S);
-  void EmitSwitchStmt(const SwitchStmt &S);
+  void EmitSwitchStmt(const SwitchStmt &S,
+                   ArrayRef<const Attr *> Attrs = None); // HLSL Change
   void EmitDefaultStmt(const DefaultStmt &S);
   void EmitCaseStmt(const CaseStmt &S);
   void EmitCaseStmtRange(const CaseStmt &S);
@@ -2374,6 +2414,7 @@ public:
   RValue EmitLoadOfExtVectorElementLValue(LValue V);
   RValue EmitLoadOfBitfieldLValue(LValue LV);
   RValue EmitLoadOfGlobalRegLValue(LValue LV);
+  RValue EmitLoadOfExtMatrixElementLValue(LValue V); // HLSL Change
 
   /// EmitStoreThroughLValue - Store the specified rvalue into the specified
   /// lvalue, where both are guaranteed to the have the same type, and that type
@@ -2413,6 +2454,8 @@ public:
   LValue EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
                                 bool Accessed = false);
   LValue EmitExtVectorElementExpr(const ExtVectorElementExpr *E);
+  LValue EmitExtMatrixElementExpr(const ExtMatrixElementExpr *E); // HLSL Change
+  LValue EmitHLSLVectorElementExpr(const HLSLVectorElementExpr *E); // HLSL Change
   LValue EmitMemberExpr(const MemberExpr *E);
   LValue EmitObjCIsaExpr(const ObjCIsaExpr *E);
   LValue EmitCompoundLiteralLValue(const CompoundLiteralExpr *E);
@@ -2575,6 +2618,10 @@ public:
   RValue EmitCUDAKernelCallExpr(const CUDAKernelCallExpr *E,
                                 ReturnValueSlot ReturnValue);
 
+  // HLSL Change Begins
+  RValue EmitHLSLBuiltinCallExpr(const FunctionDecl *FD, const CallExpr *E,
+                                 ReturnValueSlot ReturnValue);
+  // HLSL Change Ends
 
   RValue EmitBuiltinExpr(const FunctionDecl *FD,
                          unsigned BuiltinID, const CallExpr *E,

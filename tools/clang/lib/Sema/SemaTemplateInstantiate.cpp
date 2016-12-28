@@ -1,14 +1,12 @@
 //===------- SemaTemplateInstantiate.cpp - C++ Template Instantiation ------===/
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//===----------------------------------------------------------------------===/
-//
-//  This file implements C++ template instantiation.
-//
-//===----------------------------------------------------------------------===/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaTemplateInstantiate.cpp                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "TreeTransform.h"
@@ -1669,7 +1667,8 @@ ParmVarDecl *Sema::SubstParmVarDecl(ParmVarDecl *OldParm,
                                         OldParm->getLocation(),
                                         OldParm->getIdentifier(),
                                         NewDI->getType(), NewDI,
-                                        OldParm->getStorageClass());
+                                        OldParm->getStorageClass(),
+                                        OldParm->getParamModifiers()); // HLSL Change - add param mod
   if (!NewParm)
     return nullptr;
 
@@ -1892,7 +1891,9 @@ static bool DiagnoseUninstantiableTemplate(Sema &S,
     S.Diag(PointOfInstantiation, diag::err_template_instantiate_undefined)
       << (TSK != TSK_ImplicitInstantiation)
       << S.Context.getTypeDeclType(Instantiation);
+    if (Pattern->getLocation().isValid()) { // HLSL Change - ellide location notes for built-ins
     S.Diag(Pattern->getLocation(), diag::note_template_decl_here);
+  }
   }
 
   // In general, Instantiation isn't marked invalid to get more than one

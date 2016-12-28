@@ -1,18 +1,19 @@
 //===--- OperatorPrecedence.cpp ---------------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// OperatorPrecedence.cpp                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines and computes precedence levels for binary/ternary operators.
+/// \file                                                                    //
+/// \brief Defines and computes precedence levels for binary/ternary operators.//
 ///
-//===----------------------------------------------------------------------===//
-#include "clang/Basic/OperatorPrecedence.h"
 
+#include "clang/Basic/OperatorPrecedence.h"
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 namespace clang {
 
 prec::Level getBinOpPrecedence(tok::TokenKind Kind, bool GreaterThanIsOperator,

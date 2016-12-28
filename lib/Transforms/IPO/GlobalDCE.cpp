@@ -1,19 +1,18 @@
 //===-- GlobalDCE.cpp - DCE unreachable internal functions ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This transform is designed to eliminate unreachable internal globals from the
-// program.  It uses an aggressive algorithm, searching out globals that are
-// known to be alive.  After it finds all of the globals which are needed, it
-// deletes whatever is left over.  This allows it to delete recursive chunks of
-// the program which are unreachable.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// GlobalDCE.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This transform is designed to eliminate unreachable internal globals from the//
+// program.  It uses an aggressive algorithm, searching out globals that are //
+// known to be alive.  After it finds all of the globals which are needed, it//
+// deletes whatever is left over.  This allows it to delete recursive chunks of//
+// the program which are unreachable.                                        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/IPO.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -25,6 +24,10 @@
 #include "llvm/Transforms/Utils/GlobalStatus.h"
 #include "llvm/Pass.h"
 #include <unordered_map>
+#include "dxc/HLSL/HLModule.h" // HLSL Change
+#include "dxc/HLSL/DxilModule.h" // HLSL Change
+#include "dxc/HLSL/DXILOperations.h" // HLSL Change
+#include "dxc/HLSL/DxilInstructions.h" // HLSL Change
 using namespace llvm;
 
 #define DEBUG_TYPE "globaldce"
@@ -99,6 +102,11 @@ bool GlobalDCE::runOnModule(Module &M) {
       if (!I->isDiscardableIfUnused())
         GlobalIsNeeded(I);
     }
+    // HLSL Change Starts - look for instructions that refer to a
+    // variable through a metadata record lookup; currently high-level
+    // does not use these instructions, so the pre-DXIL-gen DCE takes
+    // care of unused resources that might affect signatures.
+    // HLSL Change Ends
   }
 
   for (Module::global_iterator I = M.global_begin(), E = M.global_end();
@@ -139,6 +147,13 @@ bool GlobalDCE::runOnModule(Module &M) {
       }
     }
 
+  // HLSL Change Starts - remove resource metadata
+  hlsl::HLModule *HLM = M.HasHLModule() ? &M.GetHLModule() : nullptr;
+  if (!DeadGlobalVars.empty() && HLM != nullptr) {
+    HLM->RemoveResources(DeadGlobalVars.data(), DeadGlobalVars.size());
+  }
+  // HLSL Change Ends
+
   // The second pass drops the bodies of functions which are dead...
   std::vector<Function*> DeadFunctions;
   for (Module::iterator I = M.begin(), E = M.end(); I != E; ++I)
@@ -162,6 +177,7 @@ bool GlobalDCE::runOnModule(Module &M) {
     // themselves.
     for (unsigned i = 0, e = DeadFunctions.size(); i != e; ++i) {
       RemoveUnusedGlobalValue(*DeadFunctions[i]);
+      if (HLM != nullptr) HLM->RemoveFunction(DeadFunctions[i]); // HLSL Change
       M.getFunctionList().erase(DeadFunctions[i]);
     }
     NumFunctions += DeadFunctions.size();
@@ -171,6 +187,7 @@ bool GlobalDCE::runOnModule(Module &M) {
   if (!DeadGlobalVars.empty()) {
     for (unsigned i = 0, e = DeadGlobalVars.size(); i != e; ++i) {
       RemoveUnusedGlobalValue(*DeadGlobalVars[i]);
+      if (HLM != nullptr) HLM->RemoveGlobal(DeadGlobalVars[i]); // HLSL Change
       M.getGlobalList().erase(DeadGlobalVars[i]);
     }
     NumVariables += DeadGlobalVars.size();

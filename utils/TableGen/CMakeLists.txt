@@ -1,4 +1,12 @@
-set(LLVM_LINK_COMPONENTS Support)
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
+set(LLVM_LINK_COMPONENTS Support MSSupport)
+
+set (HLSL_IGNORE_SOURCES
+  X86DisassemblerTables.cpp
+  X86ModRMFilters.cpp
+  X86RecognizableInstr.cpp
+  )
 
 add_tablegen(llvm-tblgen LLVM
   AsmMatcherEmitter.cpp
@@ -28,8 +36,5 @@ add_tablegen(llvm-tblgen LLVM
   RegisterInfoEmitter.cpp
   SubtargetEmitter.cpp
   TableGen.cpp
-  X86DisassemblerTables.cpp
-  X86ModRMFilters.cpp
-  X86RecognizableInstr.cpp
   CTagsEmitter.cpp
   )

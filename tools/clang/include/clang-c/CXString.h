@@ -1,16 +1,12 @@
 /*===-- clang-c/CXString.h - C Index strings  --------------------*- C -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header provides the interface to C Index strings.                     *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
-
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXString.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #ifndef LLVM_CLANG_C_CXSTRING_H
 #define LLVM_CLANG_C_CXSTRING_H
 
@@ -43,12 +39,12 @@ typedef struct {
 /**
  * \brief Retrieve the character data associated with the given string.
  */
-CINDEX_LINKAGE const char *clang_getCString(CXString string);
+CINDEX_LINKAGE const char * LIBCLANG_CC clang_getCString(CXString string);
 
 /**
  * \brief Free the given string.
  */
-CINDEX_LINKAGE void clang_disposeString(CXString string);
+CINDEX_LINKAGE void LIBCLANG_CC clang_disposeString(CXString string);
 
 /**
  * @}

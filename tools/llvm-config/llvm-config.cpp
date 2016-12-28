@@ -1,21 +1,20 @@
 //===-- llvm-config.cpp - LLVM project configuration utility --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This tool encapsulates information about an LLVM project configuration for
-// use by other project's build environments (to determine installed path,
-// available features, required libraries, etc.).
-//
-// Note that although this tool *may* be used by some parts of LLVM's build
-// itself (i.e., the Makefiles use it to compute required libraries when linking
-// tools), this tool is primarily designed to support external projects.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-config.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This tool encapsulates information about an LLVM project configuration for//
+// use by other project's build environments (to determine installed path,   //
+// available features, required libraries, etc.).                            //
+//                                                                           //
+// Note that although this tool *may* be used by some parts of LLVM's build  //
+// itself (i.e., the Makefiles use it to compute required libraries when linking//
+// tools), this tool is primarily designed to support external projects.     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
@@ -171,7 +170,8 @@ std::string GetExecutablePath(const char *Argv0) {
   return llvm::sys::fs::getMainExecutable(Argv0, P);
 }
 
-int main(int argc, char **argv) {
+// HLSL Change: changed calling convention to __cdecl
+int __cdecl main(int argc, char **argv) {
   std::vector<StringRef> Components;
   bool PrintLibs = false, PrintLibNames = false, PrintLibFiles = false;
   bool PrintSystemLibs = false;

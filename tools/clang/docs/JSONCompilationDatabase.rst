@@ -2,6 +2,9 @@
 JSON Compilation Database Format Specification
 ==============================================
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 This document describes a format for specifying how to replay single
 compilations independently of the build system.
 

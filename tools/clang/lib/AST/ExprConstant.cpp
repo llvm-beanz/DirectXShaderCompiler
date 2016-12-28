@@ -1,37 +1,36 @@
 //===--- ExprConstant.cpp - Expression Constant Evaluator -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Expr constant evaluator.
-//
-// Constant expression evaluation produces four main results:
-//
-//  * A success/failure flag indicating whether constant folding was successful.
-//    This is the 'bool' return value used by most of the code in this file. A
-//    'false' return value indicates that constant folding has failed, and any
-//    appropriate diagnostic has already been produced.
-//
-//  * An evaluated result, valid only if constant folding has not failed.
-//
-//  * A flag indicating if evaluation encountered (unevaluated) side-effects.
-//    These arise in cases such as (sideEffect(), 0) and (sideEffect() || 1),
-//    where it is possible to determine the evaluated result regardless.
-//
-//  * A set of notes indicating why the evaluation was not a constant expression
-//    (under the C++11 / C++1y rules only, at the moment), or, if folding failed
-//    too, why the expression could not be folded.
-//
-// If we are checking for a potential constant expression, failure to constant
-// fold a potential constant sub-expression will be indicated by a 'false'
-// return value (the expression could not be folded) and no diagnostic (the
-// expression is not necessarily non-constant).
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExprConstant.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Expr constant evaluator.                         //
+//                                                                           //
+// Constant expression evaluation produces four main results:                //
+//                                                                           //
+//  * A success/failure flag indicating whether constant folding was successful.//
+//    This is the 'bool' return value used by most of the code in this file. A//
+//    'false' return value indicates that constant folding has failed, and any//
+//    appropriate diagnostic has already been produced.                      //
+//                                                                           //
+//  * An evaluated result, valid only if constant folding has not failed.    //
+//                                                                           //
+//  * A flag indicating if evaluation encountered (unevaluated) side-effects.//
+//    These arise in cases such as (sideEffect(), 0) and (sideEffect() || 1),//
+//    where it is possible to determine the evaluated result regardless.     //
+//                                                                           //
+//  * A set of notes indicating why the evaluation was not a constant expression//
+//    (under the C++11 / C++1y rules only, at the moment), or, if folding failed//
+//    too, why the expression could not be folded.                           //
+//                                                                           //
+// If we are checking for a potential constant expression, failure to constant//
+// fold a potential constant sub-expression will be indicated by a 'false'   //
+// return value (the expression could not be folded) and no diagnostic (the  //
+// expression is not necessarily non-constant).                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/APValue.h"
 #include "clang/AST/ASTContext.h"
@@ -48,11 +47,36 @@
 #include <cstring>
 #include <functional>
 
+#include "llvm/Support/OacrIgnoreCond.h"  // HLSL Change - constant evaluator is language-dependant
+#include "dxc/HlslIntrinsicOp.h"          // HLSL Change
+
 using namespace clang;
 using llvm::APSInt;
 using llvm::APFloat;
 
 static bool IsGlobalLValue(APValue::LValueBase B);
+
+// HLSL Change Starts - reuse code from CallExpr::getBuiltinCallee
+static const FunctionDecl *GetCallExprFunction(const CallExpr *CE) {
+  const ImplicitCastExpr *ICE = dyn_cast<ImplicitCastExpr>(CE->getCallee());
+  if (!ICE) // FIXME: deal with more complex calls (e.g. (func)(), (*func)()).
+    return 0;
+
+  const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(ICE->getSubExpr());
+  if (!DRE)
+    return 0;
+
+  const FunctionDecl *FDecl = dyn_cast<FunctionDecl>(DRE->getDecl());
+  if (!FDecl)
+    return 0;
+
+  if (!FDecl->getIdentifier())
+    return 0;
+
+  return FDecl;
+}
+// HLSL Change Ends
+
 
 namespace {
   struct LValue;
@@ -3706,6 +3730,43 @@ static bool EvaluateArgs(ArrayRef<const Expr*> Args, ArgVector &ArgValues,
   return Success;
 }
 
+// HLSL Change Starts
+/// Evaluate an HLSL intrinsic call.
+static bool HandleIntrinsicCall(SourceLocation CallLoc, unsigned opcode,
+                                const LValue *This, ArrayRef<const Expr *> Args,
+                                EvalInfo &Info, APValue &Result) {
+  ArgVector ArgValues(Args.size());
+  if (!EvaluateArgs(Args, ArgValues, Info))
+    return false;
+
+  if (!Info.CheckCallLimit(CallLoc))
+    return false;
+
+  switch ((hlsl::IntrinsicOp)opcode) {
+  case hlsl::IntrinsicOp::IOP_max:
+    assert(Args.size() == 2 && "else call should be invalid");
+    assert(ArgValues[0].getKind() == ArgValues[1].getKind() && "else call is invalid");
+    if (ArgValues[0].isInt()) {
+      Result = ArgValues[0].getInt() > ArgValues[1].getInt() ? ArgValues[0] : ArgValues[1];
+    }
+    else if (ArgValues[0].isFloat()) {
+      // TODO: handle NaNs properly
+      APFloat::cmpResult r = ArgValues[0].getFloat().compare(ArgValues[1].getFloat());
+      Result = (r == APFloat::cmpGreaterThan) ? ArgValues[0] : ArgValues[1];
+    }
+    else {
+      // TODO: consider a better error message here
+      Info.Diag(CallLoc, diag::note_invalid_subexpr_in_const_expr);
+      return false;
+    }
+    return true;
+  default:
+    Info.Diag(CallLoc, diag::note_invalid_subexpr_in_const_expr);
+    return false;
+  }
+}
+// HLSL Change Ends
+
 /// Evaluate a function call.
 static bool HandleFunctionCall(SourceLocation CallLoc,
                                const FunctionDecl *Callee, const LValue *This,
@@ -4153,6 +4214,21 @@ public:
     if (This && !This->checkSubobject(Info, E, CSK_This))
       return false;
 
+    // HLSL Changes Start
+    {
+      unsigned opcode;
+      StringRef group;
+      if (hlsl::GetIntrinsicOp(FD, opcode, group)) {
+        APValue opResult;
+        if (!HandleIntrinsicCall(E->getExprLoc(), opcode, This, Args, Info,
+                                 opResult)) {
+          return false;
+        }
+        return DerivedSuccess(opResult, E);
+      }
+    }
+    // HLSL Changes End
+
     // DR1358 allows virtual constexpr functions in some cases. Don't allow
     // calls to such functions in constant expressions.
     if (This && !HasQualifier &&
@@ -4177,6 +4253,7 @@ public:
   bool VisitInitListExpr(const InitListExpr *E) {
     if (E->getNumInits() == 0)
       return DerivedZeroInitialization(E);
+    if (Info.getLangOpts().HLSL) return Error(E); // HLSL Change
     if (E->getNumInits() == 1)
       return StmtVisitorTy::Visit(E->getInit(0));
     return Error(E);
@@ -4217,6 +4294,9 @@ public:
   }
 
   bool VisitCastExpr(const CastExpr *E) {
+    if (Info.getLangOpts().HLSL && E->getSubExpr()->getStmtClass() == Stmt::InitListExprClass) { // HLSL Change
+      return Error(E);
+    }
     switch (E->getCastKind()) {
     default:
       break;
@@ -4651,8 +4731,12 @@ bool LValueExprEvaluator::VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
   if (E->getBase()->getType()->isVectorType())
     return Error(E);
 
-  if (!EvaluatePointer(E->getBase(), Result, Info))
-    return false;
+  if (this->getEvalInfo().Ctx.getLangOpts().HLSL) { // HLSL Change
+    return Error(E); // TODO: handle arrays
+  } else {
+    if (!EvaluatePointer(E->getBase(), Result, Info))
+      return false;
+  }
 
   APSInt Index;
   if (!EvaluateInteger(E->getIdx(), Index, Info))
@@ -5005,8 +5089,8 @@ bool PointerExprEvaluator::VisitCallExpr(const CallExpr *E) {
 
       if (BaseAlignment < Align) {
         Result.Designator.setInvalid();
-	// FIXME: Quantities here cast to integers because the plural modifier
-	// does not work on APSInts yet.
+    // FIXME: Quantities here cast to integers because the plural modifier
+    // does not work on APSInts yet.
         CCEDiag(E->getArg(0),
                 diag::note_constexpr_baa_insufficient_alignment) << 0
           << (int) BaseAlignment.getQuantity()
@@ -5266,6 +5350,7 @@ bool RecordExprEvaluator::VisitCastExpr(const CastExpr *E) {
 }
 
 bool RecordExprEvaluator::VisitInitListExpr(const InitListExpr *E) {
+  if (Info.getLangOpts().HLSL) return false; // HLSL Change
   const RecordDecl *RD = E->getType()->castAs<RecordType>()->getDecl();
   if (RD->isInvalidDecl()) return false;
   const ASTRecordLayout &Layout = Info.Ctx.getASTRecordLayout(RD);
@@ -5471,6 +5556,7 @@ public:
     }
   }
   bool VisitInitListExpr(const InitListExpr *E) {
+    if (Info.getLangOpts().HLSL) return Error(E); // HLSL Change
     return VisitConstructExpr(E);
   }
   bool VisitCXXConstructExpr(const CXXConstructExpr *E) {
@@ -5505,7 +5591,15 @@ namespace {
       : ExprEvaluatorBaseTy(info), Result(Result) {}
 
     bool Success(const ArrayRef<APValue> &V, const Expr *E) {
-      assert(V.size() == E->getType()->castAs<VectorType>()->getNumElements());
+      // HLSL Change Begins.
+      const VectorType *VT = nullptr;
+      if (hlsl::IsHLSLVecType(E->getType())) {
+        VT = hlsl::ConvertHLSLVecMatTypeToExtVectorType(getEvalInfo().Ctx,
+                                                        E->getType());
+      } else
+        VT = E->getType()->castAs<VectorType>();
+      // HLSL Change Ends.
+      assert(V.size() == VT->getNumElements());
       // FIXME: remove this APValue copy.
       Result = APValue(V.data(), V.size());
       return true;
@@ -5529,7 +5623,7 @@ namespace {
 } // end anonymous namespace
 
 static bool EvaluateVector(const Expr* E, APValue& Result, EvalInfo &Info) {
-  assert(E->isRValue() && E->getType()->isVectorType() &&"not a vector rvalue");
+  assert(E->isRValue() && (E->getType()->isVectorType() || hlsl::IsHLSLVecType(E->getType())) &&"not a vector rvalue"); // HLSL Change
   return VectorExprEvaluator(Info, Result).Visit(E);
 }
 
@@ -5605,7 +5699,25 @@ bool VectorExprEvaluator::VisitCastExpr(const CastExpr* E) {
 
 bool
 VectorExprEvaluator::VisitInitListExpr(const InitListExpr *E) {
-  const VectorType *VT = E->getType()->castAs<VectorType>();
+  // HLSL Change Begins.
+  if (Info.getLangOpts().HLSL) {
+    QualType Ty = E->getType();
+    if (!hlsl::IsHLSLVecType(Ty))
+      return Error(E); // HLSL Change
+    unsigned vecSize = hlsl::GetHLSLVecSize(Ty);
+    // TODO: support all cases.
+    if (E->getNumInits() != vecSize)
+      return Error(E); // HLSL Change
+  }
+  // HLSL Change Ends.
+  const VectorType *VT = nullptr;
+  // HLSL Change Begins.
+  if (hlsl::IsHLSLVecType(E->getType())) {
+    VT = hlsl::ConvertHLSLVecMatTypeToExtVectorType(getEvalInfo().Ctx,
+                                                    E->getType());
+  } else
+    VT = E->getType()->castAs<VectorType>();
+  // HLSL Change Ends.
   unsigned NumInits = E->getNumInits();
   unsigned NumElements = VT->getNumElements();
 
@@ -5725,6 +5837,7 @@ static bool EvaluateArray(const Expr *E, const LValue &This,
 }
 
 bool ArrayExprEvaluator::VisitInitListExpr(const InitListExpr *E) {
+  if (Info.getLangOpts().HLSL) return Error(E); // HLSL Change
   const ConstantArrayType *CAT = Info.Ctx.getAsConstantArrayType(E->getType());
   if (!CAT)
     return Error(E);
@@ -7421,6 +7534,8 @@ bool IntExprEvaluator::VisitCastExpr(const CastExpr *E) {
   case CK_ARCReclaimReturnedObject:
   case CK_ARCExtendBlockObject:
   case CK_CopyAndAutoreleaseBlockObject:
+  case CK_HLSLVectorToScalarCast:   // HLSL Change
+  case CK_HLSLMatrixToScalarCast:   // HLSL Change
     return Error(E);
 
   case CK_UserDefinedConversion:
@@ -8348,6 +8463,16 @@ static bool EvaluateVoid(const Expr *E, EvalInfo &Info) {
 static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
   // In C, function designators are not lvalues, but we evaluate them as if they
   // are.
+  // HLSL Change Begins.
+  if (Info.getLangOpts().HLSL && E->getStmtClass() == Stmt::InitListExprClass) { // HLSL Change
+    if (hlsl::IsHLSLVecType(E->getType())) {
+      if (EvaluateVector(E, Result, Info))
+        return true;
+    }
+    if (!E->getType()->isScalarType())
+      return false;
+  }
+  // HLSL Change Ends.
   QualType T = E->getType();
   if (E->isGLValue() || T->isFunctionType()) {
     LValue LV;
@@ -8483,6 +8608,7 @@ static bool FastEvaluateAsRValue(const Expr *Exp, Expr::EvalResult &Result,
   // performance problems. Only do so in C++11 for now.
   if (Exp->isRValue() && (Exp->getType()->isArrayType() ||
                           Exp->getType()->isRecordType()) &&
+      !hlsl::IsHLSLVecMatType(Exp->getType()) && // HLSL Change
       !Ctx.getLangOpts().CPlusPlus11) {
     IsConst = false;
     return true;
@@ -8681,6 +8807,8 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::CompoundAssignOperatorClass:
   case Expr::CompoundLiteralExprClass:
   case Expr::ExtVectorElementExprClass:
+  case Expr::ExtMatrixElementExprClass: // HLSL Change
+  case Expr::HLSLVectorElementExprClass: // HLSL Change
   case Expr::DesignatedInitExprClass:
   case Expr::NoInitExprClass:
   case Expr::DesignatedInitUpdateExprClass:
@@ -8782,7 +8910,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
     // constant expressions, but they can never be ICEs because an ICE cannot
     // contain an operand of (pointer to) function type.
     const CallExpr *CE = cast<CallExpr>(E);
-    if (CE->getBuiltinCallee())
+    if (hlsl::IsIntrinsicOp(GetCallExprFunction(CE)) || CE->getBuiltinCallee()) // HLSL Change
       return CheckEvalInICE(E, Ctx);
     return ICEDiag(IK_NotICE, E->getLocStart());
   }
@@ -8912,7 +9040,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
           }
         }
       }
-      if (Exp->getOpcode() == BO_Comma) {
+      if (Exp->getOpcode() == BO_Comma && !Ctx.getLangOpts().HLSL) { // HLSL Change: comma is allowed in ICE
         if (Ctx.getLangOpts().C99) {
           // C99 6.6p3 introduces a strange edge case: comma can be in an ICE
           // if it isn't evaluated.

@@ -8,6 +8,11 @@ LLVM Coding Standards
 Introduction
 ============
 
+NOTE: this document describes the coding standards for the original LLVM
+project, not the DirectX Compiler. The project as a whole uses different
+styles depending on the primary design goals of the component. See HLSL
+Changes for some background on these.
+
 This document attempts to describe a few coding standards that are being used in
 the LLVM source tree.  Although no coding standards should be regarded as
 absolute requirements to be followed in all instances, coding standards are
@@ -40,8 +45,7 @@ change it in some other way.  Just do the reformating as a separate commit from
 the functionality change.
   
 The ultimate goal of these guidelines is the increase readability and
-maintainability of our common source base. If you have suggestions for topics to
-be included, please mail them to `Chris <mailto:sabre@nondot.org>`_.
+maintainability of our common source base.
 
 Languages, Libraries, and Standards
 ===================================
@@ -238,19 +242,18 @@ tree.  The standard header looks like this:
 .. code-block:: c++
 
   //===-- llvm/Instruction.h - Instruction class definition -------*- C++ -*-===//
-  //
-  //                     The LLVM Compiler Infrastructure
-  //
-  // This file is distributed under the University of Illinois Open Source
-  // License. See LICENSE.TXT for details.
-  //
-  //===----------------------------------------------------------------------===//
-  ///
-  /// \file
-  /// This file contains the declaration of the Instruction class, which is the
-  /// base class for all of the VM instructions.
-  ///
-  //===----------------------------------------------------------------------===//
+  ///////////////////////////////////////////////////////////////////////////////
+  //                                                                           //
+  // Instruction.h                                                             //
+  // Copyright (C) Microsoft Corporation. All rights reserved.                 //
+  // Licensed under the MIT license. See COPYRIGHT in the project root for     //
+  // full license information.                                                 //
+  //                                                                           //
+  // \file                                                                     //
+  // This file contains the declaration of the Instruction class, which is the //
+  // base class for all of the VM instructions.                                //
+  //                                                                           //
+  ///////////////////////////////////////////////////////////////////////////////
 
 A few things to note about this particular format: The "``-*- C++ -*-``" string
 on the first line is there to tell Emacs that the source file is a C++ file, not

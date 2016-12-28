@@ -1,16 +1,15 @@
 //===--- Overload.h - C++ Overloading ---------------------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Overload.h                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the data structures and types used in C++               //
+// overload resolution.                                                      //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the data structures and types used in C++
-// overload resolution.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_SEMA_OVERLOAD_H
 #define LLVM_CLANG_SEMA_OVERLOAD_H
@@ -83,6 +82,21 @@ namespace clang {
     ICK_TransparentUnionConversion, ///< Transparent Union Conversions
     ICK_Writeback_Conversion,  ///< Objective-C ARC writeback conversion
     ICK_Zero_Event_Conversion, ///< Zero constant to event (OpenCL1.2 6.12.10)
+
+    // HLSL Change Starts
+    // The following conversion types also imply a potential followup 
+    // ComponentConversion.
+    // List is roughly ordered to preserve the property:
+    //   "better conversion kinds have smaller values"
+    // Unfortunately, this property isn't really possible to preserve due 
+    // to potential additional component conversion.
+    ICK_HLSLVector_Scalar,     ///< HLSLVector/Matrix to scalar
+    ICK_HLSLVector_Conversion, ///< HLSLVector/Matrix conversion
+    ICK_Flat_Conversion,       ///< Flat assignment conversion for HLSL (inline conversion, straddled)
+    ICK_HLSLVector_Splat,      ///< HLSLVector/Matrix splat
+    ICK_HLSLVector_Truncation, ///< HLSLVector/Matrix truncation
+    // HLSL Change Ends
+
     ICK_Num_Conversion_Kinds   ///< The number of conversion kinds
   };
 
@@ -137,6 +151,14 @@ namespace clang {
     /// conversion, floating-integral conversion, pointer conversion,
     /// pointer-to-member conversion, or boolean conversion.
     ImplicitConversionKind Second : 8;
+
+    // HLSL Change Starts
+    /// ComponentConversion - If this is not ICK_Identity, this describes
+    /// the type of conversion to apply to the component type of an HLSL
+    /// vector or matrix type.  If used, Second must be one of the 
+    /// ICK_HLSLVector_* implicit conversion kinds.
+    ImplicitConversionKind ComponentConversion : 8;
+    // HLSL Change Ends
 
     /// Third - The third conversion can be a qualification conversion.
     ImplicitConversionKind Third : 8;
@@ -612,6 +634,8 @@ namespace clang {
     /// the OverloadCandidateSet.
     ImplicitConversionSequence *Conversions;
 
+    ImplicitConversionSequence *OutConversions; // HLSL Change
+
     /// The FixIt hints which can be used to fix the Bad candidate.
     ConversionFixItGenerator Fix;
 
@@ -704,8 +728,9 @@ namespace clang {
     };
 
   private:
-    SmallVector<OverloadCandidate, 16> Candidates;
-    llvm::SmallPtrSet<Decl *, 16> Functions;
+    static const int InlineCandidates = 4; // HLSL Change - shrink inline cost
+    SmallVector<OverloadCandidate, InlineCandidates> Candidates; // HLSL Change - shrink inline cost
+    llvm::SmallPtrSet<Decl *, InlineCandidates> Functions; // HLSL Change - shrink inline cost
 
     // Allocator for OverloadCandidate::Conversions. We store the first few
     // elements inline to avoid allocation for small sets.
@@ -716,7 +741,7 @@ namespace clang {
 
     unsigned NumInlineSequences;
     llvm::AlignedCharArray<llvm::AlignOf<ImplicitConversionSequence>::Alignment,
-                           16 * sizeof(ImplicitConversionSequence)> InlineSpace;
+                           InlineCandidates * sizeof(ImplicitConversionSequence)> InlineSpace; // HLSL Change - shrink inline cost
 
     OverloadCandidateSet(const OverloadCandidateSet &) = delete;
     void operator=(const OverloadCandidateSet &) = delete;
@@ -755,7 +780,7 @@ namespace clang {
 
       // Assign space from the inline array if there are enough free slots
       // available.
-      if (NumConversions + NumInlineSequences <= 16) {
+      if (NumConversions + NumInlineSequences <= InlineCandidates) {
         ImplicitConversionSequence *I =
             (ImplicitConversionSequence *)InlineSpace.buffer;
         C.Conversions = &I[NumInlineSequences];
@@ -769,6 +794,22 @@ namespace clang {
       // Construct the new objects.
       for (unsigned i = 0; i != NumConversions; ++i)
         new (&C.Conversions[i]) ImplicitConversionSequence();
+
+      // HLSL Change Starts - consider specifying this size separately
+      if (NumConversions + NumInlineSequences <= InlineCandidates) {
+        ImplicitConversionSequence *I =
+          (ImplicitConversionSequence *)InlineSpace.buffer;
+        C.OutConversions = &I[NumInlineSequences];
+        NumInlineSequences += NumConversions;
+      }
+      else {
+        // Otherwise get memory from the allocator.
+        C.OutConversions = ConversionSequenceAllocator
+          .Allocate<ImplicitConversionSequence>(NumConversions);
+      }
+      for (unsigned i = 0; i != NumConversions; ++i)
+        new (&C.OutConversions[i]) ImplicitConversionSequence();
+      // HLSL Change Ends
 
       C.NumConversions = NumConversions;
       return C;

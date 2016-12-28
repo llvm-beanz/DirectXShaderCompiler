@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 #===-- test-release.sh - Test the LLVM release candidates ------------------===#
 #
-#                     The LLVM Compiler Infrastructure
-#
-# This file is distributed under the University of Illinois Open Source
-# License.
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 #
 #===------------------------------------------------------------------------===#
 #

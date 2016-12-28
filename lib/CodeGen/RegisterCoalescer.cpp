@@ -1,17 +1,16 @@
 //===- RegisterCoalescer.cpp - Generic Register Coalescing Interface -------==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the generic RegisterCoalescer interface which
-// is used as the common interface used by all clients and
-// implementations of register coalescing.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RegisterCoalescer.cpp                                                     //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the generic RegisterCoalescer interface which        //
+// is used as the common interface used by all clients and                   //
+// implementations of register coalescing.                                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "RegisterCoalescer.h"
 #include "llvm/ADT/STLExtras.h"
@@ -2712,7 +2711,8 @@ struct MBBPriorityInfo {
 /// block (the unsigned), and then on the MBB number.
 ///
 /// EnableGlobalCopies assumes that the primary sort key is loop depth.
-static int compareMBBPriority(const MBBPriorityInfo *LHS,
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl compareMBBPriority(const MBBPriorityInfo *LHS,
                               const MBBPriorityInfo *RHS) {
   // Deeper loops first
   if (LHS->Depth != RHS->Depth)

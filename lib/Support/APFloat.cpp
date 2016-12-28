@@ -1,16 +1,15 @@
 //===-- APFloat.cpp - Implement APFloat class -----------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements a class to represent arbitrary precision floating
-// point values and provide a variety of arithmetic operations on them.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// APFloat.cpp                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements a class to represent arbitrary precision floating    //
+// point values and provide a variety of arithmetic operations on them.      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
@@ -526,8 +525,8 @@ static const char NaNU[] = "NAN";
    significant nibble.  Write out exactly COUNT hexdigits, return
    COUNT.  */
 static unsigned int
-partAsHex (char *dst, integerPart part, unsigned int count,
-           const char *hexDigitChars)
+partAsHex (_Out_writes_(count) char *dst, integerPart part, unsigned int count,
+           _In_count_(16) const char *hexDigitChars)
 {
   unsigned int result = count;
 
@@ -544,7 +543,7 @@ partAsHex (char *dst, integerPart part, unsigned int count,
 
 /* Write out an unsigned decimal integer.  */
 static char *
-writeUnsignedDecimal (char *dst, unsigned int n)
+writeUnsignedDecimal (_Out_writes_(10) char *dst, unsigned int n) // HLSL Change: '4294967295' is ten characters
 {
   char buff[40], *p;
 
@@ -562,7 +561,7 @@ writeUnsignedDecimal (char *dst, unsigned int n)
 
 /* Write out a signed decimal integer.  */
 static char *
-writeSignedDecimal (char *dst, int value)
+writeSignedDecimal(_Out_writes_(11) char *dst, int value) // HLSL Change: '-2147483648' is eleven characters
 {
   if (value < 0) {
     *dst++ = '-';
@@ -2669,6 +2668,7 @@ APFloat::convertFromString(StringRef str, roundingMode rounding_mode)
   return convertFromDecimalString(StringRef(p, slen), rounding_mode);
 }
 
+#if 0 // HLSL Change
 /* Write out a hexadecimal representation of the floating point value
    to DST, which must be of sufficient size, in the C99 form
    [-]0xh.hhhhp[+-]d.  Return the number of characters written,
@@ -2844,6 +2844,8 @@ APFloat::convertNormalToHexString(char *dst, unsigned int hexDigits,
 
   return writeSignedDecimal (dst, exponent);
 }
+
+#endif
 
 hash_code llvm::hash_value(const APFloat &Arg) {
   if (!Arg.isFiniteNonZero())

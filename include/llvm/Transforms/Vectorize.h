@@ -1,14 +1,13 @@
 //===-- Vectorize.h - Vectorization Transformations -------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This header file defines prototypes for accessor functions that expose passes
-// in the Vectorize transformations library.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Vectorize.h                                                               //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header file defines prototypes for accessor functions that expose passes//
+// in the Vectorize transformations library.                                 //
 //
 //===----------------------------------------------------------------------===//
 
@@ -125,8 +124,8 @@ Pass *createLoopVectorizePass(bool NoUnrolling = false,
 // SLPVectorizer - Create a bottom-up SLP vectorizer pass.
 //
 Pass *createSLPVectorizerPass();
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Vectorize the BasicBlock.
 ///
 /// @param BB The BasicBlock to be vectorized

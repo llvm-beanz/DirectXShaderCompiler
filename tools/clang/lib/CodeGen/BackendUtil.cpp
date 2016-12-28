@@ -1,11 +1,12 @@
 //===--- BackendUtil.cpp - LLVM Backend Utilities -------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BackendUtil.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/CodeGen/BackendUtil.h"
 #include "clang/Basic/Diagnostic.h"
@@ -41,6 +42,9 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include <memory>
+#include "dxc/HLSL/DxilGenerationPass.h" // HLSL Change
+#include "dxc/HLSL/HLMatrixLowerPass.h"  // HLSL Change
+
 using namespace clang;
 using namespace llvm;
 
@@ -52,6 +56,14 @@ class EmitAssemblyHelper {
   const clang::TargetOptions &TargetOpts;
   const LangOptions &LangOpts;
   Module *TheModule;
+  // HLSL Changes Start
+  std::string CodeGenPassesConfig;
+  std::string PerModulePassesConfig;
+  std::string PerFunctionPassesConfig;
+  mutable llvm::raw_string_ostream CodeGenPassesConfigOS;
+  mutable llvm::raw_string_ostream PerModulePassesConfigOS;
+  mutable llvm::raw_string_ostream PerFunctionPassesConfigOS;
+  // HLSL Changes End
 
   Timer CodeGenerationTime;
 
@@ -70,6 +82,7 @@ private:
   legacy::PassManager *getCodeGenPasses() const {
     if (!CodeGenPasses) {
       CodeGenPasses = new legacy::PassManager();
+      CodeGenPasses->TrackPassOS = &CodeGenPassesConfigOS;
       CodeGenPasses->add(
           createTargetTransformInfoWrapperPass(getTargetIRAnalysis()));
     }
@@ -79,6 +92,7 @@ private:
   legacy::PassManager *getPerModulePasses() const {
     if (!PerModulePasses) {
       PerModulePasses = new legacy::PassManager();
+      PerModulePasses->TrackPassOS = &PerModulePassesConfigOS;
       PerModulePasses->add(
           createTargetTransformInfoWrapperPass(getTargetIRAnalysis()));
     }
@@ -88,6 +102,7 @@ private:
   legacy::FunctionPassManager *getPerFunctionPasses() const {
     if (!PerFunctionPasses) {
       PerFunctionPasses = new legacy::FunctionPassManager(TheModule);
+      PerFunctionPasses->TrackPassOS = &PerFunctionPassesConfigOS;
       PerFunctionPasses->add(
           createTargetTransformInfoWrapperPass(getTargetIRAnalysis()));
     }
@@ -120,7 +135,12 @@ public:
     : Diags(_Diags), CodeGenOpts(CGOpts), TargetOpts(TOpts), LangOpts(LOpts),
       TheModule(M), CodeGenerationTime("Code Generation Time"),
       CodeGenPasses(nullptr), PerModulePasses(nullptr),
-      PerFunctionPasses(nullptr) {}
+      PerFunctionPasses(nullptr),
+      // HLSL Changes Start
+      CodeGenPassesConfigOS(CodeGenPassesConfig),
+      PerModulePassesConfigOS(PerModulePassesConfig),
+      PerFunctionPassesConfigOS(PerFunctionPassesConfig) {}
+      // HLSL Changes End
 
   ~EmitAssemblyHelper() {
     delete CodeGenPasses;
@@ -151,6 +171,8 @@ private:
 
 }
 
+#ifdef MS_ENABLE_OBJCARC // HLSL Change
+
 static void addObjCARCAPElimPass(const PassManagerBuilder &Builder, PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
     PM.add(createObjCARCAPElimPass());
@@ -165,6 +187,8 @@ static void addObjCARCOptPass(const PassManagerBuilder &Builder, PassManagerBase
   if (Builder.OptLevel > 0)
     PM.add(createObjCARCOptPass());
 }
+
+#endif // MS_ENABLE_OBJCARC - HLSL Change
 
 static void addSampleProfileLoaderPass(const PassManagerBuilder &Builder,
                                        legacy::PassManagerBase &PM) {
@@ -183,6 +207,8 @@ static void addBoundsCheckingPass(const PassManagerBuilder &Builder,
                                     legacy::PassManagerBase &PM) {
   PM.add(createBoundsCheckingPass());
 }
+
+#ifdef MS_ENABLE_INSTR // HLSL Change
 
 static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
                                      legacy::PassManagerBase &PM) {
@@ -244,6 +270,8 @@ static void addDataFlowSanitizerPass(const PassManagerBuilder &Builder,
   PM.add(createDataFlowSanitizerPass(LangOpts.SanitizerBlacklistFiles));
 }
 
+#endif // MS_ENABLE_INSTR - HLSL Change
+
 static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
                                          const CodeGenOptions &CodeGenOpts) {
   TargetLibraryInfoImpl *TLII = new TargetLibraryInfoImpl(TargetTriple);
@@ -277,9 +305,13 @@ void EmitAssemblyHelper::CreatePasses() {
 
   // Handle disabling of LLVM optimization, where we want to preserve the
   // internal module before any optimization.
-  if (CodeGenOpts.DisableLLVMOpts) {
+  if (CodeGenOpts.DisableLLVMOpts || CodeGenOpts.HLSLHighLevel) { // HLSL Change
     OptLevel = 0;
+    // HLSL Change Begins.
+    // HLSL always inline.
+    if (!LangOpts.HLSL || CodeGenOpts.HLSLHighLevel)
     Inlining = CodeGenOpts.NoInlining;
+    // HLSL Change Ends.
   }
 
   PassManagerBuilderWrapper PMBuilder(CodeGenOpts, LangOpts);
@@ -288,6 +320,7 @@ void EmitAssemblyHelper::CreatePasses() {
   PMBuilder.BBVectorize = CodeGenOpts.VectorizeBB;
   PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
   PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
+  PMBuilder.HLSLHighLevel = CodeGenOpts.HLSLHighLevel; // HLSL Change
 
   PMBuilder.DisableUnitAtATime = !CodeGenOpts.UnitAtATime;
   PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
@@ -303,6 +336,7 @@ void EmitAssemblyHelper::CreatePasses() {
                            addSampleProfileLoaderPass);
 
   // In ObjC ARC mode, add the main ARC optimization passes.
+#ifdef MS_ENABLE_OBJCARC // HLSL Change
   if (LangOpts.ObjCAutoRefCount) {
     PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
                            addObjCARCExpandPass);
@@ -318,6 +352,9 @@ void EmitAssemblyHelper::CreatePasses() {
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addBoundsCheckingPass);
   }
+#endif // MS_ENABLE_OBJCARC - HLSL Change
+
+#ifdef MS_ENABLE_INSTR // HLSL Change
 
   if (CodeGenOpts.SanitizeCoverageType ||
       CodeGenOpts.SanitizeCoverageIndirectCalls ||
@@ -363,6 +400,8 @@ void EmitAssemblyHelper::CreatePasses() {
                            addDataFlowSanitizerPass);
   }
 
+#endif // MS_ENABLE_INSTR - HLSL Change
+
   // Figure out TargetLibraryInfo.
   Triple TargetTriple(TheModule->getTargetTriple());
   PMBuilder.LibraryInfo = createTLII(TargetTriple, CodeGenOpts);
@@ -395,6 +434,7 @@ void EmitAssemblyHelper::CreatePasses() {
   if (!CodeGenOpts.RewriteMapFiles.empty())
     addSymbolRewriterPass(CodeGenOpts, MPM);
 
+#ifdef MS_ENABLE_INSTR // HLSL Change
   if (!CodeGenOpts.DisableGCov &&
       (CodeGenOpts.EmitGcovArcs || CodeGenOpts.EmitGcovNotes)) {
     // Not using 'GCOVOptions::getDefault' allows us to avoid exiting if
@@ -419,6 +459,7 @@ void EmitAssemblyHelper::CreatePasses() {
     Options.InstrProfileOutput = CodeGenOpts.InstrProfileOutput;
     MPM->add(createInstrProfilingPass(Options));
   }
+#endif
 
   PMBuilder.populateModulePassManager(*MPM);
 }
@@ -445,6 +486,7 @@ TargetMachine *EmitAssemblyHelper::CreateTargetMachine(bool MustCreateTM) {
   assert(CodeModel != ~0u && "invalid code model!");
   llvm::CodeModel::Model CM = static_cast<llvm::CodeModel::Model>(CodeModel);
 
+#if 0 // HLSL Change - no global state mutation on per-instance work
   SmallVector<const char *, 16> BackendArgs;
   BackendArgs.push_back("clang"); // Fake program name.
   if (!CodeGenOpts.DebugPass.empty()) {
@@ -460,13 +502,16 @@ TargetMachine *EmitAssemblyHelper::CreateTargetMachine(bool MustCreateTM) {
   BackendArgs.push_back(nullptr);
   llvm::cl::ParseCommandLineOptions(BackendArgs.size() - 1,
                                     BackendArgs.data());
+#endif // HLSL Change
 
   std::string FeaturesStr;
   if (!TargetOpts.Features.empty()) {
+#if 0 // HLSL Change
     SubtargetFeatures Features;
     for (const std::string &Feature : TargetOpts.Features)
       Features.AddFeature(Feature);
     FeaturesStr = Features.getString();
+#endif // HLSL Change
   }
 
   llvm::Reloc::Model RM = llvm::Reloc::Default;
@@ -580,8 +625,10 @@ bool EmitAssemblyHelper::AddEmitPasses(BackendAction Action,
   // Add ObjC ARC final-cleanup optimizations. This is done as part of the
   // "codegen" passes so that it isn't run multiple times when there is
   // inlining happening.
+#ifdef MS_ENABLE_OBJCARC // HLSL Change
   if (CodeGenOpts.OptimizationLevel > 0)
     PM->add(createObjCARCContractPass());
+#endif // HLSL Change
 
   if (TM->addPassesToEmitFile(*PM, OS, CGFT,
                               /*DisableVerify=*/!CodeGenOpts.VerifyModule)) {
@@ -598,6 +645,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
 
   bool UsesCodeGen = (Action != Backend_EmitNothing &&
                       Action != Backend_EmitBC &&
+                      Action != Backend_EmitPasses &&
                       Action != Backend_EmitLL);
   if (!TM)
     TM.reset(CreateTargetMachine(UsesCodeGen));
@@ -610,6 +658,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
 
   switch (Action) {
   case Backend_EmitNothing:
+  case Backend_EmitPasses: // HLSL Change
     break;
 
   case Backend_EmitBC:
@@ -629,6 +678,27 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
 
   // Before executing passes, print the final values of the LLVM options.
   cl::PrintOptionValues();
+
+  // HLSL Change Starts
+  if (Action == Backend_EmitPasses) {
+    if (PerFunctionPasses) {
+      *OS << "# Per-function passes\n"
+             "-opt-fn-passes\n";
+      *OS << PerFunctionPassesConfigOS.str();
+    }
+    if (PerModulePasses) {
+      *OS << "# Per-module passes\n"
+             "-opt-mod-passes\n";
+      *OS << PerModulePassesConfigOS.str();
+    }
+    if (CodeGenPasses) {
+      *OS << "# Code generation passes\n"
+             "-opt-mod-passes\n";
+      *OS << CodeGenPassesConfigOS.str();
+    }
+    return;
+  }
+  // HLSL Change Ends
 
   // Run passes. For now we do all passes at once, but eventually we
   // would like to have the option of streaming code generation.

@@ -1,15 +1,14 @@
 //===--- TemplateName.cpp - C++ Template Name Representation---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the TemplateName interface and subclasses.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TemplateName.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the TemplateName interface and subclasses.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/TemplateName.h"
 #include "clang/AST/DeclTemplate.h"
@@ -161,8 +160,10 @@ const DiagnosticBuilder &clang::operator<<(const DiagnosticBuilder &DB,
   std::string NameStr;
   raw_string_ostream OS(NameStr);
   LangOptions LO;
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
   LO.CPlusPlus = true;
   LO.Bool = true;
+#endif
   OS << '\'';
   N.print(OS, PrintingPolicy(LO));
   OS << '\'';
@@ -172,8 +173,10 @@ const DiagnosticBuilder &clang::operator<<(const DiagnosticBuilder &DB,
 
 void TemplateName::dump(raw_ostream &OS) const {
   LangOptions LO;  // FIXME!
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
   LO.CPlusPlus = true;
   LO.Bool = true;
+#endif
   print(OS, PrintingPolicy(LO));
 }
 

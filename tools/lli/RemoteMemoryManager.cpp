@@ -1,16 +1,15 @@
 //===---- RemoteMemoryManager.cpp - Recording memory manager --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This memory manager allocates local storage and keeps a record of each
-// allocation. Iterators are provided for all data and code allocations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// RemoteMemoryManager.cpp                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This memory manager allocates local storage and keeps a record of each    //
+// allocation. Iterators are provided for all data and code allocations.     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "RemoteMemoryManager.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"

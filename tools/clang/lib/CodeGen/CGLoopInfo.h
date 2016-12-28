@@ -1,16 +1,15 @@
 //===---- CGLoopInfo.h - LLVM CodeGen for loop metadata -*- C++ -*---------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CGLoopInfo.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is the internal state used for llvm translation for loop statement   //
+// metadata.                                                                 //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is the internal state used for llvm translation for loop statement
-// metadata.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_LIB_CODEGEN_CGLOOPINFO_H
 #define LLVM_CLANG_LIB_CODEGEN_CGLOOPINFO_H
@@ -50,6 +49,13 @@ struct LoopAttributes {
 
   /// \brief llvm.loop.interleave.count
   unsigned VectorizerUnroll;
+
+  // HLSL Change Begins.
+  /// \brief hlsl [loop] attribute
+  bool     HlslLoop;
+  /// \brief hlsl [unroll] attribute
+  unsigned HlslUnrollCount;
+  // HLSL Change Ends.
 };
 
 /// \brief Information used when generating a structured loop.
@@ -120,6 +126,13 @@ public:
 
   /// \brief Set the vectorizer unroll for the next loop pushed.
   void setVectorizerUnroll(unsigned U) { StagedAttrs.VectorizerUnroll = U; }
+
+  // HLSL Change Begins
+  /// \brief Set the hlsl unroll count for the next loop pushed.
+  void setHlslUnrollCount(unsigned U) { StagedAttrs.HlslUnrollCount = U; }
+  /// \brief Set the hlsl loop for the next loop pushed.
+  void setHlslLoop(bool Enable = true) { StagedAttrs.HlslLoop = Enable; }
+  // HLSL Chagne Ends
 
 private:
   /// \brief Returns true if there is LoopInfo on the stack.

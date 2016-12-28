@@ -1,16 +1,17 @@
 //===--- ASTWriterStmt.cpp - Statement and Expression Serialization -------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASTWriterStmt.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Implements serialization for Statements and Expressions.
+/// \file                                                                    //
+/// \brief Implements serialization for Statements and Expressions.          //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/AST/ASTContext.h"
@@ -66,6 +67,13 @@ void ASTStmtWriter::VisitNullStmt(NullStmt *S) {
   Writer.AddSourceLocation(S->getSemiLoc(), Record);
   Record.push_back(S->HasLeadingEmptyMacro);
   Code = serialization::STMT_NULL;
+}
+
+// HLSL Change: adding support for HLSL discard stmt.
+void ASTStmtWriter::VisitDiscardStmt(DiscardStmt *S) {
+  VisitStmt(S);
+  Writer.AddSourceLocation(S->getLoc(), Record);
+  Code = serialization::STMT_DISCARD;
 }
 
 void ASTStmtWriter::VisitCompoundStmt(CompoundStmt *S) {
@@ -672,6 +680,19 @@ void ASTStmtWriter::VisitExtVectorElementExpr(ExtVectorElementExpr *E) {
   Writer.AddSourceLocation(E->getAccessorLoc(), Record);
   Code = serialization::EXPR_EXT_VECTOR_ELEMENT;
 }
+
+// HLSL Change Starts
+void ASTStmtWriter::VisitExtMatrixElementExpr(ExtMatrixElementExpr *E) {
+  // This requires a new serialization code that will break compatibility.
+  // Until there is a scenario for serializing these AST tress this is left unimplemented.
+  assert(false && "ASTStmtWriter::VisitExtMatrixElementExpr is unimplemented");
+}
+void ASTStmtWriter::VisitHLSLVectorElementExpr(HLSLVectorElementExpr *E) {
+  // This requires a new serialization code that will break compatibility.
+  // Until there is a scenario for serializing these AST tress this is left unimplemented.
+  assert(false && "ASTStmtWriter::VisitHLSLVectorElementExpr is unimplemented");
+}
+// HLSL Change Ends
 
 void ASTStmtWriter::VisitInitListExpr(InitListExpr *E) {
   VisitExpr(E);

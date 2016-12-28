@@ -1,17 +1,16 @@
 //===- CXString.cpp - Routines for manipulating CXStrings -----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines routines for manipulating CXStrings. It should be the
-// only file that has internal knowledge of the encoding of the data in
-// CXStrings.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CXString.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines routines for manipulating CXStrings. It should be the   //
+// only file that has internal knowledge of the encoding of the data in      //
+// CXStrings.                                                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CXString.h"
 #include "CXTranslationUnit.h"
@@ -74,7 +73,7 @@ CXString createDup(const char *String) {
     return createEmpty();
 
   CXString Str;
-  Str.data = strdup(String);
+  Str.data = _strdup(String); // HLSL Change strdup to _strdup
   Str.private_flags = CXS_Malloc;
   return Str;
 }
@@ -153,7 +152,7 @@ bool isManagedByPool(CXString str) {
 // libClang public APIs.
 //===----------------------------------------------------------------------===//
 
-extern "C" {
+// extern "C" {               // HLSL Change -Don't use c linkage.
 const char *clang_getCString(CXString string) {
   if (string.private_flags == (unsigned) CXS_StringBuf) {
     return static_cast<const cxstring::CXStringBuf *>(string.data)->Data.data();
@@ -175,5 +174,5 @@ void clang_disposeString(CXString string) {
       break;
   }
 }
-} // end: extern "C"
+// } // end: extern "C"      // HLSL Change -Don't use c linkage.
 

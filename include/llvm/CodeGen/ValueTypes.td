@@ -1,17 +1,16 @@
 //===- ValueTypes.td - ValueType definitions ---------------*- tablegen -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Value types - These values correspond to the register types defined in the
-// ValueTypes.h file.  If you update anything here, you must update it there as
-// well!
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ValueTypes.td                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Value types - These values correspond to the register types defined in the//
+// ValueTypes.h file.  If you update anything here, you must update it there as//
+// well!                                                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 class ValueType<int size, int value> {
   string Namespace = "MVT";

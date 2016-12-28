@@ -1,16 +1,15 @@
 //== ObjCContainersASTChecker.cpp - CoreFoundation containers API *- C++ -*-==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// An AST checker that looks for common pitfalls when using 'CFArray',
-// 'CFDictionary', 'CFSet' APIs.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ObjCContainersASTChecker.cpp                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// An AST checker that looks for common pitfalls when using 'CFArray',       //
+// 'CFDictionary', 'CFSet' APIs.                                             //
+//                                                                           //
+
 #include "ClangSACheckers.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Analysis/AnalysisContext.h"
@@ -20,7 +19,8 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 using namespace ento;
 

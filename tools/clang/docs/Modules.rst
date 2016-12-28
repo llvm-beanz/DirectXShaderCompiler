@@ -7,6 +7,11 @@ Modules
 
 Introduction
 ============
+
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only. Module support
+is not currently compiled or supported.
+
 Most software is built using a number of software libraries, including libraries supplied by the platform, internal libraries built as part of the software itself to provide structure, and third-party libraries. For each library, one needs to access both its interface (API) and its implementation. In the C family of languages, the interface to a library is accessed by including the appropriate header files(s):
 
 .. code-block:: c

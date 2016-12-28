@@ -1,34 +1,33 @@
 //===--- SemaPseudoObject.cpp - Semantic Analysis for Pseudo-Objects ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for expressions involving
-//  pseudo-object references.  Pseudo-objects are conceptual objects
-//  whose storage is entirely abstract and all accesses to which are
-//  translated through some sort of abstraction barrier.
-//
-//  For example, Objective-C objects can have "properties", either
-//  declared or undeclared.  A property may be accessed by writing
-//    expr.prop
-//  where 'expr' is an r-value of Objective-C pointer type and 'prop'
-//  is the name of the property.  If this expression is used in a context
-//  needing an r-value, it is treated as if it were a message-send
-//  of the associated 'getter' selector, typically:
-//    [expr prop]
-//  If it is used as the LHS of a simple assignment, it is treated
-//  as a message-send of the associated 'setter' selector, typically:
-//    [expr setProp: RHS]
-//  If it is used as the LHS of a compound assignment, or the operand
-//  of a unary increment or decrement, both are required;  for example,
-//  'expr.prop *= 100' would be translated to:
-//    [expr setProp: [expr prop] * 100]
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaPseudoObject.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for expressions involving         //
+//  pseudo-object references.  Pseudo-objects are conceptual objects         //
+//  whose storage is entirely abstract and all accesses to which are         //
+//  translated through some sort of abstraction barrier.                     //
+//                                                                           //
+//  For example, Objective-C objects can have "properties", either           //
+//  declared or undeclared.  A property may be accessed by writing           //
+//    expr.prop                                                              //
+//  where 'expr' is an r-value of Objective-C pointer type and 'prop'        //
+//  is the name of the property.  If this expression is used in a context    //
+//  needing an r-value, it is treated as if it were a message-send           //
+//  of the associated 'getter' selector, typically:                          //
+//    [expr prop]                                                            //
+//  If it is used as the LHS of a simple assignment, it is treated           //
+//  as a message-send of the associated 'setter' selector, typically:        //
+//    [expr setProp: RHS]                                                    //
+//  If it is used as the LHS of a compound assignment, or the operand        //
+//  of a unary increment or decrement, both are required;  for example,      //
+//  'expr.prop *= 100' would be translated to:                               //
+//    [expr setProp: [expr prop] * 100]                                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ExprCXX.h"
@@ -41,6 +40,38 @@
 
 using namespace clang;
 using namespace sema;
+
+// HLSL Change Starts
+// No ObjC parse/sema support, so simply skip all of this compilation.
+// Here are enough stubs to link the current targets.
+#if 1
+
+Sema::ObjCSubscriptKind
+Sema::CheckSubscriptingKind(Expr *FromE) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::checkPseudoObjectRValue(Expr *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::checkPseudoObjectIncDec(Scope *Sc, SourceLocation opcLoc,
+  UnaryOperatorKind opcode, Expr *op) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+ExprResult Sema::checkPseudoObjectAssignment(Scope *S, SourceLocation opcLoc,
+  BinaryOperatorKind opcode,
+  Expr *LHS, Expr *RHS) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+Expr *Sema::recreateSyntacticForm(PseudoObjectExpr *E) {
+  llvm_unreachable("HLSL does not support ObjC constructs");
+}
+
+#else
+// HLSL Change Ends
 
 namespace {
   // Basically just a very focused copy of TreeTransform.
@@ -1619,3 +1650,5 @@ Expr *Sema::recreateSyntacticForm(PseudoObjectExpr *E) {
     return stripOpaqueValuesFromPseudoObjectRef(*this, syntax);
   }
 }
+
+#endif // HLSL Change

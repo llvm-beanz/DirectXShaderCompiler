@@ -1,17 +1,18 @@
 //===--- Format.cpp - Format C++ code -------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Format.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief This file implements functions declared in Format.h. This will be
-/// split into separate files as we go.
+/// \file                                                                    //
+/// \brief This file implements functions declared in Format.h. This will be //
+/// split into separate files as we go.                                      //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "ContinuationIndenter.h"
 #include "TokenAnnotator.h"
@@ -1600,6 +1601,7 @@ tooling::Replacements reformat(const FormatStyle &Style, StringRef Code,
 
 LangOptions getFormattingLangOpts(const FormatStyle &Style) {
   LangOptions LangOpts;
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
   LangOpts.CPlusPlus = 1;
   LangOpts.CPlusPlus11 = Style.Standard == FormatStyle::LS_Cpp03 ? 0 : 1;
   LangOpts.CPlusPlus14 = Style.Standard == FormatStyle::LS_Cpp03 ? 0 : 1;
@@ -1610,6 +1612,7 @@ LangOptions getFormattingLangOpts(const FormatStyle &Style) {
   LangOpts.ObjC1 = 1;
   LangOpts.ObjC2 = 1;
   LangOpts.MicrosoftExt = 1; // To get kw___try, kw___finally.
+#endif
   return LangOpts;
 }
 

@@ -1,15 +1,14 @@
 //===--- Mangle.cpp - Mangle C++ Names --------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Implements generic name mangling support for blocks and Objective-C.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Mangle.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Implements generic name mangling support for blocks and Objective-C.      //
+//                                                                           //
+
 #include "clang/AST/Attr.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
@@ -24,7 +23,8 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 #define MANGLE_CHECKER 0
 
 #if MANGLE_CHECKER

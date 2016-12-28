@@ -1,22 +1,21 @@
 //===- IntervalPartition.h - Interval partition Calculation -----*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// IntervalPartition.h                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains the declaration of the IntervalPartition class, which  //
+// calculates and represents the interval partition of a function, or a      //
+// preexisting interval partition.                                           //
 //
-//                     The LLVM Compiler Infrastructure
+// In this way, the interval partition may be used to reduce a flow graph down//
+// to its degenerate single node interval partition (unless it is irreducible).//
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains the declaration of the IntervalPartition class, which
-// calculates and represents the interval partition of a function, or a
-// preexisting interval partition.
-//
-// In this way, the interval partition may be used to reduce a flow graph down
-// to its degenerate single node interval partition (unless it is irreducible).
-//
-// TODO: The IntervalPartition class should take a bool parameter that tells
-// whether it should add the "tails" of an interval to an interval itself or if
-// they should be represented as distinct intervals.
+// TODO: The IntervalPartition class should take a bool parameter that tells //
+// whether it should add the "tails" of an interval to an interval itself or if//
+// they should be represented as distinct intervals.                         //
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,8 +27,8 @@
 #include <map>
 
 namespace llvm {
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 //
 // IntervalPartition - This class builds and holds an "interval partition" for
 // a function.  This partition divides the control flow graph into a set of

@@ -1,11 +1,12 @@
 //===--- FrontendOptions.h --------------------------------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// FrontendOptions.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_FRONTEND_FRONTENDOPTIONS_H
 #define LLVM_CLANG_FRONTEND_FRONTENDOPTIONS_H
@@ -70,6 +71,7 @@ enum InputKind {
   IK_PreprocessedObjC,
   IK_PreprocessedObjCXX,
   IK_OpenCL,
+  IK_HLSL, // HLSL Change: Enum for files with input kind hlsl
   IK_CUDA,
   IK_PreprocessedCuda,
   IK_AST,

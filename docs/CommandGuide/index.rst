@@ -1,6 +1,9 @@
 LLVM Command Guide
 ------------------
 
+NOTE: the DirectX Compiler project drops support for many of these tools, as
+they are no longer suitable or have a more specialized replacement.
+
 The following documents are command descriptions for all of the LLVM tools.
 These pages describe how to use the LLVM commands and what their options are.
 Note that these pages do not describe all of the options available for all
@@ -36,7 +39,6 @@ Debugging Tools
 .. toctree::
    :maxdepth: 1
 
-   bugpoint
    llvm-extract
    llvm-bcanalyzer
 

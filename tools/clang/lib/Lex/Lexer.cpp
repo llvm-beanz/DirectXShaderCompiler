@@ -1,15 +1,14 @@
 //===--- Lexer.cpp - C Language Family Lexer ------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements the Lexer and Token interfaces.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Lexer.cpp                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements the Lexer and Token interfaces.                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Lex/Lexer.h"
 #include "UnicodeCharSets.h"
@@ -229,7 +228,7 @@ void Lexer::Stringify(SmallVectorImpl<char> &Str) {
 /// \brief Slow case of getSpelling. Extract the characters comprising the
 /// spelling of this token from the provided input buffer.
 static size_t getSpellingSlow(const Token &Tok, const char *BufPtr,
-                              const LangOptions &LangOpts, char *Spelling) {
+                              const LangOptions &LangOpts, _Out_cap_x_(Tok.getLength()) char *Spelling) {
   assert(Tok.needsCleaning() && "getSpellingSlow called on simple token");
 
   size_t Length = 0;
@@ -1557,12 +1556,26 @@ bool Lexer::isHexaLiteral(const char *Start, const LangOptions &LangOpts) {
 /// constant. From[-1] is the first character lexed.  Return the end of the
 /// constant.
 bool Lexer::LexNumericConstant(Token &Result, const char *CurPtr) {
+  return LexNumericConstant(Result, CurPtr, 0);
+}
+
+bool Lexer::LexNumericConstant(Token &Result, const char *CurPtr, unsigned Periods) {
   unsigned Size;
   char C = getCharAndSize(CurPtr, Size);
   char PrevCh = 0;
-  while (isPreprocessingNumberBody(C)) {
+  while (isPreprocessingNumberBody(C) && !(C == '.' && Periods)) { // HLSL Change - support '1.0.xxx' floating point swizzle
     CurPtr = ConsumeChar(CurPtr, Size, Result);
     PrevCh = C;
+    // HLSL Change Begin.
+    // Support '1.0.xxx' floating point swizzle
+    if (C == '.') {
+        Periods++;
+        if (*CurPtr == 'x' || *CurPtr == 'r') {
+          CurPtr--;
+          break;
+        }
+    }
+    // HLSL Change End.
     C = getCharAndSize(CurPtr, Size);
   }
 
@@ -1571,7 +1584,7 @@ bool Lexer::LexNumericConstant(Token &Result, const char *CurPtr) {
     // If we are in Microsoft mode, don't continue if the constant is hex.
     // For example, MSVC will accept the following as 3 tokens: 0x1234567e+1
     if (!LangOpts.MicrosoftExt || !isHexaLiteral(BufferPtr, LangOpts))
-      return LexNumericConstant(Result, ConsumeChar(CurPtr, Size, Result));
+      return LexNumericConstant(Result, ConsumeChar(CurPtr, Size, Result), Periods);
   }
 
   // If we have a hex FP constant, continue.
@@ -1587,7 +1600,7 @@ bool Lexer::LexNumericConstant(Token &Result, const char *CurPtr) {
         IsHexFloat = false;
     }
     if (IsHexFloat)
-      return LexNumericConstant(Result, ConsumeChar(CurPtr, Size, Result));
+      return LexNumericConstant(Result, ConsumeChar(CurPtr, Size, Result), Periods);
   }
 
   // If we have a digit separator, continue.
@@ -1599,15 +1612,15 @@ bool Lexer::LexNumericConstant(Token &Result, const char *CurPtr) {
         Diag(CurPtr, diag::warn_cxx11_compat_digit_separator);
       CurPtr = ConsumeChar(CurPtr, Size, Result);
       CurPtr = ConsumeChar(CurPtr, NextSize, Result);
-      return LexNumericConstant(Result, CurPtr);
+      return LexNumericConstant(Result, CurPtr, Periods);
     }
   }
 
   // If we have a UCN or UTF-8 character (perhaps in a ud-suffix), continue.
   if (C == '\\' && tryConsumeIdentifierUCN(CurPtr, Size, Result))
-    return LexNumericConstant(Result, CurPtr);
+    return LexNumericConstant(Result, CurPtr, Periods);
   if (!isASCII(C) && tryConsumeIdentifierUTF8Char(CurPtr))
-    return LexNumericConstant(Result, CurPtr);
+    return LexNumericConstant(Result, CurPtr, Periods);
 
   // Update the location of token as well as BufferPtr.
   const char *TokStart = BufferPtr;
@@ -2015,6 +2028,8 @@ bool Lexer::SkipLineComment(Token &Result, const char *CurPtr,
                             bool &TokAtPhysicalStartOfLine) {
   // If Line comments aren't explicitly enabled for this language, emit an
   // extension warning.
+#ifdef MS_SUPPORT_VARIABLE_LANGOPTS
+
   if (!LangOpts.LineComment && !isLexingRawMode()) {
     Diag(BufferPtr, diag::ext_line_comment);
 
@@ -2022,6 +2037,12 @@ bool Lexer::SkipLineComment(Token &Result, const char *CurPtr,
     // unit.
     LangOpts.LineComment = true;
   }
+
+#else
+
+  assert(LangOpts.LineComment);
+
+#endif
 
   // Scan over the body of the comment.  The common case, when scanning, is that
   // the comment contains normal ascii characters with nothing interesting in

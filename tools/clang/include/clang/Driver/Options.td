@@ -1,17 +1,16 @@
 //===--- Options.td - Options for clang -----------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the options accepted by clang.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Options.td                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the options accepted by clang.                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+// Include the common option parsing interfaces.                             //
 
-// Include the common option parsing interfaces.
 include "llvm/Option/OptParser.td"
 
 /////////
@@ -460,8 +459,8 @@ def fcolor_diagnostics : Flag<["-"], "fcolor-diagnostics">, Group<f_Group>,
 def fdiagnostics_color : Flag<["-"], "fdiagnostics-color">, Group<f_Group>,
   Flags<[CoreOption, DriverOption]>;
 def fdiagnostics_color_EQ : Joined<["-"], "fdiagnostics-color=">, Group<f_Group>;
-def fansi_escape_codes : Flag<["-"], "fansi-escape-codes">, Group<f_Group>,
-  Flags<[CoreOption, CC1Option]>, HelpText<"Use ANSI escape codes for diagnostics">;
+//def fansi_escape_codes : Flag<["-"], "fansi-escape-codes">, Group<f_Group>, // HLSL Change: disable ANSI escape codes
+//  Flags<[CoreOption, CC1Option]>, HelpText<"Use ANSI escape codes for diagnostics">;
 def fcomment_block_commands : CommaJoined<["-"], "fcomment-block-commands=">, Group<f_clang_Group>, Flags<[CC1Option]>,
   HelpText<"Treat each comma separated argument in <arg> as a documentation comment block command">,
   MetaVarName<"<arg>">;
@@ -677,6 +676,8 @@ def fms_compatibility : Flag<["-"], "fms-compatibility">, Group<f_Group>, Flags<
 def fms_volatile : Joined<["-"], "fms-volatile">, Group<f_Group>, Flags<[CC1Option]>;
 def fmsc_version : Joined<["-"], "fmsc-version=">, Group<f_Group>, Flags<[DriverOption, CoreOption]>,
   HelpText<"Microsoft compiler version number to report in _MSC_VER (0 = don't define it (default))">;
+def hlsl_version : Separate<["-", "/"], "HV">, Group<f_Group>, Flags<[DriverOption, CoreOption, CC1Option]>,
+  HelpText<"HLSL version (2015, 2016)">; // HLSL Change - mimic the HLSLOptions.td flag
 def fms_compatibility_version
     : Joined<["-"], "fms-compatibility-version=">,
       Group<f_Group>,

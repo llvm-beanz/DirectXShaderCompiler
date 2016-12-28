@@ -1,17 +1,16 @@
 //===- LibCallSemantics.cpp - Describe library semantics ------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements interfaces that can be used to describe language
-// specific runtime library interfaces (e.g. libc, libm, etc) to LLVM
-// optimizers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LibCallSemantics.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements interfaces that can be used to describe language     //
+// specific runtime library interfaces (e.g. libc, libm, etc) to LLVM        //
+// optimizers.                                                               //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Analysis/LibCallSemantics.h"
 #include "llvm/ADT/StringMap.h"

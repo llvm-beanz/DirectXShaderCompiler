@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// regengine.inc                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 /*-
  * This code is derived from OpenBSD's libc/regex, original license follows:
  *
@@ -92,7 +101,7 @@ static const char *backref(struct match *, const char *, const char *, sopno,
                            sopno, sopno, int);
 static const char *fast(struct match *, const char *, const char *, sopno, sopno);
 static const char *slow(struct match *, const char *, const char *, sopno, sopno);
-static states step(struct re_guts *, sopno, sopno, states, int, states);
+static states step(struct re_guts *, sopno, sopno, _states_param_ states, int, _states_param_ states);
 #define MAX_RECURSION	100
 #define	BOL	(OUT+1)
 #define	EOL	(BOL+1)
@@ -849,9 +858,9 @@ static states
 step(struct re_guts *g,
     sopno start,		/* start state within strip */
     sopno stop,			/* state after stop state within strip */
-    states bef,			/* states reachable before */
+_states_param_    states bef,			/* states reachable before */
     int ch,			/* character or NONCHAR code */
-    states aft)			/* states already known reachable after */
+_states_param_    states aft)			/* states already known reachable after */
 {
 	cset *cs;
 	sop s;

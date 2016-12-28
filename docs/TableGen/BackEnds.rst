@@ -8,6 +8,13 @@ TableGen BackEnds
 Introduction
 ============
 
+NOTE: the DirectX Compiler project supports TableGen functionality, but also
+relies on /utils/hct/hctdb.py and its supporting files to generate code and
+documentation. The hctdb.py file is a Python script that builds an in-memory
+representation of various concepts; other tools can query this information to
+generate code. Long-form simple declarations are preferred for hctdb, but when
+convenient more powerful constructs can be employed.
+
 TableGen backends are at the core of TableGen's functionality. The source files
 provide the semantics to a generated (in memory) structure, but it's up to the
 backend to print this out in a way that is meaningful to the user (normally a
@@ -411,17 +418,4 @@ AttrDocs
 
 **Purpose**: Creates ``AttributeReference.rst`` from ``AttrDocs.td``, and is
 used for documenting user-facing attributes.
-
-How to write a back-end
-=======================
-
-TODO.
-
-Until we get a step-by-step HowTo for writing TableGen backends, you can at
-least grab the boilerplate (build system, new files, etc.) from Clang's
-r173931.
-
-TODO: How they work, how to write one.  This section should not contain details
-about any particular backend, except maybe ``-print-enums`` as an example.  This
-should highlight the APIs in ``TableGen/Record.h``.
 

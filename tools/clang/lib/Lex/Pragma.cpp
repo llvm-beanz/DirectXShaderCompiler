@@ -1,16 +1,15 @@
 //===--- Pragma.cpp - Pragma registration and handling --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the PragmaHandler/PragmaTable interfaces and implements
-// pragma related methods of the Preprocessor class.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Pragma.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the PragmaHandler/PragmaTable interfaces and implements//
+// pragma related methods of the Preprocessor class.                         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Lex/Pragma.h"
 #include "clang/Basic/FileManager.h"
@@ -1425,6 +1424,16 @@ struct PragmaRegionHandler : public PragmaHandler {
 /// RegisterBuiltinPragmas - Install the standard preprocessor pragmas:
 /// \#pragma GCC poison/system_header/dependency and \#pragma once.
 void Preprocessor::RegisterBuiltinPragmas() {
+  // HLSL Change Starts - pick only the pragma handlers we care about
+  if (LangOpts.HLSL) {
+    // TODO: add HLSL-specific pragma handlers
+    AddPragmaHandler(new PragmaOnceHandler());
+    AddPragmaHandler(new PragmaMarkHandler());
+    AddPragmaHandler(new PragmaMessageHandler(PPCallbacks::PMK_Message));
+    return;
+  }
+  // HLSL Change Ends
+
   AddPragmaHandler(new PragmaOnceHandler());
   AddPragmaHandler(new PragmaMarkHandler());
   AddPragmaHandler(new PragmaPushMacroHandler());

@@ -1,18 +1,17 @@
 //===- InlinerPass.h - Code common to all inliners --------------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InlinerPass.h                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines a simple policy-based bottom-up inliner.  This file     //
+// implements all of the boring mechanics of the bottom-up inlining, while the//
+// subclass determines WHAT to inline, which is the much more interesting    //
+// component.                                                                //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines a simple policy-based bottom-up inliner.  This file
-// implements all of the boring mechanics of the bottom-up inlining, while the
-// subclass determines WHAT to inline, which is the much more interesting
-// component.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_TRANSFORMS_IPO_INLINERPASS_H
 #define LLVM_TRANSFORMS_IPO_INLINERPASS_H
@@ -73,6 +72,11 @@ struct Inliner : public CallGraphSCCPass {
   /// attribute. This is useful for the InlineAlways pass that only wants to
   /// deal with that subset of the functions.
   bool removeDeadFunctions(CallGraph &CG, bool AlwaysInlineOnly = false);
+
+  // HLSL Change Starts
+  void applyOptions(PassOptions O) override;
+  void dumpConfig(raw_ostream &OS) override;
+  // HLSL Change Ends
 
 private:
   // InlineThreshold - Cache the value here for easy access.

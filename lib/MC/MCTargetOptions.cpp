@@ -1,14 +1,17 @@
 //===- lib/MC/MCTargetOptions.cpp - MC Target Options --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MCTargetOptions.cpp                                                       //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/MC/MCTargetOptions.h"
+
+#if 0 // HLSL Change
 
 namespace llvm {
 
@@ -23,3 +26,5 @@ StringRef MCTargetOptions::getABIName() const {
 }
 
 } // end namespace llvm
+
+#endif // HLSL Change

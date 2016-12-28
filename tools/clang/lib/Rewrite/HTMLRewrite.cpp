@@ -1,16 +1,15 @@
 //== HTMLRewrite.cpp - Translate source code into prettified HTML --*- C++ -*-//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the HTMLRewriter class, which is used to translate the
-//  text of a source file into prettified HTML.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// HTMLRewrite.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the HTMLRewriter class, which is used to translate the //
+//  text of a source file into prettified HTML.                              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Rewrite/Core/HTMLRewrite.h"
 #include "clang/Basic/SourceManager.h"

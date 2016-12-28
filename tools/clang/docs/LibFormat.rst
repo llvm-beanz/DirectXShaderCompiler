@@ -2,6 +2,9 @@
 LibFormat
 =========
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 LibFormat is a library that implements automatic source code formatting based
 on Clang. This documents describes the LibFormat interface and design as well
 as some basic style discussions.

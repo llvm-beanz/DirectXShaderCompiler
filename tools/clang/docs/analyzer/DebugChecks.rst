@@ -5,6 +5,9 @@ Debug Checks
 .. contents::
    :local:
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 The analyzer contains a number of checkers which can aid in debugging. Enable
 them by using the "-analyzer-checker=" flag, followed by the name of the
 checker.

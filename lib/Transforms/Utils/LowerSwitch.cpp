@@ -1,17 +1,16 @@
 //===- LowerSwitch.cpp - Eliminate Switch instructions --------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// The LowerSwitch transformation rewrites switch instructions with a sequence
-// of branches, which allows targets to get away with not implementing the
-// switch instruction until it is convenient.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LowerSwitch.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// The LowerSwitch transformation rewrites switch instructions with a sequence//
+// of branches, which allows targets to get away with not implementing the   //
+// switch instruction until it is convenient.                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/ADT/STLExtras.h"

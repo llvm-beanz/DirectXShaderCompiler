@@ -1,11 +1,12 @@
 //===-- Analysis.cpp ------------------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Analysis.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm-c/Analysis.h"
 #include "llvm-c/Initialization.h"
@@ -75,6 +76,7 @@ void LLVMInitializeAnalysis(LLVMPassRegistryRef R) {
   initializeAnalysis(*unwrap(R));
 }
 
+_Use_decl_annotations_
 LLVMBool LLVMVerifyModule(LLVMModuleRef M, LLVMVerifierFailureAction Action,
                           char **OutMessages) {
   raw_ostream *DebugOS = Action != LLVMReturnStatusAction ? &errs() : nullptr;
@@ -91,7 +93,7 @@ LLVMBool LLVMVerifyModule(LLVMModuleRef M, LLVMVerifierFailureAction Action,
     report_fatal_error("Broken module found, compilation aborted!");
 
   if (OutMessages)
-    *OutMessages = strdup(MsgsOS.str().c_str());
+    *OutMessages = _strdup(MsgsOS.str().c_str()); // HLSL Change for strdup
 
   return Result;
 }

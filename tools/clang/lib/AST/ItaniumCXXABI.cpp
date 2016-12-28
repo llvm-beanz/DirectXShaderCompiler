@@ -1,21 +1,20 @@
 //===------- ItaniumCXXABI.cpp - AST support for the Itanium C++ ABI ------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This provides C++ AST support targeting the Itanium C++ ABI, which is
-// documented at:
-//  http://www.codesourcery.com/public/cxx-abi/abi.html
-//  http://www.codesourcery.com/public/cxx-abi/abi-eh.html
-//
-// It also supports the closely-related ARM C++ ABI, documented at:
-// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0041c/IHI0041C_cppabi.pdf
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ItaniumCXXABI.cpp                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This provides C++ AST support targeting the Itanium C++ ABI, which is     //
+// documented at:                                                            //
+//  http://www.codesourcery.com/public/cxx-abi/abi.html                      //
+//  http://www.codesourcery.com/public/cxx-abi/abi-eh.html                   //
+//                                                                           //
+// It also supports the closely-related ARM C++ ABI, documented at:          //
+// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0041c/IHI0041C_cppabi.pdf//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CXXABI.h"
 #include "clang/AST/ASTContext.h"
@@ -65,7 +64,7 @@ public:
 
     QualType Key =
         Context.getFunctionType(Context.VoidTy, Proto->getParamTypes(),
-                                FunctionProtoType::ExtProtoInfo());
+                                FunctionProtoType::ExtProtoInfo(), None); // HLSL Change - add param modifiers
     Key = Context.getCanonicalType(Key);
     return ++ManglingNumbers[Key->castAs<FunctionProtoType>()];
   }

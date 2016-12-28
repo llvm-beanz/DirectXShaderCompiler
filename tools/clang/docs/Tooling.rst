@@ -2,6 +2,10 @@
 Choosing the Right Interface for Your Application
 =================================================
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only. The recommended
+APIs for the library are available via dxcapi.h
+
 Clang provides infrastructure to write tools that need syntactic and semantic
 information about a program.  This document will give a short introduction of
 the different ways to write clang tools, and their pros and cons.

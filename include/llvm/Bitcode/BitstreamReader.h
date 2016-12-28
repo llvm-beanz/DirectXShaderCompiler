@@ -1,16 +1,15 @@
 //===- BitstreamReader.h - Low-level bitstream reader interface -*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// BitstreamReader.h                                                         //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header defines the BitstreamReader class.  This class can be used to //
+// read an arbitrary bitstream, regardless of its contents.                  //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This header defines the BitstreamReader class.  This class can be used to
-// read an arbitrary bitstream, regardless of its contents.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_BITCODE_BITSTREAMREADER_H
 #define LLVM_BITCODE_BITSTREAMREADER_H
@@ -23,6 +22,46 @@
 #include <vector>
 
 namespace llvm {
+
+// HLSL Change Starts
+class BitstreamCursor;
+class BitstreamUseTracker {
+private:
+  typedef std::pair<uint64_t, uint64_t> UseRange;
+  SmallVector<UseRange, 8> Ranges;
+  enum ExtendResult {
+    Exclusive,
+    ExtendedBegin,
+    ExtendedEnd,
+    ExtendedBoth,
+    Included
+  };
+  static ExtendResult extendRange(UseRange &R, UseRange &NewRange);
+  static bool contains(const UseRange &UR);
+  bool considerMergeRight(size_t idx);
+public:
+  struct AutoTrack {
+    BitstreamUseTracker *BT;
+    uint64_t begin;
+    void end(uint64_t end) {
+      BitstreamUseTracker::track(BT, begin, end);
+    }
+  };
+  static AutoTrack start(BitstreamUseTracker *BT, uint64_t begin) {
+    AutoTrack AT; AT.BT = BT; AT.begin = begin; return AT;
+  }
+  
+  struct ScopeTrack {
+    BitstreamCursor *BC;
+    uint64_t begin;
+    ~ScopeTrack();
+  };
+  static ScopeTrack scope_track(BitstreamCursor *BC);
+  static void track(BitstreamUseTracker *BT, uint64_t begin, uint64_t end);
+  void insert(uint64_t begin, uint64_t end);
+  bool isDense(uint64_t endBitoffset) const;
+};
+// HLSL Change Ends
 
 /// This class is used to read from an LLVM bitcode stream, maintaining
 /// information that is global to decoding the entire file. While a file is
@@ -58,6 +97,8 @@ public:
       : IgnoreBlockInfoNames(true) {
     init(Start, End);
   }
+
+  BitstreamUseTracker *Tracker = nullptr; // HLSL Change
 
   BitstreamReader(std::unique_ptr<MemoryObject> BitcodeBytes)
       : BitcodeBytes(std::move(BitcodeBytes)), IgnoreBlockInfoNames(true) {}
@@ -285,7 +326,7 @@ public:
 
   /// This is a convenience function for clients that don't expect any
   /// subblocks. This just skips over them automatically.
-  BitstreamEntry advanceSkippingSubblocks(unsigned Flags = 0) {
+  BitstreamEntry advanceSkippingSubblocks(unsigned Flags = 0, unsigned *pCount = nullptr) {
     while (1) {
       // If we found a normal entry, return it.
       BitstreamEntry Entry = advance(Flags);
@@ -293,6 +334,7 @@ public:
         return Entry;
 
       // If we found a sub-block, just skip over it and check the next entry.
+      if (pCount) *pCount += 1; // HLSL Change - count skipped blocks
       if (SkipBlock())
         return BitstreamEntry::getError();
     }
@@ -345,6 +387,7 @@ public:
     static const unsigned Mask = sizeof(word_t) > 4 ? 0x3f : 0x1f;
 
     // If the field is fully contained by CurWord, return it quickly.
+    auto T = BitstreamUseTracker::scope_track(this); // HLSL Change
     if (BitsInCurWord >= NumBits) {
       word_t R = CurWord & (~word_t(0) >> (BitsInWord - NumBits));
 
@@ -418,6 +461,7 @@ private:
   void SkipToFourByteBoundary() {
     // If word_t is 64-bits and if we've read less than 32 bits, just dump
     // the bits we have up to the next 32-bit boundary.
+    auto T = BitstreamUseTracker::scope_track(this); // HLSL Change
     if (sizeof(word_t) > 4 &&
         BitsInCurWord >= 32) {
       CurWord >>= BitsInCurWord-32;
@@ -509,7 +553,7 @@ public:
   //===--------------------------------------------------------------------===//
   void ReadAbbrevRecord();
 
-  bool ReadBlockInfoBlock();
+  bool ReadBlockInfoBlock(unsigned *pCount = nullptr);
 };
 
 } // End llvm namespace

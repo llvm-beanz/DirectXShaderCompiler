@@ -1,11 +1,12 @@
 //===-- CompilerInstance.h - Clang Compiler Instance ------------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CompilerInstance.h                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_FRONTEND_COMPILERINSTANCE_H_
 #define LLVM_CLANG_FRONTEND_COMPILERINSTANCE_H_
@@ -26,6 +27,16 @@
 #include <memory>
 #include <string>
 #include <utility>
+
+// HLSL Change Starts
+namespace hlsl {
+  class DxcLangExtensionsHelperApply {
+  public:
+    virtual void SetupSema(clang::Sema &S) = 0;
+    virtual void SetupPreprocessorOptions(clang::PreprocessorOptions &PPOpts) = 0;
+  };
+}
+// HLSL Change Ends
 
 namespace llvm {
 class raw_fd_ostream;
@@ -108,11 +119,14 @@ class CompilerInstance : public ModuleLoader {
   /// \brief The frontend timer.
   std::unique_ptr<llvm::Timer> FrontendTimer;
 
+#if 0 // HLSL Change Starts - no support for modules or PCH
   /// \brief The ASTReader, if one exists.
   IntrusiveRefCntPtr<ASTReader> ModuleManager;
 
   /// \brief The module dependency collector for crashdumps
   std::shared_ptr<ModuleDependencyCollector> ModuleDepCollector;
+
+#endif // HLSL Change Ends - no support for modules or PCH
 
   /// \brief The module provider.
   std::shared_ptr<PCHContainerOperations> ThePCHContainerOperations;
@@ -122,6 +136,7 @@ class CompilerInstance : public ModuleLoader {
 
   std::vector<std::shared_ptr<DependencyCollector>> DependencyCollectors;
 
+#if 0 // HLSL Change Start - no support for modules
   /// \brief The set of top-level modules that has already been loaded,
   /// along with the module map
   llvm::DenseMap<const IdentifierInfo *, Module *> KnownModules;
@@ -151,6 +166,8 @@ class CompilerInstance : public ModuleLoader {
   /// \brief One or more modules failed to build.
   bool ModuleBuildFailed;
 
+#endif // HLSL Change Ends - no support for modules
+
   /// \brief Holds information about the output file.
   ///
   /// If TempFilename is not empty we must rename it to Filename at the end.
@@ -178,6 +195,9 @@ class CompilerInstance : public ModuleLoader {
   /// The list of active output files.
   std::list<OutputFile> OutputFiles;
 
+  /// The output stream to override llvm::outs if needed.
+  llvm::raw_ostream* OutStream; // HLSL Change
+
   CompilerInstance(const CompilerInstance &) = delete;
   void operator=(const CompilerInstance &) = delete;
 public:
@@ -186,6 +206,13 @@ public:
           std::make_shared<PCHContainerOperations>(),
       bool BuildingModule = false);
   ~CompilerInstance() override;
+
+  // HLSL Change Starts
+  hlsl::DxcLangExtensionsHelperApply *HlslLangExtensions = nullptr;
+  bool WriteDefaultOutputDirectly = false; // HLSL Change
+  llvm::raw_ostream* getOutStream() { return OutStream; }
+  void setOutStream(llvm::raw_ostream *OS) { OutStream = OS; }
+  // HLSL Change Ends
 
   /// @name High-Level Operations
   /// {
@@ -242,7 +269,7 @@ public:
   /// \brief Set the flag indicating whether we should (re)build the global
   /// module index.
   void setBuildGlobalModuleIndex(bool Build) {
-    BuildGlobalModuleIndex = Build;
+    (Build);// BuildGlobalModuleIndex = Build; // HLSL Change - no support for modules
   }
 
   /// }
@@ -493,6 +520,7 @@ public:
   std::unique_ptr<Sema> takeSema();
   void resetAndLeakSema();
 
+#if 0 // HLSL Change Starts - no support for modules or PCH
   /// }
   /// @name Module Management
   /// {
@@ -522,6 +550,8 @@ public:
     return *Writer;
   }
 
+#endif // HLSL Change Ends - no support for modules or PCH
+  
   /// Return the appropriate PCHContainerReader depending on the
   /// current CodeGenOptions.
   const PCHContainerReader &getPCHContainerReader() const {
@@ -762,7 +792,7 @@ public:
                          SourceLocation ImportLoc) override;
 
   bool hadModuleLoaderFatalFailure() const {
-    return ModuleLoader::HadFatalFailure;
+    return false; // return ModuleLoader::HadFatalFailure; // HLSL Change - no support for modules
   }
 
   GlobalModuleIndex *loadGlobalModuleIndex(SourceLocation TriggerLoc) override;

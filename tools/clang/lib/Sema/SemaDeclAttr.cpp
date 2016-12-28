@@ -1,15 +1,14 @@
 //===--- SemaDeclAttr.cpp - Declaration Attribute Handling ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements decl-related attribute processing.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaDeclAttr.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements decl-related attribute processing.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTContext.h"
@@ -31,6 +30,7 @@
 #include "clang/Sema/Scope.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MathExtras.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 using namespace clang;
 using namespace sema;
 
@@ -4596,6 +4596,15 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
 
   switch (Attr.getKind()) {
   default:
+    // HLSL Change Starts
+    if (S.LangOpts.HLSL)
+    {
+      bool Handled = false;
+      hlsl::HandleDeclAttributeForHLSL(S, D, Attr, Handled);
+      if (Handled) break;
+    }
+    // HLSL Change Ends
+
     // Type attributes are handled elsewhere; silently move on.
     assert(Attr.isTypeAttr() && "Non-type attribute not handled");
     break;
@@ -5296,6 +5305,15 @@ void Sema::ProcessDeclAttributes(Scope *S, Decl *D, const Declarator &PD) {
   // Finally, apply any attributes on the decl itself.
   if (const AttributeList *Attrs = PD.getAttributes())
     ProcessDeclAttributeList(S, D, Attrs);
+
+  // HLSL Change Starts - Get custom attributes from our declarator object and append to AST Decl object
+  for (std::vector<InheritableAttr*>::const_iterator
+    i = PD.customAttributesList.begin(),
+    e = PD.customAttributesList.end();
+    i != e; ++i) {
+    D->addAttr(*i);
+  }
+  // HLSL Change Ends
 }
 
 /// Is the given declaration allowed to use a forbidden type?

@@ -1,16 +1,14 @@
-//===- llvm/LinkAllPasses.h ------------ Reference All Passes ---*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LinkAllPasses.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header file pulls in all transformation and analysis passes for tools//
+// like opt and bugpoint that need this functionality.                       //
 //
-//                      The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This header file pulls in all transformation and analysis passes for tools
-// like opt and bugpoint that need this functionality.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_LINKALLPASSES_H
 #define LLVM_LINKALLPASSES_H
@@ -61,7 +59,7 @@ namespace {
       (void) llvm::createScalarEvolutionAliasAnalysisPass();
       (void) llvm::createTypeBasedAliasAnalysisPass();
       (void) llvm::createScopedNoAliasAAPass();
-      (void) llvm::createBoundsCheckingPass();
+      // (void) llvm::createBoundsCheckingPass(); // HLSL Change - do not link
       (void) llvm::createBreakCriticalEdgesPass();
       (void) llvm::createCallGraphPrinterPass();
       (void) llvm::createCallGraphViewerPass();
@@ -81,8 +79,8 @@ namespace {
       (void) llvm::createDomPrinterPass();
       (void) llvm::createDomOnlyViewerPass();
       (void) llvm::createDomViewerPass();
-      (void) llvm::createGCOVProfilerPass();
-      (void) llvm::createInstrProfilingPass();
+      // (void) llvm::createGCOVProfilerPass(); // HLSL Change - do not link
+      // (void) llvm::createInstrProfilingPass(); // HLSL Change - do not link
       (void) llvm::createFunctionInliningPass();
       (void) llvm::createAlwaysInlinerPass();
       (void) llvm::createGlobalDCEPass();
@@ -111,15 +109,15 @@ namespace {
       (void) llvm::createLowerSwitchPass();
       (void) llvm::createNaryReassociatePass();
       (void) llvm::createNoAAPass();
-      (void) llvm::createObjCARCAliasAnalysisPass();
-      (void) llvm::createObjCARCAPElimPass();
-      (void) llvm::createObjCARCExpandPass();
-      (void) llvm::createObjCARCContractPass();
-      (void) llvm::createObjCARCOptPass();
-      (void) llvm::createPAEvalPass();
+      // (void) llvm::createObjCARCAliasAnalysisPass(); // HLSL Change - do not link
+      // (void) llvm::createObjCARCAPElimPass(); // HLSL Change - do not link
+      // (void) llvm::createObjCARCExpandPass(); // HLSL Change - do not link
+      // (void) llvm::createObjCARCContractPass(); // HLSL Change - do not link
+      // (void) llvm::createObjCARCOptPass(); // HLSL Change - do not link
+      // (void) llvm::createPAEvalPass();// HLSL Change - do not link
       (void) llvm::createPromoteMemoryToRegisterPass();
       (void) llvm::createDemoteRegisterToMemoryPass();
-      (void) llvm::createPruneEHPass();
+      // (void) llvm::createPruneEHPass(); // HLSL Change - do not link
       (void) llvm::createPostDomOnlyPrinterPass();
       (void) llvm::createPostDomPrinterPass();
       (void) llvm::createPostDomOnlyViewerPass();
@@ -131,7 +129,7 @@ namespace {
       (void) llvm::createRegionPrinterPass();
       (void) llvm::createRegionViewerPass();
       (void) llvm::createSCCPPass();
-      (void) llvm::createSafeStackPass();
+      // (void) llvm::createSafeStackPass(); // HLSL Change - do not link
       (void) llvm::createScalarReplAggregatesPass();
       (void) llvm::createSingleLoopExtractorPass();
       (void) llvm::createStripSymbolsPass();
@@ -143,7 +141,7 @@ namespace {
       (void) llvm::createUnifyFunctionExitNodesPass();
       (void) llvm::createInstCountPass();
       (void) llvm::createConstantHoistingPass();
-      (void) llvm::createCodeGenPreparePass();
+      // (void) llvm::createCodeGenPreparePass(); // HLSL Change - do not link
       (void) llvm::createEarlyCSEPass();
       (void) llvm::createMergedLoadStoreMotionPass();
       (void) llvm::createGVNPass();
@@ -165,9 +163,9 @@ namespace {
       (void) llvm::createCorrelatedValuePropagationPass();
       (void) llvm::createMemDepPrinter();
       (void) llvm::createInstructionSimplifierPass();
-      (void) llvm::createLoopVectorizePass();
-      (void) llvm::createSLPVectorizerPass();
-      (void) llvm::createBBVectorizePass();
+      // (void) llvm::createLoopVectorizePass(); // HLSL Change - do not link
+      // (void) llvm::createSLPVectorizerPass(); // HLSL Change - do not link
+      // (void) llvm::createBBVectorizePass(); // HLSL Change - do not link
       (void) llvm::createPartiallyInlineLibCallsPass();
       (void) llvm::createScalarizerPass();
       (void) llvm::createSeparateConstOffsetFromGEPPass();

@@ -1,3 +1,8 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
+# HLSL Change - add ignored sources
+set(HLSL_IGNORE_SOURCES CGObjCGNU.cpp CGObjCMac.cpp CGObjCRuntime.cpp CGOpenCLRuntime.cpp CGOpenMPRuntime.cpp)
+
 set(LLVM_LINK_COMPONENTS
   Analysis
   BitReader
@@ -6,11 +11,11 @@ set(LLVM_LINK_COMPONENTS
   IPO
   IRReader
   InstCombine
-  Instrumentation
+#  Instrumentation # HLSL Change
   Linker
-  MC
-  ObjCARCOpts
-  Object
+#  MC # HLSL Change
+#  ObjCARCOpts # HLSL Change
+#  Object # HLSL Change
   ProfileData
   ScalarOpts
   Support
@@ -49,13 +54,15 @@ add_clang_library(clangCodeGen
   CGExprComplex.cpp
   CGExprConstant.cpp
   CGExprScalar.cpp
+  CGHLSLRuntime.cpp
+  CGHLSLMS.cpp
   CGLoopInfo.cpp
   CGObjC.cpp
-  CGObjCGNU.cpp
-  CGObjCMac.cpp
-  CGObjCRuntime.cpp
-  CGOpenCLRuntime.cpp
-  CGOpenMPRuntime.cpp
+  # CGObjCGNU.cpp # HLSL Change - no definitions used
+  # CGObjCMac.cpp # HLSL Change - no definitions used
+  # CGObjCRuntime.cpp # HLSL Change - no definitions used
+  # CGOpenCLRuntime.cpp # HLSL Change - no definitions used
+  # CGOpenMPRuntime.cpp # HLSL Change - no definitions used
   CGRecordLayoutBuilder.cpp
   CGStmt.cpp
   CGStmtOpenMP.cpp

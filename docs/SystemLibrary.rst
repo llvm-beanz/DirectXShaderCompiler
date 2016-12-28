@@ -5,6 +5,11 @@ System Library
 Abstract
 ========
 
+NOTE: this document describes the System Library for the original LLVM
+project, not the DirectX Compiler. While most of the library remains the same,
+there are some important changes. See HLSL Changes for some background on
+these.
+
 This document provides some details on LLVM's System Library, located in the
 source at ``lib/System`` and ``include/llvm/System``. The library's purpose is
 to shield LLVM from the differences between operating systems for the few

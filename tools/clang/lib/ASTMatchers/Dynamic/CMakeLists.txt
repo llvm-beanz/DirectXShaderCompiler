@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set(LLVM_LINK_COMPONENTS support)
 
 add_clang_library(clangDynamicASTMatchers
@@ -11,3 +13,7 @@ add_clang_library(clangDynamicASTMatchers
   clangASTMatchers
   clangBasic
   )
+
+# HLSL Changes Start
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj") # otherwise will hit fatal error C1128 on x64
+# HLSL Changes End

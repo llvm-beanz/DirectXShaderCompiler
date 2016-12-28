@@ -1,16 +1,15 @@
 //===-- llvm/CodeGen/MachineModuleInfoImpls.cpp ---------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements object-file format specific implementations of
-// MachineModuleInfoImpl.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MachineModuleInfoImpls.cpp                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements object-file format specific implementations of       //
+// MachineModuleInfoImpl.                                                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/CodeGen/MachineModuleInfoImpls.h"
 #include "llvm/MC/MCSymbol.h"
@@ -24,7 +23,9 @@ using namespace llvm;
 void MachineModuleInfoMachO::anchor() {}
 void MachineModuleInfoELF::anchor() {}
 
-static int SortSymbolPair(const void *LHS, const void *RHS) {
+
+// HLSL Change: changed calling convention to __cdecl
+static int __cdecl SortSymbolPair(const void *LHS, const void *RHS) {
   typedef std::pair<MCSymbol*, MachineModuleInfoImpl::StubValueTy> PairTy;
   const MCSymbol *LHSS = ((const PairTy *)LHS)->first;
   const MCSymbol *RHSS = ((const PairTy *)RHS)->first;

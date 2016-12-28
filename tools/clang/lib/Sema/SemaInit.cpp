@@ -1,15 +1,14 @@
 //===--- SemaInit.cpp - Semantic Analysis for Initializers ----------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements semantic analysis for initializers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaInit.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements semantic analysis for initializers.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/Initialization.h"
 #include "clang/AST/ASTContext.h"
@@ -21,6 +20,7 @@
 #include "clang/Sema/Designator.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/SemaInternal.h"
+#include "clang/Sema/SemaHLSL.h" // HLSL Change
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -234,6 +234,7 @@ static void CheckStringInit(Expr *Str, QualType &DeclT, const ArrayType *AT,
 namespace {
 class InitListChecker {
   Sema &SemaRef;
+  const InitializationKind &Kind; // HLSL Change: provide access to the initialization kind
   bool hadError;
   bool VerifyOnly; // no diagnostics, no structure building
   llvm::DenseMap<InitListExpr *, InitListExpr *> SyntacticToSemantic;
@@ -352,7 +353,7 @@ class InitListChecker {
                                SourceLocation Loc);
 
 public:
-  InitListChecker(Sema &S, const InitializedEntity &Entity,
+  InitListChecker(Sema &S, const InitializedEntity &Entity, const InitializationKind &K,  // HLSL Change - add Kind
                   InitListExpr *IL, QualType &T, bool VerifyOnly);
   bool HadError() { return hadError; }
 
@@ -706,9 +707,10 @@ InitListChecker::FillInEmptyInitializations(const InitializedEntity &Entity,
 
 
 InitListChecker::InitListChecker(Sema &S, const InitializedEntity &Entity,
+                                 const InitializationKind &K,    // HLSL Change - add K
                                  InitListExpr *IL, QualType &T,
                                  bool VerifyOnly)
-  : SemaRef(S), VerifyOnly(VerifyOnly) {
+  : SemaRef(S), VerifyOnly(VerifyOnly), Kind(K) { // HLSL Change - add Kind
   // FIXME: Check that IL isn't already the semantic form of some other
   // InitListExpr. If it is, we'd create a broken AST.
 
@@ -894,6 +896,7 @@ void InitListChecker::CheckExplicitInitList(const InitializedEntity &Entity,
                                             InitListExpr *IList, QualType &T,
                                             InitListExpr *StructuredList,
                                             bool TopLevelObject) {
+  assert((IList->isExplicit() || SemaRef.getLangOpts().HLSL) && "Illegal Implicit InitListExpr"); // HLSL Change: reuse in context of constructors for vectors
   if (!VerifyOnly) {
     SyntacticToSemantic[IList] = StructuredList;
     StructuredList->setSyntacticForm(IList);
@@ -1071,7 +1074,7 @@ void InitListChecker::CheckSubElementType(const InitializedEntity &Entity,
     return;
   }
 
-  if (SemaRef.getLangOpts().CPlusPlus) {
+  if (SemaRef.getLangOpts().CPlusPlus && !SemaRef.getLangOpts().HLSL) { // HLSL Change: use OpenCL-style rules
     // C++ [dcl.init.aggr]p2:
     //   Each member is copy-initialized from the corresponding
     //   initializer-clause.
@@ -1363,7 +1366,8 @@ void InitListChecker::CheckVectorType(const InitializedEntity &Entity,
     return;
   }
 
-  if (!SemaRef.getLangOpts().OpenCL) {
+  // HLSL Change - HLSL is more similar to OpenCL than C/C++
+  if (!SemaRef.getLangOpts().OpenCL && !SemaRef.getLangOpts().HLSL) {
     // If the initializing element is a vector, try to copy-initialize
     // instead of breaking it apart (which is doomed to failure anyway).
     Expr *Init = IList->getInit(Index);
@@ -1489,8 +1493,19 @@ void InitListChecker::CheckVectorType(const InitializedEntity &Entity,
     }
   }
 
+  // HLSL Change Starts
+  // For copy assignments that aren't explicit initialization lists, allow extra elements (emit a warning though).
+  bool extraElementsAllowed = false;
+  if (SemaRef.getLangOpts().HLSL && IList->getLBraceLoc().isInvalid()) {
+    extraElementsAllowed = numEltsInit > maxElements;
+    if (extraElementsAllowed && !VerifyOnly) {
+      SemaRef.Diag(Kind.getLocation(), diag::warn_hlsl_implicit_vector_truncation);
+    }
+  }
+  // HLSL Change Ends
+
   // OpenCL requires all elements to be initialized.
-  if (numEltsInit != maxElements) {
+  if (numEltsInit != maxElements && !extraElementsAllowed) {  // HLSL Change
     if (!VerifyOnly)
       SemaRef.Diag(IList->getLocStart(),
                    diag::err_vector_incorrect_num_initializers)
@@ -3785,7 +3800,7 @@ static void TryListInitialization(Sema &S,
     return;
   }
 
-  InitListChecker CheckInitList(S, Entity, InitList,
+  InitListChecker CheckInitList(S, Entity, Kind, InitList,  // HLSL Change - add Kind
           DestType, /*VerifyOnly=*/true);
   if (CheckInitList.HadError()) {
     Sequence.SetFailed(InitializationSequence::FK_ListInitializationFailed);
@@ -4852,6 +4867,13 @@ void InitializationSequence::InitializeFrom(Sema &S,
       SourceType = Initializer->getType();
   }
 
+  // HLSL Change Starts
+  if (S.getLangOpts().HLSL) {
+    hlsl::InitializeInitSequenceForHLSL(&S, Entity, Kind, Args, TopLevelOfInitList, this);
+    return;
+  }
+  // HLSL Change Ends
+
   //     - If the initializer is a (non-parenthesized) braced-init-list, the
   //       object is list-initialized (8.5.4).
   if (Kind.getKind() != InitializationKind::IK_Direct) {
@@ -5009,6 +5031,10 @@ void InitializationSequence::InitializeFrom(Sema &S,
     return;
   }
   assert(Args.size() == 1 && "Zero-argument case handled above");
+  // HLSL Change Starts
+  assert(Initializer != nullptr && "otherwise prior code changed and Args.size() == 1 no longer reads from first argument");
+  _Analysis_assume_(Initializer != nullptr);
+  // HLSL Change Ends
 
   //    - Otherwise, if the source type is a (possibly cv-qualified) class
   //      type, conversion functions are considered.
@@ -6139,6 +6165,26 @@ InitializationSequence::Perform(Sema &S,
   // grab the only argument out the Args and place it into the "current"
   // initializer.
   switch (Steps.front().Kind) {
+  // HLSL Change Starts
+  case SK_ListInitialization: {
+    // In vector constructor cases, we may synthesize an InitListExpr
+    assert(Args.size() == 1 || S.getLangOpts().HLSL);
+    CurInit = Args[0];
+    Expr* CurInitExpr = CurInit.get();
+    if (!CurInitExpr) return ExprError();
+    if (CurInitExpr->getStmtClass() != Stmt::StmtClass::InitListExprClass) {
+      assert(S.getLangOpts().HLSL);
+      for (unsigned i = 0; i < Args.size(); ++i) {
+        if (Args[i]->isLValue()) {
+          Args[i] = ImplicitCastExpr::Create(S.Context, Args[i]->getType(),
+            CK_LValueToRValue, Args[i], /*BasePath=*/0, VK_RValue);
+        }
+      }
+      CurInit = new (S.getASTContext())InitListExpr(S.getASTContext(), SourceLocation(), Args, SourceLocation());
+    }
+    break;
+  }
+  // HLSL Change Ends
   case SK_ResolveAddressOfOverloadedFunction:
   case SK_CastDerivedToBaseRValue:
   case SK_CastDerivedToBaseXValue:
@@ -6154,7 +6200,6 @@ InitializationSequence::Perform(Sema &S,
   case SK_LValueToRValue:
   case SK_ConversionSequence:
   case SK_ConversionSequenceNoNarrowing:
-  case SK_ListInitialization:
   case SK_UnwrapInitList:
   case SK_RewrapInitList:
   case SK_CAssignment:
@@ -6476,7 +6521,16 @@ InitializationSequence::Perform(Sema &S,
       bool IsTemporary = !S.Context.hasSameType(Entity.getType(), Ty);
       InitializedEntity TempEntity = InitializedEntity::InitializeTemporary(Ty);
       InitializedEntity InitEntity = IsTemporary ? TempEntity : Entity;
-      InitListChecker PerformInitList(S, InitEntity,
+
+      // HLSL Change Starts - all analysis done - TODO semantic changes for IR
+      if (S.getLangOpts().HLSL) {
+        CurInit.get();
+        InitList->setType(InitEntity.getType());
+        CurInit = shouldBindAsTemporary(InitEntity)
+          ? S.MaybeBindToTemporary(InitList)
+          : InitList;
+      } else { // HLSL Change Ends code below is conditional
+        InitListChecker PerformInitList(S, InitEntity, Kind, // HLSL Change - added Kind
           InitList, Ty, /*VerifyOnly=*/false);
       if (PerformInitList.HadError())
         return ExprError();
@@ -6500,6 +6554,7 @@ InitializationSequence::Perform(Sema &S,
       CurInit = shouldBindAsTemporary(InitEntity)
           ? S.MaybeBindToTemporary(StructuredInitList)
           : StructuredInitList;
+      } // HLSL Change - end conditional
       break;
     }
 
@@ -6817,6 +6872,7 @@ static void emitBadConversionNotes(Sema &S, const InitializedEntity &entity,
 }
 
 static void diagnoseListInit(Sema &S, const InitializedEntity &Entity,
+                             const InitializationKind &Kind,  // HLSL Change - added Kind
                              InitListExpr *InitList) {
   QualType DestType = Entity.getType();
 
@@ -6829,7 +6885,7 @@ static void diagnoseListInit(Sema &S, const InitializedEntity &Entity,
         clang::ArrayType::Normal, 0);
     InitializedEntity HiddenArray =
         InitializedEntity::InitializeTemporary(ArrayType);
-    return diagnoseListInit(S, HiddenArray, InitList);
+    return diagnoseListInit(S, HiddenArray, Kind, InitList);  // HLSL Change - added Kind
   }
 
   if (DestType->isReferenceType()) {
@@ -6837,7 +6893,7 @@ static void diagnoseListInit(Sema &S, const InitializedEntity &Entity,
     // create a temporary of the inner type (per [dcl.init.list]p3.6) and the
     // inner initialization failed.
     QualType T = DestType->getAs<ReferenceType>()->getPointeeType();
-    diagnoseListInit(S, InitializedEntity::InitializeTemporary(T), InitList);
+    diagnoseListInit(S, InitializedEntity::InitializeTemporary(T), Kind, InitList);
     SourceLocation Loc = InitList->getLocStart();
     if (auto *D = Entity.getDecl())
       Loc = D->getLocation();
@@ -6845,7 +6901,7 @@ static void diagnoseListInit(Sema &S, const InitializedEntity &Entity,
     return;
   }
 
-  InitListChecker DiagnoseInitList(S, Entity, InitList, DestType,
+  InitListChecker DiagnoseInitList(S, Entity, Kind, InitList, DestType,  // HLSL Change - added Kind
                                    /*VerifyOnly=*/false);
   assert(DiagnoseInitList.HadError() &&
          "Inconsistent init list check result.");
@@ -7199,8 +7255,15 @@ bool InitializationSequence::Diagnose(Sema &S,
 
   case FK_ListInitializationFailed: {
     // Run the init list checker again to emit diagnostics.
-    InitListExpr *InitList = cast<InitListExpr>(Args[0]);
-    diagnoseListInit(S, Entity, InitList);
+    // HLSL Change Starts: allow for the possibility of having to construct an InitListExpr.
+    if (!S.getLangOpts().HLSL) {
+      InitListExpr *InitList = cast<InitListExpr>(Args[0]);
+      diagnoseListInit(S, Entity, Kind, InitList);  // HLSL Change - added Kind
+    }
+    else {
+      // For HLSL, InitializeInitSequenceForHLSL should report error messages.
+    }
+    // HLSL Change Ends
     break;
   }
 

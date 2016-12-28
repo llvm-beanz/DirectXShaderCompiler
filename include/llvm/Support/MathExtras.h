@@ -1,15 +1,14 @@
 //===-- llvm/Support/MathExtras.h - Useful math functions -------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MathExtras.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains some functions that are useful for math stuff.         //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains some functions that are useful for math stuff.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_SUPPORT_MATHEXTRAS_H
 #define LLVM_SUPPORT_MATHEXTRAS_H
@@ -454,7 +453,7 @@ inline unsigned countPopulation(T Value) {
 }
 
 /// Log2 - This function returns the log base 2 of the specified value
-inline double Log2(double Value) {
+inline double __cdecl Log2(double Value) {  // HLSL Change - __cdecl
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 18
   return __builtin_log(Value) / __builtin_log(2.0);
 #else
@@ -466,26 +465,26 @@ inline double Log2(double Value) {
 /// -1 if the value is zero. (32 bit edition.)
 /// Ex. Log2_32(32) == 5, Log2_32(1) == 0, Log2_32(0) == -1, Log2_32(6) == 2
 inline unsigned Log2_32(uint32_t Value) {
-  return 31 - countLeadingZeros(Value);
+  return 31 - (unsigned)countLeadingZeros(Value);   // HLSL Change (unsigned)
 }
 
 /// Log2_64 - This function returns the floor log base 2 of the specified value,
 /// -1 if the value is zero. (64 bit edition.)
 inline unsigned Log2_64(uint64_t Value) {
-  return 63 - countLeadingZeros(Value);
+  return 63 - (unsigned)countLeadingZeros(Value);   // HLSL Change (unsigned)
 }
 
 /// Log2_32_Ceil - This function returns the ceil log base 2 of the specified
 /// value, 32 if the value is zero. (32 bit edition).
 /// Ex. Log2_32_Ceil(32) == 5, Log2_32_Ceil(1) == 0, Log2_32_Ceil(6) == 3
 inline unsigned Log2_32_Ceil(uint32_t Value) {
-  return 32 - countLeadingZeros(Value - 1);
+  return 32 - (unsigned)countLeadingZeros(Value - 1);   // HLSL Change (unsigned)
 }
 
 /// Log2_64_Ceil - This function returns the ceil log base 2 of the specified
 /// value, 64 if the value is zero. (64 bit edition.)
 inline unsigned Log2_64_Ceil(uint64_t Value) {
-  return 64 - countLeadingZeros(Value - 1);
+  return 64 - (unsigned)countLeadingZeros(Value - 1);   // HLSL Change (unsigned)
 }
 
 /// GreatestCommonDivisor64 - Return the greatest common divisor of the two

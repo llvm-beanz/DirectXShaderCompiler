@@ -1,20 +1,18 @@
 /*===-- llvm-c/TargetMachine.h - Target Machine Library C Interface - C++ -*-=*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This header declares the C interface to the Target and TargetMachine       *|
-|* classes, which can be used to generate assembly or object files.           *|
-|*                                                                            *|
-|* Many exotic languages can interoperate with C code but have a harder time  *|
-|* with C++ due to name mangling. So in addition to C, this interface enables *|
-|* tools written in such languages.                                           *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetMachine.h                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This header declares the C interface to the Target and TargetMachine      //
+// classes, which can be used to generate assembly or object files.          //
+// Many exotic languages can interoperate with C code but have a harder time //
+// with C++ due to name mangling. So in addition to C, this interface enables//
+// tools written in such languages.                                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_C_TARGETMACHINE_H
 #define LLVM_C_TARGETMACHINE_H
@@ -69,8 +67,10 @@ LLVMTargetRef LLVMGetTargetFromName(const char *Name);
 /** Finds the target corresponding to the given triple and stores it in \p T.
   Returns 0 on success. Optionally returns any error in ErrorMessage.
   Use LLVMDisposeMessage to dispose the message. */
-LLVMBool LLVMGetTargetFromTriple(const char* Triple, LLVMTargetRef *T,
-                                 char **ErrorMessage);
+LLVMBool LLVMGetTargetFromTriple(
+    const char* Triple, 
+    LLVMTargetRef *T,
+    _Out_opt_ char **ErrorMessage);
 
 /** Returns the name of a target. See llvm::Target::getName */
 const char *LLVMGetTargetName(LLVMTargetRef T);
@@ -126,11 +126,13 @@ void LLVMSetTargetMachineAsmVerbosity(LLVMTargetMachineRef T,
   wraps several c++ only classes (among them a file stream). Returns any
   error in ErrorMessage. Use LLVMDisposeMessage to dispose the message. */
 LLVMBool LLVMTargetMachineEmitToFile(LLVMTargetMachineRef T, LLVMModuleRef M,
-  char *Filename, LLVMCodeGenFileType codegen, char **ErrorMessage);
+  _In_ char *Filename, LLVMCodeGenFileType codegen, 
+  _Out_opt_ char **ErrorMessage);
 
 /** Compile the LLVM IR stored in \p M and store the result in \p OutMemBuf. */
 LLVMBool LLVMTargetMachineEmitToMemoryBuffer(LLVMTargetMachineRef T, LLVMModuleRef M,
-  LLVMCodeGenFileType codegen, char** ErrorMessage, LLVMMemoryBufferRef *OutMemBuf);
+    LLVMCodeGenFileType codegen, 
+    _Out_opt_ char** ErrorMessage, LLVMMemoryBufferRef *OutMemBuf);
 
 /*===-- Triple ------------------------------------------------------------===*/
 /** Get a triple for the host machine as a string. The result needs to be

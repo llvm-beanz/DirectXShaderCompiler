@@ -1,3 +1,5 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen)
 
 add_llvm_library(LLVMTarget
@@ -14,6 +16,8 @@ add_llvm_library(LLVMTarget
   )
 
 foreach(t ${LLVM_TARGETS_TO_BUILD})
+  if (NOT t STREQUAL "None") # HLSL Change
   message(STATUS "Targeting ${t}")
   add_subdirectory(${t})
+  endif() # HLSL Change
 endforeach()

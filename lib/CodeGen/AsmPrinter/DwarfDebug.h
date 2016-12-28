@@ -1,13 +1,12 @@
 //===-- llvm/CodeGen/DwarfDebug.h - Dwarf Debug Framework ------*- C++ -*--===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file contains support for writing dwarf debug info into asm files.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DwarfDebug.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file contains support for writing dwarf debug info into asm files.   //
 //
 //===----------------------------------------------------------------------===//
 
@@ -65,8 +64,8 @@ public:
   unsigned getSourceID() const { return SourceID; }
   MCSymbol *getLabel() const { return Label; }
 };
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// This class is used to track local variable information.
 ///
 /// Variables can be created from allocas, in which case they're generated from

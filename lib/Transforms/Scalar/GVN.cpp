@@ -1,19 +1,18 @@
 //===- GVN.cpp - Eliminate redundant values and loads ---------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This pass performs global value numbering to eliminate fully redundant
-// instructions.  It also performs simple dead load elimination.
-//
-// Note that this pass does the value numbering itself; it does not use the
-// ValueNumbering analysis passes.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// GVN.cpp                                                                   //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This pass performs global value numbering to eliminate fully redundant    //
+// instructions.  It also performs simple dead load elimination.             //
+//                                                                           //
+// Note that this pass does the value numbering itself; it does not use the  //
+// ValueNumbering analysis passes.                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/ADT/DenseMap.h"
@@ -51,6 +50,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include <vector>
+#include "dxc/HLSL/DxilConstants.h"  // HLSL Change
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -2478,6 +2478,14 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   // purpose register.
   if (isa<CmpInst>(CurInst))
     return false;
+
+  // HLSL Change Begin
+  // Don't do PRE on share memory. The PHI may merge two shader memory variable.
+  if (PointerType *PT = dyn_cast<PointerType>(CurInst->getType())) {
+    if (PT->getAddressSpace() == hlsl::DXIL::kTGSMAddrSpace)
+      return false;
+  }
+  // HLSL Change End
 
   // We don't currently value number ANY inline asm calls.
   if (CallInst *CallI = dyn_cast<CallInst>(CurInst))

@@ -1,15 +1,14 @@
 //===--- SemaDeclObjC.cpp - Semantic Analysis for ObjC Declarations -------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements semantic analysis for Objective C declarations.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// SemaDeclObjC.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements semantic analysis for Objective C declarations.     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTConsumer.h"
@@ -3501,6 +3500,13 @@ Sema::ObjCContainerKind Sema::getObjCContainerKind() const {
 // Note: For class/category implementations, allMethods is always null.
 Decl *Sema::ActOnAtEnd(Scope *S, SourceRange AtEnd, ArrayRef<Decl *> allMethods,
                        ArrayRef<DeclGroupPtrTy> allTUVars) {
+#if 1 // HLSL Change Starts
+  (S);
+  (AtEnd);
+  (allMethods);
+  (allTUVars);
+  return nullptr;
+#else
   if (getObjCContainerKind() == Sema::OCK_None)
     return nullptr;
 
@@ -3698,6 +3704,7 @@ Decl *Sema::ActOnAtEnd(Scope *S, SourceRange AtEnd, ArrayRef<Decl *> allMethods,
 
   ActOnDocumentableDecl(ClassDecl);
   return ClassDecl;
+#endif // HLSL Change Ends
 }
 
 
@@ -4092,6 +4099,9 @@ Decl *Sema::ActOnMethodDeclaration(
     DeclaratorChunk::ParamInfo *CParamInfo, unsigned CNumArgs, // c-style args
     AttributeList *AttrList, tok::ObjCKeywordKind MethodDeclKind,
     bool isVariadic, bool MethodDefinition) {
+  // HLSL Change Starts
+  llvm_unreachable("HLSL does not support ObjC constructs");
+#if 0
   // Make sure we can establish a context for the method.
   if (!CurContext->isObjCContainer()) {
     Diag(MethodLoc, diag::error_missing_method_context);
@@ -4301,6 +4311,7 @@ Decl *Sema::ActOnMethodDeclaration(
   ActOnDocumentableDecl(ObjCMethod);
 
   return ObjCMethod;
+#endif // HLSL Change Ends
 }
 
 bool Sema::CheckObjCDeclScope(Decl *D) {
@@ -4557,6 +4568,7 @@ namespace {
 
 void Sema::DiagnoseUnusedBackingIvarInAccessor(Scope *S,
                                           const ObjCImplementationDecl *ImplD) {
+#if 0 // HLSL Change
   if (S->hasUnrecoverableErrorOccurred())
     return;
 
@@ -4585,4 +4597,5 @@ void Sema::DiagnoseUnusedBackingIvarInAccessor(Scope *S,
       Diag(PDecl->getLocation(), diag::note_property_declare);
     }
   }
+#endif  // HLSL Change
 }

@@ -1,16 +1,15 @@
 //===-- Target.cpp --------------------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the common infrastructure (including C bindings) for 
-// libLLVMTarget.a, which implements target information.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Target.cpp                                                                //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the common infrastructure (including C bindings) for //
+// libLLVMTarget.a, which implements target information.                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm-c/Target.h"
 #include "llvm-c/Initialization.h"
@@ -56,7 +55,7 @@ void LLVMAddTargetLibraryInfo(LLVMTargetLibraryInfoRef TLI,
 
 char *LLVMCopyStringRepOfTargetData(LLVMTargetDataRef TD) {
   std::string StringRep = unwrap(TD)->getStringRepresentation();
-  return strdup(StringRep.c_str());
+  return _strdup(StringRep.c_str()); // HLSL Change strdup to _strdup
 }
 
 LLVMByteOrdering LLVMByteOrder(LLVMTargetDataRef TD) {

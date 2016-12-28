@@ -1,6 +1,8 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license. See COPYRIGHT in the project root for full license information.
 set(LLVM_LINK_COMPONENTS
-  MC
-  MCParser
+#  MC            # HLSL Change
+#  MCParser      # HLSL Change
   Support
   )
 
@@ -20,6 +22,8 @@ add_clang_library(clangParse
   ParseTemplate.cpp
   ParseTentative.cpp
   Parser.cpp
+  ParseHLSL.cpp # HLSL Change
+  HLSLRootSignature.cpp # HLSL Change
 
   LINK_LIBS
   clangAST

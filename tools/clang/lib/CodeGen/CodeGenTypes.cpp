@@ -1,15 +1,14 @@
 //===--- CodeGenTypes.cpp - Type translation for LLVM CodeGen -------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is the code that handles AST -> LLVM type lowering.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CodeGenTypes.cpp                                                          //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is the code that handles AST -> LLVM type lowering.                  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CodeGenTypes.h"
 #include "CGCXXABI.h"
@@ -19,6 +18,7 @@
 #include "TargetInfo.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/RecordLayout.h"
@@ -26,6 +26,8 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
+#include "CodeGenModule.h" // HLSL Change
+#include "CGHLSLRuntime.h" // HLSL Change
 using namespace clang;
 using namespace CodeGen;
 
@@ -73,6 +75,23 @@ void CodeGenTypes::addRecordTypeName(const RecordDecl *RD,
 
   if (!suffix.empty())
     OS << suffix;
+
+  // HLSL Change Starts
+  
+  // Note that this check, like the 'abs' check, shouldn't happen by simple
+  // string comparison; instead we can map the types and functions we
+  // inject and look them up by a simple pointer value check.
+  bool isMatrix = RD->getIdentifier() == &(getContext().Idents.get(StringRef("matrix")));
+  if (isMatrix) {
+    // Encode additional information into the type.
+    const ClassTemplateSpecializationDecl* templateDecl = dyn_cast<ClassTemplateSpecializationDecl>(RD);
+    OS
+      << "." << templateDecl->getTemplateArgs().get(0).getAsType().getAsString()
+      << "." << templateDecl->getTemplateArgs().get(1).getAsIntegral().toString(10)
+      << "." << templateDecl->getTemplateArgs().get(2).getAsIntegral().toString(10);
+  }
+
+  // HLSL Change Ends
 
   Ty->setName(OS.str());
 }
@@ -302,9 +321,39 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
   const Type *Ty = T.getTypePtr();
 
   // RecordTypes are cached and processed specially.
-  if (const RecordType *RT = dyn_cast<RecordType>(Ty))
-    return ConvertRecordDeclType(RT->getDecl());
-  
+  if (const RecordType *RT = dyn_cast<RecordType>(Ty)) {
+    // HLSL Change Starts
+    if (getContext().getLangOpts().HLSL && !hlsl::IsHLSLMatType(T)) {
+      if (const ExtVectorType *extVecTy =
+              hlsl::ConvertHLSLVecMatTypeToExtVectorType(getContext(), T)) {
+        Ty = getContext()
+                 .getExtVectorType(extVecTy->getElementType(),
+                                   extVecTy->getNumElements())
+                 .getTypePtr();
+      } else if (hlsl::IsHLSLOutputPatchType(T)) {
+        // Convert OutputPatch to array.
+        QualType eltTy = hlsl::GetHLSLOutputPatchElementType(T);
+        unsigned count = hlsl::GetHLSLOutputPatchCount(T);
+        Ty = getContext()
+                 .getConstantArrayType(eltTy, llvm::APInt(32, count),
+                                       ArrayType::ArraySizeModifier::Normal, 0)
+                 .getTypePtr();
+      } else if (hlsl::IsHLSLInputPatchType(T)) {
+        // Convert InputPatch to array.
+        QualType eltTy = hlsl::GetHLSLOutputPatchElementType(T);
+        unsigned count = hlsl::GetHLSLOutputPatchCount(T);
+        Ty = getContext()
+                 .getConstantArrayType(eltTy, llvm::APInt(32, count),
+                                       ArrayType::ArraySizeModifier::Normal, 0)
+                 .getTypePtr();
+      }
+      else
+        return ConvertRecordDeclType(RT->getDecl());
+    }
+    // HLSL Change Ends
+    else
+      return ConvertRecordDeclType(RT->getDecl());
+  }
   // See if type is already cached.
   llvm::DenseMap<const Type *, llvm::Type *>::iterator TCI = TypeCache.find(Ty);
   // If type is found in map then use it. Otherwise, convert type T.
@@ -353,12 +402,20 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
     case BuiltinType::ULongLong:
     case BuiltinType::WChar_S:
     case BuiltinType::WChar_U:
+    // HLSL Change Starts
+    case BuiltinType::Min12Int:
+    case BuiltinType::LitInt:
+    // HLSL Change Ends
     case BuiltinType::Char16:
     case BuiltinType::Char32:
       ResultType = llvm::IntegerType::get(getLLVMContext(),
                                  static_cast<unsigned>(Context.getTypeSize(T)));
       break;
-
+    // HLSL Change Starts
+    case BuiltinType::Min10Float:
+// OACR error 6287
+#pragma prefast(disable: __WARNING_REDUNDANTTEST, "language options are constants, by design")
+    // HLSL Change Ends
     case BuiltinType::Half:
       // Half FP can either be storage-only (lowered to i16) or native.
       ResultType =
@@ -366,6 +423,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
                            Context.getLangOpts().NativeHalfType ||
                                Context.getLangOpts().HalfArgsAndReturns);
       break;
+    case BuiltinType::LitFloat: // HLSL Change
     case BuiltinType::Float:
     case BuiltinType::Double:
     case BuiltinType::LongDouble:

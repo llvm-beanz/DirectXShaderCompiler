@@ -1,19 +1,18 @@
 //===--- ExecuteCompilerInvocation.cpp ------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file holds ExecuteCompilerInvocation(). It is split into its own file to
-// minimize the impact of pulling in essentially everything else in Clang.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ExecuteCompilerInvocation.cpp                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file holds ExecuteCompilerInvocation(). It is split into its own file to//
+// minimize the impact of pulling in essentially everything else in Clang.   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/FrontendTool/Utils.h"
-#include "clang/ARCMigrate/ARCMTActions.h"
+// #include "clang/ARCMigrate/ARCMTActions.h" // HLSL Change
 #include "clang/CodeGen/CodeGenAction.h"
 #include "clang/Driver/Options.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -51,13 +50,13 @@ static FrontendAction *CreateFrontendBaseAction(CompilerInstance &CI) {
   case EmitCodeGenOnly:        return new EmitCodeGenOnlyAction();
   case EmitObj:                return new EmitObjAction();
   case FixIt:                  return new FixItAction();
-  case GenerateModule:         return new GenerateModuleAction;
-  case GeneratePCH:            return new GeneratePCHAction;
+  //case GenerateModule:         return new GenerateModuleAction; // HLSL Change - no support for modules
+  //case GeneratePCH:            return new GeneratePCHAction; // HLSL Change - no support for PCH
   case GeneratePTH:            return new GeneratePTHAction();
   case InitOnly:               return new InitOnlyAction();
   case ParseSyntaxOnly:        return new SyntaxOnlyAction();
-  case ModuleFileInfo:         return new DumpModuleInfoAction();
-  case VerifyPCH:              return new VerifyPCHAction();
+  //case ModuleFileInfo:         return new DumpModuleInfoAction(); // HLSL Change - no support for modules
+  //case VerifyPCH:              return new VerifyPCHAction(); // HLSL Change - no support for PCH
 
   case PluginAction: {
     for (FrontendPluginRegistry::iterator it =
@@ -153,10 +152,12 @@ static FrontendAction *CreateFrontendAction(CompilerInstance &CI) {
   }
 #endif
 
+#if 0 // HLSL Change Starts - no support for AST serialization/deserialization
   // If there are any AST files to merge, create a frontend action
   // adaptor to perform the merge.
   if (!FEOpts.ASTMergeFiles.empty())
     Act = new ASTMergeAction(Act, FEOpts.ASTMergeFiles);
+#endif // HLSL Change Ends - no support for AST serialization/deserialization
 
   return Act;
 }

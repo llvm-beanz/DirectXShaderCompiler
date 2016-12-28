@@ -1,16 +1,15 @@
 //== DivZeroChecker.cpp - Division by zero checker --------------*- C++ -*--==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This defines DivZeroChecker, a builtin check in ExprEngine that performs
-// checks for division by zeros.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DivZeroChecker.cpp                                                        //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This defines DivZeroChecker, a builtin check in ExprEngine that performs  //
+// checks for division by zeros.                                             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "ClangSACheckers.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"

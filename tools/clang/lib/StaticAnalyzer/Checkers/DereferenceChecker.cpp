@@ -1,16 +1,15 @@
 //== NullDerefChecker.cpp - Null dereference checker ------------*- C++ -*--==//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This defines NullDerefChecker, a builtin check in ExprEngine that performs
-// checks for null pointers at loads and stores.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DereferenceChecker.cpp                                                    //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This defines NullDerefChecker, a builtin check in ExprEngine that performs//
+// checks for null pointers at loads and stores.                             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "ClangSACheckers.h"
 #include "clang/AST/ExprObjC.h"

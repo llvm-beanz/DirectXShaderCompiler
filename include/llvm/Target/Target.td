@@ -1,18 +1,17 @@
 //===- Target.td - Target Independent TableGen interface ---*- tablegen -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines the target-independent interfaces which should be
-// implemented by each target which is using a TableGen based code generator.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Target.td                                                                 //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the target-independent interfaces which should be       //
+// implemented by each target which is using a TableGen based code generator.//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+// Include all information about LLVM intrinsics.                            //
 
-// Include all information about LLVM intrinsics.
 include "llvm/IR/Intrinsics.td"
 
 //===----------------------------------------------------------------------===//

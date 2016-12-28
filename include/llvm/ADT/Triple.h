@@ -1,11 +1,12 @@
 //===-- llvm/ADT/Triple.h - Target triple helper class ----------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Triple.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_ADT_TRIPLE_H
 #define LLVM_ADT_TRIPLE_H
@@ -83,6 +84,10 @@ public:
     hsail64,    // AMD HSAIL with 64-bit pointers
     spir,       // SPIR: standard portable IR for OpenCL 32-bit version
     spir64,     // SPIR: standard portable IR for OpenCL 64-bit version
+    // HLSL Change Begins
+    dxil,       // DXIL: DirectX Intermediate Language 32-bit
+    dxil64,     // DXIL: DirectX Intermediate Language 64-bit
+    // HLSL Change Ends
     kalimba,    // Kalimba: generic kalimba
     shave,      // SHAVE: Movidius vector VLIW processors
     wasm32,     // WebAssembly with 32-bit pointers
@@ -122,6 +127,7 @@ public:
     IBM,
     ImaginationTechnologies,
     MipsTechnologies,
+    Microsoft,    // HLSL Change
     NVIDIA,
     CSR,
     LastVendorType = CSR
@@ -152,6 +158,7 @@ public:
     CUDA,       // NVIDIA CUDA
     NVCL,       // NVIDIA OpenCL
     AMDHSA,     // AMD HSA Runtime
+    DirectX,    // HLSL Change
     PS4,
     LastOSType = PS4
   };

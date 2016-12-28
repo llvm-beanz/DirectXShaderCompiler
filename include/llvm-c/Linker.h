@@ -1,15 +1,14 @@
 /*===-- llvm-c/Linker.h - Module Linker C Interface -------------*- C++ -*-===*\
-|*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
-|*                                                                            *|
-|*===----------------------------------------------------------------------===*|
-|*                                                                            *|
-|* This file defines the C interface to the module/file/archive linker.       *|
-|*                                                                            *|
-\*===----------------------------------------------------------------------===*/
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Linker.h                                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines the C interface to the module/file/archive linker.      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_C_LINKER_H
 #define LLVM_C_LINKER_H
@@ -36,7 +35,7 @@ typedef enum {
  * Note that the linker mode parameter \p Unused is no longer used, and has
  * no effect. */
 LLVMBool LLVMLinkModules(LLVMModuleRef Dest, LLVMModuleRef Src,
-                         LLVMLinkerMode Unused, char **OutMessage);
+                         LLVMLinkerMode Unused, _Outptr_result_maybenull_ char **OutMessage);
 
 #ifdef __cplusplus
 }

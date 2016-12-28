@@ -1,15 +1,14 @@
 //=== Target/TargetRegisterInfo.h - Target Register Information -*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file describes an abstract interface used to get information about a
-// target machines register file.  This information is used for a variety of
-// purposed, especially register allocation.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// TargetRegisterInfo.h                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file describes an abstract interface used to get information about a //
+// target machines register file.  This information is used for a variety of //
+// purposed, especially register allocation.                                 //
 //
 //===----------------------------------------------------------------------===//
 
@@ -874,7 +873,8 @@ public:
 
 //===----------------------------------------------------------------------===//
 //                           SuperRegClassIterator
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 //
 // Iterate over the possible super-registers for a given register class. The
 // iterator will visit a list of pairs (Idx, Mask) corresponding to the

@@ -1,20 +1,20 @@
 //===--- Sanitizers.cpp - C Language Family Language Options ----*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file defines the classes from Sanitizers.h
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Sanitizers.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file defines the classes from Sanitizers.h                          //
+//                                                                           //
+
 #include "clang/Basic/Sanitizers.h"
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 using namespace clang;
 
 SanitizerMask clang::parseSanitizerValue(StringRef Value, bool AllowGroups) {

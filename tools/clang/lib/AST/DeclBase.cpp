@@ -1,15 +1,14 @@
 //===--- DeclBase.cpp - Declaration AST Node Implementation ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Decl and DeclContext classes.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// DeclBase.cpp                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Decl and DeclContext classes.                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/AST/DeclBase.h"
 #include "clang/AST/ASTContext.h"
@@ -31,6 +30,9 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+
+#include "llvm/Support/OacrIgnoreCond.h" // HLSL Change - options change visibility rules
+
 using namespace clang;
 
 //===----------------------------------------------------------------------===//
@@ -623,6 +625,7 @@ unsigned Decl::getIdentifierNamespaceForKind(Kind DeclKind) {
     case Import:
     case OMPThreadPrivate:
     case Empty:
+    case HLSLBuffer: // HLSL Change
       // Never looked up by name.
       return 0;
   }
@@ -886,6 +889,11 @@ bool DeclContext::isTransparentContext() const {
   else if (DeclKind == Decl::LinkageSpec)
     return true;
 
+  // HLSL Change Starts
+  if (DeclKind == Decl::HLSLBuffer)
+    return true;
+  // HLSL Change Ends
+
   return false;
 }
 
@@ -926,6 +934,12 @@ DeclContext *DeclContext::getPrimaryContext() {
   case Decl::Captured:
     // There is only one DeclContext for these entities.
     return this;
+
+  // HLSL Change Starts
+  case Decl::HLSLBuffer:
+    // Each buffer, even with the same name, is a distinct construct.
+    return this;
+  // HLSL Change Ends
 
   case Decl::Namespace:
     // The original namespace is our primary context.

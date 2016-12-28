@@ -5,6 +5,9 @@ How to write RecursiveASTVisitor based ASTFrontendActions.
 Introduction
 ============
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 In this tutorial you will learn how to create a FrontendAction that uses
 a RecursiveASTVisitor to find CXXRecordDecl AST nodes with a specified
 name.

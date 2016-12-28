@@ -1,14 +1,13 @@
 //===- llvm/Analysis/LoopInfoImpl.h - Natural Loop Calculator ---*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is the generic implementation of LoopInfo used for both Loops and
-// MachineLoops.
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LoopInfoImpl.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is the generic implementation of LoopInfo used for both Loops and    //
+// MachineLoops.                                                             //
 //
 //===----------------------------------------------------------------------===//
 
@@ -333,8 +332,8 @@ void LoopBase<BlockT, LoopT>::print(raw_ostream &OS, unsigned Depth) const {
   for (iterator I = begin(), E = end(); I != E; ++I)
     (*I)->print(OS, Depth+2);
 }
-
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 /// Stable LoopInfo Analysis - Build a loop tree using stable iterators so the
 /// result does / not depend on use list (block predecessor) order.
 ///

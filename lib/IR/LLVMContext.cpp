@@ -1,16 +1,15 @@
 //===-- LLVMContext.cpp - Implement LLVMContext ---------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements LLVMContext, as a wrapper around the opaque
-//  class LLVMContextImpl.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// LLVMContext.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+//  This file implements LLVMContext, as a wrapper around the opaque         //
+//  class LLVMContextImpl.                                                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/LLVMContext.h"
 #include "LLVMContextImpl.h"
@@ -230,7 +229,8 @@ void LLVMContext::diagnose(const DiagnosticInfo &DI) {
   DI.print(DP);
   errs() << "\n";
   if (DI.getSeverity() == DS_Error)
-    exit(1);
+    // exit(1); // HLSL Change - unwind if necessary, but don't terminate the process
+    throw std::exception();
 }
 
 void LLVMContext::emitError(unsigned LocCookie, const Twine &ErrorStr) {

@@ -1,21 +1,21 @@
 //===-- ASanStackFrameLayout.cpp - helper for AddressSanitizer ------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Definition of ComputeASanStackFrameLayout (see ASanStackFrameLayout.h).
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ASanStackFrameLayout.cpp                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// Definition of ComputeASanStackFrameLayout (see ASanStackFrameLayout.h).   //
+//                                                                           //
+
 #include "llvm/Transforms/Utils/ASanStackFrameLayout.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MathExtras.h"
 #include <algorithm>
-
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 namespace llvm {
 
 // We sort the stack variables by alignment (largest first) to minimize

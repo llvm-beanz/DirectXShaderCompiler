@@ -1,18 +1,17 @@
 //===- llvm/PassRegistry.h - Pass Information Registry ----------*- C++ -*-===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// PassRegistry.h                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file defines PassRegistry, a class that is used in the initialization//
+// and registration of passes.  At application startup, passes are registered//
+// with the PassRegistry, which is later provided to the PassManager for     //
+// dependency resolution and similar tasks.                                  //
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines PassRegistry, a class that is used in the initialization
-// and registration of passes.  At application startup, passes are registered
-// with the PassRegistry, which is later provided to the PassManager for 
-// dependency resolution and similar tasks.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_PASSREGISTRY_H
 #define LLVM_PASSREGISTRY_H
@@ -39,7 +38,7 @@ struct PassRegistrationListener;
 /// threads simultaneously, you will need to use a separate PassRegistry on
 /// each thread.
 class PassRegistry {
-  mutable sys::SmartRWMutex<true> Lock;
+  //mutable sys::SmartRWMutex<true> Lock; // HLSL Change - no lock needed
 
   /// PassInfoMap - Keep track of the PassInfo object for each registered pass.
   typedef DenseMap<const void *, const PassInfo *> MapType;

@@ -2,6 +2,9 @@
 Tutorial for building tools using LibTooling and LibASTMatchers
 ===============================================================
 
+NOTE: this document applies to the original Clang project, not the DirectX
+Compiler. It's made available for informational purposes only.
+
 This document is intended to show how to build a useful source-to-source
 translation tool based on Clang's `LibTooling <LibTooling.html>`_. It is
 explicitly aimed at people who are new to Clang, so all you should need

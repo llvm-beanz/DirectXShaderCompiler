@@ -1,20 +1,19 @@
 //===-- CommandLine.cpp - Command line parser implementation --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This class implements a command line argument processor that is useful when
-// creating a tool.  It provides a simple, minimalistic interface that is easily
-// extensible and supports nonlocal (library) command line options.
-//
-// Note that rather than trying to figure out what this code does, you could try
-// reading the library documentation located in docs/CommandLine.html
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CommandLine.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This class implements a command line argument processor that is useful when//
+// creating a tool.  It provides a simple, minimalistic interface that is easily//
+// extensible and supports nonlocal (library) command line options.          //
+//                                                                           //
+// Note that rather than trying to figure out what this code does, you could try//
+// reading the library documentation located in docs/CommandLine.html        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm-c/Support.h"
@@ -1444,7 +1443,8 @@ void basic_parser_impl::printOptionNoValue(const Option &O,
 // -help and -help-hidden option implementation
 //
 
-static int OptNameCompare(const std::pair<const char *, Option *> *LHS,
+// HLSL Change - __cdecl
+static int __cdecl OptNameCompare(const std::pair<const char *, Option *> *LHS,
                           const std::pair<const char *, Option *> *RHS) {
   return strcmp(LHS->first, RHS->first);
 }
@@ -1544,7 +1544,7 @@ public:
   // Helper function for printOptions().
   // It shall return a negative value if A's name should be lexicographically
   // ordered before B's name. It returns a value greater equal zero otherwise.
-  static int OptionCategoryCompare(OptionCategory *const *A,
+  static int __cdecl OptionCategoryCompare(OptionCategory *const *A,
                                    OptionCategory *const *B) {
     return strcmp((*A)->getName(), (*B)->getName());
   }
@@ -1760,7 +1760,8 @@ public:
       CPU = "(unknown)";
     OS << ".\n"
 #if (ENABLE_TIMESTAMPS == 1)
-       << "  Built " << __DATE__ << " (" << __TIME__ << ").\n"
+// HLSL Change - remove any possibility that __DATE__ or __TIME__ are used (build cache)
+//       << "  Built " << __DATE__ << " (" << __TIME__ << ").\n"
 #endif
        << "  Default target: " << sys::getDefaultTargetTriple() << '\n'
        << "  Host CPU: " << CPU << '\n';

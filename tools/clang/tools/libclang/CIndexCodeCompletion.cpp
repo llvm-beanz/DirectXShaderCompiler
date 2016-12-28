@@ -1,16 +1,15 @@
 //===- CIndexCodeCompletion.cpp - Code Completion API hooks ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Clang-C Source Indexing library hooks for
-// code completion.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// CIndexCodeCompletion.cpp                                                  //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Clang-C Source Indexing library hooks for        //
+// code completion.                                                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "CIndexer.h"
 #include "CIndexDiagnostic.h"
@@ -53,7 +52,7 @@
 using namespace clang;
 using namespace clang::cxindex;
 
-extern "C" {
+// extern "C" {             // HLSL Change -Don't use c linkage.
 
 enum CXCompletionChunkKind
 clang_getCompletionChunkKind(CXCompletionString completion_string,
@@ -347,7 +346,7 @@ AllocatedCXCodeCompleteResults::~AllocatedCXCodeCompleteResults() {
             --CodeCompletionResultObjects);
 }
   
-} // end extern "C"
+// } // end extern "C"       // HLSL Change -Don't use c linkage.
 
 static unsigned long long getContextsForContextKind(
                                           enum CodeCompletionContext::Kind kind, 
@@ -646,7 +645,7 @@ namespace {
   };
 }
 
-extern "C" {
+// extern "C" {                       // HLSL Change -Don't use c linkage.
 struct CodeCompleteAtInfo {
   CXTranslationUnit TU;
   const char *complete_filename;
@@ -924,7 +923,7 @@ CXString clang_codeCompleteGetObjCSelector(CXCodeCompleteResults *ResultsIn) {
   return cxstring::createDup(Results->Selector);
 }
   
-} // end extern "C"
+// } // end extern "C"                // HLSL Change -Don't use c linkage.
 
 /// \brief Simple utility function that appends a \p New string to the given
 /// \p Old string, using the \p Buffer for storage.
@@ -998,9 +997,9 @@ namespace {
   };
 }
 
-extern "C" {
+// extern "C" {            // HLSL Change -Don't use c linkage.
   void clang_sortCodeCompletionResults(CXCompletionResult *Results,
                                        unsigned NumResults) {
     std::stable_sort(Results, Results + NumResults, OrderCompletionResults());
   }
-}
+// }                       // HLSL Change -Don't use c linkage.

@@ -1,16 +1,15 @@
 //===--- ParseStmt.cpp - Statement and Block Parser -----------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the Statement and Block portions of the Parser
-// interface.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParseStmt.cpp                                                             //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the Statement and Block portions of the Parser       //
+// interface.                                                                //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "clang/Parse/Parser.h"
 #include "RAIIObjectsForParser.h"
@@ -102,6 +101,7 @@ Parser::ParseStatementOrDeclaration(StmtVector &Stmts, bool OnlyStatement,
 
   ParsedAttributesWithRange Attrs(AttrFactory);
   MaybeParseCXX11Attributes(Attrs, nullptr, /*MightBeObjCMessageSend*/ true);
+  MaybeParseHLSLAttributes(Attrs);    // HLSL Change
 
   StmtResult Res = ParseStatementOrDeclarationAfterAttributes(Stmts,
                                  OnlyStatement, TrailingElseLoc, Attrs);
@@ -160,6 +160,10 @@ Retry:
   switch (Kind) {
   case tok::at: // May be a @try or @throw statement
     {
+      // HLSL Change Starts
+      assert(!getLangOpts().HLSL && "HLSL does not recognize '@' as a token");
+      if (getLangOpts().HLSL) goto tok_default_case;
+      // HLSL Change Ends
       ProhibitAttributes(Attrs); // TODO: is it correct?
       AtLoc = ConsumeToken();  // consume @
       return ParseObjCAtStatement(AtLoc);
@@ -173,6 +177,13 @@ Retry:
   case tok::identifier: {
     Token Next = NextToken();
     if (Next.is(tok::colon)) { // C99 6.8.1: labeled-statement
+      // HLSL Change Starts
+      if (getLangOpts().HLSL) {
+        Diag(Tok, diag::err_hlsl_unsupported_construct) << "label";
+        SkipUntil(tok::semi);
+        return StmtError();
+      }
+      // HLSL Change Ends
       // identifier ':' statement
       return ParseLabeledStatement(Attrs);
     }
@@ -201,6 +212,7 @@ Retry:
     // Fall through
   }
 
+  tok_default_case: // HLSL Change - add to target cases dead-code'd by HLSL
   default: {
     if ((getLangOpts().CPlusPlus || !OnlyStatement) && isDeclarationStatement()) {
       SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
@@ -244,6 +256,13 @@ Retry:
     return ParseForStatement(TrailingElseLoc);
 
   case tok::kw_goto:                // C99 6.8.6.1: goto-statement
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << "goto";
+      SkipUntil(tok::semi);
+      return StmtError();
+    }
+    // HLSL Change Ends
     Res = ParseGotoStatement();
     SemiError = "goto";
     break;
@@ -261,6 +280,13 @@ Retry:
     break;
 
   case tok::kw_asm: {
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      SkipUntil(tok::semi);
+      return StmtError();
+    }
+    // HLSL Change Ends
     ProhibitAttributes(Attrs);
     bool msAsm = false;
     Res = ParseAsmStatement(msAsm);
@@ -279,9 +305,17 @@ Retry:
     return StmtEmpty();
 
   case tok::kw_try:                 // C++ 15: try-block
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_reserved_keyword) << Tok.getName();
+      SkipUntil(tok::semi);
+      return StmtError();
+    }
+    // HLSL Change Ends
     return ParseCXXTryBlock();
 
   case tok::kw___try:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs); // TODO: is it correct?
     return ParseSEHTryBlock();
 
@@ -291,58 +325,74 @@ Retry:
     break;
 
   case tok::annot_pragma_vis:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaVisibility();
     return StmtEmpty();
 
   case tok::annot_pragma_pack:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaPack();
     return StmtEmpty();
 
   case tok::annot_pragma_msstruct:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaMSStruct();
     return StmtEmpty();
 
   case tok::annot_pragma_align:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaAlign();
     return StmtEmpty();
 
   case tok::annot_pragma_weak:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaWeak();
     return StmtEmpty();
 
   case tok::annot_pragma_weakalias:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaWeakAlias();
     return StmtEmpty();
 
   case tok::annot_pragma_redefine_extname:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaRedefineExtname();
     return StmtEmpty();
 
   case tok::annot_pragma_fp_contract:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     Diag(Tok, diag::err_pragma_fp_contract_scope);
     ConsumeToken();
     return StmtError();
 
   case tok::annot_pragma_opencl_extension:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     HandlePragmaOpenCLExtension();
     return StmtEmpty();
 
   case tok::annot_pragma_captured:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     return HandlePragmaCaptured();
 
   case tok::annot_pragma_openmp:
+    if (getLangOpts().HLSL) goto tok_default_case; // HLSL Change - remove unsupported case
     ProhibitAttributes(Attrs);
     return ParseOpenMPDeclarativeOrExecutableDirective(!OnlyStatement);
+
+  // HLSL Change Starts
+  case tok::kw_discard:
+    return HandleHLSLDiscardStmt(ExprResult(false).get());
+  // HLSL Change Ends
 
   case tok::annot_pragma_ms_pointers_to_members:
     ProhibitAttributes(Attrs);
@@ -415,6 +465,7 @@ StmtResult Parser::ParseExprStatement() {
 ///   seh-finally-block
 ///
 StmtResult Parser::ParseSEHTryBlock() {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");  // HLSL Change
   assert(Tok.is(tok::kw___try) && "Expected '__try'");
   SourceLocation TryLoc = ConsumeToken();
 
@@ -453,6 +504,7 @@ StmtResult Parser::ParseSEHTryBlock() {
 ///   '__except' '(' seh-filter-expression ')' compound-statement
 ///
 StmtResult Parser::ParseSEHExceptBlock(SourceLocation ExceptLoc) {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");  // HLSL Change
   PoisonIdentifierRAIIObject raii(Ident__exception_code, false),
     raii2(Ident___exception_code, false),
     raii3(Ident_GetExceptionCode, false);
@@ -505,6 +557,7 @@ StmtResult Parser::ParseSEHExceptBlock(SourceLocation ExceptLoc) {
 ///   '__finally' compound-statement
 ///
 StmtResult Parser::ParseSEHFinallyBlock(SourceLocation FinallyLoc) {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");  // HLSL Change
   PoisonIdentifierRAIIObject raii(Ident__abnormal_termination, false),
     raii2(Ident___abnormal_termination, false),
     raii3(Ident_AbnormalTermination, false);
@@ -530,6 +583,7 @@ StmtResult Parser::ParseSEHFinallyBlock(SourceLocation FinallyLoc) {
 ///   '__leave' ';'
 ///
 StmtResult Parser::ParseSEHLeaveStatement() {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");  // HLSL Change
   SourceLocation LeaveLoc = ConsumeToken();  // eat the '__leave'.
   return Actions.ActOnSEHLeaveStmt(LeaveLoc, getCurScope());
 }
@@ -541,6 +595,7 @@ StmtResult Parser::ParseSEHLeaveStatement() {
 /// [GNU]   identifier ':' attributes[opt] statement
 ///
 StmtResult Parser::ParseLabeledStatement(ParsedAttributesWithRange &attrs) {
+  assert(!getLangOpts().HLSL && "no label parsing support in HLSL (case and default handled elsewhere)");  // HLSL Change
   assert(Tok.is(tok::identifier) && Tok.getIdentifierInfo() &&
          "Not an identifier!");
 
@@ -677,7 +732,13 @@ StmtResult Parser::ParseCaseStatement(bool MissingCase, ExprResult Expr) {
     SourceLocation DotDotDotLoc;
     ExprResult RHS;
     if (TryConsumeToken(tok::ellipsis, DotDotDotLoc)) {
-      Diag(DotDotDotLoc, diag::ext_gnu_case_range);
+      // HLSL Change Starts - disallow range extension
+      if (getLangOpts().HLSL) {
+        Diag(DotDotDotLoc, diag::err_hlsl_unsupported_construct) << "case range";
+      } else {
+      // HLSL Change Ends - next line is now conditional
+        Diag(DotDotDotLoc, diag::ext_gnu_case_range);
+      } // HLSL Change - close conditional
       RHS = ParseConstantExpression();
       if (RHS.isInvalid()) {
         if (SkipUntil(tok::colon, tok::r_brace, StopAtSemi | StopBeforeMatch)) {
@@ -845,6 +906,7 @@ StmtResult Parser::ParseCompoundStatement(bool isStmtExpr,
 /// separately since some pragmas (FP_CONTRACT) must appear before any C
 /// statement in the compound, but may be intermingled with other pragmas.
 void Parser::ParseCompoundStatementLeadingPragmas() {
+  if (getLangOpts().HLSL) return; // HLSL Change - none of these pragmas are supported
   bool checkForPragmas = true;
   while (checkForPragmas) {
     switch (Tok.getKind()) {
@@ -917,6 +979,13 @@ StmtResult Parser::ParseCompoundStatementBody(bool isStmtExpr) {
   // "__label__ X, Y, Z;" is the GNU "Local Label" extension.  These are
   // only allowed at the start of a compound stmt regardless of the language.
   while (Tok.is(tok::kw___label__)) {
+    // HLSL Change Starts
+    if (getLangOpts().HLSL) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << "local label";
+      SkipUntil(tok::semi);
+      break;
+    }
+    // HLSL Change Ends
     SourceLocation LabelLoc = ConsumeToken();
 
     SmallVector<Decl *, 8> DeclsInGroup;
@@ -945,7 +1014,7 @@ StmtResult Parser::ParseCompoundStatementBody(bool isStmtExpr) {
   }
 
   while (Tok.isNot(tok::r_brace) && !isEofOrEom()) {
-    if (Tok.is(tok::annot_pragma_unused)) {
+    if (!getLangOpts().HLSL && Tok.is(tok::annot_pragma_unused)) { // HLSL Change - annot_pragma_unused is not produced in HLSL
       HandlePragmaUnused();
       continue;
     }
@@ -965,6 +1034,7 @@ StmtResult Parser::ParseCompoundStatementBody(bool isStmtExpr) {
       ParsedAttributesWithRange attrs(AttrFactory);
       MaybeParseCXX11Attributes(attrs, nullptr,
                                 /*MightBeObjCMessageSend*/ true);
+      MaybeParseHLSLAttributes(attrs);    // HLSL Change
 
       // If this is the start of a declaration, parse it as such.
       if (isDeclarationStatement()) {
@@ -1487,6 +1557,12 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
   if (C99orCXXorObjC)
     ScopeFlags = Scope::DeclScope | Scope::ControlScope;
 
+  // HLSL Change Starts - leak declarations in for control parts into outer scope
+  if (getLangOpts().HLSL) {
+    ScopeFlags = Scope::ForDeclScope;
+  }
+  // HLSL Change Ends
+
   ParseScope ForScope(this, ScopeFlags);
 
   BalancedDelimiterTracker T(*this, tok::l_paren);
@@ -1513,6 +1589,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
 
   ParsedAttributesWithRange attrs(AttrFactory);
   MaybeParseCXX11Attributes(attrs);
+  // HLSL Change: comment only - MaybeParseHLSLAttributes would go here if allowed at this point
 
   // Parse the first part of the for specifier.
   if (Tok.is(tok::semi)) {  // for (;
@@ -1520,7 +1597,8 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
     // no first part, eat the ';'.
     ConsumeToken();
   } else if (getLangOpts().CPlusPlus && Tok.is(tok::identifier) &&
-             isForRangeIdentifier()) {
+             isForRangeIdentifier()
+             && !getLangOpts().HLSL) {   // HLSL Change - disallow for-range
     ProhibitAttributes(attrs);
     IdentifierInfo *Name = Tok.getIdentifierInfo();
     SourceLocation Loc = ConsumeToken();
@@ -1546,7 +1624,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
       Diag(Tok, diag::ext_c99_variable_decl_in_for_loop);
 
     // In C++0x, "for (T NS:a" might not be a typo for ::
-    bool MightBeForRangeStmt = getLangOpts().CPlusPlus;
+    bool MightBeForRangeStmt = getLangOpts().CPlusPlus && !getLangOpts().HLSL; // HLSL Change - disallow for-range
     ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
 
     SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
@@ -1747,6 +1825,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
 /// Note: this lets the caller parse the end ';'.
 ///
 StmtResult Parser::ParseGotoStatement() {
+  assert(!getLangOpts().HLSL && "no goto parsing support in HLSL");   // HLSL Change
   assert(Tok.is(tok::kw_goto) && "Not a goto stmt!");
   SourceLocation GotoLoc = ConsumeToken();  // eat the 'goto'.
 
@@ -1814,9 +1893,12 @@ StmtResult Parser::ParseReturnStatement() {
     if (Tok.is(tok::l_brace) && getLangOpts().CPlusPlus) {
       R = ParseInitializer();
       if (R.isUsable())
-        Diag(R.get()->getLocStart(), getLangOpts().CPlusPlus11 ?
-             diag::warn_cxx98_compat_generalized_initializer_lists :
-             diag::ext_generalized_initializer_lists)
+        // HLSL Change - take HLSL into account for error message
+        Diag(R.get()->getLocStart(), getLangOpts().HLSL ? 
+             diag::err_hlsl_compat_generalized_initializer_lists :
+             getLangOpts().CPlusPlus11 ?
+              diag::warn_cxx98_compat_generalized_initializer_lists :
+              diag::ext_generalized_initializer_lists)
           << R.get()->getSourceRange();
     } else
       R = ParseExpression();
@@ -1891,6 +1973,7 @@ Decl *Parser::ParseFunctionStatementBody(Decl *Decl, ParseScope &BodyScope) {
 ///         'try' ctor-initializer[opt] compound-statement handler-seq
 ///
 Decl *Parser::ParseFunctionTryBlock(Decl *Decl, ParseScope &BodyScope) {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");    // HLSL Change
   assert(Tok.is(tok::kw_try) && "Expected 'try'");
   SourceLocation TryLoc = ConsumeToken();
 
@@ -1952,6 +2035,7 @@ bool Parser::trySkippingFunctionBody() {
 ///         'try' compound-statement handler-seq
 ///
 StmtResult Parser::ParseCXXTryBlock() {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");    // HLSL Change
   assert(Tok.is(tok::kw_try) && "Expected 'try'");
 
   SourceLocation TryLoc = ConsumeToken();
@@ -1975,6 +2059,7 @@ StmtResult Parser::ParseCXXTryBlock() {
 ///         'try' compound-statement seh-finally-block
 ///
 StmtResult Parser::ParseCXXTryBlockCommon(SourceLocation TryLoc, bool FnTry) {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");    // HLSL Change
   if (Tok.isNot(tok::l_brace))
     return StmtError(Diag(Tok, diag::err_expected) << tok::l_brace);
 
@@ -2041,6 +2126,7 @@ StmtResult Parser::ParseCXXTryBlockCommon(SourceLocation TryLoc, bool FnTry) {
 ///     '...'
 ///
 StmtResult Parser::ParseCXXCatchBlock(bool FnCatch) {
+  assert(!getLangOpts().HLSL && "no exception parsing support in HLSL");    // HLSL Change
   assert(Tok.is(tok::kw_catch) && "Expected 'catch'");
 
   SourceLocation CatchLoc = ConsumeToken();
@@ -2061,6 +2147,7 @@ StmtResult Parser::ParseCXXCatchBlock(bool FnCatch) {
   if (Tok.isNot(tok::ellipsis)) {
     ParsedAttributesWithRange Attributes(AttrFactory);
     MaybeParseCXX11Attributes(Attributes);
+    assert(!getLangOpts().HLSL); // HLSL Change: in lieu of MaybeParseHLSLAttributes - catch blocks not allowed
 
     DeclSpec DS(AttrFactory);
     DS.takeAttributesFrom(Attributes);
@@ -2090,6 +2177,7 @@ StmtResult Parser::ParseCXXCatchBlock(bool FnCatch) {
 }
 
 void Parser::ParseMicrosoftIfExistsStatement(StmtVector &Stmts) {
+  assert(!getLangOpts().HLSL && "no __if_exists support in HLSL");    // HLSL Change
   IfExistsCondition Result;
   if (ParseMicrosoftIfExistsCondition(Result))
     return;
@@ -2145,3 +2233,12 @@ void Parser::ParseMicrosoftIfExistsStatement(StmtVector &Stmts) {
   }
   Braces.consumeClose();
 }
+
+// HLSL Change Starts
+StmtResult Parser::HandleHLSLDiscardStmt(Expr *Fn) {
+  assert(Tok.is(tok::kw_discard));
+  SourceLocation Loc = ConsumeToken();
+  ExpectAndConsumeSemi(diag::err_expected_semi_after_expr);
+  return Actions.ActOnHlslDiscardStmt(Loc);
+}
+// HLSL Change Ends

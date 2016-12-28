@@ -1,11 +1,12 @@
 //===- lib/MC/MCStreamer.cpp - Streaming Machine Code Output --------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// MCStreamer.cpp                                                            //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/ADT/SmallString.h"
@@ -76,6 +77,7 @@ void MCStreamer::generateCompactUnwindEncodings(MCAsmBackend *MAB) {
 
 /// EmitIntValue - Special case of EmitValue that avoids the client having to
 /// pass in a MCExpr for constant integers.
+_Use_decl_annotations_
 void MCStreamer::EmitIntValue(uint64_t Value, unsigned Size) {
   assert(1 <= Size && Size <= 8 && "Invalid size");
   assert((isUIntN(8 * Size, Value) || isIntN(8 * Size, Value)) &&

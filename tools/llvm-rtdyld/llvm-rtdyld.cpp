@@ -1,15 +1,14 @@
 //===-- llvm-rtdyld.cpp - MCJIT Testing Tool ------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is a testing tool for use with the MC-JIT LLVM components.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// llvm-rtdyld.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is a testing tool for use with the MC-JIT LLVM components.           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/DebugInfo/DIContext.h"
@@ -669,7 +668,7 @@ static int linkAndVerify() {
   return ErrorCode;
 }
 
-int main(int argc, char **argv) {
+int __cdecl main(int argc, char **argv) { // HLSL Change - __cdecl
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);
 

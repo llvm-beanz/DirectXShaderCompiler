@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// StmtNodes.td                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 class AttrSubject;
 
 class Stmt<bit abstract = 0> : AttrSubject {
@@ -84,6 +93,12 @@ def ParenListExpr : DStmt<Expr>;
 def VAArgExpr : DStmt<Expr>;
 def GenericSelectionExpr : DStmt<Expr>;
 def PseudoObjectExpr : DStmt<Expr>;
+
+// HLSL Change Starts
+def ExtMatrixElementExpr : DStmt<Expr>;
+def HLSLVectorElementExpr : DStmt<Expr>;
+def DiscardStmt : Stmt;
+// HLSL Change Ends
 
 // Atomic expressions
 def AtomicExpr : DStmt<Expr>;

@@ -1,23 +1,25 @@
 //===--- Specifiers.h - Declaration and Type Specifiers ---------*- C++ -*-===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Specifiers.h                                                              //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
 ///
-/// \file
-/// \brief Defines various enumerations that describe declaration and
-/// type specifiers.
+/// \file                                                                    //
+/// \brief Defines various enumerations that describe declaration and        //
+/// type specifiers.                                                         //
 ///
-//===----------------------------------------------------------------------===//
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #ifndef LLVM_CLANG_BASIC_SPECIFIERS_H
 #define LLVM_CLANG_BASIC_SPECIFIERS_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/ArrayRef.h" // HLSL Change
 
 namespace clang {
   /// \brief Specifies the width of a type, e.g., short, long, or long long.
@@ -45,6 +47,8 @@ namespace clang {
     TST_char32,       // C++11 char32_t
     TST_int,
     TST_int128,
+    TST_min10float,   // HLSL Change - HLSL type
+    TST_min12int,     // HLSL Change - HLSL type
     TST_half,         // OpenCL half, ARM NEON __fp16
     TST_float,
     TST_double,
@@ -260,5 +264,43 @@ namespace clang {
   llvm::StringRef getNullabilitySpelling(NullabilityKind kind,
                                          bool isContextSensitive = false);
 } // end namespace clang
+
+// HLSL Change Starts
+namespace hlsl {
+  /// In/inout/out/uniform parameter modifier.
+  class ParameterModifier {
+  public:
+    enum Kind { In, InOut, Out, Uniform, Invalid };
+
+    ParameterModifier() : m_Kind(Kind::In) { }
+    ParameterModifier(enum Kind Kind) : m_Kind(Kind) { }
+
+    static ParameterModifier FromInOut(bool isIn, bool isOut) {
+      if (isIn && !isOut)
+        return hlsl::ParameterModifier(hlsl::ParameterModifier::Kind::In);
+      if (isIn && isOut)
+        return hlsl::ParameterModifier(hlsl::ParameterModifier::Kind::InOut);
+      assert(!isIn && isOut && "else args are invalid");
+      return hlsl::ParameterModifier(hlsl::ParameterModifier::Kind::Out);
+    }
+
+    Kind GetKind() const { return m_Kind; }
+
+    unsigned getAsUnsigned() const { return (unsigned)m_Kind; }
+
+    bool isIn() const { return m_Kind == Kind::In; }
+    bool isOut() const { return m_Kind == Kind::Out; }
+    bool isInOut() const { return m_Kind == Kind::InOut; }
+    bool isAnyIn() const { return isIn() || isInOut(); }
+    bool isAnyOut() const { return isOut() || isInOut(); }
+    bool operator==(const ParameterModifier& other) const { return m_Kind == other.m_Kind; }
+    bool operator!=(const ParameterModifier& other) const { return m_Kind != other.m_Kind; }
+
+  private:
+    enum Kind m_Kind;
+  };
+}
+
+// HLSL Change Ends
 
 #endif // LLVM_CLANG_BASIC_SPECIFIERS_H

@@ -1,15 +1,14 @@
 //===- InstCombineCalls.cpp -----------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the visitCall and visitInvoke functions.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InstCombineCalls.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the visitCall and visitInvoke functions.             //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "InstCombineInternal.h"
 #include "llvm/ADT/Statistic.h"
@@ -591,6 +590,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     }
     break;
   }
+#if 0 // HLSL Change - remove platform intrinsics
   case Intrinsic::ppc_altivec_lvx:
   case Intrinsic::ppc_altivec_lvxl:
     // Turn PPC lvx -> load if the pointer is known aligned.
@@ -1110,6 +1110,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
 
     break;
   }
+#endif // HLSL Change - remove platform intrinsics
   case Intrinsic::stackrestore: {
     // If the save is right next to the restore, remove the restore.  This can
     // happen when variable allocas are DCE'd.

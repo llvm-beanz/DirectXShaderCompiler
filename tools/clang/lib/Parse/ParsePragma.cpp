@@ -1,15 +1,14 @@
 //===--- ParsePragma.cpp - Language specific pragma parsing ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the language specific #pragma handlers.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// ParsePragma.cpp                                                           //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This file implements the language specific #pragma handlers.              //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "RAIIObjectsForParser.h"
 #include "clang/AST/ASTContext.h"
@@ -159,6 +158,8 @@ struct PragmaUnrollHintHandler : public PragmaHandler {
 }  // end namespace
 
 void Parser::initializePragmaHandlers() {
+  if (!getLangOpts().HLSL) { // HLSL Change
+  // HLSL Note - Considering adding alignment support
   AlignHandler.reset(new PragmaAlignHandler());
   PP.AddPragmaHandler(AlignHandler.get());
 
@@ -224,9 +225,11 @@ void Parser::initializePragmaHandlers() {
     PP.AddPragmaHandler(MSSection.get());
   }
 
+  // HLSL Note - Considering adding alignment support
   OptimizeHandler.reset(new PragmaOptimizeHandler(Actions));
   PP.AddPragmaHandler("clang", OptimizeHandler.get());
 
+  // HLSL Note - Considering adding alignment support
   LoopHintHandler.reset(new PragmaLoopHintHandler());
   PP.AddPragmaHandler("clang", LoopHintHandler.get());
 
@@ -235,9 +238,11 @@ void Parser::initializePragmaHandlers() {
 
   NoUnrollHintHandler.reset(new PragmaUnrollHintHandler("nounroll"));
   PP.AddPragmaHandler(NoUnrollHintHandler.get());
+  } // HLSL Change, matching HLSL check to remove pragma processing
 }
 
 void Parser::resetPragmaHandlers() {
+  if (!getLangOpts().HLSL) { // HLSL Change - open conditional for skipping pragmas
   // Remove the pragma handlers we installed.
   PP.RemovePragmaHandler(AlignHandler.get());
   AlignHandler.reset();
@@ -304,6 +309,7 @@ void Parser::resetPragmaHandlers() {
 
   PP.RemovePragmaHandler(NoUnrollHintHandler.get());
   NoUnrollHintHandler.reset();
+  } // HLSL Change - close conditional for skipping pragmas
 }
 
 /// \brief Handle the annotation token produced for #pragma unused(...)
@@ -312,6 +318,7 @@ void Parser::resetPragmaHandlers() {
 /// "#pragma unused(x,y)" becomes:
 /// annot_pragma_unused 'x' annot_pragma_unused 'y'
 void Parser::HandlePragmaUnused() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_unused));
   SourceLocation UnusedLoc = ConsumeToken();
   Actions.ActOnPragmaUnused(Tok, getCurScope(), UnusedLoc);
@@ -319,6 +326,7 @@ void Parser::HandlePragmaUnused() {
 }
 
 void Parser::HandlePragmaVisibility() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_vis));
   const IdentifierInfo *VisType =
     static_cast<IdentifierInfo *>(Tok.getAnnotationValue());
@@ -335,6 +343,7 @@ struct PragmaPackInfo {
 };
 
 void Parser::HandlePragmaPack() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_pack));
   PragmaPackInfo *Info =
     static_cast<PragmaPackInfo *>(Tok.getAnnotationValue());
@@ -350,6 +359,7 @@ void Parser::HandlePragmaPack() {
 }
 
 void Parser::HandlePragmaMSStruct() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_msstruct));
   Sema::PragmaMSStructKind Kind =
     static_cast<Sema::PragmaMSStructKind>(
@@ -359,6 +369,7 @@ void Parser::HandlePragmaMSStruct() {
 }
 
 void Parser::HandlePragmaAlign() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_align));
   Sema::PragmaOptionsAlignKind Kind =
     static_cast<Sema::PragmaOptionsAlignKind>(
@@ -368,6 +379,7 @@ void Parser::HandlePragmaAlign() {
 }
 
 void Parser::HandlePragmaWeak() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_weak));
   SourceLocation PragmaLoc = ConsumeToken();
   Actions.ActOnPragmaWeakID(Tok.getIdentifierInfo(), PragmaLoc,
@@ -376,6 +388,7 @@ void Parser::HandlePragmaWeak() {
 }
 
 void Parser::HandlePragmaWeakAlias() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_weakalias));
   SourceLocation PragmaLoc = ConsumeToken();
   IdentifierInfo *WeakName = Tok.getIdentifierInfo();
@@ -390,6 +403,7 @@ void Parser::HandlePragmaWeakAlias() {
 }
 
 void Parser::HandlePragmaRedefineExtname() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_redefine_extname));
   SourceLocation RedefLoc = ConsumeToken();
   IdentifierInfo *RedefName = Tok.getIdentifierInfo();
@@ -403,6 +417,7 @@ void Parser::HandlePragmaRedefineExtname() {
 }
 
 void Parser::HandlePragmaFPContract() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_fp_contract));
   tok::OnOffSwitch OOS =
     static_cast<tok::OnOffSwitch>(
@@ -413,6 +428,7 @@ void Parser::HandlePragmaFPContract() {
 
 StmtResult Parser::HandlePragmaCaptured()
 {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_captured));
   ConsumeToken();
 
@@ -443,6 +459,7 @@ namespace {
 }
 
 void Parser::HandlePragmaOpenCLExtension() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_opencl_extension));
   OpenCLExtData data =
       OpenCLExtData::getFromOpaqueValue(Tok.getAnnotationValue());
@@ -468,6 +485,7 @@ void Parser::HandlePragmaOpenCLExtension() {
 }
 
 void Parser::HandlePragmaMSPointersToMembers() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_ms_pointers_to_members));
   LangOptions::PragmaMSPointersToMembersKind RepresentationMethod =
       static_cast<LangOptions::PragmaMSPointersToMembersKind>(
@@ -477,6 +495,7 @@ void Parser::HandlePragmaMSPointersToMembers() {
 }
 
 void Parser::HandlePragmaMSVtorDisp() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_ms_vtordisp));
   uintptr_t Value = reinterpret_cast<uintptr_t>(Tok.getAnnotationValue());
   Sema::PragmaVtorDispKind Kind =
@@ -487,6 +506,7 @@ void Parser::HandlePragmaMSVtorDisp() {
 }
 
 void Parser::HandlePragmaMSPragma() {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_ms_pragma));
   // Grab the tokens out of the annotation and enter them into the stream.
   auto TheTokens = (std::pair<Token*, size_t> *)Tok.getAnnotationValue();
@@ -518,6 +538,7 @@ void Parser::HandlePragmaMSPragma() {
 
 bool Parser::HandlePragmaMSSection(StringRef PragmaName,
                                    SourceLocation PragmaLocation) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   if (Tok.isNot(tok::l_paren)) {
     PP.Diag(PragmaLocation, diag::warn_pragma_expected_lparen) << PragmaName;
     return false;
@@ -599,6 +620,7 @@ bool Parser::HandlePragmaMSSection(StringRef PragmaName,
 
 bool Parser::HandlePragmaMSSegment(StringRef PragmaName,
                                    SourceLocation PragmaLocation) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   if (Tok.isNot(tok::l_paren)) {
     PP.Diag(PragmaLocation, diag::warn_pragma_expected_lparen) << PragmaName;
     return false;
@@ -683,6 +705,7 @@ bool Parser::HandlePragmaMSSegment(StringRef PragmaName,
 // #pragma init_seg({ compiler | lib | user | "section-name" [, func-name]} )
 bool Parser::HandlePragmaMSInitSeg(StringRef PragmaName,
                                    SourceLocation PragmaLocation) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   if (getTargetInfo().getTriple().getEnvironment() != llvm::Triple::MSVC) {
     PP.Diag(PragmaLocation, diag::warn_pragma_init_seg_unsupported_target);
     return false;
@@ -764,6 +787,7 @@ static std::string PragmaLoopHintString(Token PragmaName, Token Option) {
 }
 
 bool Parser::HandlePragmaLoopHint(LoopHint &Hint) {
+  assert(!getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   assert(Tok.is(tok::annot_pragma_loop_hint));
   PragmaLoopHintInfo *Info =
       static_cast<PragmaLoopHintInfo *>(Tok.getAnnotationValue());
@@ -874,6 +898,7 @@ bool Parser::HandlePragmaLoopHint(LoopHint &Hint) {
 void PragmaGCCVisibilityHandler::HandlePragma(Preprocessor &PP, 
                                               PragmaIntroducerKind Introducer,
                                               Token &VisTok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation VisLoc = VisTok.getLocation();
 
   Token Tok;
@@ -935,6 +960,7 @@ void PragmaGCCVisibilityHandler::HandlePragma(Preprocessor &PP,
 void PragmaPackHandler::HandlePragma(Preprocessor &PP, 
                                      PragmaIntroducerKind Introducer,
                                      Token &PackTok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation PackLoc = PackTok.getLocation();
 
   Token Tok;
@@ -1052,6 +1078,7 @@ void PragmaPackHandler::HandlePragma(Preprocessor &PP,
 void PragmaMSStructHandler::HandlePragma(Preprocessor &PP, 
                                          PragmaIntroducerKind Introducer,
                                          Token &MSStructTok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   Sema::PragmaMSStructKind Kind = Sema::PMSST_OFF;
   
   Token Tok;
@@ -1097,6 +1124,7 @@ void PragmaMSStructHandler::HandlePragma(Preprocessor &PP,
 // #pragma 'options 'align' '=' {'native','natural','mac68k','power','reset'}
 static void ParseAlignPragma(Preprocessor &PP, Token &FirstTok,
                              bool IsOptions) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   Token Tok;
 
   if (IsOptions) {
@@ -1180,6 +1208,7 @@ void PragmaOptionsHandler::HandlePragma(Preprocessor &PP,
 void PragmaUnusedHandler::HandlePragma(Preprocessor &PP, 
                                        PragmaIntroducerKind Introducer,
                                        Token &UnusedTok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   // FIXME: Should we be expanding macros here? My guess is no.
   SourceLocation UnusedLoc = UnusedTok.getLocation();
 
@@ -1262,6 +1291,7 @@ void PragmaUnusedHandler::HandlePragma(Preprocessor &PP,
 void PragmaWeakHandler::HandlePragma(Preprocessor &PP, 
                                      PragmaIntroducerKind Introducer,
                                      Token &WeakTok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation WeakLoc = WeakTok.getLocation();
 
   Token Tok;
@@ -1325,6 +1355,7 @@ void PragmaWeakHandler::HandlePragma(Preprocessor &PP,
 void PragmaRedefineExtnameHandler::HandlePragma(Preprocessor &PP, 
                                                PragmaIntroducerKind Introducer,
                                                 Token &RedefToken) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation RedefLoc = RedefToken.getLocation();
 
   Token Tok;
@@ -1372,6 +1403,7 @@ void
 PragmaFPContractHandler::HandlePragma(Preprocessor &PP, 
                                       PragmaIntroducerKind Introducer,
                                       Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   tok::OnOffSwitch OOS;
   if (PP.LexOnOffSwitch(OOS))
     return;
@@ -1394,6 +1426,7 @@ void
 PragmaOpenCLExtensionHandler::HandlePragma(Preprocessor &PP, 
                                            PragmaIntroducerKind Introducer,
                                            Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   PP.LexUnexpandedToken(Tok);
   if (Tok.isNot(tok::identifier)) {
     PP.Diag(Tok.getLocation(), diag::warn_pragma_expected_identifier) <<
@@ -1458,6 +1491,7 @@ void
 PragmaNoOpenMPHandler::HandlePragma(Preprocessor &PP,
                                     PragmaIntroducerKind Introducer,
                                     Token &FirstTok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   if (!PP.getDiagnostics().isIgnored(diag::warn_pragma_omp_ignored,
                                      FirstTok.getLocation())) {
     PP.Diag(FirstTok, diag::warn_pragma_omp_ignored);
@@ -1473,6 +1507,7 @@ void
 PragmaOpenMPHandler::HandlePragma(Preprocessor &PP,
                                   PragmaIntroducerKind Introducer,
                                   Token &FirstTok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SmallVector<Token, 16> Pragma;
   Token Tok;
   Tok.startToken();
@@ -1506,6 +1541,7 @@ PragmaOpenMPHandler::HandlePragma(Preprocessor &PP,
 void PragmaMSPointersToMembers::HandlePragma(Preprocessor &PP,
                                              PragmaIntroducerKind Introducer,
                                              Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation PointersToMembersLoc = Tok.getLocation();
   PP.Lex(Tok);
   if (Tok.isNot(tok::l_paren)) {
@@ -1604,6 +1640,7 @@ void PragmaMSPointersToMembers::HandlePragma(Preprocessor &PP,
 void PragmaMSVtorDisp::HandlePragma(Preprocessor &PP,
                                     PragmaIntroducerKind Introducer,
                                     Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation VtorDispLoc = Tok.getLocation();
   PP.Lex(Tok);
   if (Tok.isNot(tok::l_paren)) {
@@ -1681,6 +1718,8 @@ void PragmaMSVtorDisp::HandlePragma(Preprocessor &PP,
   AnnotTok.setKind(tok::annot_pragma_ms_vtordisp);
   AnnotTok.setLocation(VtorDispLoc);
   AnnotTok.setAnnotationEndLoc(EndLoc);
+// OACR error 6297
+#pragma prefast(disable: __WARNING_RESULTOFSHIFTCASTTOLARGERSIZE, "valid Kind values will not overflow")
   AnnotTok.setAnnotationValue(reinterpret_cast<void *>(
       static_cast<uintptr_t>((Kind << 16) | (Value & 0xFFFF))));
   PP.EnterToken(AnnotTok);
@@ -1691,6 +1730,7 @@ void PragmaMSVtorDisp::HandlePragma(Preprocessor &PP,
 void PragmaMSPragma::HandlePragma(Preprocessor &PP,
                                   PragmaIntroducerKind Introducer,
                                   Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   Token EoF, AnnotTok;
   EoF.startToken();
   EoF.setKind(tok::eof);
@@ -1729,6 +1769,7 @@ void PragmaMSPragma::HandlePragma(Preprocessor &PP,
 void PragmaDetectMismatchHandler::HandlePragma(Preprocessor &PP,
                                                PragmaIntroducerKind Introducer,
                                                Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation CommentLoc = Tok.getLocation();
   PP.Lex(Tok);
   if (Tok.isNot(tok::l_paren)) {
@@ -1785,6 +1826,7 @@ void PragmaDetectMismatchHandler::HandlePragma(Preprocessor &PP,
 void PragmaCommentHandler::HandlePragma(Preprocessor &PP,
                                         PragmaIntroducerKind Introducer,
                                         Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   SourceLocation CommentLoc = Tok.getLocation();
   PP.Lex(Tok);
   if (Tok.isNot(tok::l_paren)) {
@@ -1860,6 +1902,7 @@ void PragmaCommentHandler::HandlePragma(Preprocessor &PP,
 void PragmaOptimizeHandler::HandlePragma(Preprocessor &PP, 
                                         PragmaIntroducerKind Introducer,
                                         Token &FirstToken) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   Token Tok;
   PP.Lex(Tok);
   if (Tok.is(tok::eod)) {
@@ -1983,6 +2026,7 @@ static bool ParseLoopHintValue(Preprocessor &PP, Token &Tok, Token PragmaName,
 void PragmaLoopHintHandler::HandlePragma(Preprocessor &PP,
                                          PragmaIntroducerKind Introducer,
                                          Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   // Incoming token is "loop" from "#pragma clang loop".
   Token PragmaName = Tok;
   SmallVector<Token, 1> TokenList;
@@ -2070,6 +2114,7 @@ void PragmaLoopHintHandler::HandlePragma(Preprocessor &PP,
 void PragmaUnrollHintHandler::HandlePragma(Preprocessor &PP,
                                            PragmaIntroducerKind Introducer,
                                            Token &Tok) {
+  assert(!PP.getLangOpts().HLSL && "not supported in HLSL - unreachable"); // HLSL Change
   // Incoming token is "unroll" for "#pragma unroll", or "nounroll" for
   // "#pragma nounroll".
   Token PragmaName = Tok;

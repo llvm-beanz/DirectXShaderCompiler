@@ -1,18 +1,17 @@
 //===- InstructionNamer.cpp - Give anonymous instructions names -----------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This is a little utility pass that gives instructions names, this is mostly
-// useful when diffing the effect of an optimization because deleting an
-// unnamed instruction can change all other instruction numbering, making the
-// diff very noisy.
-//
-//===----------------------------------------------------------------------===//
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// InstructionNamer.cpp                                                      //
+// Copyright (C) Microsoft Corporation. All rights reserved.                 //
+// Licensed under the MIT license. See COPYRIGHT in the project root for     //
+// full license information.                                                 //
+//                                                                           //
+// This is a little utility pass that gives instructions names, this is mostly//
+// useful when diffing the effect of an optimization because deleting an     //
+// unnamed instruction can change all other instruction numbering, making the//
+// diff very noisy.                                                          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/IR/Function.h"
