@@ -308,12 +308,12 @@ namespace {
                       const MemoryLocation &LocB) override;
     bool pointsToConstantMemory(const MemoryLocation &Loc,
                                 bool OrLocal) override;
-    ModRefBehavior getModRefBehavior(ImmutableCallSite CS) override;
-    ModRefBehavior getModRefBehavior(const Function *F) override;
-    ModRefResult getModRefInfo(ImmutableCallSite CS,
-                               const MemoryLocation &Loc) override;
-    ModRefResult getModRefInfo(ImmutableCallSite CS1,
-                               ImmutableCallSite CS2) override;
+    FunctionModRefBehavior getModRefBehavior(ImmutableCallSite CS) override;
+    FunctionModRefBehavior getModRefBehavior(const Function *F) override;
+    ModRefInfo getModRefInfo(ImmutableCallSite CS,
+                             const MemoryLocation &Loc) override;
+    ModRefInfo getModRefInfo(ImmutableCallSite CS1,
+                             ImmutableCallSite CS2) override;
   };
 }  // End of anonymous namespace
 
@@ -495,32 +495,31 @@ bool TypeBasedAliasAnalysis::pointsToConstantMemory(const MemoryLocation &Loc,
   return AliasAnalysis::pointsToConstantMemory(Loc, OrLocal);
 }
 
-AliasAnalysis::ModRefBehavior
+FunctionModRefBehavior
 TypeBasedAliasAnalysis::getModRefBehavior(ImmutableCallSite CS) {
   if (!EnableTBAA)
     return AliasAnalysis::getModRefBehavior(CS);
 
-  ModRefBehavior Min = UnknownModRefBehavior;
+  FunctionModRefBehavior Min = FMRB_UnknownModRefBehavior;
 
   // If this is an "immutable" type, we can assume the call doesn't write
   // to memory.
   if (const MDNode *M = CS.getInstruction()->getMetadata(LLVMContext::MD_tbaa))
     if ((!isStructPathTBAA(M) && TBAANode(M).TypeIsImmutable()) ||
         (isStructPathTBAA(M) && TBAAStructTagNode(M).TypeIsImmutable()))
-      Min = OnlyReadsMemory;
+      Min = FMRB_OnlyReadsMemory;
 
-  return ModRefBehavior(AliasAnalysis::getModRefBehavior(CS) & Min);
+  return FunctionModRefBehavior(AliasAnalysis::getModRefBehavior(CS) & Min);
 }
 
-AliasAnalysis::ModRefBehavior
+FunctionModRefBehavior
 TypeBasedAliasAnalysis::getModRefBehavior(const Function *F) {
   // Functions don't have metadata. Just chain to the next implementation.
   return AliasAnalysis::getModRefBehavior(F);
 }
 
-AliasAnalysis::ModRefResult
-TypeBasedAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
-                                      const MemoryLocation &Loc) {
+ModRefInfo TypeBasedAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
+                                                 const MemoryLocation &Loc) {
   if (!EnableTBAA)
     return AliasAnalysis::getModRefInfo(CS, Loc);
 
@@ -528,14 +527,13 @@ TypeBasedAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
     if (const MDNode *M =
             CS.getInstruction()->getMetadata(LLVMContext::MD_tbaa))
       if (!Aliases(L, M))
-        return NoModRef;
+        return MRI_NoModRef;
 
   return AliasAnalysis::getModRefInfo(CS, Loc);
 }
 
-AliasAnalysis::ModRefResult
-TypeBasedAliasAnalysis::getModRefInfo(ImmutableCallSite CS1,
-                                      ImmutableCallSite CS2) {
+ModRefInfo TypeBasedAliasAnalysis::getModRefInfo(ImmutableCallSite CS1,
+                                                 ImmutableCallSite CS2) {
   if (!EnableTBAA)
     return AliasAnalysis::getModRefInfo(CS1, CS2);
 
@@ -544,7 +542,7 @@ TypeBasedAliasAnalysis::getModRefInfo(ImmutableCallSite CS1,
     if (const MDNode *M2 =
             CS2.getInstruction()->getMetadata(LLVMContext::MD_tbaa))
       if (!Aliases(M1, M2))
-        return NoModRef;
+        return MRI_NoModRef;
 
   return AliasAnalysis::getModRefInfo(CS1, CS2);
 }

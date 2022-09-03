@@ -56,7 +56,7 @@ struct FunctionRecord {
   bool MayReadAnyGlobal;
 
   unsigned getInfoForGlobal(const GlobalValue *GV) const {
-    unsigned Effect = MayReadAnyGlobal ? AliasAnalysis::Ref : 0;
+    unsigned Effect = MayReadAnyGlobal ? MRI_Ref : 0;
     std::map<const GlobalValue *, unsigned>::const_iterator I =
         GlobalInfo.find(GV);
     if (I != GlobalInfo.end())
@@ -112,54 +112,6 @@ public:
     AU.setPreservesAll(); // Does not transform code
   }
 
-  //------------------------------------------------
-  // Implement the AliasAnalysis API
-  //
-  AliasResult alias(const MemoryLocation &LocA,
-                    const MemoryLocation &LocB) override;
-  ModRefResult getModRefInfo(ImmutableCallSite CS,
-                             const MemoryLocation &Loc) override;
-  ModRefResult getModRefInfo(ImmutableCallSite CS1,
-                             ImmutableCallSite CS2) override {
-    return AliasAnalysis::getModRefInfo(CS1, CS2);
-  }
-
-  /// getModRefBehavior - Return the behavior of the specified function if
-  /// called from the specified call site.  The call site may be null in which
-  /// case the most generic behavior of this function should be returned.
-  ModRefBehavior getModRefBehavior(const Function *F) override {
-    ModRefBehavior Min = UnknownModRefBehavior;
-
-    if (FunctionRecord *FR = getFunctionInfo(F)) {
-      if (FR->FunctionEffect == 0)
-        Min = DoesNotAccessMemory;
-      else if ((FR->FunctionEffect & Mod) == 0)
-        Min = OnlyReadsMemory;
-    }
-
-    return ModRefBehavior(AliasAnalysis::getModRefBehavior(F) & Min);
-  }
-
-  /// getModRefBehavior - Return the behavior of the specified function if
-  /// called from the specified call site.  The call site may be null in which
-  /// case the most generic behavior of this function should be returned.
-  ModRefBehavior getModRefBehavior(ImmutableCallSite CS) override {
-    ModRefBehavior Min = UnknownModRefBehavior;
-
-    if (const Function *F = CS.getCalledFunction())
-      if (FunctionRecord *FR = getFunctionInfo(F)) {
-        if (FR->FunctionEffect == 0)
-          Min = DoesNotAccessMemory;
-        else if ((FR->FunctionEffect & Mod) == 0)
-          Min = OnlyReadsMemory;
-      }
-
-    return ModRefBehavior(AliasAnalysis::getModRefBehavior(CS) & Min);
-  }
-
-  void deleteValue(Value *V) override;
-  void addEscapingUse(Use &U) override;
-
   /// getAdjustedAnalysisPointer - This method is used when a pass implements
   /// an analysis interface through multiple inheritance.  If needed, it
   /// should override this to adjust the this pointer as needed for the
@@ -169,6 +121,54 @@ public:
       return (AliasAnalysis *)this;
     return this;
   }
+
+  //------------------------------------------------
+  // Implement the AliasAnalysis API
+  //
+  AliasResult alias(const MemoryLocation &LocA,
+                    const MemoryLocation &LocB) override;
+  ModRefInfo getModRefInfo(ImmutableCallSite CS,
+                           const MemoryLocation &Loc) override;
+  ModRefInfo getModRefInfo(ImmutableCallSite CS1,
+                           ImmutableCallSite CS2) override {
+    return AliasAnalysis::getModRefInfo(CS1, CS2);
+  }
+
+  /// getModRefBehavior - Return the behavior of the specified function if
+  /// called from the specified call site.  The call site may be null in which
+  /// case the most generic behavior of this function should be returned.
+  FunctionModRefBehavior getModRefBehavior(const Function *F) override {
+    FunctionModRefBehavior Min = FMRB_UnknownModRefBehavior;
+
+    if (FunctionRecord *FR = getFunctionInfo(F)) {
+      if (FR->FunctionEffect == 0)
+        Min = FMRB_DoesNotAccessMemory;
+      else if ((FR->FunctionEffect & MRI_Mod) == 0)
+        Min = FMRB_OnlyReadsMemory;
+    }
+
+    return FunctionModRefBehavior(AliasAnalysis::getModRefBehavior(F) & Min);
+  }
+
+  /// getModRefBehavior - Return the behavior of the specified function if
+  /// called from the specified call site.  The call site may be null in which
+  /// case the most generic behavior of this function should be returned.
+  FunctionModRefBehavior getModRefBehavior(ImmutableCallSite CS) override {
+    FunctionModRefBehavior Min = FMRB_UnknownModRefBehavior;
+
+    if (const Function *F = CS.getCalledFunction())
+      if (FunctionRecord *FR = getFunctionInfo(F)) {
+        if (FR->FunctionEffect == 0)
+          Min = FMRB_DoesNotAccessMemory;
+        else if ((FR->FunctionEffect & MRI_Mod) == 0)
+          Min = FMRB_OnlyReadsMemory;
+      }
+
+    return FunctionModRefBehavior(AliasAnalysis::getModRefBehavior(CS) & Min);
+  }
+
+  void deleteValue(Value *V) override;
+  void addEscapingUse(Use &U) override;
 
 private:
   /// getFunctionInfo - Return the function info for the function, or null if
@@ -226,11 +226,11 @@ void GlobalsModRef::AnalyzeGlobals(Module &M) {
         NonAddressTakenGlobals.insert(I);
 
         for (unsigned i = 0, e = Readers.size(); i != e; ++i)
-          FunctionInfo[Readers[i]].GlobalInfo[I] |= Ref;
+          FunctionInfo[Readers[i]].GlobalInfo[I] |= MRI_Ref;
 
         if (!I->isConstant()) // No need to keep track of writers to constants
           for (unsigned i = 0, e = Writers.size(); i != e; ++i)
-            FunctionInfo[Writers[i]].GlobalInfo[I] |= Mod;
+            FunctionInfo[Writers[i]].GlobalInfo[I] |= MRI_Mod;
         ++NumNonAddrTakenGlobalVars;
 
         // If this global holds a pointer type, see if it is an indirect global.
@@ -394,13 +394,13 @@ void GlobalsModRef::AnalyzeCallGraph(CallGraph &CG, Module &M) {
         if (F->doesNotAccessMemory()) {
           // Can't do better than that!
         } else if (F->onlyReadsMemory()) {
-          FunctionEffect |= Ref;
+          FunctionEffect |= MRI_Ref;
           if (!F->isIntrinsic())
             // This function might call back into the module and read a global -
             // consider every global as possibly being read by this function.
             FR.MayReadAnyGlobal = true;
         } else {
-          FunctionEffect |= ModRef;
+          FunctionEffect |= MRI_ModRef;
           // Can't say anything useful unless it's an intrinsic - they don't
           // read or write global variables of the kind considered here.
           KnowNothing = !F->isIntrinsic();
@@ -441,10 +441,10 @@ void GlobalsModRef::AnalyzeCallGraph(CallGraph &CG, Module &M) {
 
     // Scan the function bodies for explicit loads or stores.
     for (auto *Node : SCC) {
-      if (FunctionEffect == ModRef)
+      if (FunctionEffect == MRI_ModRef)
         break; // The mod/ref lattice saturates here.
       for (Instruction &I : inst_range(Node->getFunction())) {
-        if (FunctionEffect == ModRef)
+        if (FunctionEffect == MRI_ModRef)
           break; // The mod/ref lattice saturates here.
 
         // We handle calls specially because the graph-relevant aspects are
@@ -453,13 +453,13 @@ void GlobalsModRef::AnalyzeCallGraph(CallGraph &CG, Module &M) {
           if (isAllocationFn(&I, TLI) || isFreeCall(&I, TLI)) {
             // FIXME: It is completely unclear why this is necessary and not
             // handled by the above graph code.
-            FunctionEffect |= ModRef;
+            FunctionEffect |= MRI_ModRef;
           } else if (Function *Callee = CS.getCalledFunction()) {
             // The callgraph doesn't include intrinsic calls.
             if (Callee->isIntrinsic()) {
-              ModRefBehavior Behaviour =
+              FunctionModRefBehavior Behaviour =
                   AliasAnalysis::getModRefBehavior(Callee);
-              FunctionEffect |= (Behaviour & ModRef);
+              FunctionEffect |= (Behaviour & MRI_ModRef);
             }
           }
           continue;
@@ -468,13 +468,13 @@ void GlobalsModRef::AnalyzeCallGraph(CallGraph &CG, Module &M) {
         // All non-call instructions we use the primary predicates for whether
         // thay read or write memory.
         if (I.mayReadFromMemory())
-          FunctionEffect |= Ref;
+          FunctionEffect |= MRI_Ref;
         if (I.mayWriteToMemory())
-          FunctionEffect |= Mod;
+          FunctionEffect |= MRI_Mod;
       }
     }
 
-    if ((FunctionEffect & Mod) == 0)
+    if ((FunctionEffect & MRI_Mod) == 0)
       ++NumReadMemFunctions;
     if (FunctionEffect == 0)
       ++NumNoMemFunctions;
@@ -547,9 +547,9 @@ AliasResult GlobalsModRef::alias(const MemoryLocation &LocA,
   return AliasAnalysis::alias(LocA, LocB);
 }
 
-AliasAnalysis::ModRefResult
-GlobalsModRef::getModRefInfo(ImmutableCallSite CS, const MemoryLocation &Loc) {
-  unsigned Known = ModRef;
+ModRefInfo GlobalsModRef::getModRefInfo(ImmutableCallSite CS,
+                                        const MemoryLocation &Loc) {
+  unsigned Known = MRI_ModRef;
 
   // If we are asking for mod/ref info of a direct call with a pointer to a
   // global we are tracking, return information if we have it.
@@ -562,9 +562,9 @@ GlobalsModRef::getModRefInfo(ImmutableCallSite CS, const MemoryLocation &Loc) {
           if (const FunctionRecord *FR = getFunctionInfo(F))
             Known = FR->getInfoForGlobal(GV);
 
-  if (Known == NoModRef)
-    return NoModRef; // No need to query other mod/ref analyses
-  return ModRefResult(Known & AliasAnalysis::getModRefInfo(CS, Loc));
+  if (Known == MRI_NoModRef)
+    return MRI_NoModRef; // No need to query other mod/ref analyses
+  return ModRefInfo(Known & AliasAnalysis::getModRefInfo(CS, Loc));
 }
 
 //===----------------------------------------------------------------------===//
