@@ -51,6 +51,7 @@ add_llvm_library(LLVMAnalysis
   MemoryLocation.cpp
   ModuleDebugInfoPrinter.cpp
   NoAliasAnalysis.cpp
+  OrderedBasicBlock.cpp
   PHITransAddr.cpp
   PostDominators.cpp
   PtrUseVisitor.cpp
