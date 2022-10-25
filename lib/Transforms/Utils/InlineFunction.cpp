@@ -40,6 +40,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Timer.h"
 #include <algorithm>
 using namespace llvm;
 
@@ -405,6 +406,10 @@ static void AddAliasScopeMetadata(CallSite CS, ValueToValueMapTy &VMap,
     return;
 
   const Function *CalledFunc = CS.getCalledFunction();
+  static Timer AAMetadataTimer;
+  if (!AAMetadataTimer.isInitialized())
+    AAMetadataTimer.init("AddAliasScopeMetadata");
+  NamedRegionTimer T((CalledFunc->getName() + " - AddAliasScopeMetadata").str(), "AddAliasScopeMetadata");
   SmallVector<const Argument *, 4> NoAliasArgs;
 
   for (Function::const_arg_iterator I = CalledFunc->arg_begin(),
@@ -953,6 +958,11 @@ bool llvm::InlineFunction(CallSite CS, InlineFunctionInfo &IFI,
   if (!CalledFunc ||              // Can't inline external function or indirect
       CalledFunc->isDeclaration() || // call, or call to a vararg function!
       CalledFunc->getFunctionType()->isVarArg()) return false;
+
+  static Timer AAMetadataTimer;
+  if (!AAMetadataTimer.isInitialized())
+    AAMetadataTimer.init("InlineFunction");
+  NamedRegionTimer T((CalledFunc->getName() + " - InlineFunction").str(), "InlineFunction");
 
   // If the call to the callee cannot throw, set the 'nounwind' flag on any
   // calls that we inline.

@@ -81,10 +81,10 @@ raw_ostream *llvm::CreateInfoOutputFile() {
 }
 
 #define DefaultTimerGroupName "Miscellaneous Ungrouped Timers"
-// static TimerGroup DefaultTimerGroup(DefaultTimerGroupName); // HLSL Change - global init
+static TimerGroup DefaultTimerGroup(DefaultTimerGroupName); // HLSL Change - global init
 static TimerGroup *getDefaultTimerGroup() {
 #if 1 // HLSL Change Starts - global with special clean-up and init
-  return nullptr; // rather than alloc-on-demand or &DefaultTimerGroup;
+  return &DefaultTimerGroup; // rather than alloc-on-demand or &DefaultTimerGroup;
 #else
   TimerGroup *tmp = DefaultTimerGroup;
   sys::MemoryFence();
