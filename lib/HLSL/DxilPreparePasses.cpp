@@ -22,6 +22,7 @@
 #include "dxc/DXIL/DxilConstants.h"
 #include "dxc/HlslIntrinsicOp.h"
 #include "dxc/HLSL/DxilPoisonValues.h"
+#include "dxc/HLSL/IntermediateMetadata.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -1713,3 +1714,25 @@ INITIALIZE_PASS_END(CleanupDxBreak, "hlsl-cleanup-dxbreak", "HLSL Remove unneces
 FunctionPass *llvm::createCleanupDxBreakPass() {
   return new CleanupDxBreak();
 }
+
+class DxilMetadataCleanup : public ModulePass {
+public:
+  static char ID; // Pass identification, replacement for typeid
+  explicit DxilMetadataCleanup() : ModulePass(ID) {}
+
+  StringRef getPassName() const override { return "HLSL DXIL Metadata Cleanup"; }
+
+  bool runOnModule(Module &M) override {
+    hlsl::LangStdMD Std(M);
+    Std.erase();
+    return true;
+  }
+};
+
+char DxilMetadataCleanup::ID = 0;
+
+ModulePass *llvm::createDxilMetadataCleanupPass() {
+  return new DxilMetadataCleanup();
+}
+
+INITIALIZE_PASS(DxilMetadataCleanup, "dxil-metadata-cleanup", "DXIL Metadata Cleanup", false, false)

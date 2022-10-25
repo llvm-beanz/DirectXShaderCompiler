@@ -40,6 +40,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Support/CommandLine.h"
+#include "dxc/HLSL/IntermediateMetadata.h" // HLSL Change
 #include <algorithm>
 using namespace llvm;
 
@@ -401,8 +402,12 @@ static void CloneAliasScopeMetadata(CallSite CS, ValueToValueMapTy &VMap) {
 /// non-derived loads, stores and memory intrinsics with the new alias scopes.
 static void AddAliasScopeMetadata(CallSite CS, ValueToValueMapTy &VMap,
                                   const DataLayout &DL, AliasAnalysis *AA) {
-  if (!EnableNoAliasConversion)
+  // HLSL Change Begin - Disable noalias conversion for HLSL 2021 and earlier
+  auto *M = CS.getParent()->getModule();
+  hlsl::LangStdMD Std(*M);
+  if (!EnableNoAliasConversion || Std.getLangVersion() <= 2021)
     return;
+  // HLSL Change End - Disable noalias conversion for HLSL 2021 and earlier
 
   const Function *CalledFunc = CS.getCalledFunction();
   SmallVector<const Argument *, 4> NoAliasArgs;

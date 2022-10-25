@@ -50,6 +50,7 @@
 #include "dxc/HLSL/HLSLExtensionsCodegenHelper.h"
 #include "dxc/HLSL/DxilGenerationPass.h" // support pause/resume passes
 #include "dxc/HLSL/DxilExportMap.h"
+#include "dxc/HLSL/IntermediateMetadata.h"
 #include "dxc/DXIL/DxilResourceProperties.h"
 
 #include "CGHLSLMSHelper.h"
@@ -3627,6 +3628,10 @@ HLCBuffer &CGMSHLSLRuntime::GetOrCreateCBuffer(HLSLBufferDecl *D) {
 void CGMSHLSLRuntime::FinishCodeGen() {
   HLModule &HLM = *m_pHLModule;
   llvm::Module &M = TheModule;
+
+  hlsl::LangStdMD::create(M,
+                          static_cast<uint32_t>(CGM.getLangOpts().HLSLVersion));
+
   // Do this before CloneShaderEntry and TranslateRayQueryConstructor to avoid
   // update valToResPropertiesMap for cloned inst.
   FinishIntrinsics(HLM, m_IntrinsicMap, objectProperties);

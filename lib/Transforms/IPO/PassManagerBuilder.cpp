@@ -325,6 +325,7 @@ static void addHLSLPasses(bool HLSLHighLevel, unsigned OptLevel, bool OnlyWarnOn
   if (OptLevel > 0) {
     MPM.add(createDxilFixConstArrayInitializerPass());
   }
+  MPM.add(createDxilMetadataCleanupPass());
 }
 // HLSL Change Ends
 
