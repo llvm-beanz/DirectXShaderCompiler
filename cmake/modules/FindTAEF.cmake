@@ -38,6 +38,9 @@ elseif ("${DXC_BUILD_ARCH}" STREQUAL "Win32" )
 endif ("${DXC_BUILD_ARCH}" STREQUAL "x64" )
 
 set(TAEF_INCLUDE_DIRS ${TAEF_INCLUDE_DIR})
+list(GET TAEF_LIBRARIES 0 _lib)
+get_filename_component(TAEF_LIBRARY_DIR ${_lib} DIRECTORY)
+
 
 # Get TAEF binaries path from the header location
 set(TAEF_NUGET_BIN ${TAEF_INCLUDE_DIR}/../Binaries/Release)

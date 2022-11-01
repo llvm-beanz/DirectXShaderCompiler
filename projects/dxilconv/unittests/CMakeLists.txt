@@ -23,6 +23,8 @@ target_include_directories(dxilconv-tests PRIVATE
   ${TAEF_INCLUDE_DIRS}
 )
 
+target_link_options(dxilconv-tests PRIVATE "-libpath:${TAEF_LIBRARY_DIR}")
+
 add_dependencies(dxilconv-tests dxilconv HLSLTestLib)
 
 install(TARGETS dxilconv-tests

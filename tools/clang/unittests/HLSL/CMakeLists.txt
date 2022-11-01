@@ -95,6 +95,8 @@ target_link_libraries(clang-hlsl-tests PRIVATE
   ${D3D12_LIBRARIES}
   shlwapi
   )
+
+  target_link_options(clang-hlsl-tests PRIVATE "-libpath:${TAEF_LIBRARY_DIR}")
 else(WIN32)
 target_link_libraries(clang-hlsl-tests
   dxcompiler
