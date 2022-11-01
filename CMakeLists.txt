@@ -631,7 +631,7 @@ endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
 # enable warnings as errors for debug build
-if (WIN32)
+if (WIN32 AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} /WX")
 endif (WIN32)
 
