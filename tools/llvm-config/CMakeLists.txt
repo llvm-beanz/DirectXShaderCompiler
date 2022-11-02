@@ -24,6 +24,13 @@ set(LLVM_OBJ_ROOT ${LLVM_BINARY_DIR})
 set(LLVM_CPPFLAGS "${CMAKE_CPP_FLAGS} ${CMAKE_CPP_FLAGS_${uppercase_CMAKE_BUILD_TYPE}} ${LLVM_DEFINITIONS}")
 set(LLVM_CFLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE}} ${LLVM_DEFINITIONS}")
 set(LLVM_CXXFLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}} ${COMPILE_FLAGS} ${LLVM_DEFINITIONS}")
+
+# HLSL Change Begin
+# This sanitizing is needed in order to build llvm-config on Windows with profiling enabled.
+string(REPLACE "\\" "\\\\" LLVM_CFLAGS "${LLVM_CFLAGS}")
+string(REPLACE "\\" "\\\\" LLVM_CXXFLAGS "${LLVM_CXXFLAGS}")
+# HLSL Change End
+
 # Use the C++ link flags, since they should be a superset of C link flags.
 set(LLVM_LDFLAGS "${CMAKE_CXX_LINK_FLAGS}")
 set(LLVM_BUILDMODE ${CMAKE_BUILD_TYPE})
