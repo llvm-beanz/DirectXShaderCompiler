@@ -3597,6 +3597,8 @@ struct FPTestScope
 };
 
 void VerifyDivByZeroThrows() {
+#if !defined(__clang__)
+  // Clang doesn't fully support all the extra SEH exceptions.
   bool bCaughtExpectedException = false;
   __try {
     float one = 1.0;
@@ -3607,6 +3609,7 @@ void VerifyDivByZeroThrows() {
     bCaughtExpectedException = true;
   }
   VERIFY_IS_TRUE(bCaughtExpectedException);
+#endif
 }
 
 TEST_F(CompilerTest, CodeGenFloatingPointEnvironment) {
