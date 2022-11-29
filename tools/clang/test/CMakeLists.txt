@@ -69,7 +69,7 @@ endif()
 
 # HLSL Change Begin
 # Explicitly overriding check-clang dependencies for HLSL
-set(CLANG_TEST_DEPS clang opt FileCheck count not)
+set(CLANG_TEST_DEPS dxc dxcompiler clang-tblgen llvm-config opt FileCheck count not ClangUnitTests)
 # HLSL Change End
 
 
