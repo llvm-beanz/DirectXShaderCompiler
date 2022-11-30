@@ -413,10 +413,12 @@ GetDxilContainerPart(const DxilContainerHeader *pHeader, uint32_t index) {
 }
 
 /// Gets a part header by index.
-inline DxilPartHeader *GetDxilContainerPart(DxilContainerHeader *pHeader,
-                                            uint32_t index) {
-  return const_cast<DxilPartHeader *>(GetDxilContainerPart(
-      reinterpret_cast<const DxilContainerHeader *>(pHeader), index));
+inline void *GetDxilContainerPartPtr(DxilContainerHeader *pHeader,
+                                     uint32_t index) {
+  uint8_t *pLinearContainer = reinterpret_cast<uint8_t *>(pHeader);
+  const uint32_t *pPartOffsetTable =
+      reinterpret_cast<const uint32_t *>(pHeader + 1);
+  return static_cast<void *>(pLinearContainer + pPartOffsetTable[index]);
 }
 
 /// Gets the part data from the header.

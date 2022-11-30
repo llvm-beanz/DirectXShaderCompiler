@@ -1787,7 +1787,10 @@ TEST_F(DxilContainerTest, DisassemblyWhenInvalidThenFails) {
     pHeader->PartCount = 1;
     *((uint32_t *)(pHeader + 1)) = sizeof(*pHeader) + sizeof(uint32_t);
     pHeader->ContainerSizeInBytes += sizeof(uint32_t);
-    hlsl::GetDxilContainerPart(pHeader, 0)->PartSize = 1024;
+    uint8_t *Data = static_cast<uint8_t*>(hlsl::GetDxilContainerPartPtr(pHeader, 0));
+    Data += offsetof(hlsl::DxilPartHeader, PartSize);
+    const uint32_t NewPartSize = 1024;
+    std::memcpy(Data, static_cast<const void*>(&NewPartSize), sizeof(uint32_t));
     pHeader->ContainerSizeInBytes += sizeof(hlsl::DxilPartHeader);
     CreateBlobPinned(pHeader, pHeader->ContainerSizeInBytes, 0, &pSource);
     VERIFY_FAILED(pCompiler->Disassemble(pSource, &pDisassembly));

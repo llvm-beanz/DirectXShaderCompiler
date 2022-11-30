@@ -187,7 +187,7 @@ static HRESULT CreateContainerForPDB(IMalloc *pMalloc,
     return E_FAIL;
 
   hlsl::DxilContainerHeader *DxilHeader = (hlsl::DxilContainerHeader *)pOldContainer->GetBufferPointer();
-  hlsl::DxilProgramHeader *ProgramHeader = nullptr;
+  const hlsl::DxilProgramHeader *ProgramHeader = nullptr;
 
   struct Part {
     typedef std::function<HRESULT(IStream *)> WriteProc;
@@ -214,7 +214,7 @@ static HRESULT CreateContainerForPDB(IMalloc *pMalloc,
   };
 
   for (unsigned i = 0; i < DxilHeader->PartCount; i++) {
-    hlsl::DxilPartHeader *PartHeader = GetDxilContainerPart(DxilHeader, i);
+    const hlsl::DxilPartHeader *PartHeader = GetDxilContainerPart(DxilHeader, i);
     if (ShouldBeCopiedIntoPDB(PartHeader->PartFourCC)) {
       UINT32 uSize = PartHeader->PartSize;
       const void *pPartData = PartHeader+1;
@@ -234,7 +234,7 @@ static HRESULT CreateContainerForPDB(IMalloc *pMalloc,
     if (PartHeader->PartFourCC == hlsl::DFCC_DXIL ||
       PartHeader->PartFourCC == hlsl::DFCC_ShaderDebugInfoDXIL)
     {
-      ProgramHeader = (hlsl::DxilProgramHeader *)(PartHeader+1);
+      ProgramHeader = (const hlsl::DxilProgramHeader *)(PartHeader+1);
     }
   }
 
