@@ -403,6 +403,17 @@ struct DxilShaderPDBInfo {
 };
 
 /// Gets a part header by index.
+inline const uint8_t *
+GetDxilContainerPartPtr(const DxilContainerHeader *Hdr, uint32_t Idx) {
+  const uint8_t *Buffer = reinterpret_cast<const uint8_t *>(Hdr);
+  const uint32_t OffsetOffset =
+      sizeof(DxilContainerHeader) + (Idx * sizeof(uint32_t));
+  uint32_t Offset;
+  std::memcpy(static_cast<void *>(&Offset), Buffer + OffsetOffset,
+              sizeof(uint32_t));
+  return Buffer + Offset;
+}
+
 inline const DxilPartHeader *
 GetDxilContainerPart_Legacy(const DxilContainerHeader *pHeader, uint32_t index) {
   const uint8_t *pLinearContainer = reinterpret_cast<const uint8_t *>(pHeader);
@@ -468,10 +479,14 @@ struct DxilPartIsType {
 struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
                                                const DxilContainerHeader *> {
   const DxilContainerHeader *pHeader;
+  const uint8_t *Part;
   uint32_t index;
 
   DxilPartIterator(const DxilContainerHeader *h, uint32_t i)
-      : pHeader(h), index(i) {}
+      : pHeader(h), Part(nullptr), index(i) {
+        if (pHeader != nullptr)
+          Part = GetDxilContainerPartPtr(pHeader, index);
+      }
 
   // increment
   DxilPartIterator &operator++() {
@@ -494,7 +509,40 @@ struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
   const DxilPartHeader *operator*() const {
     return GetDxilContainerPart_Legacy(pHeader, index);
   }
+
+  operator bool() {
+    return pHeader == nullptr;
+  }
+
+  const uint8_t *getContent() const {
+    return Part != nullptr ? Part + sizeof(DxilPartHeader) : nullptr;
+  }
+
+  uint32_t getPartSize() const {
+    if (Part == nullptr)
+          return 0u;
+    uint32_t PartSize = 0u;
+    std::memcpy(static_cast<void *>(&PartSize),
+                Part + offsetof(DxilPartHeader, PartSize),
+                sizeof(DxilPartHeader::PartSize));
+    return PartSize;
+  }
+
+  uint32_t getPartFourCC() const {
+    if (Part == nullptr)
+          return 0u;
+    uint32_t FourCC = 0u;
+    std::memcpy(static_cast<void *>(&FourCC),
+                Part + offsetof(DxilPartHeader, PartFourCC),
+                sizeof(DxilPartHeader::PartFourCC));
+    return FourCC;
+  }
 };
+
+inline DxilPartIterator GetDxilContainerPart(const DxilContainerHeader *Hdr,
+                                             uint32_t Idx) {
+  return DxilPartIterator(Hdr, Idx);
+}
 
 DxilPartIterator begin(const DxilContainerHeader *pHeader);
 DxilPartIterator end(const DxilContainerHeader *pHeader);

@@ -375,8 +375,8 @@ HRESULT DxilContainerReflection::GetPartKind(UINT32 idx, _Out_ UINT32 *pResult) 
   if (pResult == nullptr) return E_POINTER;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart_Legacy(m_pHeader, idx);
-  *pResult = pPart->PartFourCC;
+  const DxilPartIterator Part = GetDxilContainerPart(m_pHeader, idx);
+  *pResult = Part.getPartFourCC();
   return S_OK;
 }
 
@@ -386,10 +386,10 @@ HRESULT DxilContainerReflection::GetPartContent(UINT32 idx, _COM_Outptr_ IDxcBlo
   *ppResult = nullptr;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart_Legacy(m_pHeader, idx);
-  const char *pData = GetDxilPartData(pPart);
-  uint32_t offset = (uint32_t)(pData - (char*)m_container->GetBufferPointer()); // Offset from the beginning.
-  uint32_t length = pPart->PartSize;
+  const DxilPartIterator Part = GetDxilContainerPart(m_pHeader, idx);
+  const uint8_t *pData = Part.getContent();
+  uint32_t offset = (uint32_t)(pData - (uint8_t*)m_container->GetBufferPointer()); // Offset from the beginning.
+  uint32_t length = Part.getPartSize();
   DxcThreadMalloc TM(m_pMalloc);
   return DxcCreateBlobFromBlob(m_container, offset, length, ppResult);
 }
