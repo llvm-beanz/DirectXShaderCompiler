@@ -676,7 +676,7 @@ std::string DumpParts(IDxcBlob *pBlob) {
     << " FourCC: " << FourCCStr(pContainer->HeaderFourCC) << std::endl
     << " Part count: " << pContainer->PartCount << std::endl;
   for (uint32_t i = 0; i < pContainer->PartCount; ++i) {
-    hlsl::DxilPartHeader *pPart = hlsl::GetDxilContainerPart(pContainer, i);
+    hlsl::DxilPartHeader *pPart = hlsl::GetDxilContainerPart_Legacy(pContainer, i);
     o << "Part " << i << std::endl
       << " FourCC: " << FourCCStr(pPart->PartFourCC) << std::endl
       << " Size: " << pPart->PartSize << std::endl;

@@ -404,7 +404,7 @@ struct DxilShaderPDBInfo {
 
 /// Gets a part header by index.
 inline const DxilPartHeader *
-GetDxilContainerPart(const DxilContainerHeader *pHeader, uint32_t index) {
+GetDxilContainerPart_Legacy(const DxilContainerHeader *pHeader, uint32_t index) {
   const uint8_t *pLinearContainer = reinterpret_cast<const uint8_t *>(pHeader);
   const uint32_t *pPartOffsetTable =
       reinterpret_cast<const uint32_t *>(pHeader + 1);
@@ -413,9 +413,9 @@ GetDxilContainerPart(const DxilContainerHeader *pHeader, uint32_t index) {
 }
 
 /// Gets a part header by index.
-inline DxilPartHeader *GetDxilContainerPart(DxilContainerHeader *pHeader,
+inline DxilPartHeader *GetDxilContainerPart_Legacy(DxilContainerHeader *pHeader,
                                             uint32_t index) {
-  return const_cast<DxilPartHeader *>(GetDxilContainerPart(
+  return const_cast<DxilPartHeader *>(GetDxilContainerPart_Legacy(
       reinterpret_cast<const DxilContainerHeader *>(pHeader), index));
 }
 
@@ -492,7 +492,7 @@ struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
     return index != other.index || pHeader != other.pHeader;
   }
   const DxilPartHeader *operator*() const {
-    return GetDxilContainerPart(pHeader, index);
+    return GetDxilContainerPart_Legacy(pHeader, index);
   }
 };
 

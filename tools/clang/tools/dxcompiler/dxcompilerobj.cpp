@@ -214,7 +214,7 @@ static HRESULT CreateContainerForPDB(IMalloc *pMalloc,
   };
 
   for (unsigned i = 0; i < DxilHeader->PartCount; i++) {
-    hlsl::DxilPartHeader *PartHeader = GetDxilContainerPart(DxilHeader, i);
+    hlsl::DxilPartHeader *PartHeader = GetDxilContainerPart_Legacy(DxilHeader, i);
     if (ShouldBeCopiedIntoPDB(PartHeader->PartFourCC)) {
       UINT32 uSize = PartHeader->PartSize;
       const void *pPartData = PartHeader+1;

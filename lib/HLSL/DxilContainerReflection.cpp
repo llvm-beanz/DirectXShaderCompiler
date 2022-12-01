@@ -375,7 +375,7 @@ HRESULT DxilContainerReflection::GetPartKind(UINT32 idx, _Out_ UINT32 *pResult) 
   if (pResult == nullptr) return E_POINTER;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
+  const DxilPartHeader *pPart = GetDxilContainerPart_Legacy(m_pHeader, idx);
   *pResult = pPart->PartFourCC;
   return S_OK;
 }
@@ -386,7 +386,7 @@ HRESULT DxilContainerReflection::GetPartContent(UINT32 idx, _COM_Outptr_ IDxcBlo
   *ppResult = nullptr;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
+  const DxilPartHeader *pPart = GetDxilContainerPart_Legacy(m_pHeader, idx);
   const char *pData = GetDxilPartData(pPart);
   uint32_t offset = (uint32_t)(pData - (char*)m_container->GetBufferPointer()); // Offset from the beginning.
   uint32_t length = pPart->PartSize;
@@ -411,7 +411,7 @@ HRESULT DxilContainerReflection::GetPartReflection(UINT32 idx, REFIID iid, void 
   *ppvObject = nullptr;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
+  const DxilPartHeader *pPart = GetDxilContainerPart_Legacy(m_pHeader, idx);
   if (!hlsl::IsValidReflectionModulePart((hlsl::DxilFourCC)pPart->PartFourCC))
     return E_NOTIMPL;
 
@@ -419,7 +419,7 @@ HRESULT DxilContainerReflection::GetPartReflection(UINT32 idx, REFIID iid, void 
   // to using RDAT for reflection instead of module.
   const DxilPartHeader *pRDATPart = nullptr;
   for (idx = 0; idx < m_pHeader->PartCount; ++idx) {
-    const DxilPartHeader *pPartTest = GetDxilContainerPart(m_pHeader, idx);
+    const DxilPartHeader *pPartTest = GetDxilContainerPart_Legacy(m_pHeader, idx);
     if (pPartTest->PartFourCC == DFCC_RuntimeData) {
       pRDATPart = pPartTest;
     }

@@ -55,7 +55,7 @@ HRESULT DxilContainerReader::GetPartContent(uint32_t idx, _Outptr_ const void **
   *ppResult = nullptr;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
+  const DxilPartHeader *pPart = GetDxilContainerPart_Legacy(m_pHeader, idx);
   *ppResult = GetDxilPartData(pPart);
   if (pResultSize != nullptr) {
     *pResultSize = pPart->PartSize;
@@ -67,7 +67,7 @@ HRESULT DxilContainerReader::GetPartFourCC(uint32_t idx, _Out_ uint32_t *pResult
   if (pResult == nullptr) return E_POINTER;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
+  const DxilPartHeader *pPart = GetDxilContainerPart_Legacy(m_pHeader, idx);
   *pResult = pPart->PartFourCC;
   return S_OK;
 }
