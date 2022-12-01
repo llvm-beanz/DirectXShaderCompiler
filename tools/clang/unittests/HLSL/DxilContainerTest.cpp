@@ -1715,6 +1715,19 @@ TEST_F(DxilContainerTest, DisassemblyWhenMissingThenFails) {
   VERIFY_FAILED(pCompiler->Disassemble(pSource, &pDisassembly));
 }
 
+namespace testing {
+inline hlsl::DxilPartHeader *
+GetDxilContainerPart(hlsl::DxilContainerHeader *Hdr, uint32_t Idx) {
+  uint8_t *Buffer = reinterpret_cast<uint8_t *>(Hdr);
+  const uint32_t OffsetOffset =
+      sizeof(hlsl::DxilContainerHeader) + (Idx * sizeof(uint32_t));
+  uint32_t Offset;
+  std::memcpy(static_cast<void *>(&Offset), Buffer + OffsetOffset,
+              sizeof(uint32_t));
+  return reinterpret_cast<hlsl::DxilPartHeader*>(Buffer + Offset);
+}
+} // namespace testing
+
 TEST_F(DxilContainerTest, DisassemblyWhenInvalidThenFails) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcBlobEncoding> pDisassembly;
@@ -1787,10 +1800,7 @@ TEST_F(DxilContainerTest, DisassemblyWhenInvalidThenFails) {
     pHeader->PartCount = 1;
     *((uint32_t *)(pHeader + 1)) = sizeof(*pHeader) + sizeof(uint32_t);
     pHeader->ContainerSizeInBytes += sizeof(uint32_t);
-    uint8_t *Data = static_cast<uint8_t*>(hlsl::GetDxilContainerPartPtr(pHeader, 0));
-    Data += offsetof(hlsl::DxilPartHeader, PartSize);
-    const uint32_t NewPartSize = 1024;
-    std::memcpy(Data, static_cast<const void*>(&NewPartSize), sizeof(uint32_t));
+    testing::GetDxilContainerPart(pHeader, 0)->PartSize = 1024;
     pHeader->ContainerSizeInBytes += sizeof(hlsl::DxilPartHeader);
     CreateBlobPinned(pHeader, pHeader->ContainerSizeInBytes, 0, &pSource);
     VERIFY_FAILED(pCompiler->Disassemble(pSource, &pDisassembly));

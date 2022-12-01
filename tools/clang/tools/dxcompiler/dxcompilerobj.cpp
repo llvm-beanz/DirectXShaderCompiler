@@ -214,12 +214,13 @@ static HRESULT CreateContainerForPDB(IMalloc *pMalloc,
   };
 
   for (unsigned i = 0; i < DxilHeader->PartCount; i++) {
-    const hlsl::DxilPartHeader *PartHeader = GetDxilContainerPart(DxilHeader, i);
-    if (ShouldBeCopiedIntoPDB(PartHeader->PartFourCC)) {
-      UINT32 uSize = PartHeader->PartSize;
-      const void *pPartData = PartHeader+1;
+    hlsl::DxilPartIterator PartIt = GetDxilContainerPart(DxilHeader, i);
+    uint32_t PartFourCC = PartIt.getPartFourCC();
+    if (ShouldBeCopiedIntoPDB(PartFourCC)) {
+      UINT32 uSize = PartIt.getPartSize();
+      const void *pPartData = PartIt.getContent();
       Part NewPart(
-        PartHeader->PartFourCC,
+        PartFourCC,
         uSize,
         [pPartData, uSize](IStream *pStream) {
           ULONG uBytesWritten = 0;
@@ -231,10 +232,10 @@ static HRESULT CreateContainerForPDB(IMalloc *pMalloc,
     }
 
     // Could use any of these. We're mostly after the header version and all that.
-    if (PartHeader->PartFourCC == hlsl::DFCC_DXIL ||
-      PartHeader->PartFourCC == hlsl::DFCC_ShaderDebugInfoDXIL)
+    if (PartFourCC == hlsl::DFCC_DXIL ||
+        PartFourCC == hlsl::DFCC_ShaderDebugInfoDXIL)
     {
-      ProgramHeader = (const hlsl::DxilProgramHeader *)(PartHeader+1);
+      ProgramHeader = (hlsl::DxilProgramHeader *)PartIt.getContent();
     }
   }
 

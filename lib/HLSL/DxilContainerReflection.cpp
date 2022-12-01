@@ -375,8 +375,8 @@ HRESULT DxilContainerReflection::GetPartKind(UINT32 idx, _Out_ UINT32 *pResult) 
   if (pResult == nullptr) return E_POINTER;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
-  *pResult = pPart->PartFourCC;
+  const DxilPartIterator Part = GetDxilContainerPart(m_pHeader, idx);
+  *pResult = Part.getPartFourCC();
   return S_OK;
 }
 
@@ -386,10 +386,10 @@ HRESULT DxilContainerReflection::GetPartContent(UINT32 idx, _COM_Outptr_ IDxcBlo
   *ppResult = nullptr;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
-  const char *pData = GetDxilPartData(pPart);
-  uint32_t offset = (uint32_t)(pData - (char*)m_container->GetBufferPointer()); // Offset from the beginning.
-  uint32_t length = pPart->PartSize;
+  const DxilPartIterator Part = GetDxilContainerPart(m_pHeader, idx);
+  const uint8_t *pData = Part.getContent();
+  uint32_t offset = (uint32_t)(pData - (uint8_t*)m_container->GetBufferPointer()); // Offset from the beginning.
+  uint32_t length = Part.getPartSize();
   DxcThreadMalloc TM(m_pMalloc);
   return DxcCreateBlobFromBlob(m_container, offset, length, ppResult);
 }
@@ -411,24 +411,26 @@ HRESULT DxilContainerReflection::GetPartReflection(UINT32 idx, REFIID iid, void 
   *ppvObject = nullptr;
   if (!IsLoaded()) return E_NOT_VALID_STATE;
   if (idx >= m_pHeader->PartCount) return E_BOUNDS;
-  const DxilPartHeader *pPart = GetDxilContainerPart(m_pHeader, idx);
-  if (!hlsl::IsValidReflectionModulePart((hlsl::DxilFourCC)pPart->PartFourCC))
+  DxilPartIterator Part = GetDxilContainerPart(m_pHeader, idx);
+  if (!hlsl::IsValidReflectionModulePart(
+          (hlsl::DxilFourCC)Part.getPartFourCC()))
     return E_NOTIMPL;
 
   // Use DFCC_ShaderStatistics for reflection instead of DXIL part, until switch
   // to using RDAT for reflection instead of module.
-  const DxilPartHeader *pRDATPart = nullptr;
+  DxilPartIterator RDATPart(nullptr, 0);
   for (idx = 0; idx < m_pHeader->PartCount; ++idx) {
-    const DxilPartHeader *pPartTest = GetDxilContainerPart(m_pHeader, idx);
-    if (pPartTest->PartFourCC == DFCC_RuntimeData) {
-      pRDATPart = pPartTest;
+    const DxilPartIterator PartTest = GetDxilContainerPart(m_pHeader, idx);
+    if (PartTest.getPartFourCC() == DFCC_RuntimeData) {
+      RDATPart = PartTest;
     }
-    if (pPart->PartFourCC != DFCC_ShaderStatistics) {
-      if (pPartTest->PartFourCC == DFCC_ShaderStatistics) {
+    if (Part.getPartFourCC() != DFCC_ShaderStatistics) {
+      if (PartTest.getPartFourCC() == DFCC_ShaderStatistics) {
         const DxilProgramHeader *pProgramHeaderTest =
-          reinterpret_cast<const DxilProgramHeader*>(GetDxilPartData(pPartTest));
-        if (IsValidDxilProgramHeader(pProgramHeaderTest, pPartTest->PartSize)) {
-          pPart = pPartTest;
+            reinterpret_cast<const DxilProgramHeader *>(PartTest.getContent());
+        if (IsValidDxilProgramHeader(pProgramHeaderTest,
+                                     PartTest.getPartSize())) {
+          Part = PartTest;
           continue;
         }
       }
@@ -438,7 +440,7 @@ HRESULT DxilContainerReflection::GetPartReflection(UINT32 idx, REFIID iid, void 
   DxcThreadMalloc TM(m_pMalloc);
   HRESULT hr = S_OK;
 
-  IFC(hlsl::CreateDxilShaderOrLibraryReflectionFromModulePart(pPart, pRDATPart, iid, ppvObject));
+  IFC(hlsl::CreateDxilShaderOrLibraryReflectionFromModulePart(*Part, *RDATPart, iid, ppvObject));
 
 Cleanup:
   return hr;
