@@ -405,6 +405,7 @@ struct DxilShaderPDBInfo {
 /// Gets a part header by index.
 inline const uint8_t *
 GetDxilContainerPartPtr(const DxilContainerHeader *Hdr, uint32_t Idx) {
+  if (Hdr == nullptr) return nullptr;
   const uint8_t *Buffer = reinterpret_cast<const uint8_t *>(Hdr);
   const uint32_t OffsetOffset =
       sizeof(DxilContainerHeader) + (Idx * sizeof(uint32_t));
@@ -466,6 +467,8 @@ struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
   const uint8_t *Part;
   uint32_t index;
 
+  DxilPartIterator() : pHeader(nullptr), Part(nullptr), index(0) {}
+
   DxilPartIterator(const DxilPartIterator&) = default;
 
   DxilPartIterator(const DxilContainerHeader *h, uint32_t i)
@@ -477,11 +480,13 @@ struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
   // increment
   DxilPartIterator &operator++() {
     ++index;
+    Part = GetDxilContainerPartPtr(pHeader, index);
     return *this;
   }
   DxilPartIterator operator++(int) {
-    DxilPartIterator result(pHeader, index);
+    DxilPartIterator result(*this);
     ++index;
+    Part = GetDxilContainerPartPtr(pHeader, index);
     return result;
   }
 
@@ -499,7 +504,7 @@ struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
   }
 
   operator bool() {
-    return pHeader == nullptr;
+    return pHeader != nullptr;
   }
 
   const uint8_t *getContent() const {
@@ -508,7 +513,7 @@ struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
 
   uint32_t getPartSize() const {
     if (Part == nullptr)
-          return 0u;
+      return 0u;
     uint32_t PartSize = 0u;
     std::memcpy(static_cast<void *>(&PartSize),
                 Part + offsetof(DxilPartHeader, PartSize),
@@ -518,7 +523,7 @@ struct DxilPartIterator : public std::iterator<std::input_iterator_tag,
 
   uint32_t getPartFourCC() const {
     if (Part == nullptr)
-          return 0u;
+      return 0u;
     uint32_t FourCC = 0u;
     std::memcpy(static_cast<void *>(&FourCC),
                 Part + offsetof(DxilPartHeader, PartFourCC),

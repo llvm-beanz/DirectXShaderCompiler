@@ -5611,35 +5611,35 @@ HRESULT ValidateDxilContainerParts(llvm::Module *pModule,
                      ShaderKind == DXIL::ShaderKind::Mesh;
 
   std::unordered_set<uint32_t> FourCCFound;
-  const DxilPartHeader *pRootSignaturePart = nullptr;
-  const DxilPartHeader *pPSVPart = nullptr;
+  DxilPartIterator RootSignaturePart;
+  DxilPartIterator PSVPart;
 
   for (auto it = begin(pContainer), itEnd = end(pContainer); it != itEnd; ++it) {
-    const DxilPartHeader *pPart = *it;
+    uint32_t PartFourCC = it.getPartFourCC();
 
     char szFourCC[5];
-    PartKindToCharArray(pPart->PartFourCC, szFourCC);
-    if (FourCCFound.find(pPart->PartFourCC) != FourCCFound.end()) {
+    PartKindToCharArray(PartFourCC, szFourCC);
+    if (FourCCFound.find(PartFourCC) != FourCCFound.end()) {
       // Two parts with same FourCC found
       ValCtx.EmitFormatError(ValidationRule::ContainerPartRepeated, {szFourCC});
       continue;
     }
-    FourCCFound.insert(pPart->PartFourCC);
+    FourCCFound.insert(PartFourCC);
 
-    switch (pPart->PartFourCC)
+    switch (PartFourCC)
     {
     case DFCC_InputSignature:
       if (ValCtx.isLibProfile) {
         ValCtx.EmitFormatError(ValidationRule::ContainerPartInvalid, { szFourCC });
       } else {
-        VerifySignatureMatches(ValCtx, DXIL::SignatureKind::Input, GetDxilPartData(pPart), pPart->PartSize);
+        VerifySignatureMatches(ValCtx, DXIL::SignatureKind::Input, it.getContent(), it.getPartSize());
       }
       break;
     case DFCC_OutputSignature:
       if (ValCtx.isLibProfile) {
         ValCtx.EmitFormatError(ValidationRule::ContainerPartInvalid, { szFourCC });
       } else {
-        VerifySignatureMatches(ValCtx, DXIL::SignatureKind::Output, GetDxilPartData(pPart), pPart->PartSize);
+        VerifySignatureMatches(ValCtx, DXIL::SignatureKind::Output, it.getContent(), it.getPartSize());
       }
       break;
     case DFCC_PatchConstantSignature:
@@ -5647,27 +5647,27 @@ HRESULT ValidateDxilContainerParts(llvm::Module *pModule,
         ValCtx.EmitFormatError(ValidationRule::ContainerPartInvalid, { szFourCC });
       } else {
         if (bTessOrMesh) {
-          VerifySignatureMatches(ValCtx, DXIL::SignatureKind::PatchConstOrPrim, GetDxilPartData(pPart), pPart->PartSize);
+          VerifySignatureMatches(ValCtx, DXIL::SignatureKind::PatchConstOrPrim, it.getContent(), it.getPartSize());
         } else {
           ValCtx.EmitFormatError(ValidationRule::ContainerPartMatches, {"Program Patch Constant Signature"});
         }
       }
       break;
     case DFCC_FeatureInfo:
-      VerifyFeatureInfoMatches(ValCtx, GetDxilPartData(pPart), pPart->PartSize);
+      VerifyFeatureInfoMatches(ValCtx, it.getContent(), it.getPartSize());
       break;
     case DFCC_RootSignature:
-      pRootSignaturePart = pPart;
+      RootSignaturePart = it;
       if (ValCtx.isLibProfile) {
         ValCtx.EmitFormatError(ValidationRule::ContainerPartInvalid, { szFourCC });
       }
       break;
     case DFCC_PipelineStateValidation:
-      pPSVPart = pPart;
+      PSVPart = it;
       if (ValCtx.isLibProfile) {
         ValCtx.EmitFormatError(ValidationRule::ContainerPartInvalid, { szFourCC });
       } else {
-        VerifyPSVMatches(ValCtx, GetDxilPartData(pPart), pPart->PartSize);
+        VerifyPSVMatches(ValCtx, it.getContent(), it.getPartSize());
       }
       break;
 
@@ -5681,7 +5681,7 @@ HRESULT ValidateDxilContainerParts(llvm::Module *pModule,
       continue;
 
     case DFCC_ShaderHash:
-      if (pPart->PartSize != sizeof(DxilShaderHash)) {
+      if (it.getPartSize() != sizeof(DxilShaderHash)) {
         ValCtx.EmitFormatError(ValidationRule::ContainerPartInvalid, { szFourCC });
       }
       break;
@@ -5693,7 +5693,7 @@ HRESULT ValidateDxilContainerParts(llvm::Module *pModule,
         //  - support earlier versions
         //  - verify no newer record versions than known here (size no larger than newest version)
         //  - verify all data makes sense and matches expectations based on module
-        VerifyRDATMatches(ValCtx, GetDxilPartData(pPart), pPart->PartSize);
+        VerifyRDATMatches(ValCtx, it.getContent(), it.getPartSize());
       } else {
         ValCtx.EmitFormatError(ValidationRule::ContainerPartInvalid, { szFourCC });
       }
@@ -5729,17 +5729,18 @@ HRESULT ValidateDxilContainerParts(llvm::Module *pModule,
     }
 
     // Validate Root Signature
-    if (pPSVPart) {
-      if (pRootSignaturePart) {
+    if (PSVPart) {
+      if (RootSignaturePart) {
         std::string diagStr;
         raw_string_ostream DiagStream(diagStr);
         try {
           RootSignatureHandle RS;
-          RS.LoadSerialized((const uint8_t*)GetDxilPartData(pRootSignaturePart), pRootSignaturePart->PartSize);
+          RS.LoadSerialized(RootSignaturePart.getContent(), RootSignaturePart.getPartSize());
           RS.Deserialize();
           IFTBOOL(VerifyRootSignatureWithShaderPSV(RS.GetDesc(),
                                                    pDxilModule->GetShaderModel()->GetKind(),
-                                                   GetDxilPartData(pPSVPart), pPSVPart->PartSize,
+                                                   PSVPart.getContent(),
+                                                   PSVPart.getPartSize(),
                                                    DiagStream),
                   DXC_E_INCORRECT_ROOT_SIGNATURE);
         } catch (...) {
