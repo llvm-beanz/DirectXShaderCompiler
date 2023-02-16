@@ -11,7 +11,7 @@
 #pragma once
 
 #include "dxc/Support/ErrorCodes.h"
-#include "dxc/Support/WinAdapter.h"
+#include "dxc/Support/WinAdapter.h" // For HRESULT
 #include <exception>
 #include <string>
 

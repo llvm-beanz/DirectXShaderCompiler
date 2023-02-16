@@ -13,7 +13,6 @@
 
 #include "dxc/Support/Global.h"
 #include "dxc/DXIL/DxilConstants.h"
-#include "dxc/Support/WinAdapter.h"
 #include <memory>
 
 namespace llvm {

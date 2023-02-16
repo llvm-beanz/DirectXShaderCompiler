@@ -12,7 +12,6 @@
 #pragma once
 
 #include "dxc/DXIL/DxilConstants.h"
-#include "dxc/Support/WinAdapter.h"
 
 #define RDAT_NULL_REF ((uint32_t)0xFFFFFFFF)
 
