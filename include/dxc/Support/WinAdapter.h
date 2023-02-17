@@ -212,9 +212,6 @@
 #define DxcEtw_DxcValidation_Start()
 #define DxcEtw_DxcValidation_Stop(hr)
 
-#define UInt32Add UIntAdd
-#define Int32ToUInt32 IntToUInt
-
 //===--------------------- HRESULT Related Macros -------------------------===//
 
 #define S_OK ((HRESULT)0L)

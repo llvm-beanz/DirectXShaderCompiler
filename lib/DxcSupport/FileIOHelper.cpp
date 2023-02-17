@@ -436,9 +436,11 @@ static HRESULT CodePageBufferToWide(UINT32 codePage, LPCVOID bufferPointer,
     return HRESULT_FROM_WIN32(GetLastError());
 
   // Add an extra character in case we need it for null-termination
-  unsigned buffSizeWide;
-  IFR(Int32ToUInt32(numToConvertWide, &buffSizeWide));
-  IFR(UInt32Add(buffSizeWide, 1, &buffSizeWide));
+  // MultiByteToWideChar is defined to return 0 on error or the _positive_
+  // number of bytes required. This cannot fail.
+  unsigned buffSizeWide = static_cast<unsigned>(numToConvertWide);
+  // This cannot overflow since it was converted from a signed value.
+  ++buffSizeWide;
   IFR(UInt32Mult(buffSizeWide, sizeof(WCHAR), &buffSizeWide));
   wideNewCopy.AllocateBytes(buffSizeWide);
   IFROOM(wideNewCopy.m_pData);
@@ -504,25 +506,26 @@ static HRESULT CodePageBufferToUtf8(UINT32 codePage, LPCVOID bufferPointer,
   if (numToConvertUtf8 == 0)
     return HRESULT_FROM_WIN32(GetLastError());
 
-  UINT32 buffSizeUtf8;
-  IFR(Int32ToUInt32(numToConvertUtf8, &buffSizeUtf8));
-  if (!IsBufferNullTerminated(wideChars, wideCharCount * sizeof(wchar_t), DXC_CP_WIDE)) {
-    // If original size doesn't include null-terminator,
-    // we have to add one to the converted buffer.
-    IFR(UInt32Add(buffSizeUtf8, 1, &buffSizeUtf8));
-  }
+  size_t buffSizeUtf8 = static_cast<size_t>(numToConvertUtf8);
+  if (!IsBufferNullTerminated(wideChars, wideCharCount * sizeof(wchar_t),
+                              DXC_CP_WIDE))
+    ++buffSizeUtf8; // This cannot overflow since it was converted from a signed
+                    // value.
   utf8NewCopy.AllocateBytes(buffSizeUtf8);
   IFROOM(utf8NewCopy.m_pData);
 
+  // Since we've incremented buffSizeUtf8, it _can_ overflow on a back convert.
+  if (buffSizeUtf8 > static_cast<size_t>(std::numeric_limits<int>::max()))
+    return ERROR_ARITHMETIC_OVERFLOW;
+  numToConvertUtf8 = static_cast<int>(buffSizeUtf8);
+
   int numActuallyConvertedUtf8 =
     WideCharToMultiByte(CP_UTF8, 0, wideChars, wideCharCount,
-                        utf8NewCopy, buffSizeUtf8, NULL, NULL);
+                        utf8NewCopy, numToConvertUtf8, NULL, NULL);
   if (numActuallyConvertedUtf8 == 0)
     return HRESULT_FROM_WIN32(GetLastError());
-  if (numActuallyConvertedUtf8 < 0)
-    return E_OUTOFMEMORY;
 
-  if ((UINT32)numActuallyConvertedUtf8 < buffSizeUtf8 &&
+  if (static_cast<size_t>(numActuallyConvertedUtf8) < buffSizeUtf8 &&
       utf8NewCopy.m_pData[numActuallyConvertedUtf8 - 1] != '\0') {
     utf8NewCopy.m_pData[numActuallyConvertedUtf8++] = '\0';
   }
@@ -713,8 +716,9 @@ HRESULT DxcCreateBlobEncodingFromBlob(
 
   InternalDxcBlobEncoding *internalEncoding;
   if (offset || length) {
-    UINT32 end;
-    IFR(UInt32Add(offset, length, &end));
+    UINT32 end = offset + length;
+    if (end < offset)
+      return ERROR_ARITHMETIC_OVERFLOW;
     SIZE_T blobSize = pFromBlob->GetBufferSize();
     if (end > blobSize)
       return E_INVALIDARG;

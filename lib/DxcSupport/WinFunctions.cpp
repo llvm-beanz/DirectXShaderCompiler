@@ -40,28 +40,6 @@ HRESULT StringCchPrintfA(char *dst, size_t dstSize, const char *format, ...) {
   va_end(args);
   return S_OK;
 }
-HRESULT UIntAdd(UINT uAugend, UINT uAddend, UINT *puResult) {
-  HRESULT hr;
-  if ((uAugend + uAddend) >= uAugend) {
-    *puResult = (uAugend + uAddend);
-    hr = S_OK;
-  } else {
-    *puResult = 0xffffffff;
-    hr = ERROR_ARITHMETIC_OVERFLOW;
-  }
-  return hr;
-}
-HRESULT IntToUInt(int in, UINT *out) {
-  HRESULT hr;
-  if (in >= 0) {
-    *out = (UINT)in;
-    hr = S_OK;
-  } else {
-    *out = 0xffffffff;
-    hr = ERROR_ARITHMETIC_OVERFLOW;
-  }
-  return hr;
-}
 HRESULT SizeTToInt(size_t in, int *out) {
   HRESULT hr;
   if(in <= INT_MAX) {
