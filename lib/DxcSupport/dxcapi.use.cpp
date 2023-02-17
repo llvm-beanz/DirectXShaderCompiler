@@ -232,19 +232,17 @@ void WriteBlobToHandle(_In_opt_ IDxcBlob *pBlob, _In_ HANDLE hFile, _In_opt_ LPC
 
 void WriteUtf8ToConsole(_In_opt_count_(charCount) const char *pText,
                         int charCount, DWORD streamType) {
-  if (charCount == 0 || pText == nullptr) {
+  if (streamType != STD_OUTPUT_HANDLE && streamType != STD_ERROR_HANDLE)
+    throw hlsl::Exception(E_INVALIDARG);
+
+  if (charCount == 0 || pText == nullptr)
     return;
-  }
 
-  std::string resultToPrint;
-  wchar_t *wideMessage = nullptr;
-  size_t wideMessageLen;
-  Unicode::UTF8BufferToWideBuffer(pText, charCount, &wideMessage,
-                                   &wideMessageLen);
-
-  WriteWideNullTermToConsole(wideMessage, streamType);
-
-  delete[] wideMessage;
+  FILE *stream = (streamType == STD_OUTPUT_HANDLE) ? stdout : stderr;
+  
+  fwrite(pText, charCount, 1, stream);
+  fprintf(stream, "\n");
+  fflush(stream);
 }
 
 void WriteUtf8ToConsoleSizeT(_In_opt_count_(charCount) const char *pText,
