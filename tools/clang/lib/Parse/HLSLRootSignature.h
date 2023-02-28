@@ -13,6 +13,7 @@
 #include "dxc/DXIL/DXIL.h"
 #include "dxc/DxilRootSignature/DxilRootSignature.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 
 namespace llvm {
 class raw_ostream;
@@ -231,10 +232,9 @@ class RootSignatureParser {
 public:
   RootSignatureParser(RootSignatureTokenizer *pTokenizer,
                       DxilRootSignatureVersion DefaultVersion,
-                      DxilRootSignatureCompilationFlags Flags,
-                      llvm::raw_ostream &OS);
+                      DxilRootSignatureCompilationFlags Flags);
 
-  bool Parse(DxilVersionedRootSignatureDesc **ppRootSignature);
+  llvm::Error Parse(DxilVersionedRootSignatureDesc **ppRootSignature);
 
 private:
   typedef RootSignatureTokenizer::Token TokenType;
@@ -242,46 +242,44 @@ private:
   RootSignatureTokenizer *m_pTokenizer;
   DxilRootSignatureVersion m_Version;
   DxilRootSignatureCompilationFlags m_CompilationFlags;
-  llvm::raw_ostream &m_OS;
 
-  bool GetAndMatchToken(TokenType &Token, TokenType::Type Type);
-  bool Error(const char *pError, ...);
+  llvm::Error GetAndMatchToken(TokenType &Token, TokenType::Type Type);
 
-  bool ParseRootSignature(DxilVersionedRootSignatureDesc **ppRootSignature);
-  bool ParseRootSignatureFlags(DxilRootSignatureFlags &Flags);
-  bool ParseRootConstants(DxilRootParameter1 &P);
-  bool ParseRootShaderResource(TokenType::Type TokType, TokenType::Type RegType,
+  llvm::Error ParseRootSignature(DxilVersionedRootSignatureDesc **ppRootSignature);
+  llvm::Error ParseRootSignatureFlags(DxilRootSignatureFlags &Flags);
+  llvm::Error ParseRootConstants(DxilRootParameter1 &P);
+  llvm::Error ParseRootShaderResource(TokenType::Type TokType, TokenType::Type RegType,
                                DxilRootParameterType ResType,
                                DxilRootParameter1 &P);
-  bool ParseRootDescriptorTable(DxilRootParameter1 &P);
-  bool ParseStaticSampler(DxilStaticSamplerDesc &P);
+  llvm::Error ParseRootDescriptorTable(DxilRootParameter1 &P);
+  llvm::Error ParseStaticSampler(DxilStaticSamplerDesc &P);
 
-  bool ParseDescTableResource(TokenType::Type TokType, TokenType::Type RegType,
+  llvm::Error ParseDescTableResource(TokenType::Type TokType, TokenType::Type RegType,
                               DxilDescriptorRangeType RangeType,
                               DxilDescriptorRange1 &R);
 
-  bool ParseRegister(TokenType::Type RegType, uint32_t &Reg);
-  bool ParseSpace(uint32_t &Space);
-  bool ParseNumDescriptors(uint32_t &NumDescriptors);
-  bool ParseRootDescFlags(DxilRootDescriptorFlags &Flags);
-  bool ParseDescRangeFlags(DxilDescriptorRangeType RangeType,
+  llvm::Error ParseRegister(TokenType::Type RegType, uint32_t &Reg);
+  llvm::Error ParseSpace(uint32_t &Space);
+  llvm::Error ParseNumDescriptors(uint32_t &NumDescriptors);
+  llvm::Error ParseRootDescFlags(DxilRootDescriptorFlags &Flags);
+  llvm::Error ParseDescRangeFlags(DxilDescriptorRangeType RangeType,
                            DxilDescriptorRangeFlags &Flags);
-  bool ParseOffset(uint32_t &Offset);
-  bool ParseVisibility(DxilShaderVisibility &Vis);
-  bool ParseNum32BitConstants(uint32_t &NumConst);
+  llvm::Error ParseOffset(uint32_t &Offset);
+  llvm::Error ParseVisibility(DxilShaderVisibility &Vis);
+  llvm::Error ParseNum32BitConstants(uint32_t &NumConst);
 
-  bool ParseFilter(DxilFilter &Filter);
-  bool ParseTextureAddressMode(DxilTextureAddressMode &AddressMode);
-  bool ParseMipLODBias(float &MipLODBias);
-  bool ParseMaxAnisotropy(uint32_t &MaxAnisotropy);
-  bool ParseComparisonFunction(DxilComparisonFunc &ComparisonFunc);
-  bool ParseBorderColor(DxilStaticBorderColor &BorderColor);
-  bool ParseMinLOD(float &MinLOD);
-  bool ParseMaxLOD(float &MaxLOD);
+  llvm::Error ParseFilter(DxilFilter &Filter);
+  llvm::Error ParseTextureAddressMode(DxilTextureAddressMode &AddressMode);
+  llvm::Error ParseMipLODBias(float &MipLODBias);
+  llvm::Error ParseMaxAnisotropy(uint32_t &MaxAnisotropy);
+  llvm::Error ParseComparisonFunction(DxilComparisonFunc &ComparisonFunc);
+  llvm::Error ParseBorderColor(DxilStaticBorderColor &BorderColor);
+  llvm::Error ParseMinLOD(float &MinLOD);
+  llvm::Error ParseMaxLOD(float &MaxLOD);
 
-  bool ParseFloat(float &v);
+  llvm::Error ParseFloat(float &v);
 
-  bool MarkParameter(bool &bSeen, const char *pName);
+  llvm::Error MarkParameter(bool &bSeen, const char *pName);
 };
 
 } // namespace hlsl

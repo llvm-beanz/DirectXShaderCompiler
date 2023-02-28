@@ -17,6 +17,7 @@
 #include "clang/Parse/ParseDiagnostic.h"
 #include "clang/Parse/ParseHLSL.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Errc.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <float.h>
@@ -28,6 +29,10 @@ DEFINE_ENUM_FLAG_OPERATORS(DxilRootSignatureFlags)
 DEFINE_ENUM_FLAG_OPERATORS(DxilRootDescriptorFlags)
 DEFINE_ENUM_FLAG_OPERATORS(DxilDescriptorRangeFlags)
 DEFINE_ENUM_FLAG_OPERATORS(DxilRootSignatureCompilationFlags)
+
+static Error err(const Twine &S) {
+  return make_error<StringError>(S, errc::invalid_argument);
+}
 
 RootSignatureTokenizer::RootSignatureTokenizer(const char *pStr, size_t len)
     : m_pStrPos(pStr), m_pEndPos(pStr + len) {
@@ -399,10 +404,9 @@ bool RootSignatureTokenizer::ToRegister(LPCSTR pBuf, Token &T) {
 }
 
 bool RootSignatureTokenizer::ToKeyword(const char *pBuf, Token &T,
-                                       llvm::StringRef pKeyword,
-                                       Token::Type Type) {
+                                       StringRef pKeyword, Token::Type Type) {
   // Tokens are case-insencitive to allow more flexibility for programmers
-  if (pKeyword.equals_lower(llvm::StringRef(pBuf))) {
+  if (pKeyword.equals_lower(StringRef(pBuf))) {
     T = Token(Type, pBuf);
     return true;
   }
@@ -421,11 +425,11 @@ bool RootSignatureTokenizer::IsAlpha(char c) const { return isalpha(c) > 0; }
 
 RootSignatureParser::RootSignatureParser(
     RootSignatureTokenizer *pTokenizer, DxilRootSignatureVersion DefaultVersion,
-    DxilRootSignatureCompilationFlags CompilationFlags, llvm::raw_ostream &OS)
+    DxilRootSignatureCompilationFlags CompilationFlags)
     : m_pTokenizer(pTokenizer), m_Version(DefaultVersion),
-      m_CompilationFlags(CompilationFlags), m_OS(OS) {}
+      m_CompilationFlags(CompilationFlags) {}
 
-bool RootSignatureParser::Parse(
+Error RootSignatureParser::Parse(
     DxilVersionedRootSignatureDesc **ppRootSignature) {
 
   DXASSERT(!((bool)(m_CompilationFlags &
@@ -434,29 +438,19 @@ bool RootSignatureParser::Parse(
                     DxilRootSignatureCompilationFlags::LocalRootSignature)),
            "global and local cannot be both set");
   if (!ppRootSignature)
-    return true;
+    return Error::success();
   return ParseRootSignature(ppRootSignature);
 }
 
-bool RootSignatureParser::GetAndMatchToken(TokenType &Token,
-                                           TokenType::Type Type) {
+Error RootSignatureParser::GetAndMatchToken(TokenType &Token,
+                                            TokenType::Type Type) {
   Token = m_pTokenizer->GetToken();
   if (Token.GetType() != Type)
-    return Error("Unexpected token '%s'", Token.GetStr());
-  return true;
+    return err(Twine("Unexpected token '") + Token.GetStr() + "'");
+  return Error::success();
 }
 
-bool RootSignatureParser::Error(LPCSTR pError, ...) {
-  va_list Args;
-  char msg[512];
-  va_start(Args, pError);
-  vsnprintf_s(msg, _countof(msg), pError, Args);
-  va_end(Args);
-  m_OS << msg;
-  return false;
-}
-
-bool RootSignatureParser::ParseRootSignature(
+Error RootSignatureParser::ParseRootSignature(
     DxilVersionedRootSignatureDesc **ppRootSignature) {
   TokenType Token;
   bool bSeenFlags = false;
@@ -482,69 +476,68 @@ bool RootSignatureParser::ParseRootSignature(
   while (Token.GetType() != TokenType::EOL) {
     switch (Token.GetType()) {
     case TokenType::RootFlags:
-      if (!bSeenFlags) {
-        if (!ParseRootSignatureFlags(pRS->Desc_1_1.Flags))
-          return false;
-        bSeenFlags = true;
-      } else {
-        return Error("RootFlags cannot be specified more than once");
-      }
+      if (bSeenFlags)
+        return err("RootFlags cannot be specified more than once");
+      if (auto Err = ParseRootSignatureFlags(pRS->Desc_1_1.Flags))
+        return Err;
+      bSeenFlags = true;
+
       break;
 
     case TokenType::RootConstants: {
       DxilRootParameter1 P;
-      if (!ParseRootConstants(P))
-        return false;
+      if (auto Err = ParseRootConstants(P))
+        return Err;
       RSParameters.push_back(P);
       break;
     }
 
     case TokenType::CBV: {
       DxilRootParameter1 P;
-      if (!ParseRootShaderResource(Token.GetType(), TokenType::BReg,
-                                   DxilRootParameterType::CBV, P))
-        return false;
+      if (auto Err = ParseRootShaderResource(Token.GetType(), TokenType::BReg,
+                                             DxilRootParameterType::CBV, P))
+        return Err;
       RSParameters.push_back(P);
       break;
     }
 
     case TokenType::SRV: {
       DxilRootParameter1 P;
-      if (!ParseRootShaderResource(Token.GetType(), TokenType::TReg,
-                                   DxilRootParameterType::SRV, P))
-        return false;
+      if (auto Err = ParseRootShaderResource(Token.GetType(), TokenType::TReg,
+                                             DxilRootParameterType::SRV, P))
+        return Err;
       RSParameters.push_back(P);
       break;
     }
 
     case TokenType::UAV: {
       DxilRootParameter1 P;
-      if (!ParseRootShaderResource(Token.GetType(), TokenType::UReg,
-                                   DxilRootParameterType::UAV, P))
-        return false;
+      if (auto Err = ParseRootShaderResource(Token.GetType(), TokenType::UReg,
+                                             DxilRootParameterType::UAV, P))
+        return Err;
       RSParameters.push_back(P);
       break;
     }
 
     case TokenType::DescriptorTable: {
       DxilRootParameter1 P;
-      if (!ParseRootDescriptorTable(P))
-        return false;
+      if (auto Err = ParseRootDescriptorTable(P))
+        return Err;
       RSParameters.push_back(P);
       break;
     }
 
     case TokenType::StaticSampler: {
       DxilStaticSamplerDesc P;
-      if (!ParseStaticSampler(P))
-        return false;
+      if (auto Err = ParseStaticSampler(P))
+        return Err;
       StaticSamplers.push_back(P);
       break;
     }
 
     default:
-      return Error("Unexpected token '%s' when parsing root signature",
-                   Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() +
+                 "' when parsing root signature");
     }
 
     Token = m_pTokenizer->GetToken();
@@ -553,7 +546,7 @@ bool RootSignatureParser::ParseRootSignature(
 
     // Consume ','
     if (Token.GetType() != TokenType::Comma)
-      return Error("Expected ',', found: '%s'", Token.GetStr());
+      return err(Twine("Expected ',', found: '") + Token.GetStr() + "'");
 
     Token = m_pTokenizer->PeekToken();
   }
@@ -585,7 +578,7 @@ bool RootSignatureParser::ParseRootSignature(
           pRS, m_Version,
           const_cast<const DxilVersionedRootSignatureDesc **>(&pRS1));
     } catch (...) {
-      return false;
+      return err("An unexpected exception occurred.");
     }
     hlsl::DeleteRootSignature(pRS);
     pRS = pRS1;
@@ -594,10 +587,10 @@ bool RootSignatureParser::ParseRootSignature(
   *ppRootSignature = pRS;
   ScopeCleanup.Fn = []() {};
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseRootSignatureFlags(
+Error RootSignatureParser::ParseRootSignatureFlags(
     DxilRootSignatureFlags &Flags) {
   // RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
   // DENY_VERTEX_SHADER_ROOT_ACCESS)
@@ -614,23 +607,22 @@ bool RootSignatureParser::ParseRootSignatureFlags(
 
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::RootFlags))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::LParen))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::RootFlags))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::LParen))
+    return Err;
 
   Flags = DxilRootSignatureFlags::None;
 
   Token = m_pTokenizer->PeekToken();
   if (Token.GetType() == TokenType::NumberU32) {
-    if (!GetAndMatchToken(Token, TokenType::NumberU32))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+      return Err;
     uint32_t n = Token.GetU32Value();
-    if (n != 0) {
-      return Error("Root signature flag values can only be 0 or flag enum "
-                   "values, found: '%s'",
-                   Token.GetStr());
-    }
+    if (n != 0)
+      return err(Twine("Root signature flag values can only be 0 or flag enum "
+                       "values, found: '") +
+                 Token.GetStr() + "'");
   } else {
     for (;;) {
       Token = m_pTokenizer->GetToken();
@@ -665,8 +657,7 @@ bool RootSignatureParser::ParseRootSignatureFlags(
       case TokenType::LOCAL_ROOT_SIGNATURE:
         if ((bool)(m_CompilationFlags &
                    DxilRootSignatureCompilationFlags::GlobalRootSignature))
-          return Error(
-              "LOCAL_ROOT_SIGNATURE flag used in global root signature");
+          return err("LOCAL_ROOT_SIGNATURE flag used in global root signature");
         Flags |= DxilRootSignatureFlags::LocalRootSignature;
         break;
       case TokenType::CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED:
@@ -676,26 +667,26 @@ bool RootSignatureParser::ParseRootSignatureFlags(
         Flags |= DxilRootSignatureFlags::SamplerHeapDirectlyIndexed;
         break;
       default:
-        return Error("Expected a root signature flag value, found: '%s'",
-                     Token.GetStr());
+        return err(Twine("Expected a root signature flag value, found: '") +
+                   Token.GetStr() + "'");
       }
 
       Token = m_pTokenizer->PeekToken();
       if (Token.GetType() == TokenType::RParen)
         break;
 
-      if (!GetAndMatchToken(Token, TokenType::OR))
-        return false;
+      if (auto Err = GetAndMatchToken(Token, TokenType::OR))
+        return Err;
     }
   }
 
-  if (!GetAndMatchToken(Token, TokenType::RParen))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::RParen))
+    return Err;
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseRootConstants(DxilRootParameter1 &P) {
+Error RootSignatureParser::ParseRootConstants(DxilRootParameter1 &P) {
   //"RootConstants(num32BitConstants=3, b2 [, space=1,
   // visibility=SHADER_VISIBILITY_ALL ] ), "
   TokenType Token;
@@ -708,41 +699,41 @@ bool RootSignatureParser::ParseRootConstants(DxilRootParameter1 &P) {
   bool bSeenSpace = false;
   bool bSeenVisibility = false;
 
-  if (!GetAndMatchToken(Token, TokenType::RootConstants))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::LParen))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::RootConstants))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::LParen))
+    return Err;
 
   for (;;) {
     Token = m_pTokenizer->PeekToken();
 
     switch (Token.GetType()) {
     case TokenType::num32BitConstants:
-      if (!MarkParameter(bSeenNum32BitConstants, "num32BitConstants"))
-        return false;
-      if (!ParseNum32BitConstants(P.Constants.Num32BitValues))
-        return false;
+      if (auto Err = MarkParameter(bSeenNum32BitConstants, "num32BitConstants"))
+        return Err;
+      if (auto Err = ParseNum32BitConstants(P.Constants.Num32BitValues))
+        return Err;
       break;
     case TokenType::BReg:
-      if (!MarkParameter(bSeenBReg, "cbuffer register b#"))
-        return false;
-      if (!ParseRegister(TokenType::BReg, P.Constants.ShaderRegister))
-        return false;
+      if (auto Err = MarkParameter(bSeenBReg, "cbuffer register b#"))
+        return Err;
+      if (auto Err = ParseRegister(TokenType::BReg, P.Constants.ShaderRegister))
+        return Err;
       break;
     case TokenType::space:
-      if (!MarkParameter(bSeenSpace, "space"))
-        return false;
-      if (!ParseSpace(P.Constants.RegisterSpace))
-        return false;
+      if (auto Err = MarkParameter(bSeenSpace, "space"))
+        return Err;
+      if (auto Err = ParseSpace(P.Constants.RegisterSpace))
+        return Err;
       break;
     case TokenType::visibility:
-      if (!MarkParameter(bSeenVisibility, "visibility"))
-        return false;
-      if (!ParseVisibility(P.ShaderVisibility))
-        return false;
+      if (auto Err = MarkParameter(bSeenVisibility, "visibility"))
+        return Err;
+      if (auto Err = ParseVisibility(P.ShaderVisibility))
+        return Err;
       break;
     default:
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
       break;
     }
 
@@ -750,23 +741,22 @@ bool RootSignatureParser::ParseRootConstants(DxilRootParameter1 &P) {
     if (Token.GetType() == TokenType::RParen)
       break;
     else if (Token.GetType() != TokenType::Comma)
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
   }
 
   if (!bSeenNum32BitConstants)
-    return Error("num32BitConstants must be defined for each RootConstants");
+    return err("num32BitConstants must be defined for each RootConstants");
 
   if (!bSeenBReg)
-    return Error(
+    return err(
         "Constant buffer register b# must be defined for each RootConstants");
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseRootShaderResource(TokenType::Type TokType,
-                                                  TokenType::Type RegType,
-                                                  DxilRootParameterType ResType,
-                                                  DxilRootParameter1 &P) {
+Error RootSignatureParser::ParseRootShaderResource(
+    TokenType::Type TokType, TokenType::Type RegType,
+    DxilRootParameterType ResType, DxilRootParameter1 &P) {
   // CBV(b0 [, space=3, flags=0, visibility=VISIBILITY_ALL] )
   TokenType Token;
   P.ParameterType = ResType;
@@ -779,10 +769,10 @@ bool RootSignatureParser::ParseRootShaderResource(TokenType::Type TokType,
   bool bSeenSpace = false;
   bool bSeenVisibility = false;
 
-  if (!GetAndMatchToken(Token, TokType))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::LParen))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokType))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::LParen))
+    return Err;
 
   for (;;) {
     Token = m_pTokenizer->PeekToken();
@@ -791,31 +781,31 @@ bool RootSignatureParser::ParseRootShaderResource(TokenType::Type TokType,
     case TokenType::BReg:
     case TokenType::TReg:
     case TokenType::UReg:
-      if (!MarkParameter(bSeenReg, "shader register"))
-        return false;
-      if (!ParseRegister(RegType, P.Descriptor.ShaderRegister))
-        return false;
+      if (auto Err = MarkParameter(bSeenReg, "shader register"))
+        return Err;
+      if (auto Err = ParseRegister(RegType, P.Descriptor.ShaderRegister))
+        return Err;
       break;
     case TokenType::flags:
-      if (!MarkParameter(bSeenFlags, "flags"))
-        return false;
-      if (!ParseRootDescFlags(P.Descriptor.Flags))
-        return false;
+      if (auto Err = MarkParameter(bSeenFlags, "flags"))
+        return Err;
+      if (auto Err = ParseRootDescFlags(P.Descriptor.Flags))
+        return Err;
       break;
     case TokenType::space:
-      if (!MarkParameter(bSeenSpace, "space"))
-        return false;
-      if (!ParseSpace(P.Descriptor.RegisterSpace))
-        return false;
+      if (auto Err = MarkParameter(bSeenSpace, "space"))
+        return Err;
+      if (auto Err = ParseSpace(P.Descriptor.RegisterSpace))
+        return Err;
       break;
     case TokenType::visibility:
-      if (!MarkParameter(bSeenVisibility, "visibility"))
-        return false;
-      if (!ParseVisibility(P.ShaderVisibility))
-        return false;
+      if (auto Err = MarkParameter(bSeenVisibility, "visibility"))
+        return Err;
+      if (auto Err = ParseVisibility(P.ShaderVisibility))
+        return Err;
       break;
     default:
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
       break;
     }
 
@@ -823,16 +813,16 @@ bool RootSignatureParser::ParseRootShaderResource(TokenType::Type TokType,
     if (Token.GetType() == TokenType::RParen)
       break;
     else if (Token.GetType() != TokenType::Comma)
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
   }
 
   if (!bSeenReg)
-    return Error("shader register must be defined for each CBV/SRV/UAV");
+    return err("shader register must be defined for each CBV/SRV/UAV");
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseRootDescriptorTable(DxilRootParameter1 &P) {
+Error RootSignatureParser::ParseRootDescriptorTable(DxilRootParameter1 &P) {
   // DescriptorTable( SRV(t2, numDescriptors = 6), UAV(u0, numDescriptors = 4)
   // [, visibility = SHADER_VISIBILITY_ALL ] )
   TokenType Token;
@@ -843,10 +833,10 @@ bool RootSignatureParser::ParseRootDescriptorTable(DxilRootParameter1 &P) {
   bool bSeenVisibility = false;
   SmallVector<DxilDescriptorRange1, 4> Ranges;
 
-  if (!GetAndMatchToken(Token, TokenType::DescriptorTable))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::LParen))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::DescriptorTable))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::LParen))
+    return Err;
 
   for (;;) {
     Token = m_pTokenizer->PeekToken();
@@ -854,44 +844,45 @@ bool RootSignatureParser::ParseRootDescriptorTable(DxilRootParameter1 &P) {
     switch (Token.GetType()) {
     case TokenType::CBV: {
       DxilDescriptorRange1 R;
-      if (!ParseDescTableResource(Token.GetType(), TokenType::BReg,
-                                  DxilDescriptorRangeType::CBV, R))
-        return false;
+      if (auto Err = ParseDescTableResource(Token.GetType(), TokenType::BReg,
+                                            DxilDescriptorRangeType::CBV, R))
+        return Err;
       Ranges.push_back(R);
       break;
     }
     case TokenType::SRV: {
       DxilDescriptorRange1 R;
-      if (!ParseDescTableResource(Token.GetType(), TokenType::TReg,
-                                  DxilDescriptorRangeType::SRV, R))
-        return false;
+      if (auto Err = ParseDescTableResource(Token.GetType(), TokenType::TReg,
+                                            DxilDescriptorRangeType::SRV, R))
+        return Err;
       Ranges.push_back(R);
       break;
     }
     case TokenType::UAV: {
       DxilDescriptorRange1 R;
-      if (!ParseDescTableResource(Token.GetType(), TokenType::UReg,
-                                  DxilDescriptorRangeType::UAV, R))
-        return false;
+      if (auto Err = ParseDescTableResource(Token.GetType(), TokenType::UReg,
+                                            DxilDescriptorRangeType::UAV, R))
+        return Err;
       Ranges.push_back(R);
       break;
     }
     case TokenType::Sampler: {
       DxilDescriptorRange1 R;
-      if (!ParseDescTableResource(Token.GetType(), TokenType::SReg,
-                                  DxilDescriptorRangeType::Sampler, R))
-        return false;
+      if (auto Err =
+              ParseDescTableResource(Token.GetType(), TokenType::SReg,
+                                     DxilDescriptorRangeType::Sampler, R))
+        return Err;
       Ranges.push_back(R);
       break;
     }
     case TokenType::visibility:
-      if (!MarkParameter(bSeenVisibility, "visibility"))
-        return false;
-      if (!ParseVisibility(P.ShaderVisibility))
-        return false;
+      if (auto Err = MarkParameter(bSeenVisibility, "visibility"))
+        return Err;
+      if (auto Err = ParseVisibility(P.ShaderVisibility))
+        return Err;
       break;
     default:
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
       break;
     }
 
@@ -899,7 +890,7 @@ bool RootSignatureParser::ParseRootDescriptorTable(DxilRootParameter1 &P) {
     if (Token.GetType() == TokenType::RParen)
       break;
     else if (Token.GetType() != TokenType::Comma)
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
   }
 
   if (Ranges.size() > 0) {
@@ -910,10 +901,10 @@ bool RootSignatureParser::ParseRootDescriptorTable(DxilRootParameter1 &P) {
     P.DescriptorTable.NumDescriptorRanges = Ranges.size();
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseDescTableResource(
+Error RootSignatureParser::ParseDescTableResource(
     TokenType::Type TokType, TokenType::Type RegType,
     DxilDescriptorRangeType RangeType, DxilDescriptorRange1 &R) {
   TokenType Token;
@@ -932,10 +923,10 @@ bool RootSignatureParser::ParseDescTableResource(
   bool bSeenFlags = false;
   bool bSeenOffset = false;
 
-  if (!GetAndMatchToken(Token, TokType))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::LParen))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokType))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::LParen))
+    return Err;
 
   for (;;) {
     Token = m_pTokenizer->PeekToken();
@@ -945,37 +936,37 @@ bool RootSignatureParser::ParseDescTableResource(
     case TokenType::TReg:
     case TokenType::UReg:
     case TokenType::SReg:
-      if (!MarkParameter(bSeenReg, "shader register"))
-        return false;
-      if (!ParseRegister(RegType, R.BaseShaderRegister))
-        return false;
+      if (auto Err = MarkParameter(bSeenReg, "shader register"))
+        return Err;
+      if (auto Err = ParseRegister(RegType, R.BaseShaderRegister))
+        return Err;
       break;
     case TokenType::numDescriptors:
-      if (!MarkParameter(bSeenNumDescriptors, "numDescriptors"))
-        return false;
-      if (!ParseNumDescriptors(R.NumDescriptors))
-        return false;
+      if (auto Err = MarkParameter(bSeenNumDescriptors, "numDescriptors"))
+        return Err;
+      if (auto Err = ParseNumDescriptors(R.NumDescriptors))
+        return Err;
       break;
     case TokenType::space:
-      if (!MarkParameter(bSeenSpace, "space"))
-        return false;
-      if (!ParseSpace(R.RegisterSpace))
-        return false;
+      if (auto Err = MarkParameter(bSeenSpace, "space"))
+        return Err;
+      if (auto Err = ParseSpace(R.RegisterSpace))
+        return Err;
       break;
     case TokenType::flags:
-      if (!MarkParameter(bSeenFlags, "flags"))
-        return false;
-      if (!ParseDescRangeFlags(RangeType, R.Flags))
-        return false;
+      if (auto Err = MarkParameter(bSeenFlags, "flags"))
+        return Err;
+      if (auto Err = ParseDescRangeFlags(RangeType, R.Flags))
+        return Err;
       break;
     case TokenType::offset:
-      if (!MarkParameter(bSeenOffset, "offset"))
-        return false;
-      if (!ParseOffset(R.OffsetInDescriptorsFromTableStart))
-        return false;
+      if (auto Err = MarkParameter(bSeenOffset, "offset"))
+        return Err;
+      if (auto Err = ParseOffset(R.OffsetInDescriptorsFromTableStart))
+        return Err;
       break;
     default:
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
       break;
     }
 
@@ -983,57 +974,56 @@ bool RootSignatureParser::ParseDescTableResource(
     if (Token.GetType() == TokenType::RParen)
       break;
     else if (Token.GetType() != TokenType::Comma)
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
   }
 
   if (!bSeenReg)
-    return Error("shader register must be defined for each CBV/SRV/UAV");
+    return err("shader register must be defined for each CBV/SRV/UAV");
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseRegister(TokenType::Type RegType,
-                                        uint32_t &Reg) {
+Error RootSignatureParser::ParseRegister(TokenType::Type RegType,
+                                         uint32_t &Reg) {
   TokenType Token = m_pTokenizer->PeekToken();
 
   switch (Token.GetType()) {
   case TokenType::BReg:
-    if (!GetAndMatchToken(Token, TokenType::BReg))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::BReg))
+      return Err;
     break;
   case TokenType::TReg:
-    if (!GetAndMatchToken(Token, TokenType::TReg))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::TReg))
+      return Err;
     break;
   case TokenType::UReg:
-    if (!GetAndMatchToken(Token, TokenType::UReg))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::UReg))
+      return Err;
     break;
   case TokenType::SReg:
-    if (!GetAndMatchToken(Token, TokenType::SReg))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::SReg))
+      return Err;
     break;
   default:
-    return Error(
-        "Expected a register token (CBV, SRV, UAV, Sampler), found: '%s'",
-        Token.GetStr());
+    return err(
+        Twine("Expected a register token (CBV, SRV, UAV, Sampler), found: '") +
+        Token.GetStr() + "'");
   }
 
   if (Token.GetType() != RegType) {
     switch (RegType) {
     case TokenType::BReg:
-      return Error("Incorrect register type '%s' in CBV (expected b#)",
-                   Token.GetStr());
+      return err(Twine("Incorrect register type '") + Token.GetStr() +
+                 "' in CBV (expected b#)");
     case TokenType::TReg:
-      return Error("Incorrect register type '%s' in SRV (expected t#)",
-                   Token.GetStr());
+      return err(Twine("Incorrect register type '") + Token.GetStr() +
+                 "' in SRV (expected t#)");
     case TokenType::UReg:
-      return Error("Incorrect register type '%s' in UAV (expected u#)",
-                   Token.GetStr());
+      return err(Twine("Incorrect register type '") + Token.GetStr() +
+                 "' in UAV (expected u#)");
     case TokenType::SReg:
-      return Error(
-          "Incorrect register type '%s' in Sampler/StaticSampler (expected s#)",
-          Token.GetStr());
+      return err(Twine("Incorrect register type '") + Token.GetStr() +
+                 "' in Sampler/StaticSampler (expected s#)");
     default:
       // Only Register types are relevant.
       break;
@@ -1042,67 +1032,67 @@ bool RootSignatureParser::ParseRegister(TokenType::Type RegType,
 
   Reg = Token.GetU32Value();
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseSpace(uint32_t &Space) {
+Error RootSignatureParser::ParseSpace(uint32_t &Space) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::space))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::NumberU32))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::space))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+    return Err;
   Space = Token.GetU32Value();
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseNumDescriptors(uint32_t &NumDescriptors) {
+Error RootSignatureParser::ParseNumDescriptors(uint32_t &NumDescriptors) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::numDescriptors))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::numDescriptors))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
   Token = m_pTokenizer->PeekToken();
   if (Token.GetType() == TokenType::unbounded) {
-    if (!GetAndMatchToken(Token, TokenType::unbounded))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::unbounded))
+      return Err;
     NumDescriptors = UINT32_MAX;
   } else {
-    if (!GetAndMatchToken(Token, TokenType::NumberU32))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+      return Err;
     NumDescriptors = Token.GetU32Value();
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseRootDescFlags(DxilRootDescriptorFlags &Flags) {
+Error RootSignatureParser::ParseRootDescFlags(DxilRootDescriptorFlags &Flags) {
   // flags=DATA_VOLATILE | DATA_STATIC | DATA_STATIC_WHILE_SET_AT_EXECUTE
   TokenType Token;
 
   if (m_Version == DxilRootSignatureVersion::Version_1_0)
-    return Error("Root descriptor flags cannot be specified for root_sig_1_0");
+    return err("Root descriptor flags cannot be specified for root_sig_1_0");
 
-  if (!GetAndMatchToken(Token, TokenType::flags))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::flags))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
 
   Flags = DxilRootDescriptorFlags::None;
 
   Token = m_pTokenizer->PeekToken();
   if (Token.GetType() == TokenType::NumberU32) {
-    if (!GetAndMatchToken(Token, TokenType::NumberU32))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+      return Err;
     uint32_t n = Token.GetU32Value();
     if (n != 0)
-      return Error("Root descriptor flag values can only be 0 or flag enum "
-                   "values, found: '%s'",
-                   Token.GetStr());
+      return err(Twine("Root descriptor flag values can only be 0 or flag enum "
+                       "values, found: '") +
+                 Token.GetStr() + "'");
   } else {
     for (;;) {
       Token = m_pTokenizer->GetToken();
@@ -1117,8 +1107,8 @@ bool RootSignatureParser::ParseRootDescFlags(DxilRootDescriptorFlags &Flags) {
         Flags |= DxilRootDescriptorFlags::DataStaticWhileSetAtExecute;
         break;
       default:
-        return Error("Expected a root descriptor flag value, found: '%s'",
-                     Token.GetStr());
+        return err(Twine("Expected a root descriptor flag value, found: '") +
+                   Token.GetStr() + "'");
       }
 
       Token = m_pTokenizer->PeekToken();
@@ -1126,15 +1116,15 @@ bool RootSignatureParser::ParseRootDescFlags(DxilRootDescriptorFlags &Flags) {
           Token.GetType() == TokenType::Comma)
         break;
 
-      if (!GetAndMatchToken(Token, TokenType::OR))
-        return false;
+      if (auto Err = GetAndMatchToken(Token, TokenType::OR))
+        return Err;
     }
   }
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseDescRangeFlags(DxilDescriptorRangeType,
-                                              DxilDescriptorRangeFlags &Flags) {
+Error RootSignatureParser::ParseDescRangeFlags(
+    DxilDescriptorRangeType, DxilDescriptorRangeFlags &Flags) {
   // flags=DESCRIPTORS_VOLATILE | DATA_VOLATILE | DATA_STATIC |
   // DATA_STATIC_WHILE_SET_AT_EXECUTE |
   // DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
@@ -1142,25 +1132,26 @@ bool RootSignatureParser::ParseDescRangeFlags(DxilDescriptorRangeType,
   TokenType Token;
 
   if (m_Version == DxilRootSignatureVersion::Version_1_0) {
-    return Error("Descriptor range flags cannot be specified for root_sig_1_0");
+    return err("Descriptor range flags cannot be specified for root_sig_1_0");
   }
 
-  if (!GetAndMatchToken(Token, TokenType::flags))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::flags))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
 
   Flags = DxilDescriptorRangeFlags::None;
 
   Token = m_pTokenizer->PeekToken();
   if (Token.GetType() == TokenType::NumberU32) {
-    if (!GetAndMatchToken(Token, TokenType::NumberU32))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+      return Err;
     uint32_t n = Token.GetU32Value();
     if (n != 0) {
-      return Error("Descriptor range flag values can only be 0 or flag enum "
-                   "values, found: '%s'",
-                   Token.GetStr());
+      return err(
+          Twine("Descriptor range flag values can only be 0 or flag enum "
+                "values, found: '") +
+          Token.GetStr() + "'");
     }
   } else {
     for (;;) {
@@ -1183,8 +1174,8 @@ bool RootSignatureParser::ParseDescRangeFlags(DxilDescriptorRangeType,
             DescriptorsStaticKeepingBufferBoundsChecks;
         break;
       default:
-        return Error("Expected a descriptor range flag value, found: '%s'",
-                     Token.GetStr());
+        return err(Twine("Expected a descriptor range flag value, found: '") +
+                   Token.GetStr() + "'");
       }
 
       Token = m_pTokenizer->PeekToken();
@@ -1192,42 +1183,43 @@ bool RootSignatureParser::ParseDescRangeFlags(DxilDescriptorRangeType,
           Token.GetType() == TokenType::Comma)
         break;
 
-      if (!GetAndMatchToken(Token, TokenType::OR))
-        return false;
+      if (auto Err = GetAndMatchToken(Token, TokenType::OR))
+        return Err;
     }
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseOffset(uint32_t &Offset) {
+Error RootSignatureParser::ParseOffset(uint32_t &Offset) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::offset))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::offset))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
   Token = m_pTokenizer->PeekToken();
   if (Token.GetType() == TokenType::DESCRIPTOR_RANGE_OFFSET_APPEND) {
-    if (!GetAndMatchToken(Token, TokenType::DESCRIPTOR_RANGE_OFFSET_APPEND))
-      return false;
+    if (auto Err =
+            GetAndMatchToken(Token, TokenType::DESCRIPTOR_RANGE_OFFSET_APPEND))
+      return Err;
     Offset = DxilDescriptorRangeOffsetAppend;
   } else {
-    if (!GetAndMatchToken(Token, TokenType::NumberU32))
-      return false;
+    if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+      return Err;
     Offset = Token.GetU32Value();
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseVisibility(DxilShaderVisibility &Vis) {
+Error RootSignatureParser::ParseVisibility(DxilShaderVisibility &Vis) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::visibility))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::visibility))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
   Token = m_pTokenizer->GetToken();
 
   switch (Token.GetType()) {
@@ -1256,27 +1248,27 @@ bool RootSignatureParser::ParseVisibility(DxilShaderVisibility &Vis) {
     Vis = DxilShaderVisibility::Mesh;
     break;
   default:
-    return Error("Unexpected visibility value: '%s'.", Token.GetStr());
+    return err(Twine("Unexpected visibility value: '") + Token.GetStr() + "'.");
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseNum32BitConstants(uint32_t &NumConst) {
+Error RootSignatureParser::ParseNum32BitConstants(uint32_t &NumConst) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::num32BitConstants))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::NumberU32))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::num32BitConstants))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+    return Err;
   NumConst = Token.GetU32Value();
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseStaticSampler(DxilStaticSamplerDesc &P) {
+Error RootSignatureParser::ParseStaticSampler(DxilStaticSamplerDesc &P) {
   // StaticSampler( s0,
   //                [ Filter = FILTER_ANISOTROPIC,
   //                  AddressU = TEXTURE_ADDRESS_WRAP,
@@ -1312,117 +1304,117 @@ bool RootSignatureParser::ParseStaticSampler(DxilStaticSamplerDesc &P) {
   bool bSeenSpace = false;
   bool bSeenVisibility = false;
 
-  if (!GetAndMatchToken(Token, TokenType::StaticSampler))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::LParen))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::StaticSampler))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::LParen))
+    return Err;
 
   for (;;) {
     Token = m_pTokenizer->PeekToken();
 
     switch (Token.GetType()) {
     case TokenType::filter:
-      if (!MarkParameter(bSeenFilter, "filter"))
-        return false;
-      if (!ParseFilter(P.Filter))
-        return false;
+      if (auto Err = MarkParameter(bSeenFilter, "filter"))
+        return Err;
+      if (auto Err = ParseFilter(P.Filter))
+        return Err;
       break;
     case TokenType::addressU:
-      if (!MarkParameter(bSeenAddressU, "addressU"))
-        return false;
-      if (!ParseTextureAddressMode(P.AddressU))
-        return false;
+      if (auto Err = MarkParameter(bSeenAddressU, "addressU"))
+        return Err;
+      if (auto Err = ParseTextureAddressMode(P.AddressU))
+        return Err;
       break;
     case TokenType::addressV:
-      if (!MarkParameter(bSeenAddressV, "addressV"))
-        return false;
-      if (!ParseTextureAddressMode(P.AddressV))
-        return false;
+      if (auto Err = MarkParameter(bSeenAddressV, "addressV"))
+        return Err;
+      if (auto Err = ParseTextureAddressMode(P.AddressV))
+        return Err;
       break;
     case TokenType::addressW:
-      if (!MarkParameter(bSeenAddressW, "addressW"))
-        return false;
-      if (!ParseTextureAddressMode(P.AddressW))
-        return false;
+      if (auto Err = MarkParameter(bSeenAddressW, "addressW"))
+        return Err;
+      if (auto Err = ParseTextureAddressMode(P.AddressW))
+        return Err;
       break;
     case TokenType::mipLODBias:
-      if (!MarkParameter(bSeenMipLODBias, "mipLODBias"))
-        return false;
-      if (!ParseMipLODBias(P.MipLODBias))
-        return false;
+      if (auto Err = MarkParameter(bSeenMipLODBias, "mipLODBias"))
+        return Err;
+      if (auto Err = ParseMipLODBias(P.MipLODBias))
+        return Err;
       break;
     case TokenType::maxAnisotropy:
-      if (!MarkParameter(bSeenMaxAnisotropy, "maxAnisotropy"))
-        return false;
-      if (!ParseMaxAnisotropy(P.MaxAnisotropy))
-        return false;
+      if (auto Err = MarkParameter(bSeenMaxAnisotropy, "maxAnisotropy"))
+        return Err;
+      if (auto Err = ParseMaxAnisotropy(P.MaxAnisotropy))
+        return Err;
       break;
     case TokenType::comparisonFunc:
-      if (!MarkParameter(bSeenComparisonFunc, "comparisonFunc"))
-        return false;
-      if (!ParseComparisonFunction(P.ComparisonFunc))
-        return false;
+      if (auto Err = MarkParameter(bSeenComparisonFunc, "comparisonFunc"))
+        return Err;
+      if (auto Err = ParseComparisonFunction(P.ComparisonFunc))
+        return Err;
       break;
     case TokenType::borderColor:
-      if (!MarkParameter(bSeenBorderColor, "borderColor"))
-        return false;
-      if (!ParseBorderColor(P.BorderColor))
-        return false;
+      if (auto Err = MarkParameter(bSeenBorderColor, "borderColor"))
+        return Err;
+      if (auto Err = ParseBorderColor(P.BorderColor))
+        return Err;
       break;
     case TokenType::minLOD:
-      if (!MarkParameter(bSeenMinLOD, "minLOD"))
-        return false;
-      if (!ParseMinLOD(P.MinLOD))
-        return false;
+      if (auto Err = MarkParameter(bSeenMinLOD, "minLOD"))
+        return Err;
+      if (auto Err = ParseMinLOD(P.MinLOD))
+        return Err;
       break;
     case TokenType::maxLOD:
-      if (!MarkParameter(bSeenMaxLOD, "maxLOD"))
-        return false;
-      if (!ParseMaxLOD(P.MaxLOD))
-        return false;
+      if (auto Err = MarkParameter(bSeenMaxLOD, "maxLOD"))
+        return Err;
+      if (auto Err = ParseMaxLOD(P.MaxLOD))
+        return Err;
       break;
     case TokenType::SReg:
-      if (!MarkParameter(bSeenSReg, "sampler register s#"))
-        return false;
-      if (!ParseRegister(TokenType::SReg, P.ShaderRegister))
-        return false;
+      if (auto Err = MarkParameter(bSeenSReg, "sampler register s#"))
+        return Err;
+      if (auto Err = ParseRegister(TokenType::SReg, P.ShaderRegister))
+        return Err;
       break;
     case TokenType::space:
-      if (!MarkParameter(bSeenSpace, "space"))
-        return false;
-      if (!ParseSpace(P.RegisterSpace))
-        return false;
+      if (auto Err = MarkParameter(bSeenSpace, "space"))
+        return Err;
+      if (auto Err = ParseSpace(P.RegisterSpace))
+        return Err;
       break;
     case TokenType::visibility:
-      if (!MarkParameter(bSeenVisibility, "visibility"))
-        return false;
-      if (!ParseVisibility(P.ShaderVisibility))
-        return false;
+      if (auto Err = MarkParameter(bSeenVisibility, "visibility"))
+        return Err;
+      if (auto Err = ParseVisibility(P.ShaderVisibility))
+        return Err;
       break;
     default:
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
     }
 
     Token = m_pTokenizer->GetToken();
     if (Token.GetType() == TokenType::RParen)
       break;
     else if (Token.GetType() != TokenType::Comma)
-      return Error("Unexpected token '%s'", Token.GetStr());
+      return err(Twine("Unexpected token '") + Token.GetStr() + "'");
   }
 
   if (!bSeenSReg)
-    return Error("Sampler register s# must be defined for each static sampler");
+    return err("Sampler register s# must be defined for each static sampler");
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseFilter(DxilFilter &Filter) {
+Error RootSignatureParser::ParseFilter(DxilFilter &Filter) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::filter))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::filter))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
   Token = m_pTokenizer->GetToken();
 
   switch (Token.GetType()) {
@@ -1535,20 +1527,20 @@ bool RootSignatureParser::ParseFilter(DxilFilter &Filter) {
     Filter = DxilFilter::MAXIMUM_ANISOTROPIC;
     break;
   default:
-    return Error("Unexpected filter value: '%s'.", Token.GetStr());
+    return err(Twine("Unexpected filter value: '") + Token.GetStr() + "'.");
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseTextureAddressMode(
+Error RootSignatureParser::ParseTextureAddressMode(
     DxilTextureAddressMode &AddressMode) {
   TokenType Token = m_pTokenizer->GetToken();
   DXASSERT_NOMSG(Token.GetType() == TokenType::addressU ||
                  Token.GetType() == TokenType::addressV ||
                  Token.GetType() == TokenType::addressW);
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
   Token = m_pTokenizer->GetToken();
 
   switch (Token.GetType()) {
@@ -1568,48 +1560,48 @@ bool RootSignatureParser::ParseTextureAddressMode(
     AddressMode = DxilTextureAddressMode::MirrorOnce;
     break;
   default:
-    return Error("Unexpected texture address mode value: '%s'.",
-                 Token.GetStr());
+    return err(Twine("Unexpected texture address mode value: '") +
+               Token.GetStr() + "'.");
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseMipLODBias(float &MipLODBias) {
+Error RootSignatureParser::ParseMipLODBias(float &MipLODBias) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::mipLODBias))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
-  if (!ParseFloat(MipLODBias))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::mipLODBias))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
+  if (auto Err = ParseFloat(MipLODBias))
+    return Err;
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseMaxAnisotropy(uint32_t &MaxAnisotropy) {
+Error RootSignatureParser::ParseMaxAnisotropy(uint32_t &MaxAnisotropy) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::maxAnisotropy))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::NumberU32))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::maxAnisotropy))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::NumberU32))
+    return Err;
   MaxAnisotropy = Token.GetU32Value();
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseComparisonFunction(
+Error RootSignatureParser::ParseComparisonFunction(
     DxilComparisonFunc &ComparisonFunc) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::comparisonFunc))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::comparisonFunc))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
   Token = m_pTokenizer->GetToken();
 
   switch (Token.GetType()) {
@@ -1638,19 +1630,20 @@ bool RootSignatureParser::ParseComparisonFunction(
     ComparisonFunc = DxilComparisonFunc::Always;
     break;
   default:
-    return Error("Unexpected texture address mode value: '%s'.",
-                 Token.GetStr());
+    return err(Twine("Unexpected texture address mode value: '") +
+               Token.GetStr() + "'.");
   }
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseBorderColor(DxilStaticBorderColor &BorderColor) {
+Error RootSignatureParser::ParseBorderColor(
+    DxilStaticBorderColor &BorderColor) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::borderColor))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::borderColor))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
   Token = m_pTokenizer->GetToken();
 
   switch (Token.GetType()) {
@@ -1670,40 +1663,40 @@ bool RootSignatureParser::ParseBorderColor(DxilStaticBorderColor &BorderColor) {
     BorderColor = DxilStaticBorderColor::OpaqueWhiteUint;
     break;
   default:
-    return Error("Unexpected texture address mode value: '%s'.",
-                 Token.GetStr());
+    return err(Twine("Unexpected texture address mode value: '") +
+               Token.GetStr() + "'.");
   }
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseMinLOD(float &MinLOD) {
+Error RootSignatureParser::ParseMinLOD(float &MinLOD) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::minLOD))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
-  if (!ParseFloat(MinLOD))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::minLOD))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
+  if (auto Err = ParseFloat(MinLOD))
+    return Err;
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseMaxLOD(float &MaxLOD) {
+Error RootSignatureParser::ParseMaxLOD(float &MaxLOD) {
   TokenType Token;
 
-  if (!GetAndMatchToken(Token, TokenType::maxLOD))
-    return false;
-  if (!GetAndMatchToken(Token, TokenType::EQ))
-    return false;
-  if (!ParseFloat(MaxLOD))
-    return false;
+  if (auto Err = GetAndMatchToken(Token, TokenType::maxLOD))
+    return Err;
+  if (auto Err = GetAndMatchToken(Token, TokenType::EQ))
+    return Err;
+  if (auto Err = ParseFloat(MaxLOD))
+    return Err;
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::ParseFloat(float &v) {
+Error RootSignatureParser::ParseFloat(float &v) {
   TokenType Token = m_pTokenizer->GetToken();
   if (Token.GetType() == TokenType::NumberU32)
     v = (float)Token.GetU32Value();
@@ -1712,19 +1705,19 @@ bool RootSignatureParser::ParseFloat(float &v) {
   else if (Token.GetType() == TokenType::NumberFloat)
     v = Token.GetFloatValue();
   else
-    return Error("Expected float, found token '%s'", Token.GetStr());
+    return err(Twine("Expected float, found token '") + Token.GetStr() + "'");
 
-  return true;
+  return Error::success();
 }
 
-bool RootSignatureParser::MarkParameter(bool &bSeen, LPCSTR pName) {
+Error RootSignatureParser::MarkParameter(bool &bSeen, const char *pName) {
 
   if (bSeen)
-    return Error("Parameter '%s' can be specified only once", pName);
+    return err(Twine("Parameter '") + pName + "' can be specified only once");
 
   bSeen = true;
 
-  return true;
+  return Error::success();
 }
 
 _Use_decl_annotations_ bool clang::ParseHLSLRootSignature(
@@ -1733,19 +1726,20 @@ _Use_decl_annotations_ bool clang::ParseHLSLRootSignature(
     hlsl::DxilVersionedRootSignatureDesc **ppDesc, SourceLocation Loc,
     clang::DiagnosticsEngine &Diags) {
   *ppDesc = nullptr;
-  std::string OSStr;
-  llvm::raw_string_ostream OS(OSStr);
   hlsl::RootSignatureTokenizer RST(pData, Len);
-  hlsl::RootSignatureParser RSP(&RST, Ver, Flags, OS);
-  if (RSP.Parse(ppDesc))
-    return true;
-  // Create diagnostic error message.
-  OS.flush();
-  if (OSStr.empty())
-    Diags.Report(Loc, clang::diag::err_hlsl_rootsig) << "unexpected";
-  else 
-    Diags.Report(Loc, clang::diag::err_hlsl_rootsig) << OSStr.c_str();
-  return false;
+  hlsl::RootSignatureParser RSP(&RST, Ver, Flags);
+  if (auto Err = RSP.Parse(ppDesc)) {
+    std::string OSStr;
+    raw_string_ostream OS(OSStr);
+    logAllUnhandledErrors(std::move(Err), OS, "");
+
+    if (OSStr.empty())
+      Diags.Report(Loc, clang::diag::err_hlsl_rootsig) << "unexpected";
+    else
+      Diags.Report(Loc, clang::diag::err_hlsl_rootsig) << OSStr.c_str();
+    return false;
+  }
+  return true;
 }
 
 _Use_decl_annotations_ void
