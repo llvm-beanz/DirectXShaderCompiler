@@ -3079,6 +3079,11 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
       return true;
     break;
 
+  // HLSL Change - Begin
+  case HLSLOutParamExprClass:
+    return true;
+  // HLSL Change - End
+
   case InitListExprClass:
     // FIXME: The children for an InitListExpr doesn't include the array filler.
     if (const Expr *E = cast<InitListExpr>(this)->getArrayFiller())

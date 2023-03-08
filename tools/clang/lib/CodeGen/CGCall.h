@@ -84,25 +84,17 @@ namespace CodeGen {
 
     void addFrom(const CallArgList &other) {
       insert(end(), other.begin(), other.end());
-#if 0 // HLSL Change - no ObjC support
       Writebacks.insert(Writebacks.end(),
                         other.Writebacks.begin(), other.Writebacks.end());
-#else
-      assert(!other.hasWritebacks() && "writeback is unreachable in HLSL");
-#endif // HLSL Change - no ObjC support
     }
 
     void addWriteback(LValue srcLV, llvm::Value *temporary,
                       llvm::Value *toUse) {
-#if 0 // HLSL Change - no ObjC support
       Writeback writeback;
       writeback.Source = srcLV;
       writeback.Temporary = temporary;
       writeback.ToUse = toUse;
       Writebacks.push_back(writeback);
-#else
-      llvm_unreachable("addWriteback is unreachable in HLSL");
-#endif // HLSL Change - no ObjC support
     }
 
     bool hasWritebacks() const { return !Writebacks.empty(); }

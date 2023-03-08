@@ -509,6 +509,7 @@ namespace  {
     void VisitExtVectorElementExpr(const ExtVectorElementExpr *Node);
     void VisitExtMatrixElementExpr(const ExtMatrixElementExpr *Node); // HLSL Change
     void VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *Node); // HLSL Change
+    void VisitHLSLOutParamExpr(const HLSLOutParamExpr *Node); // HLSL Change
     void VisitBinaryOperator(const BinaryOperator *Node);
     void VisitCompoundAssignOperator(const CompoundAssignOperator *Node);
     void VisitAddrLabelExpr(const AddrLabelExpr *Node);
@@ -2026,6 +2027,13 @@ void ASTDumper::VisitExtMatrixElementExpr(const ExtMatrixElementExpr *Node) {
 void ASTDumper::VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *Node) {
   VisitExpr(Node);
   OS << " " << Node->getAccessor().getNameStart();
+}
+
+void ASTDumper::VisitHLSLOutParamExpr(const HLSLOutParamExpr *Node) {
+  VisitExpr(Node);
+  OS << (Node->isInOut() ? " inout" : " out");
+  if (Node->canElide())
+    OS << " can elide";
 }
 // HLSL Change Ends
 

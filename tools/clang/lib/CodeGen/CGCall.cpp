@@ -2579,7 +2579,6 @@ void CodeGenFunction::EmitDelegateCallArg(CallArgList &args,
   args.add(convertTempToRValue(local, type, loc), type);
 }
 
-#if 0 // HLSL Change - no ObjC support
 static bool isProvablyNull(llvm::Value *addr) {
   return isa<llvm::ConstantPointerNull>(addr);
 }
@@ -2659,7 +2658,6 @@ static void emitWritebacks(CodeGenFunction &CGF,
   for (const auto &I : args.writebacks())
     emitWriteback(CGF, I);
 }
-#endif // HLSL Change - no ObjC support
 
 static void deactivateArgCleanupsBeforeCall(CodeGenFunction &CGF,
                                             const CallArgList &CallArgs) {
@@ -2999,6 +2997,14 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
         RValue RV = RValue::get(Ptr);
         return args.add(RV, type);
       }
+    }
+
+    // Add writeback for HLSLOutParamExpr.
+    if (const HLSLOutParamExpr *OE = dyn_cast<HLSLOutParamExpr>(E)) {
+      LValue LV = EmitLValue(E);
+      if (!OE->canElide())
+        args.addWriteback(EmitLValue(OE->getBase()), LV.getAddress(), nullptr);
+      return args.add(RValue::get(LV.getAddress()), type);
     }
     // HLSL Change Ends.
     assert(E->getObjectKind() == OK_Ordinary);
@@ -3670,14 +3676,10 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   if (Builder.isNamePreserving() && !CI->getType()->isVoidTy())
     CI->setName("call");
 
-#if 0 // HLSL Change - no ObjC support
   // Emit any writebacks immediately.  Arguably this should happen
   // after any return-value munging.
   if (CallArgs.hasWritebacks())
     emitWritebacks(*this, CallArgs);
-#else
-  assert(!CallArgs.hasWritebacks() && "writebacks are unavailable in HLSL");
-#endif // HLSL Change - no ObjC support
 
   // The stack cleanup for inalloca arguments has to run out of the normal
   // lexical order, so deactivate it and run it manually here.
