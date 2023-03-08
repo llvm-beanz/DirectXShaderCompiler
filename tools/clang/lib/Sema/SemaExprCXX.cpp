@@ -3452,9 +3452,21 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
   case ICK_HLSLVector_Splat:
   case ICK_HLSLVector_Scalar:
   case ICK_HLSLVector_Truncation:
-  case ICK_HLSLVector_Conversion:
-    From = hlsl::PerformHLSLConversion(this, From, ToType.getUnqualifiedType(), SCS, CCK).get();
+  case ICK_HLSLVector_Conversion: {
+    ExprResult FromRes = hlsl::PerformHLSLConversion(
+        this, From, ToType.getUnqualifiedType(), SCS, CCK);
+    if (FromRes.isInvalid())
+      return ExprError();
+    From = FromRes.get();
+    // If this isn't going to a reference we also need an LValueToRValue cast
+    if (!ToType->isReferenceType()) {
+      ExprResult FromRes = DefaultLvalueConversion(From);
+      if (FromRes.isInvalid())
+        return ExprError();
+      From = FromRes.get();
+    }
     break;
+  }
   // HLSL Change Ends
       
   case ICK_TransparentUnionConversion: {
