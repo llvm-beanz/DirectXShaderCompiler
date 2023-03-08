@@ -1745,12 +1745,7 @@ AddHLSLIntrinsicFunction(ASTContext &context, NamespaceDecl *NS,
     if (paramMods[i - 1].isAnyOut() ||
         paramMods[i - 1].GetKind() == hlsl::ParameterModifier::Kind::Ref) {
       QualType Ty = functionArgQualTypes[i];
-      // Aggregate type will be indirect param convert to pointer type.
-      // Don't need add reference for it.
-      if ((!Ty->isArrayType() && !Ty->isRecordType()) ||
-          hlsl::IsHLSLVecMatType(Ty)) {
-        functionArgQualTypes[i] = context.getLValueReferenceType(Ty);
-      }
+      functionArgQualTypes[i] = context.getLValueReferenceType(Ty);
     }
   }
 
