@@ -45,6 +45,7 @@
 #include "clang/Sema/Template.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "clang/Sema/SemaHLSL.h" // HLSL Change
+#include "HLSLOutParamBuilder.h" // HLSL Change
 using namespace clang;
 using namespace sema;
 
@@ -4640,6 +4641,7 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
   unsigned NumParams = Proto->getNumParams();
   bool Invalid = false;
   unsigned ArgIx = 0;
+  HLSLOutParamBuilder HLSLBuilder; // HLSL Change
   // Continue to check argument types (even if we have too few/many args).
   for (unsigned i = FirstParam; i < NumParams; i++) {
     QualType ProtoArgType = Proto->getParamType(i);
@@ -4682,6 +4684,10 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
         return true;
 
       Arg = ArgE.getAs<Expr>();
+      // HLSL Change Begin - Optimize out parameters.
+      if (Param->isModifierOut())
+        Arg = HLSLBuilder.Create(Context, Param, Arg);
+      // HLSL Change End - Optimize out paramters.
     } else {
       assert(Param && "can't use default arguments without a known callee");
 

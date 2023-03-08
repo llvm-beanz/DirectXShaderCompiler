@@ -920,6 +920,8 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitExtMatrixElementExpr(cast<ExtMatrixElementExpr>(E));
   case Expr::HLSLVectorElementExprClass:
     return EmitHLSLVectorElementExpr(cast<HLSLVectorElementExpr>(E));
+  case Expr::HLSLOutParamExprClass:
+    return EmitHLSLOutParamExpr(cast<HLSLOutParamExpr>(E));
   case Expr::CXXThisExprClass:
     return MakeAddrLValue(LoadCXXThis(), E->getType());
   // HLSL Change Ends
@@ -2961,6 +2963,20 @@ CodeGenFunction::EmitExtMatrixElementExpr(const ExtMatrixElementExpr *E) {
       *this, ResultTy, {matBase, CV}, E->getBase()->getType());
   return MakeAddrLValue(Result, E->getType());
 }
+
+LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
+  if (E->canElide())
+    return EmitLValue(E->getBase());
+  llvm::Type *Ty = ConvertType(E->getType());
+  llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "out_param");
+  if (E->isInOut()) {
+    LValue InitialState = EmitLValue(E->getBase());
+    llvm::LoadInst *Ld = Builder.CreateLoad(InitialState.getAddress(), "in_val");
+    (void)Builder.CreateStore(Ld, OutTemp);
+  }
+  return MakeAddrLValue(OutTemp, E->getType());
+}
+
 LValue
 CodeGenFunction::EmitHLSLVectorElementExpr(const HLSLVectorElementExpr *E) {
   // Emit the base vector as an l-value.
@@ -3940,28 +3956,16 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, llvm::Value *Callee,
   // HLSL Change Begins
   llvm::SmallVector<LValue, 8> castArgList;
   llvm::SmallVector<LValue, 8> lifetimeCleanupList;
-  // The argList of the CallExpr, may be update for out parameter
-  llvm::SmallVector<const Stmt *, 8> argList(E->arg_begin(), E->arg_end());
-  ConstExprIterator argBegin = argList.data();
-  ConstExprIterator argEnd = argList.data() + E->getNumArgs();
   // out param conversion
   CodeGenFunction::HLSLOutParamScope OutParamScope(*this);
-  auto MapTemp = [&](const VarDecl *LocalVD, llvm::Value *TmpArg) {
-      OutParamScope.addTemp(LocalVD, TmpArg);
-  };
-  if (getLangOpts().HLSL) {
-    if (const FunctionDecl *FD = E->getDirectCallee())
-      CGM.getHLSLRuntime().EmitHLSLOutParamConversionInit(*this, FD, E,
-                                                          castArgList, argList, lifetimeCleanupList, MapTemp);
-  }
   // HLSL Change Ends
 
   CallArgList Args;
   if (Chain)
     Args.add(RValue::get(Builder.CreateBitCast(Chain, CGM.VoidPtrTy)),
              CGM.getContext().VoidPtrTy);
-  EmitCallArgs(Args, dyn_cast<FunctionProtoType>(FnType), argBegin, argEnd,  // HLSL Change - use updated argList
-               E->getDirectCallee(), /*ParamsToSkip*/ 0);
+  EmitCallArgs(Args, dyn_cast<FunctionProtoType>(FnType), E->arg_begin(),
+               E->arg_end(), E->getDirectCallee(), /*ParamsToSkip*/ 0);
 
   const CGFunctionInfo &FnInfo = CGM.getTypes().arrangeFreeFunctionCall(
       Args, FnType, /*isChainCall=*/Chain);

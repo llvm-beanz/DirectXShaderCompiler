@@ -8193,6 +8193,20 @@ TreeTransform<Derived>::TransformHLSLVectorElementExpr(HLSLVectorElementExpr *E)
     E->getAccessorLoc(),
     E->getAccessor());
 }
+
+template <typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformHLSLOutParamExpr(HLSLOutParamExpr *E) {
+  ExprResult Base = getDerived().TransformExpr(E->getBase());
+  if (Base.isInvalid())
+    return ExprError();
+
+  if (!getDerived().AlwaysRebuild() && Base.get() == E->getBase())
+    return E;
+
+  return new (getSema().Context)
+      HLSLOutParamExpr(E->getType(), Base.get(), E->isInOut(), E->canElide());
+}
 // HLSL Change Ends
 
 template<typename Derived>

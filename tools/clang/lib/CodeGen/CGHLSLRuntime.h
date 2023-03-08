@@ -83,7 +83,6 @@ public:
   virtual void EmitHLSLOutParamConversionInit(
       CodeGenFunction &CGF, const FunctionDecl *FD, const CallExpr *E,
       llvm::SmallVector<LValue, 8> &castArgList,
-      llvm::SmallVector<const Stmt *, 8> &argList,
       llvm::SmallVector<LValue, 8> &lifetimeCleanupList,
       const std::function<void(const VarDecl *, llvm::Value *)> &TmpArgMap) = 0;
   virtual void EmitHLSLOutParamConversionCopyBack(

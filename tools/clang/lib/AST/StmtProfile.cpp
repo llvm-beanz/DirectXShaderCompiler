@@ -788,7 +788,7 @@ void StmtProfiler::VisitExtVectorElementExpr(const ExtVectorElementExpr *S) {
   VisitName(&S->getAccessor());
 }
 
-// HLSL Change
+// HLSL Change Begin
 void StmtProfiler::VisitExtMatrixElementExpr(const ExtMatrixElementExpr *S) {
   VisitExpr(S);
   VisitName(&S->getAccessor());
@@ -797,6 +797,11 @@ void StmtProfiler::VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *S) {
   VisitExpr(S);
   VisitName(&S->getAccessor());
 }
+
+void StmtProfiler::VisitHLSLOutParamExpr(const HLSLOutParamExpr *S) {
+  VisitExpr(S);
+}
+// HLSL Change End
 
 void StmtProfiler::VisitBlockExpr(const BlockExpr *S) {
   VisitExpr(S);

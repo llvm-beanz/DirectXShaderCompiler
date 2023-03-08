@@ -321,6 +321,8 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
     if (cast<HLSLVectorElementExpr>(E)->isArrow())
       return Cl::CL_LValue;
     return ClassifyInternal(Ctx, cast<HLSLVectorElementExpr>(E)->getBase());
+  case Expr::HLSLOutParamExprClass:
+    return Cl::CL_LValue;
     // HLSL Change Ends
 
     // Simply look at the actual default argument.
