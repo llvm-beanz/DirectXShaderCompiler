@@ -4752,6 +4752,41 @@ public:
   // Iterators
   child_range children() { return child_range(&Base, &Base + 1); }
 };
+
+class HLSLOutParamExpr : public Expr {
+  Expr *Base;
+  bool IsInOut;
+  bool CanElide;
+
+public:
+  HLSLOutParamExpr(QualType Ty, Expr *Base, bool IsInOut = false,
+                   bool CanElide = false)
+      : Expr(HLSLOutParamExprClass, Ty, VK_LValue, OK_Ordinary,
+             Base->isTypeDependent(), Base->isValueDependent(),
+             Base->isInstantiationDependent(),
+             Base->containsUnexpandedParameterPack()),
+        Base(Base), IsInOut(IsInOut), CanElide(CanElide) {}
+
+  const Expr *getBase() const { return Base; }
+  Expr *getBase() { return Base; }
+  void setBase(Expr *E) { Base = E; }
+
+  bool isInOut() const { return IsInOut; }
+  bool canElide() const { return CanElide; }
+
+  SourceLocation getLocStart() const LLVM_READONLY {
+    return Base->getLocStart();
+  }
+
+  SourceLocation getLocEnd() const LLVM_READONLY { return Base->getLocEnd(); }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == HLSLOutParamExprClass;
+  }
+
+  // Iterators
+  child_range children() { return child_range((Stmt**)&Base, (Stmt**)&Base + 1); }
+};
 // HLSL Change Ends
 
 /// BlockExpr - Adaptor class for mixing a BlockDecl with expressions.

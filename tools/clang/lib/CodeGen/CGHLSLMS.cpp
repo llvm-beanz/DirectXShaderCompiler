@@ -241,7 +241,6 @@ public:
   void EmitHLSLOutParamConversionInit(
       CodeGenFunction &CGF, const FunctionDecl *FD, const CallExpr *E,
       llvm::SmallVector<LValue, 8> &castArgList,
-      llvm::SmallVector<const Stmt *, 8> &argList,
       llvm::SmallVector<LValue, 8> &lifetimeCleanupList,
       const std::function<void(const VarDecl *, llvm::Value *)> &TmpArgMap)
       override;
@@ -5972,7 +5971,6 @@ void CGMSHLSLRuntime::EmitHLSLRootSignature(HLSLRootSignatureAttr *RSA,
 void CGMSHLSLRuntime::EmitHLSLOutParamConversionInit(
     CodeGenFunction &CGF, const FunctionDecl *FD, const CallExpr *E,
     llvm::SmallVector<LValue, 8> &castArgList,
-    llvm::SmallVector<const Stmt *, 8> &argList,
     llvm::SmallVector<LValue, 8> &lifetimeCleanupList,
     const std::function<void(const VarDecl *, llvm::Value *)> &TmpArgMap) {
   // Special case: skip first argument of CXXOperatorCall (it is "this").
@@ -6022,8 +6020,6 @@ void CGMSHLSLRuntime::EmitHLSLOutParamConversionInit(
               if (const ImplicitCastExpr *cast =
                       dyn_cast<ImplicitCastExpr>(cCast->getSubExpr())) {
                 if (cast->getCastKind() == CastKind::CK_LValueToRValue) {
-                  // update the arg
-                  argList[ArgIdx] = cast->getSubExpr();
                   continue;
                 }
               }
@@ -6151,16 +6147,6 @@ void CGMSHLSLRuntime::EmitHLSLOutParamConversionInit(
                         /*IdentifierInfo*/ nullptr, ParamTy,
                         CGF.getContext().getTrivialTypeSourceInfo(ParamTy),
                         StorageClass::SC_Auto);
-
-    // Aggregate type will be indirect param convert to pointer type.
-    // So don't update to ReferenceType, use RValue for it.
-    const DeclRefExpr *tmpRef = DeclRefExpr::Create(
-        CGF.getContext(), NestedNameSpecifierLoc(), SourceLocation(), tmpArg,
-        /*enclosing*/ false, tmpArg->getLocation(), ParamTy,
-        (isAggregateType || isObject) ? VK_RValue : VK_LValue);
-
-    // must update the arg, since we did emit Arg, else we get double emit.
-    argList[ArgIdx] = tmpRef;
 
     // create alloc for the tmp arg
     Value *tmpArgAddr = nullptr;

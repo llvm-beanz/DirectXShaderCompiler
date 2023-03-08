@@ -2466,6 +2466,7 @@ public:
   LValue EmitExtVectorElementExpr(const ExtVectorElementExpr *E);
   LValue EmitExtMatrixElementExpr(const ExtMatrixElementExpr *E); // HLSL Change
   LValue EmitHLSLVectorElementExpr(const HLSLVectorElementExpr *E); // HLSL Change
+  LValue EmitHLSLOutParamExpr(const HLSLOutParamExpr *E); // HLSL Change
   LValue EmitMemberExpr(const MemberExpr *E);
   LValue EmitObjCIsaExpr(const ObjCIsaExpr *E);
   LValue EmitCompoundLiteralLValue(const CompoundLiteralExpr *E);
