@@ -29,26 +29,18 @@ class HLSLOutParamBuilder {
 
   class DeclFinder : public StmtVisitor<DeclFinder> {
   public:
-    NamedDecl *Decl = nullptr;
+    ValueDecl *Decl = nullptr;
     bool MultipleFound = false;
 
     DeclFinder() = default;
-
-    void VisitStmt(Stmt *S) { VisitChildren(S); }
 
     void VisitDeclRefExpr(DeclRefExpr *DRE) {
       if (MultipleFound)
         return;
       if (Decl)
         MultipleFound = true;
-      Decl = DRE->getFoundDecl();
+      Decl = cast<ValueDecl>(DRE->getFoundDecl());
       return;
-    }
-
-    void VisitChildren(Stmt *S) {
-      for (Stmt *SubStmt : S->children())
-        if (SubStmt)
-          this->Visit(SubStmt);
     }
   };
 
@@ -61,9 +53,11 @@ public:
 
     // If the analysis returned multiple possible decls, or no decl, or we've
     // seen the decl before, generate a HLSLOutParamExpr that can't be elided.
-    if (DF.MultipleFound || DF.Decl == nullptr || SeenVars.count(DF.Decl) > 0)
-      return new (Ctx) HLSLOutParamExpr(Base->getType(), Base,
-                                        P->hasAttr<HLSLInOutAttr>());
+    if (DF.MultipleFound || DF.Decl == nullptr ||
+        DF.Decl->getType().getQualifiers().hasAddressSpace() ||
+        SeenVars.count(DF.Decl) > 0)
+      return new (Ctx)
+          HLSLOutParamExpr(Base->getType(), Base, P->hasAttr<HLSLInOutAttr>());
     // Add the decl to the seen list, and generate a HLSLOutParamExpr that can
     // be elided.
     SeenVars.insert(DF.Decl);
