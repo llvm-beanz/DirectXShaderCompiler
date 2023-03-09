@@ -3453,8 +3453,8 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
   case ICK_HLSLVector_Scalar:
   case ICK_HLSLVector_Truncation:
   case ICK_HLSLVector_Conversion: {
-    ExprResult FromRes = hlsl::PerformHLSLConversion(
-        this, From, ToType.getUnqualifiedType(), SCS, CCK);
+    ExprResult FromRes =
+        hlsl::PerformHLSLConversion(this, From, ToType, SCS, CCK);
     if (FromRes.isInvalid())
       return ExprError();
     From = FromRes.get();
@@ -3467,7 +3467,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     }
     break;
   }
-  // HLSL Change Ends
+    // HLSL Change Ends
       
   case ICK_TransparentUnionConversion: {
     ExprResult FromRes = From;
