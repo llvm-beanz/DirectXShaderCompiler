@@ -80,14 +80,6 @@ public:
   virtual llvm::Constant *EmitHLSLConstInitListExpr(CodeGenModule &CGM,
                                                     InitListExpr *E) = 0;
 
-  virtual void EmitHLSLOutParamConversionInit(
-      CodeGenFunction &CGF, const FunctionDecl *FD, const CallExpr *E,
-      llvm::SmallVector<LValue, 8> &castArgList,
-      llvm::SmallVector<LValue, 8> &lifetimeCleanupList,
-      const std::function<void(const VarDecl *, llvm::Value *)> &TmpArgMap) = 0;
-  virtual void EmitHLSLOutParamConversionCopyBack(
-      CodeGenFunction &CGF, llvm::SmallVector<LValue, 8> &castArgList,
-      llvm::SmallVector<LValue, 8> &lifetimeCleanupList) = 0;
   virtual void MarkPotentialResourceTemp(CodeGenFunction &CGF, llvm::Value *V,
                                          clang::QualType QaulTy) = 0;
   virtual llvm::Value *

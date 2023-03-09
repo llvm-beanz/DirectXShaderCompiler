@@ -3970,13 +3970,6 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, llvm::Value *Callee,
   }
   RValue CallVal = EmitCall(FnInfo, Callee, ReturnValue, Args, TargetDecl);
 
-  // HLSL Change Begins
-  // out param conversion
-  // conversion and copy back after the call
-  if (getLangOpts().HLSL)
-    CGM.getHLSLRuntime().EmitHLSLOutParamConversionCopyBack(*this, castArgList, lifetimeCleanupList);
-  // HLSL Change Ends
-
   return CallVal;
 }
 
