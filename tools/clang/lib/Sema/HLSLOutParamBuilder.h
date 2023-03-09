@@ -55,12 +55,19 @@ public:
 
     // If the types mismatch we _may_ have some casting to perform.
     if (Ty != Base->getType()) {
-      ExprResult Res = Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
+      ExprResult Res =
+          Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
       if (Res.isInvalid())
         return ExprError();
-      Base = Res.get();
-      return ExprResult(
-          new (Ctx) HLSLOutParamExpr(Ty, Base, P->hasAttr<HLSLInOutAttr>()));
+      Expr *NewBase = new (Ctx) MaterializeTemporaryExpr(Ty, Res.get(), true);
+      HLSLOutParamExpr *OutExpr =
+          new (Ctx) HLSLOutParamExpr(Ty, NewBase, P->hasAttr<HLSLInOutAttr>());
+      Res = Sema.PerformImplicitConversion(NewBase, Base->getType(),
+                                           Sema::AA_Passing);
+      if (Res.isInvalid())
+        return ExprError();
+      OutExpr->setWriteback(Res.get());
+      return ExprResult(OutExpr);
     }
 
     DeclFinder DF;
