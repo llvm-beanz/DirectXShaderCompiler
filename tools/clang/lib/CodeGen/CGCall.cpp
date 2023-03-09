@@ -2599,7 +2599,7 @@ static void emitWriteback(CodeGenFunction &CGF,
 
   // If the argument wasn't provably non-null, we need to null check
   // before doing the store.
-  bool provablyNonNull = isProvablyNonNull(srcAddr);
+  bool provablyNonNull = CGF.getLangOpts().HLSL || isProvablyNonNull(srcAddr);
   if (!provablyNonNull) {
     llvm::BasicBlock *writebackBB = CGF.createBasicBlock("icr.writeback");
     contBB = CGF.createBasicBlock("icr.done");
