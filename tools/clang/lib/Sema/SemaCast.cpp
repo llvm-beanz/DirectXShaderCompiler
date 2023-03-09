@@ -2477,7 +2477,28 @@ ExprResult Sema::BuildCStyleCastExpr(SourceLocation LPLoc,
                                      TypeSourceInfo *CastTypeInfo,
                                      SourceLocation RPLoc,
                                      Expr *CastExpr) {
-  CastOperation Op(*this, CastTypeInfo->getType(), CastExpr);  
+  // HLSL Change Begin - HLSL Derived to base casts should be lvalues.
+  QualType DstType = CastTypeInfo->getType();
+  QualType SrcType = CastExpr->getType();
+  if (getLangOpts().HLSL && isa<RecordType>(*DstType) &&
+      isa<RecordType>(*SrcType)) {
+    const auto *DstRT = DstType->getAs<RecordType>();
+    const auto *SrcRT = SrcType->getAs<RecordType>();
+    const auto *DstRD = dyn_cast<CXXRecordDecl>(DstRT->getDecl());
+    const auto *SrcRD = dyn_cast<CXXRecordDecl>(SrcRT->getDecl());
+    if (SrcRD->isDerivedFrom(DstRD)) {
+      if (SrcType.getQualifiers().hasAddressSpace()) {
+        Qualifiers Q = DstType.getQualifiers();
+        Q.addAddressSpace(SrcType.getQualifiers().getAddressSpace());
+        DstType = Context.getQualifiedType(DstType, Q);
+      }
+      return CStyleCastExpr::Create(Context, DstType, VK_LValue,
+                                    CK_HLSLDerivedToBase, CastExpr, nullptr,
+                                    CastTypeInfo, LPLoc, RPLoc);
+    }
+  }
+  CastOperation Op(*this, DstType, CastExpr);
+  // HLSL Change End - HLSL Derived to base casts should be lvalues.
   Op.DestRange = CastTypeInfo->getTypeLoc().getSourceRange();
   Op.OpRange = SourceRange(LPLoc, CastExpr->getLocEnd());
 
