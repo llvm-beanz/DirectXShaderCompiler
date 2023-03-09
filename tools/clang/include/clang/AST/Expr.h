@@ -4755,6 +4755,7 @@ public:
 
 class HLSLOutParamExpr : public Expr {
   Expr *Base;
+  Expr *Writeback;
   bool IsInOut;
   bool CanElide;
 
@@ -4765,11 +4766,15 @@ public:
              Base->isTypeDependent(), Base->isValueDependent(),
              Base->isInstantiationDependent(),
              Base->containsUnexpandedParameterPack()),
-        Base(Base), IsInOut(IsInOut), CanElide(CanElide) {}
+        Base(Base), Writeback(nullptr), IsInOut(IsInOut), CanElide(CanElide) {}
 
   const Expr *getBase() const { return Base; }
   Expr *getBase() { return Base; }
   void setBase(Expr *E) { Base = E; }
+
+  const Expr *getWriteback() const { return Writeback; }
+  Expr *getWriteback() { return Writeback; }
+  void setWriteback(Expr *E) { Writeback = E; }
 
   bool isInOut() const { return IsInOut; }
   bool canElide() const { return CanElide; }
@@ -4785,7 +4790,9 @@ public:
   }
 
   // Iterators
-  child_range children() { return child_range((Stmt**)&Base, (Stmt**)&Base + 1); }
+  child_range children() {
+    return child_range((Stmt **)&Base, (Stmt **)&Base + (Writeback ? 2 : 1));
+  }
 };
 // HLSL Change Ends
 

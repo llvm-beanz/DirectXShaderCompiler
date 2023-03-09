@@ -3002,8 +3002,12 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     // Add writeback for HLSLOutParamExpr.
     if (const HLSLOutParamExpr *OE = dyn_cast<HLSLOutParamExpr>(E)) {
       LValue LV = EmitLValue(E);
-      if (!OE->canElide())
-        args.addWriteback(EmitLValue(OE->getBase()), LV.getAddress(), nullptr);
+      if (!OE->canElide()) {
+        if (const Expr *WB = OE->getWriteback())
+          args.addWriteback(EmitLValue(WB), LV.getAddress(), nullptr);
+        else
+          args.addWriteback(EmitLValue(OE->getBase()), LV.getAddress(), nullptr);
+      }
       return args.add(RValue::get(LV.getAddress()), type);
     }
     // HLSL Change Ends.
