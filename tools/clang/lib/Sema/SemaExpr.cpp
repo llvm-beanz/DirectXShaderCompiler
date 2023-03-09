@@ -4685,8 +4685,12 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
 
       Arg = ArgE.getAs<Expr>();
       // HLSL Change Begin - Optimize out parameters.
-      if (Param->isModifierOut())
-        Arg = HLSLBuilder.Create(Context, Param, Arg);
+      if (Param->isModifierOut()) {
+        ArgE = HLSLBuilder.Create(*this, Param, Arg);
+        if (ArgE.isInvalid())
+          return true;
+        Arg = ArgE.getAs<Expr>();
+      }
       // HLSL Change End - Optimize out paramters.
     } else {
       assert(Param && "can't use default arguments without a known callee");
