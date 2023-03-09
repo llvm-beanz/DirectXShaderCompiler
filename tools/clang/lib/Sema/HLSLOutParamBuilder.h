@@ -16,6 +16,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/StmtVisitor.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/DenseSet.h"
 
 namespace clang {
@@ -47,7 +48,21 @@ class HLSLOutParamBuilder {
 public:
   HLSLOutParamBuilder() = default;
 
-  HLSLOutParamExpr *Create(ASTContext &Ctx, ParmVarDecl *P, Expr *Base) {
+  ExprResult Create(Sema &Sema, ParmVarDecl *P, Expr *Base) {
+    ASTContext &Ctx = Sema.getASTContext();
+
+    QualType Ty = P->getType().getNonLValueExprType(Ctx);
+
+    // If the types mismatch we _may_ have some casting to perform.
+    if (Ty != Base->getType()) {
+      ExprResult Res = Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
+      if (Res.isInvalid())
+        return ExprError();
+      Base = Res.get();
+      return ExprResult(
+          new (Ctx) HLSLOutParamExpr(Ty, Base, P->hasAttr<HLSLInOutAttr>()));
+    }
+
     DeclFinder DF;
     DF.Visit(Base);
 
@@ -56,13 +71,13 @@ public:
     if (DF.MultipleFound || DF.Decl == nullptr ||
         DF.Decl->getType().getQualifiers().hasAddressSpace() ||
         SeenVars.count(DF.Decl) > 0)
-      return new (Ctx)
-          HLSLOutParamExpr(Base->getType(), Base, P->hasAttr<HLSLInOutAttr>());
+      return ExprResult(
+          new (Ctx) HLSLOutParamExpr(Ty, Base, P->hasAttr<HLSLInOutAttr>()));
     // Add the decl to the seen list, and generate a HLSLOutParamExpr that can
     // be elided.
     SeenVars.insert(DF.Decl);
-    return new (Ctx) HLSLOutParamExpr(Base->getType(), Base,
-                                      P->hasAttr<HLSLInOutAttr>(), true);
+    return ExprResult(new (Ctx) HLSLOutParamExpr(
+        Ty, Base, P->hasAttr<HLSLInOutAttr>(), true));
   }
 };
 
