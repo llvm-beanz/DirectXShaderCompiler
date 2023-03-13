@@ -4783,8 +4783,8 @@ public:
   Expr *getWriteback() { return Writeback; }
   void setWriteback(Expr *E) { Writeback = E; }
 
-  const Expr *getSrcLV() const { return SrcLV; }
-  Expr *getSrcLV() { return SrcLV; }
+  const Expr *getSrcLV() const { return SrcLV ? SrcLV : Base; }
+  Expr *getSrcLV() { return SrcLV ? SrcLV : Base; }
   void setSrcLV(Expr *E) { SrcLV = E; }
 
   const OpaqueValueExpr *getOpaqueValue() const { return OpaqueVal; }
