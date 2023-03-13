@@ -2697,12 +2697,6 @@ LValue CodeGenFunction::EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
   if (Idx->getType() != IntPtrTy)
     Idx = Builder.CreateIntCast(Idx, IntPtrTy, IdxSigned, "idxprom");
 
-  // HLSL Change Starts
-  const Expr *Array = isSimpleArrayDecayOperand(E->getBase());
-  assert((!getLangOpts().HLSL || nullptr == Array) &&
-         "else array decay snuck in AST for HLSL");
-  // HLSL Change Ends
-
   // We know that the pointer points to a type of the correct size, unless the
   // size is a VLA or Objective-C interface.
   llvm::Value *Address = nullptr;
@@ -2750,7 +2744,7 @@ LValue CodeGenFunction::EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
     Address = EmitCastToVoidPtr(Base);
     Address = Builder.CreateGEP(Address, Idx, "arrayidx");
     Address = Builder.CreateBitCast(Address, Base->getType());
-  } else if (!getLangOpts().HLSL && Array) { // HLSL Change - No Array to pointer decay for HLSL
+  } else if (const Expr *Array = isSimpleArrayDecayOperand(E->getBase())) {
     // If this is A[i] where A is an array, the frontend will have decayed the
     // base to be a ArrayToPointerDecay implicit cast.  While correct, it is
     // inefficient at -O0 to emit a "gep A, 0, 0" when codegen'ing it, then a
@@ -2776,38 +2770,12 @@ LValue CodeGenFunction::EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
     else
       Address = Builder.CreateInBoundsGEP(ArrayPtr, Args, "arrayidx");
   } else {
-    // HLSL Change Starts
-    const ArrayType *AT = dyn_cast<ArrayType>(E->getBase()->getType()->getCanonicalTypeUnqualified());
-    if (getContext().getLangOpts().HLSL && AT) {
-      LValue ArrayLV;
-      // For simple multidimensional array indexing, set the 'accessed' flag for
-      // better bounds-checking of the base expression.
-      if (const auto *ASE = dyn_cast<ArraySubscriptExpr>(E->getBase()))
-        ArrayLV = EmitArraySubscriptExpr(ASE, /*Accessed*/ true);
-      else
-        ArrayLV = EmitLValue(E->getBase());
-      llvm::Value *ArrayPtr = ArrayLV.getAddress();
-
-      llvm::Value *Zero = llvm::ConstantInt::get(Int32Ty, 0);
-      llvm::Value *Args[] = { Zero, Idx };
-
-      // Propagate the alignment from the array itself to the result.
-      ArrayAlignment = ArrayLV.getAlignment();
-
-      if (getLangOpts().isSignedOverflowDefined())
-        Address = Builder.CreateGEP(ArrayPtr, Args, "arrayidx");
-      else
-        Address = Builder.CreateInBoundsGEP(ArrayPtr, Args, "arrayidx");
-
-    } else {
-      // HLSL Change Ends
-      // The base must be a pointer, which is not an aggregate.  Emit it.
-      llvm::Value *Base = EmitScalarExpr(E->getBase());
-      if (getLangOpts().isSignedOverflowDefined())
-        Address = Builder.CreateGEP(Base, Idx, "arrayidx");
-      else
-        Address = Builder.CreateInBoundsGEP(Base, Idx, "arrayidx");
-    } // HLSL Change 
+    // The base must be a pointer, which is not an aggregate.  Emit it.
+    llvm::Value *Base = EmitScalarExpr(E->getBase());
+    if (getLangOpts().isSignedOverflowDefined())
+      Address = Builder.CreateGEP(Base, Idx, "arrayidx");
+    else
+      Address = Builder.CreateInBoundsGEP(Base, Idx, "arrayidx");
   }
 
   QualType T = E->getBase()->getType()->getPointeeType();
