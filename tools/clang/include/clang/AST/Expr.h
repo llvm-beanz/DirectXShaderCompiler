@@ -824,6 +824,7 @@ class OpaqueValueExpr : public Expr {
   friend class ASTStmtReader;
   Expr *SourceExpr;
   SourceLocation Loc;
+  bool SourceIsParent; // HLSL Change
 
 public:
   OpaqueValueExpr(SourceLocation Loc, QualType T, ExprValueKind VK,
@@ -835,8 +836,7 @@ public:
            (SourceExpr && SourceExpr->isValueDependent()),
            T->isInstantiationDependentType(),
            false),
-      SourceExpr(SourceExpr), Loc(Loc) {
-  }
+      SourceExpr(SourceExpr), Loc(Loc), SourceIsParent(false) {} // HLSL Change
 
   /// Given an expression which invokes a copy constructor --- i.e.  a
   /// CXXConstructExpr, possibly wrapped in an ExprWithCleanups ---
@@ -875,6 +875,11 @@ public:
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OpaqueValueExprClass;
   }
+
+  // HLSL Change start
+  bool sourceIsParent() const { return SourceIsParent; }
+  void setSourceIsParent(bool B = true) { SourceIsParent = B; }
+  // HLSL Change end
 };
 
 /// \brief A reference to a declared variable, function, enum, etc.
@@ -4756,6 +4761,8 @@ public:
 class HLSLOutParamExpr : public Expr {
   Expr *Base;
   Expr *Writeback;
+  Expr *SrcLV;
+  OpaqueValueExpr *OpaqueVal;
   bool IsInOut;
   bool CanElide;
 
@@ -4776,6 +4783,14 @@ public:
   Expr *getWriteback() { return Writeback; }
   void setWriteback(Expr *E) { Writeback = E; }
 
+  const Expr *getSrcLV() const { return SrcLV; }
+  Expr *getSrcLV() { return SrcLV; }
+  void setSrcLV(Expr *E) { SrcLV = E; }
+
+  const OpaqueValueExpr *getOpaqueValue() const { return OpaqueVal; }
+  OpaqueValueExpr *getOpaqueValue() { return OpaqueVal; }
+  void setOpaqueValue(OpaqueValueExpr *E) { OpaqueVal = E; }
+
   bool isInOut() const { return IsInOut; }
   bool canElide() const { return CanElide; }
 
@@ -4791,7 +4806,7 @@ public:
 
   // Iterators
   child_range children() {
-    return child_range((Stmt **)&Base, (Stmt **)&Base + (Writeback ? 2 : 1));
+    return child_range((Stmt **)&Base, (Stmt **)&Base + 1);
   }
 };
 // HLSL Change Ends
