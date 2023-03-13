@@ -2970,11 +2970,17 @@ LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
   llvm::Type *Ty = ConvertType(E->getType());
   llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "out_param");
   if (E->isInOut()) {
-    LValue InitialState = EmitLValue(E->getBase());
-    llvm::LoadInst *Ld = Builder.CreateLoad(InitialState.getAddress(), "in_val");
-    (void)Builder.CreateStore(Ld, OutTemp);
+    RValue InVal = EmitAnyExprToTemp(E->getBase());
+    llvm::Value *V =
+        InVal.isScalar()
+            ? InVal.getScalarVal()
+            : Builder.CreateLoad(InVal.getAggregateAddr(), "in_val");
+    (void)Builder.CreateStore(V, OutTemp);
   }
-  return MakeAddrLValue(OutTemp, E->getType());
+  LValue Result = MakeAddrLValue(OutTemp, E->getType());
+  if (auto *OpV = E->getOpaqueValue())
+    OpaqueValueMappingData::bind(*this, OpV, Result);
+  return Result;
 }
 
 LValue
