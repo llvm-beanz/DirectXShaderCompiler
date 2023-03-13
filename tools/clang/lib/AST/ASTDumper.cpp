@@ -2034,6 +2034,8 @@ void ASTDumper::VisitHLSLOutParamExpr(const HLSLOutParamExpr *Node) {
   OS << (Node->isInOut() ? " inout" : " out");
   if (Node->canElide())
     OS << " can elide";
+  if (const auto *WB = Node->getWriteback())
+    dumpStmt(WB);
 }
 // HLSL Change Ends
 
@@ -2059,6 +2061,11 @@ void ASTDumper::VisitBlockExpr(const BlockExpr *Node) {
 
 void ASTDumper::VisitOpaqueValueExpr(const OpaqueValueExpr *Node) {
   VisitExpr(Node);
+
+  // HLSL Change start
+  if (Node->sourceIsParent())
+    return;
+  // HLSL Change end
 
   if (Expr *Source = Node->getSourceExpr())
     dumpStmt(Source);

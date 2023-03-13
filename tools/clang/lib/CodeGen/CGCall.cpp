@@ -2595,11 +2595,23 @@ static void emitWriteback(CodeGenFunction &CGF,
   assert(!isProvablyNull(srcAddr) &&
          "shouldn't have writeback for provably null argument");
 
+  if (CGF.getLangOpts().HLSL) {
+    RValue TmpVal;
+    if (writeback.CastExpr)
+      TmpVal = CGF.EmitAnyExprToTemp(writeback.CastExpr);
+    else {
+      llvm::Value *value = CGF.Builder.CreateLoad(writeback.Temporary);
+      TmpVal = RValue::get(value);
+    }
+    CGF.EmitStoreThroughLValue(TmpVal, srcLV);
+    return;
+  }
+
   llvm::BasicBlock *contBB = nullptr;
 
   // If the argument wasn't provably non-null, we need to null check
   // before doing the store.
-  bool provablyNonNull = CGF.getLangOpts().HLSL || isProvablyNonNull(srcAddr);
+  bool provablyNonNull = isProvablyNonNull(srcAddr);
   if (!provablyNonNull) {
     llvm::BasicBlock *writebackBB = CGF.createBasicBlock("icr.writeback");
     contBB = CGF.createBasicBlock("icr.done");
@@ -3002,12 +3014,9 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     // Add writeback for HLSLOutParamExpr.
     if (const HLSLOutParamExpr *OE = dyn_cast<HLSLOutParamExpr>(E)) {
       LValue LV = EmitLValue(E);
-      if (!OE->canElide()) {
-        if (const Expr *WB = OE->getWriteback())
-          args.addWriteback(EmitLValue(WB), LV.getAddress(), nullptr);
-        else
-          args.addWriteback(EmitLValue(OE->getBase()), LV.getAddress(), nullptr);
-      }
+      if (!OE->canElide())
+        args.addWriteback(EmitLValue(OE->getSrcLV()), LV.getAddress(), nullptr,
+                          OE->getWriteback());
       return args.add(RValue::get(LV.getAddress()), type);
     }
     // HLSL Change Ends.

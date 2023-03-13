@@ -59,14 +59,18 @@ public:
           Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
       if (Res.isInvalid())
         return ExprError();
-      Expr *NewBase = new (Ctx) MaterializeTemporaryExpr(Ty, Res.get(), true);
-      HLSLOutParamExpr *OutExpr =
-          new (Ctx) HLSLOutParamExpr(Ty, NewBase, P->hasAttr<HLSLInOutAttr>());
-      Res = Sema.PerformImplicitConversion(NewBase, Base->getType(),
+      HLSLOutParamExpr *OutExpr = new (Ctx)
+          HLSLOutParamExpr(Ty, Res.get(), P->hasAttr<HLSLInOutAttr>());
+      auto *OpV = new (Ctx) OpaqueValueExpr(P->getLocStart(), Ty, VK_LValue,
+                                            OK_Ordinary, OutExpr);
+      Res = Sema.PerformImplicitConversion(OpV, Base->getType(),
                                            Sema::AA_Passing);
       if (Res.isInvalid())
         return ExprError();
       OutExpr->setWriteback(Res.get());
+      OutExpr->setSrcLV(Base);
+      OutExpr->setOpaqueValue(OpV);
+      OpV->setSourceIsParent();
       return ExprResult(OutExpr);
     }
 

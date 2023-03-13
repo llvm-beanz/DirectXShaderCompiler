@@ -68,6 +68,8 @@ namespace CodeGen {
 
       /// A value to "use" after the writeback, or null.
       llvm::Value *ToUse;
+
+      const Expr *CastExpr; // HLSL Change
     };
 
     struct CallArgCleanup {
@@ -89,11 +91,12 @@ namespace CodeGen {
     }
 
     void addWriteback(LValue srcLV, llvm::Value *temporary,
-                      llvm::Value *toUse) {
+                      llvm::Value *toUse, const Expr *castExpr = nullptr) {
       Writeback writeback;
       writeback.Source = srcLV;
       writeback.Temporary = temporary;
       writeback.ToUse = toUse;
+      writeback.CastExpr = castExpr;
       Writebacks.push_back(writeback);
     }
 
