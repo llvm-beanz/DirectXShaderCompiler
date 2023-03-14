@@ -8891,6 +8891,10 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
   if (source->isFunctionType())
     return false;
 
+  // We cannot convert from non-lvalue to lvalue references.
+  if (target->isLValueReferenceType() && !sourceExpr->isLValue())
+    return false;
+
   // Convert to an r-value to begin with, with an exception for strings
   // since they are not first-class values and we want to preserve them as
   // literals.
