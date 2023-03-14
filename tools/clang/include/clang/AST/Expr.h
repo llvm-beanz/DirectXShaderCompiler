@@ -4773,7 +4773,8 @@ public:
              Base->isTypeDependent(), Base->isValueDependent(),
              Base->isInstantiationDependent(),
              Base->containsUnexpandedParameterPack()),
-        Base(Base), Writeback(nullptr), IsInOut(IsInOut), CanElide(CanElide) {}
+        Base(Base), Writeback(nullptr), SrcLV(nullptr), OpaqueVal(nullptr),
+        IsInOut(IsInOut), CanElide(CanElide) {}
 
   const Expr *getBase() const { return Base; }
   Expr *getBase() { return Base; }
