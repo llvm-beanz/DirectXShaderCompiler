@@ -1283,6 +1283,7 @@ unsigned CGMSHLSLRuntime::AddTypeAnnotation(QualType Ty,
     return 0;
   } else {
     unsigned arraySize = 0;
+    Ty = Ty.getNonReferenceType();
     QualType arrayElementTy = Ty;
     if (Ty->isConstantArrayType()) {
       const ConstantArrayType *arrayTy =

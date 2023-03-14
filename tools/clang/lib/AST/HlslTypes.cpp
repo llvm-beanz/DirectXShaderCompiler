@@ -599,6 +599,7 @@ bool IsHLSLDynamicResourceType(clang::QualType type) {
 }
 
 bool IsHLSLBufferViewType(clang::QualType type) {
+  type = type.getNonReferenceType();
   if (const RecordType *RT = type->getAs<RecordType>()) {
     StringRef name = RT->getDecl()->getName();
     if (name == "ConstantBuffer" || name == "TextureBuffer")
@@ -608,6 +609,7 @@ bool IsHLSLBufferViewType(clang::QualType type) {
 }
 
 bool IsHLSLStructuredBufferType(clang::QualType type) {
+  type = type.getNonReferenceType();
   if (const RecordType *RT = type->getAs<RecordType>()) {
     StringRef name = RT->getDecl()->getName();
     if (name == "StructuredBuffer" || name == "RWStructuredBuffer")
@@ -626,6 +628,7 @@ bool IsHLSLSubobjectType(clang::QualType type) {
 }
 
 bool IsUserDefinedRecordType(clang::QualType QT) {
+  QT = QT.getNonReferenceType();
   const clang::Type *Ty = QT.getCanonicalType().getTypePtr();
   if (const RecordType *RT = dyn_cast<RecordType>(Ty)) {
     const RecordDecl *RD = RT->getDecl();
@@ -782,7 +785,7 @@ bool GetHLSLSubobjectKind(clang::QualType type,
 }
 
 bool IsHLSLRayQueryType(clang::QualType type) {
-  type = type.getCanonicalType();
+  type = type.getNonReferenceType().getCanonicalType();
   if (const RecordType *RT = dyn_cast<RecordType>(type)) {
     if (const ClassTemplateSpecializationDecl *templateDecl =
             dyn_cast<ClassTemplateSpecializationDecl>(
@@ -797,6 +800,7 @@ bool IsHLSLRayQueryType(clang::QualType type) {
 
 QualType GetHLSLResourceResultType(QualType type) {
   // Don't canonicalize the type as to not lose snorm in Buffer<snorm float>
+  type = type.getNonReferenceType();
   const RecordType *RT = type->getAs<RecordType>();
   const RecordDecl *RD = RT->getDecl();
 
