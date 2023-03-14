@@ -139,7 +139,7 @@ bool IsHLSLCopyableAnnotatableRecord(clang::QualType QT) {
 }
 
 bool IsHLSLBuiltinRayAttributeStruct(clang::QualType QT) {
-  QT = QT.getCanonicalType();
+  QT = QT.getNonReferenceType().getCanonicalType();
   const clang::Type *Ty = QT.getTypePtr();
   if (const RecordType *RT = dyn_cast<RecordType>(Ty)) {
     const RecordDecl *RD = RT->getDecl();
@@ -249,6 +249,7 @@ bool HasHLSLUNormSNorm(clang::QualType type, bool *pIsSNorm) {
 }
 
 bool HasHLSLGloballyCoherent(clang::QualType type) {
+  type = type.getNonReferenceType();
   const AttributedType *AT = type->getAs<AttributedType>();
   while (AT) {
     AttributedType::Kind kind = AT->getAttrKind();
@@ -723,7 +724,7 @@ bool GetHLSLSubobjectKind(clang::QualType type,
                           DXIL::SubobjectKind &subobjectKind,
                           DXIL::HitGroupType &hgType) {
   hgType = (DXIL::HitGroupType)(-1);
-  type = type.getCanonicalType();
+  type = type.getNonReferenceType().getCanonicalType();
   if (const RecordType *RT = type->getAs<RecordType>()) {
     StringRef name = RT->getDecl()->getName();
     switch (name.size()) {
@@ -850,6 +851,7 @@ unsigned GetHLSLResourceTemplateUInt(clang::QualType type) {
 
 bool IsIncompleteHLSLResourceArrayType(clang::ASTContext &context,
                                        clang::QualType type) {
+  type = type.getNonReferenceType();
   if (type->isIncompleteArrayType()) {
     const IncompleteArrayType *IAT = context.getAsIncompleteArrayType(type);
     type = IAT->getElementType();
