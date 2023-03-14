@@ -1900,7 +1900,7 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
 
     const ParmVarDecl *parmDecl = FD->getParamDecl(ParmIdx);
 
-    QualType fieldTy = parmDecl->getType();
+    QualType fieldTy = parmDecl->getType().getNonReferenceType();
     // Save object properties for parameters.
     AddValToPropertyMap(ArgIt, fieldTy);
 
