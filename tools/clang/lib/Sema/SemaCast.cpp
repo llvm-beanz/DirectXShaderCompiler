@@ -80,6 +80,9 @@ namespace {
     void CheckReinterpretCast();
     void CheckStaticCast();
     void CheckDynamicCast();
+    // HLSL Change begin
+    void CheckHLSLCStyleCast(bool FunctionalCast, bool ListInitialization);
+    // HLSL Change end
     void CheckCXXCStyleCast(bool FunctionalCast, bool ListInitialization);
     void CheckCStyleCast();
 
@@ -2058,7 +2061,36 @@ static TryCastResult TryReinterpretCast(Sema &Self, ExprResult &SrcExpr,
   // So we finish by allowing everything that remains - it's got to be two
   // object pointers.
   return TC_Success;
-}                                     
+}
+
+// HLSL Change Begin
+void CastOperation::CheckHLSLCStyleCast(bool FunctionalStyle,
+                                        bool ListInitialization) {
+  QualType SrcType = SrcExpr.get()->getType();
+  if (SrcType.getCanonicalType() == DestType.getCanonicalType()) {
+    ValueKind = VK_LValue;
+    Kind = CK_NoOp;
+    ResultType = DestType;
+    return;
+  }
+  if (isa<RecordType>(*DestType) && isa<RecordType>(*SrcType)) {
+    CXXBasePaths Paths;
+    if (Self.IsDerivedFrom(SrcType, DestType, Paths)) {
+      ResultType = DestType;
+      if (SrcType.getQualifiers().hasAddressSpace()) {
+        Qualifiers Q = DestType.getQualifiers();
+        Q.addAddressSpace(SrcType.getQualifiers().getAddressSpace());
+        ResultType = Self.getASTContext().getQualifiedType(DestType, Q);
+      }
+      Self.BuildBasePathArray(Paths, BasePath);
+      ValueKind = VK_LValue;
+      Kind = CK_HLSLDerivedToBase;
+      return;
+    }
+  }
+  CheckCXXCStyleCast(FunctionalStyle, ListInitialization);
+}
+// HLSL Change End
 
 void CastOperation::CheckCXXCStyleCast(bool FunctionalStyle,
                                        bool ListInitialization) {
@@ -2477,42 +2509,21 @@ ExprResult Sema::BuildCStyleCastExpr(SourceLocation LPLoc,
                                      TypeSourceInfo *CastTypeInfo,
                                      SourceLocation RPLoc,
                                      Expr *CastExpr) {
-  // HLSL Change Begin - HLSL Derived to base casts should be lvalues.
-  QualType DstType = CastTypeInfo->getType();
-  QualType SrcType = CastExpr->getType();
-  if (getLangOpts().HLSL && SrcType.getCanonicalType() == DstType.getCanonicalType()) {
-    return CStyleCastExpr::Create(Context, DstType, VK_LValue,
-                                    CK_NoOp, CastExpr, nullptr,
-                                    CastTypeInfo, LPLoc, RPLoc);
-  }
-  if (getLangOpts().HLSL && isa<RecordType>(*DstType) &&
-      isa<RecordType>(*SrcType)) {
-    const auto *DstRT = DstType->getAs<RecordType>();
-    const auto *SrcRT = SrcType->getAs<RecordType>();
-    const auto *DstRD = dyn_cast<CXXRecordDecl>(DstRT->getDecl());
-    const auto *SrcRD = dyn_cast<CXXRecordDecl>(SrcRT->getDecl());
-    if (SrcRD->isDerivedFrom(DstRD)) {
-      if (SrcType.getQualifiers().hasAddressSpace()) {
-        Qualifiers Q = DstType.getQualifiers();
-        Q.addAddressSpace(SrcType.getQualifiers().getAddressSpace());
-        DstType = Context.getQualifiedType(DstType, Q);
-      }
-      return CStyleCastExpr::Create(Context, DstType, VK_LValue,
-                                    CK_HLSLDerivedToBase, CastExpr, nullptr,
-                                    CastTypeInfo, LPLoc, RPLoc);
-    }
-  }
-  CastOperation Op(*this, DstType, CastExpr);
-  // HLSL Change End - HLSL Derived to base casts should be lvalues.
+  CastOperation Op(*this, CastTypeInfo->getType(), CastExpr);
   Op.DestRange = CastTypeInfo->getTypeLoc().getSourceRange();
   Op.OpRange = SourceRange(LPLoc, CastExpr->getLocEnd());
 
-  if (getLangOpts().CPlusPlus) {
+  // HLSL Change begin
+  if (getLangOpts().HLSL) {
+    Op.CheckHLSLCStyleCast(/*FunctionalStyle=*/ false,
+                          isa<InitListExpr>(CastExpr));
+  } else if (getLangOpts().CPlusPlus) {
     Op.CheckCXXCStyleCast(/*FunctionalStyle=*/ false,
                           isa<InitListExpr>(CastExpr));
   } else {
     Op.CheckCStyleCast();
   }
+  // HLSL Change
 
   if (Op.SrcExpr.isInvalid())
     return ExprError();
