@@ -2480,6 +2480,11 @@ ExprResult Sema::BuildCStyleCastExpr(SourceLocation LPLoc,
   // HLSL Change Begin - HLSL Derived to base casts should be lvalues.
   QualType DstType = CastTypeInfo->getType();
   QualType SrcType = CastExpr->getType();
+  if (getLangOpts().HLSL && SrcType.getCanonicalType() == DstType.getCanonicalType()) {
+    return CStyleCastExpr::Create(Context, DstType, VK_LValue,
+                                    CK_NoOp, CastExpr, nullptr,
+                                    CastTypeInfo, LPLoc, RPLoc);
+  }
   if (getLangOpts().HLSL && isa<RecordType>(*DstType) &&
       isa<RecordType>(*SrcType)) {
     const auto *DstRT = DstType->getAs<RecordType>();
