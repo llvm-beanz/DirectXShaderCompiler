@@ -2591,10 +2591,7 @@ static bool isProvablyNonNull(llvm::Value *addr) {
 static void emitWriteback(CodeGenFunction &CGF,
                           const CallArgList::Writeback &writeback) {
   const LValue &srcLV = writeback.Source;
-  llvm::Value *srcAddr = srcLV.getAddress();
-  assert(!isProvablyNull(srcAddr) &&
-         "shouldn't have writeback for provably null argument");
-
+  
   if (CGF.getLangOpts().HLSL) {
     RValue TmpVal;
     if (writeback.CastExpr)
@@ -2603,9 +2600,17 @@ static void emitWriteback(CodeGenFunction &CGF,
       llvm::Value *value = CGF.Builder.CreateLoad(writeback.Temporary);
       TmpVal = RValue::get(value);
     }
-    CGF.EmitStoreThroughLValue(TmpVal, srcLV);
+    if (TmpVal.isScalar())
+      CGF.EmitStoreThroughLValue(TmpVal, srcLV);
+    else
+      CGF.EmitAggregateCopy(srcLV.getAddress(), TmpVal.getAggregateAddr(),
+                            srcLV.getType());
     return;
   }
+
+  llvm::Value *srcAddr = srcLV.getAddress();
+  assert(!isProvablyNull(srcAddr) &&
+         "shouldn't have writeback for provably null argument");
 
   llvm::BasicBlock *contBB = nullptr;
 
