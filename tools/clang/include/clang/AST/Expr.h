@@ -4766,15 +4766,17 @@ class HLSLOutParamExpr : public Expr {
   bool IsInOut;
   bool CanElide;
 
-public:
-  HLSLOutParamExpr(QualType Ty, Expr *Base, bool IsInOut = false,
-                   bool CanElide = false)
+  HLSLOutParamExpr(QualType Ty, Expr *Base, bool IsInOut, bool CanElide)
       : Expr(HLSLOutParamExprClass, Ty, VK_LValue, OK_Ordinary,
              Base->isTypeDependent(), Base->isValueDependent(),
              Base->isInstantiationDependent(),
              Base->containsUnexpandedParameterPack()),
         Base(Base), Writeback(nullptr), SrcLV(nullptr), OpaqueVal(nullptr),
         IsInOut(IsInOut), CanElide(CanElide) {}
+
+public:
+  static HLSLOutParamExpr *Create(const ASTContext &C, QualType Ty, Expr *Base,
+                                  bool IsInOut = false, bool CanElide = false);
 
   const Expr *getBase() const { return Base; }
   Expr *getBase() { return Base; }
@@ -4803,6 +4805,39 @@ public:
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == HLSLOutParamExprClass;
+  }
+
+  // Iterators
+  child_range children() {
+    return child_range((Stmt **)&Base, (Stmt **)&Base + 1);
+  }
+};
+
+class HLSLArrayTemporaryExpr : public Expr {
+  Expr *Base;
+
+  HLSLArrayTemporaryExpr(Expr *Base)
+      : Expr(HLSLArrayTemporaryExprClass, Base->getType(), VK_RValue,
+             OK_Ordinary, Base->isTypeDependent(), Base->isValueDependent(),
+             Base->isInstantiationDependent(),
+             Base->containsUnexpandedParameterPack()),
+        Base(Base) {}
+
+public:
+  static HLSLArrayTemporaryExpr *Create(const ASTContext &C, Expr *Base);
+
+  const Expr *getBase() const { return Base; }
+  Expr *getBase() { return Base; }
+  void setBase(Expr *E) { Base = E; }
+
+  SourceLocation getLocStart() const LLVM_READONLY {
+    return Base->getLocStart();
+  }
+
+  SourceLocation getLocEnd() const LLVM_READONLY { return Base->getLocEnd(); }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == HLSLArrayTemporaryExprClass;
   }
 
   // Iterators

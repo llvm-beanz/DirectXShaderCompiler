@@ -4362,6 +4362,20 @@ ObjCSubscriptRefExpr *ObjCSubscriptRefExpr::Create(const ASTContext &C,
                                         getMethod, setMethod, RB);
 }
 
+// HLSL Change begin
+
+HLSLOutParamExpr *HLSLOutParamExpr::Create(const ASTContext &C, QualType Ty,
+                                           Expr *Base, bool IsInOut,
+                                           bool CanElide) {
+  return new (C) HLSLOutParamExpr(Ty, Base, IsInOut, CanElide);
+}
+
+HLSLArrayTemporaryExpr *
+HLSLArrayTemporaryExpr::Create(const ASTContext &C, Expr *Base) {
+  return new (C) HLSLArrayTemporaryExpr(Base);
+}
+// HLSL Change end
+
 AtomicExpr::AtomicExpr(SourceLocation BLoc, ArrayRef<Expr*> args,
                        QualType t, AtomicOp op, SourceLocation RP)
   : Expr(AtomicExprClass, t, VK_RValue, OK_Ordinary,

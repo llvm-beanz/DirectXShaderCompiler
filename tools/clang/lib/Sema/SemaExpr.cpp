@@ -4666,6 +4666,13 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
       if (CFAudited)
         Entity.setParameterCFAudited();
 
+      // HLSL Change begin
+      // If this is an array and not an oputput, generate an array temporary
+      // expression here rather than an RValue cast.
+      if (ProtoArgType->isArrayType() && !Param->isModifierOut())
+        Arg = HLSLArrayTemporaryExpr::Create(getASTContext(), Arg);
+      // HLSL Change end
+
       ExprResult ArgE = PerformCopyInitialization(
           Entity, SourceLocation(), Arg, IsListInitialization, AllowExplicit);
       if (ArgE.isInvalid())
