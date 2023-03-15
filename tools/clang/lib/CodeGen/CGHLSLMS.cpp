@@ -212,6 +212,7 @@ private:
   void ConstructFieldAttributedAnnotation(DxilFieldAnnotation &fieldAnnotation,
                                           QualType fieldTy,
                                           bool bDefaultRowMajor);
+  LValue EmitResourceParamAnnotation(CodeGenFunction& CGF, const CastExpr *E) override;
 
   std::unordered_map<Constant *, DxilFieldAnnotation> m_ConstVarAnnotationMap;
   StringSet<> m_PreciseOutputSet;
@@ -6004,6 +6005,20 @@ Scope *CGMSHLSLRuntime::MarkScopeEnd(CodeGenFunction &CGF) {
   }
 
   return nullptr;
+}
+
+LValue CGMSHLSLRuntime::EmitResourceParamAnnotation(CodeGenFunction &CGF,
+                                                    const CastExpr *E) {
+  LValue LV = CGF.EmitLValue(E->getSubExpr());
+  IRBuilder<> Builder(dxilutil::FindAllocaInsertionPt(
+      CGF.Builder.GetInsertBlock()->getParent()));
+  llvm::Value *TmpAddr =
+      Builder.CreateAlloca(CGF.ConvertTypeForMem(E->getType()));
+  DxilResourceProperties RP = BuildResourceProperty(E->getType());
+  CopyAndAnnotateResourceArgument(LV.getAddress(), TmpAddr, RP, *m_pHLModule,
+                                  CGF);
+  return LValue::MakeAddr(TmpAddr, E->getType(), LV.getAlignment(),
+                          CGF.getContext());
 }
 
 CGHLSLRuntime *CodeGen::CreateMSHLSLRuntime(CodeGenModule &CGM) {

@@ -45,6 +45,7 @@ class ReturnStmt;
 class Attr;
 class VarDecl;
 class HLSLRootSignatureAttr;
+class CastExpr;
 
 namespace CodeGen {
 class CodeGenModule;

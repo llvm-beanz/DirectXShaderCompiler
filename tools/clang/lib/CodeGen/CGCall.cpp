@@ -3068,6 +3068,19 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     return;
   }
 
+  // HLSL Change begin
+  // This is a bit hacky... Ideally this would be part of the resource type's
+  // copy constructor, but we don't have constructors worked out so instead
+  // performing this on LValueToRValue conversion is the next best thing :(.
+  if (hlsl::IsHLSLResourceType(E->getType()) && isa<ImplicitCastExpr>(E) &&
+      cast<CastExpr>(E)->getCastKind() == CK_LValueToRValue) {
+    LValue Val = CGM.getHLSLRuntime().EmitResourceParamAnnotation(
+        *this, cast<CastExpr>(E));
+    args.add(Val.asAggregateRValue(), type);
+    return;
+  }
+  // HLSL Change end
+
   if (HasAggregateEvalKind && isa<ImplicitCastExpr>(E) &&
       cast<CastExpr>(E)->getCastKind() == CK_LValueToRValue) {
     LValue L = EmitLValue(cast<CastExpr>(E)->getSubExpr());
