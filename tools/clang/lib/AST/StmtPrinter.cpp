@@ -1393,6 +1393,8 @@ void StmtPrinter::VisitHLSLOutParamExpr(HLSLOutParamExpr *Node) {
   OS << (Node->isInOut() ? "inout " : "out ");
   PrintExpr(Node->getBase());
 }
+
+void StmtPrinter::VisitHLSLArrayTemporaryExpr(HLSLArrayTemporaryExpr *Node) {}
 // HLSL Change Ends
 void StmtPrinter::VisitCStyleCastExpr(CStyleCastExpr *Node) {
   OS << '(';

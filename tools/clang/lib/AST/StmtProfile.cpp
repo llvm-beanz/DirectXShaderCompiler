@@ -801,6 +801,11 @@ void StmtProfiler::VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *S) {
 void StmtProfiler::VisitHLSLOutParamExpr(const HLSLOutParamExpr *S) {
   VisitExpr(S);
 }
+
+void StmtProfiler::VisitHLSLArrayTemporaryExpr(
+    const HLSLArrayTemporaryExpr *S) {
+  VisitExpr(S);
+}
 // HLSL Change End
 
 void StmtProfiler::VisitBlockExpr(const BlockExpr *S) {
