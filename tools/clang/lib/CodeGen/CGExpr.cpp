@@ -2936,13 +2936,13 @@ LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
   if (E->canElide())
     return EmitLValue(E->getBase());
   llvm::Type *Ty = ConvertType(E->getType());
-  llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "out_param");
+  llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "hlsl.out");
   if (E->isInOut()) {
     RValue InVal = EmitAnyExprToTemp(E->getBase());
     llvm::Value *V =
         InVal.isScalar()
             ? InVal.getScalarVal()
-            : Builder.CreateLoad(InVal.getAggregateAddr(), "in_val");
+            : Builder.CreateLoad(InVal.getAggregateAddr(), "hlsl.in");
     (void)Builder.CreateStore(V, OutTemp);
   }
   LValue Result = MakeAddrLValue(OutTemp, E->getType());
