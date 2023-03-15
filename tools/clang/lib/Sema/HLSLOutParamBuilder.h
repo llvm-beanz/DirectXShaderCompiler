@@ -59,8 +59,8 @@ public:
           Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
       if (Res.isInvalid())
         return ExprError();
-      HLSLOutParamExpr *OutExpr = new (Ctx)
-          HLSLOutParamExpr(Ty, Res.get(), P->hasAttr<HLSLInOutAttr>());
+      HLSLOutParamExpr *OutExpr = HLSLOutParamExpr::Create(
+          Ctx, Ty, Res.get(), P->hasAttr<HLSLInOutAttr>());
       auto *OpV = new (Ctx) OpaqueValueExpr(P->getLocStart(), Ty, VK_LValue,
                                             OK_Ordinary, OutExpr);
       Res = Sema.PerformImplicitConversion(OpV, Base->getType(),
@@ -83,12 +83,12 @@ public:
         DF.Decl->getType().getQualifiers().hasAddressSpace() ||
         SeenVars.count(DF.Decl) > 0)
       return ExprResult(
-          new (Ctx) HLSLOutParamExpr(Ty, Base, P->hasAttr<HLSLInOutAttr>()));
+          HLSLOutParamExpr::Create(Ctx, Ty, Base, P->hasAttr<HLSLInOutAttr>()));
     // Add the decl to the seen list, and generate a HLSLOutParamExpr that can
     // be elided.
     SeenVars.insert(DF.Decl);
-    return ExprResult(new (Ctx) HLSLOutParamExpr(
-        Ty, Base, P->hasAttr<HLSLInOutAttr>(), true));
+    return ExprResult(HLSLOutParamExpr::Create(
+        Ctx, Ty, Base, P->hasAttr<HLSLInOutAttr>(), true));
   }
 };
 
