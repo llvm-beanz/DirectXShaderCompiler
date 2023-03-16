@@ -5418,9 +5418,6 @@ class db_dxil(object):
             [],
         )
         add_pass(
-            "hl-legalize-parameter", "HLLegalizeParameter", "Legalize parameter", []
-        )
-        add_pass(
             "scalarrepl-param-hlsl",
             "SROA_Parameter_HLSL",
             "Scalar Replacement of Aggregates HLSL (parameters)",
