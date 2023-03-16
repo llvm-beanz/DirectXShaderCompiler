@@ -6869,6 +6869,7 @@ unsigned HLSLExternalSource::GetNumConvertCheckElts(QualType leftType,
 }
 
 QualType HLSLExternalSource::GetNthElementType(QualType type, unsigned index) {
+  type = type.getNonReferenceType();
   if (type.isNull()) {
     return type;
   }
