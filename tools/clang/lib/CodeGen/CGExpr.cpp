@@ -2938,13 +2938,20 @@ LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
   llvm::Type *Ty = ConvertType(E->getType());
   // TODO: Use CreateAggTemp
   llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "hlsl.out");
+
   if (E->isInOut()) {
     RValue InVal = EmitAnyExprToTemp(E->getBase());
-    llvm::Value *V =
-        InVal.isScalar()
-            ? InVal.getScalarVal()
-            : Builder.CreateLoad(InVal.getAggregateAddr(), "hlsl.in");
-    (void)Builder.CreateStore(V, OutTemp);
+    if (hlsl::IsHLSLMatType(E->getType())) {
+      // Use matrix store to keep major info.
+      CGM.getHLSLRuntime().EmitHLSLMatrixStore(*this, InVal.getScalarVal(),
+                                               OutTemp, E->getType());
+    } else {
+      llvm::Value *V =
+          InVal.isScalar()
+              ? InVal.getScalarVal()
+              : Builder.CreateLoad(InVal.getAggregateAddr(), "hlsl.in");
+      (void)Builder.CreateStore(V, OutTemp);
+    }
   }
   LValue Result = MakeAddrLValue(OutTemp, E->getType());
   if (auto *OpV = E->getOpaqueValue())
