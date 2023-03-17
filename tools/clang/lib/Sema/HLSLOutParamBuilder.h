@@ -53,8 +53,9 @@ public:
 
     QualType Ty = P->getType().getNonLValueExprType(Ctx);
 
-    // If the types mismatch we _may_ have some casting to perform.
-    if (Ty != Base->getType()) {
+    // If the unqualified types mismatch we may have some casting. Since this
+    // results in a copy we can ignore qualifiers.
+    if (Ty.getUnqualifiedType() != Base->getType().getUnqualifiedType()) {
       ExprResult Res =
           Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
       if (Res.isInvalid())

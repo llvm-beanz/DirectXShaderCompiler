@@ -2936,6 +2936,7 @@ LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
   if (E->canElide())
     return EmitLValue(E->getBase());
   llvm::Type *Ty = ConvertType(E->getType());
+  // TODO: Use CreateAggTemp
   llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "hlsl.out");
   if (E->isInOut()) {
     RValue InVal = EmitAnyExprToTemp(E->getBase());
