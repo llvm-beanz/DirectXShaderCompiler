@@ -2066,6 +2066,12 @@ static TryCastResult TryReinterpretCast(Sema &Self, ExprResult &SrcExpr,
 // HLSL Change Begin
 void CastOperation::CheckHLSLCStyleCast(bool FunctionalStyle,
                                         bool ListInitialization) {
+  if (DestType->isDependentType() || SrcExpr.get()->isTypeDependent() ||
+      SrcExpr.get()->isValueDependent()) {
+    assert(Kind == CK_Dependent);
+    return;
+  }
+
   QualType SrcType = SrcExpr.get()->getType();
   if (SrcType.getCanonicalType() == DestType.getCanonicalType()) {
     ValueKind = VK_LValue;
@@ -2088,6 +2094,21 @@ void CastOperation::CheckHLSLCStyleCast(bool FunctionalStyle,
       return;
     }
   }
+ 
+  // HLSL Change Starts
+  // Check for HLSL vector/matrix/array/struct shrinking.
+  if (ValueKind == VK_RValue && 
+      !FunctionalStyle &&
+      !isPlaceholder(BuiltinType::Overload) &&
+      SrcExpr.get()->isLValue() &&
+      // Cannot use casts on basic type l-values
+      !SrcType.getCanonicalType()->isBuiltinType() &&
+      hlsl::IsConversionToLessOrEqualElements(&Self, SrcExpr, DestType, true)) {
+    ValueKind = VK_LValue;
+    DestType = Self.getASTContext().getLValueReferenceType(DestType);
+  }
+  // HLSL Change Ends
+
   CheckCXXCStyleCast(FunctionalStyle, ListInitialization);
 }
 // HLSL Change End
@@ -2134,20 +2155,6 @@ void CastOperation::CheckCXXCStyleCast(bool FunctionalStyle,
     assert(Kind == CK_Dependent);
     return;
   }
-
-  // HLSL Change Starts
-  // Check for HLSL vector/matrix/array/struct shrinking.
-  if (ValueKind == VK_RValue && 
-      !FunctionalStyle &&
-      !isPlaceholder(BuiltinType::Overload) &&
-      Self.getLangOpts().HLSL &&
-      SrcExpr.get()->isLValue() &&
-      // Cannot use casts on basic type l-values
-      !SrcExpr.get()->getType().getCanonicalType()->isBuiltinType() &&
-      hlsl::IsConversionToLessOrEqualElements(&Self, SrcExpr, DestType, true)) {
-    ValueKind = VK_LValue;
-  }
-  // HLSL Change Ends
 
   if (ValueKind == VK_RValue && !DestType->isRecordType() &&
       !isPlaceholder(BuiltinType::Overload)) {
