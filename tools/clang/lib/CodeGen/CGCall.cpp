@@ -2597,7 +2597,12 @@ static void emitWriteback(CodeGenFunction &CGF,
     if (writeback.CastExpr)
       TmpVal = CGF.EmitAnyExprToTemp(writeback.CastExpr);
     else {
-      llvm::Value *value = CGF.Builder.CreateLoad(writeback.Temporary);
+      llvm::Value *value;
+      if (hlsl::IsHLSLMatType(srcLV.getType()))
+        value = CGF.CGM.getHLSLRuntime().EmitHLSLMatrixLoad(
+            CGF, writeback.Temporary, srcLV.getType());
+      else
+        value = CGF.Builder.CreateLoad(writeback.Temporary);
       TmpVal = RValue::get(value);
     }
     if (TmpVal.isScalar())
