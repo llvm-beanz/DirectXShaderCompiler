@@ -3086,10 +3086,7 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     LValue L = EmitLValue(cast<CastExpr>(E)->getSubExpr());
     assert(L.isSimple());
     if (L.getAlignment() >= getContext().getTypeAlignInChars(type)) {
-      // HLSL Change Begin - don't copy input arg.
-      // Copy for out param is done at CGMSHLSLRuntime::EmitHLSLOutParamConversion*.
-      args.add(L.asAggregateRValue(), type); // /*NeedsCopy*/true);
-      // HLSL Change End
+      args.add(L.asAggregateRValue(), type, /*NeedsCopy*/true);
     } else {
       // We can't represent a misaligned lvalue in the CallArgList, so copy
       // to an aligned temporary now.
@@ -3101,16 +3098,6 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     return;
   }
 
-  // HLSL Change Begins.
-  // For DeclRefExpr of aggregate type, don't create temp.
-  if (HasAggregateEvalKind && LangOptions().HLSL &&
-      isa<DeclRefExpr>(E)) {
-    LValue LV = EmitDeclRefLValue(cast<DeclRefExpr>(E));
-    RValue RV = RValue::getAggregate(LV.getAddress());
-    args.add(RV, type);
-    return;
-  }
-  // HLSL Change Ends.
   args.add(EmitAnyExprToTemp(E), type);
 }
 
