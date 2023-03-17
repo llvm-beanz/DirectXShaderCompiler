@@ -8911,10 +8911,7 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
     // Set up a no-op conversion, other than lvalue to rvalue - HLSL does not
     // support references.
     standard->setAsIdentityConversion();
-    if (needsLValueToRValue) {
-      standard->First = ICK_Lvalue_To_Rvalue;
-    }
-
+    standard->First = clang::ICK_Identity;
     standard->setFromType(source);
     standard->setAllToTypes(target);
   }
@@ -8960,8 +8957,12 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
   if ((SourceInfo.EltKind == AR_OBJECT_CONSTANT_BUFFER ||
        SourceInfo.EltKind == AR_OBJECT_TEXTURE_BUFFER) &&
       TargetInfo.ShapeKind == AR_TOBJ_COMPOUND) {
-    if (standard)
+    if (standard) {
       standard->Second = ICK_Flat_Conversion;
+      if (needsLValueToRValue) {
+        standard->First = ICK_Lvalue_To_Rvalue;
+      }
+    }
     return hlsl::GetHLSLResourceResultType(source) == target;
   }
 
@@ -9090,7 +9091,7 @@ lSuccess:
       if (needsLValueToRValue) {
         // We don't need LValueToRValue cast before casting a derived object
         // to its base.
-        if (Second == ICK_HLSL_Derived_To_Base) {
+        if (Second == ICK_HLSL_Derived_To_Base || Second == ICK_Flat_Conversion) {
           standard->First = ICK_Identity;
         } else {
           standard->First = ICK_Lvalue_To_Rvalue;
@@ -9103,7 +9104,6 @@ lSuccess:
           DXASSERT(false,
                    "We shouldn't be producing these implicit conversion kinds");
           break;
-        case ICK_Flat_Conversion:
         case ICK_HLSLVector_Splat:
           standard->First = ICK_Lvalue_To_Rvalue;
           break;

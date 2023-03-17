@@ -3459,7 +3459,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
       return ExprError();
     From = FromRes.get();
     // If this isn't going to a reference we also need an LValueToRValue cast
-    if (!ToType->isReferenceType()) {
+    if (!CStyle && !ToType->isReferenceType()) {
       ExprResult FromRes = DefaultLvalueConversion(From);
       if (FromRes.isInvalid())
         return ExprError();
