@@ -22,7 +22,7 @@
 namespace clang {
 
 class HLSLOutParamBuilder {
-  llvm::DenseSet<NamedDecl *> SeenVars;
+  llvm::DenseSet<VarDecl *> SeenVars;
 
   // not copyable
   HLSLOutParamBuilder(const HLSLOutParamBuilder &) = delete;
@@ -30,7 +30,7 @@ class HLSLOutParamBuilder {
 
   class DeclFinder : public StmtVisitor<DeclFinder> {
   public:
-    ValueDecl *Decl = nullptr;
+    VarDecl *Decl = nullptr;
     bool MultipleFound = false;
 
     DeclFinder() = default;
@@ -40,7 +40,7 @@ class HLSLOutParamBuilder {
         return;
       if (Decl)
         MultipleFound = true;
-      Decl = cast<ValueDecl>(DRE->getFoundDecl());
+      Decl = dyn_cast<VarDecl>(DRE->getFoundDecl());
       return;
     }
   };
@@ -82,7 +82,7 @@ public:
     // seen the decl before, generate a HLSLOutParamExpr that can't be elided.
     if (DF.MultipleFound || DF.Decl == nullptr ||
         DF.Decl->getType().getQualifiers().hasAddressSpace() ||
-        SeenVars.count(DF.Decl) > 0)
+        SeenVars.count(DF.Decl) > 0 || !DF.Decl->hasLocalStorage())
       return ExprResult(
           HLSLOutParamExpr::Create(Ctx, Ty, Base, P->hasAttr<HLSLInOutAttr>()));
     // Add the decl to the seen list, and generate a HLSLOutParamExpr that can
