@@ -82,7 +82,7 @@ public:
     // seen the decl before, generate a HLSLOutParamExpr that can't be elided.
     if (DF.MultipleFound || DF.Decl == nullptr ||
         DF.Decl->getType().getQualifiers().hasAddressSpace() ||
-        SeenVars.count(DF.Decl) > 0 || !DF.Decl->hasLocalStorage())
+        SeenVars.count(DF.Decl) > 0 || DF.Decl->hasExternalStorage())
       return ExprResult(
           HLSLOutParamExpr::Create(Ctx, Ty, Base, P->hasAttr<HLSLInOutAttr>()));
     // Add the decl to the seen list, and generate a HLSLOutParamExpr that can
