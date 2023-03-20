@@ -1228,9 +1228,7 @@ unsigned CGMSHLSLRuntime::AddTypeAnnotation(QualType Ty,
   if (Ty.isNull())
     return 0;
 
-  QualType paramTy = Ty.getCanonicalType();
-  if (const ReferenceType *RefType = dyn_cast<ReferenceType>(paramTy))
-    paramTy = RefType->getPointeeType();
+  QualType paramTy = Ty.getNonReferenceType().getCanonicalType();
 
   // Get size.
   llvm::Type *Type = CGM.getTypes().ConvertType(paramTy);
