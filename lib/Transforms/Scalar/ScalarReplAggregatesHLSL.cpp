@@ -1955,12 +1955,15 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
 
       std::vector<Value *> Elts;
       bool SROAed = false;
-      if (GlobalVariable *NewEltGV = dyn_cast_or_null<GlobalVariable>(
-              TranslatePtrIfUsedByLoweredFn(GV, typeSys))) {
-        GVDbgOffset dbgOffset = GVDbgOffsetMap[GV];
-        // Don't need to update when skip SROA on base GV.
-        if (NewEltGV == dbgOffset.base)
-          continue;
+      // In Library shaders only promote global constants.
+      if (!HLM.GetShaderModel()->IsLib() ||
+          (!dxilutil::IsStaticGlobal(GV) || GV->isConstant())) {
+        if (GlobalVariable *NewEltGV = dyn_cast_or_null<GlobalVariable>(
+                TranslatePtrIfUsedByLoweredFn(GV, typeSys))) {
+          GVDbgOffset dbgOffset = GVDbgOffsetMap[GV];
+          // Don't need to update when skip SROA on base GV.
+          if (NewEltGV == dbgOffset.base)
+            continue;
 
         if (GV != NewEltGV) {
           GVDbgOffsetMap[NewEltGV] = dbgOffset;
@@ -1972,15 +1975,14 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
             GV->eraseFromParent();
             staticGVs.remove(GV);
           }
-          GV = NewEltGV;
+        } else {
+          // SROA_Parameter_HLSL has no access to a domtree, if one is needed,
+          // it'll be generated
+          SROAed = SROA_Helper::DoScalarReplacement(
+              GV, Elts, Builder, bFlatVector,
+              // TODO: set precise.
+              /*hasPrecise*/ false, typeSys, DL, DeadInsts, /*DT*/ nullptr);
         }
-      } else {
-        // SROA_Parameter_HLSL has no access to a domtree, if one is needed,
-        // it'll be generated
-        SROAed = SROA_Helper::DoScalarReplacement(
-            GV, Elts, Builder, bFlatVector,
-            // TODO: set precise.
-            /*hasPrecise*/ false, typeSys, DL, DeadInsts, /*DT*/ nullptr);
       }
 
       if (SROAed) {
