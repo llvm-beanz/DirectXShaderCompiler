@@ -307,9 +307,13 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
 bool DynamicIndexingVectorToArray::needToLower(Value *V) {
   Type *Ty = V->getType()->getPointerElementType();
   if (dyn_cast<VectorType>(Ty)) {
-    if (isa<GlobalVariable>(V) || ReplaceAllVectors) {
+    if (ReplaceAllVectors)
       return true;
-    }
+
+    auto *GV = dyn_cast<GlobalVariable>(V);
+    if (GV && (!dxilutil::IsStaticGlobal(GV) || GV->isConstant()))
+      return true;
+      
     // Don't lower local vector which only static indexing.
     if (HasVectorDynamicIndexing(V)) {
       return true;
