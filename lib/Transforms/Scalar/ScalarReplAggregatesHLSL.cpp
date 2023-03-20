@@ -143,6 +143,8 @@ static unsigned getNestedLevelInStruct(const Type *ty) {
   return lvl;
 }
 
+static void removeLifetimeUsers(Value *V);
+
 // After SROA'ing a given value into a series of elements,
 // creates the debug info for the storage of the individual elements.
 static void addDebugInfoForElements(Value *ParentVal, Type *BrokenUpTy,
@@ -1894,6 +1896,7 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
           }
 
           addDebugInfoForElements(AI, BrokenUpTy, NumInstances, Elts, DL, &DIB);
+          removeLifetimeUsers(AI);
 
           // Push Elts into workList.
           for (unsigned EltIdx = 0; EltIdx < Elts.size(); ++EltIdx) {
@@ -2348,9 +2351,8 @@ void SROA_Helper::RewriteForStore(StoreInst *SI) {
         }
       }
     }
-  } else {
-    llvm_unreachable("other type don't need rewrite");
-  }
+  } // Note: other data types we can just eliminate the store, so we don't need
+    // to rewrite anything here.
 
   // Remove the use so that the caller can keep iterating over its other users
   SI->setOperand(SI->getPointerOperandIndex(),
