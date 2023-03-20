@@ -8409,17 +8409,20 @@ bool Sema::CheckFunctionDeclaration(Scope *S, FunctionDecl *NewFD,
   //
   // test/HLSLFileCheck/shader_targets/raytracing/builtin-ray-types-anyhit.hlsl
   if (getLangOpts().HLSL) {
-    for (auto Param: NewFD->params()) {
+    for (auto Param : NewFD->params()) {
       QualType PT = Param->getType().getNonReferenceType();
+      if (!PT->isRecordType())
+        continue;
       if (const RecordType *RT = PT->getAs<RecordType>()) {
         RecordDecl *RD = RT->getDecl();
         // The diagnostic here doesn't really matter because it should never be
         // emitted.
         if (RD->isImplicit() &&
             RequireCompleteType(Param->getLocStart(), PT,
-                                diag::err_call_incomplete_argument))
+                                diag::err_call_incomplete_argument)) {
           llvm_unreachable("Implicit types should never fail to complete.");
           NewFD->setInvalidDecl();
+        }
       }
     }
   }
