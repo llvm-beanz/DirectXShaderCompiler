@@ -8909,7 +8909,6 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
       sourceExpr->isLValue() && !target->isLValueReferenceType() &&
       sourceExpr->getStmtClass() != Expr::StringLiteralClass;
 
-  bool targetRef = target->isReferenceType();
   bool TargetIsAnonymous = false;
 
   // Initialize the output standard sequence if available.
@@ -9111,6 +9110,7 @@ lSuccess:
                    "We shouldn't be producing these implicit conversion kinds");
           break;
         case ICK_HLSLVector_Splat:
+        case ICK_HLSLVector_Truncation:
           standard->First = ICK_Lvalue_To_Rvalue;
           break;
         default:
@@ -9154,13 +9154,6 @@ lSuccess:
 
     standard->Second = Second;
     standard->ComponentConversion = ComponentConversion;
-
-    // For conversion which change to RValue but targeting reference type
-    // Hold the conversion to codeGen
-    if (targetRef && standard->First == ICK_Lvalue_To_Rvalue) {
-      standard->First = ICK_Identity;
-      standard->Second = ICK_Identity;
-    }
   }
 
   AssignOpt(Remarks, remarks);
