@@ -9088,13 +9088,7 @@ lSuccess:
   if (standard) {
     if (sourceExpr->isLValue()) {
       if (needsLValueToRValue) {
-        // We don't need LValueToRValue cast before casting a derived object
-        // to its base.
-        if (Second == ICK_HLSL_Derived_To_Base || Second == ICK_Flat_Conversion) {
-          standard->First = ICK_Identity;
-        } else {
-          standard->First = ICK_Lvalue_To_Rvalue;
-        }
+        standard->First = ICK_Lvalue_To_Rvalue;
       } else {
         switch (Second) {
         case ICK_NoReturn_Adjustment:
