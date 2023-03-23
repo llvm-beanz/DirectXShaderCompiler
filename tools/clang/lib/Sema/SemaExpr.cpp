@@ -4673,15 +4673,15 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
         Arg = HLSLArrayTemporaryExpr::Create(getASTContext(), Arg);
       // HLSL Change end
 
-      ExprResult ArgE = PerformCopyInitialization(
-          Entity, SourceLocation(), Arg, IsListInitialization, AllowExplicit);
-      if (ArgE.isInvalid())
-        return true;
-
-      Arg = ArgE.getAs<Expr>();
       // HLSL Change Begin - Optimize out parameters.
       if (Param->isModifierOut()) {
-        ArgE = HLSLBuilder.Create(*this, Param, Arg);
+        ExprResult ArgE = HLSLBuilder.Create(*this, Param, Arg);
+        if (ArgE.isInvalid())
+          return true; // TODO: Emit an error!
+        Arg = ArgE.getAs<Expr>();
+      } else {
+        ExprResult ArgE = PerformCopyInitialization(
+            Entity, SourceLocation(), Arg, IsListInitialization, AllowExplicit);
         if (ArgE.isInvalid())
           return true;
         Arg = ArgE.getAs<Expr>();
