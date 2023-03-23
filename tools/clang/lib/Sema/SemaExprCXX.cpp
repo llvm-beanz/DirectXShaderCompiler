@@ -3458,13 +3458,6 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     if (FromRes.isInvalid())
       return ExprError();
     From = FromRes.get();
-    // If this isn't going to a reference we also need an LValueToRValue cast
-    if (!CStyle && !ToType->isReferenceType()) {
-      ExprResult FromRes = DefaultLvalueConversion(From);
-      if (FromRes.isInvalid())
-        return ExprError();
-      From = FromRes.get();
-    }
     break;
   }
     // HLSL Change Ends
