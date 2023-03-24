@@ -320,7 +320,7 @@ GetAllReadsReachedFromEntry(CFG &ShaderCFG, ArrayRef<PayloadUse> PayloadReads) {
 
 // Returns the record type of a payload declaration.
 CXXRecordDecl *GetPayloadType(const VarDecl *Payload) {
-  auto PayloadType = Payload->getType();
+  QualType PayloadType = Payload->getType().getNonReferenceType();
   if (PayloadType->isStructureOrClassType()) {
     return PayloadType->getAsCXXRecordDecl();
   }
