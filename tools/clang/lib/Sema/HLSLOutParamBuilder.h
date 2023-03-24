@@ -53,6 +53,11 @@ public:
 
     QualType Ty = P->getType().getNonLValueExprType(Ctx);
 
+    if(hlsl::IsHLSLVecMatType(Base->getType()) && Ty->isScalarType()) {
+      Sema.Diag(Base->getLocStart(), diag::err_hlsl_unsupported_lvalue_cast_op);
+      return ExprError();
+    }
+
     // If the unqualified types mismatch we may have some casting. Since this
     // results in a copy we can ignore qualifiers.
     if (Ty.getUnqualifiedType() != Base->getType().getUnqualifiedType()) {
