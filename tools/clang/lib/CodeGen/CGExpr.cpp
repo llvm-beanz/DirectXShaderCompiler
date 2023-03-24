@@ -2935,7 +2935,7 @@ CodeGenFunction::EmitExtMatrixElementExpr(const ExtMatrixElementExpr *E) {
 LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
   if (E->canElide())
     return EmitLValue(E->getBase());
-  llvm::Type *Ty = ConvertType(E->getType());
+  llvm::Type *Ty = ConvertTypeForMem(E->getType());
   // TODO: Use CreateAggTemp
   llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "hlsl.out");
 
@@ -2950,6 +2950,8 @@ LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
           InVal.isScalar()
               ? InVal.getScalarVal()
               : Builder.CreateLoad(InVal.getAggregateAddr(), "hlsl.in");
+      if (V->getType()->getScalarType()->isIntegerTy(1))
+        V = Builder.CreateZExt(V, Ty, "frombool");
       (void)Builder.CreateStore(V, OutTemp);
     }
   }
