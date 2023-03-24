@@ -1904,8 +1904,8 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
     AddValToPropertyMap(ArgIt, fieldTy);
 
     // if parameter type is a typedef, try to desugar it first.
-    if (isa<TypedefType>(fieldTy.getTypePtr()))
-      fieldTy = fieldTy.getDesugaredType(FD->getASTContext());
+    if (auto T = fieldTy->getAs<TypedefType>())
+      fieldTy = T->desugar();
     ConstructFieldAttributedAnnotation(paramAnnotation, fieldTy,
                                        bDefaultRowMajor);
     if (parmDecl->hasAttr<HLSLPreciseAttr>())
