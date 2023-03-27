@@ -2094,8 +2094,10 @@ void CastOperation::CheckHLSLCStyleCast(bool FunctionalStyle,
       return;
     }
   }
+
+  bool PossibleFlatConv =
+      hlsl::IsConversionToLessOrEqualElements(&Self, SrcExpr, DestType, true);
  
-  // HLSL Change Starts
   // Check for HLSL vector/matrix/array/struct shrinking.
   if (ValueKind == VK_RValue && 
       !FunctionalStyle &&
@@ -2103,11 +2105,17 @@ void CastOperation::CheckHLSLCStyleCast(bool FunctionalStyle,
       SrcExpr.get()->isLValue() &&
       // Cannot use casts on basic type l-values
       !SrcType.getCanonicalType()->isBuiltinType() &&
-      hlsl::IsConversionToLessOrEqualElements(&Self, SrcExpr, DestType, true)) {
+      PossibleFlatConv) {
     ValueKind = VK_LValue;
     DestType = Self.getASTContext().getLValueReferenceType(DestType);
   }
-  // HLSL Change Ends
+
+  // If the source is an Array and this is a possible flat conversion we should
+  // handle it to prevent array to pointer decay.
+  if (SrcType->isArrayType() && PossibleFlatConv) {
+    Kind = clang::CK_FlatConversion;
+    return;
+  }
 
   CheckCXXCStyleCast(FunctionalStyle, ListInitialization);
 }
