@@ -1075,7 +1075,8 @@ bool DiagnosePayloadParameter(Sema &S, ParmVarDecl *Payload, FunctionDecl *FD,
     return false;
   }
 
-  CXXRecordDecl *Decl = Payload->getType()->getAsCXXRecordDecl();
+  CXXRecordDecl *Decl =
+      Payload->getType().getNonReferenceType()->getAsCXXRecordDecl();
   if (!Decl || Decl->isImplicit()) {
     // error: not a user defined type decl
     return false;
