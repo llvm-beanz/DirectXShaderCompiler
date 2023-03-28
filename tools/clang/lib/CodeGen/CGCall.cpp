@@ -2610,6 +2610,10 @@ static void emitWriteback(CodeGenFunction &CGF,
     else
       CGF.EmitAggregateCopy(srcLV.getAddress(), TmpVal.getAggregateAddr(),
                             srcLV.getType());
+    uint64_t Sz = CGF.CGM.getDataLayout().getTypeAllocSize(
+        CGF.ConvertTypeForMem(srcLV.getType()));
+    CGF.EmitLifetimeEnd(llvm::ConstantInt::get(CGF.Int64Ty, Sz),
+                        writeback.Temporary);
     return;
   }
 
@@ -3024,9 +3028,13 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     // Add writeback for HLSLOutParamExpr.
     if (const HLSLOutParamExpr *OE = dyn_cast<HLSLOutParamExpr>(E)) {
       LValue LV = EmitLValue(E);
-      if (!OE->canElide())
+      if (!OE->canElide()) {
+        uint64_t Sz =
+            CGM.getDataLayout().getTypeAllocSize(ConvertTypeForMem(LV.getType()));
+        EmitLifetimeStart(Sz, LV.getAddress());
         args.addWriteback(EmitLValue(OE->getSrcLV()), LV.getAddress(), nullptr,
                           OE->getWriteback());
+      }
       return args.add(RValue::get(LV.getAddress()), type);
     }
     // HLSL Change Ends.
