@@ -3028,14 +3028,24 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     // Add writeback for HLSLOutParamExpr.
     if (const HLSLOutParamExpr *OE = dyn_cast<HLSLOutParamExpr>(E)) {
       LValue LV = EmitLValue(E);
+      llvm::Value *Addr, *BaseAddr;
+      if (LV.isExtVectorElt()) {
+        llvm::Constant *VecElts = LV.getExtVectorElts();
+        BaseAddr = LV.getExtVectorAddr();
+        Addr = Builder.CreateGEP(
+            BaseAddr,
+            {Builder.getInt32(0), VecElts->getAggregateElement((unsigned)0)});
+      } else // LV.getAddress() will assert if this is not a simple LValue.
+        Addr = BaseAddr = LV.getAddress();
+
       if (!OE->canElide()) {
-        uint64_t Sz =
-            CGM.getDataLayout().getTypeAllocSize(ConvertTypeForMem(LV.getType()));
-        EmitLifetimeStart(Sz, LV.getAddress());
-        args.addWriteback(EmitLValue(OE->getSrcLV()), LV.getAddress(), nullptr,
+        uint64_t Sz = CGM.getDataLayout().getTypeAllocSize(
+            ConvertTypeForMem(LV.getType()));
+        EmitLifetimeStart(Sz, BaseAddr);
+        args.addWriteback(EmitLValue(OE->getSrcLV()), Addr, nullptr,
                           OE->getWriteback());
       }
-      return args.add(RValue::get(LV.getAddress()), type);
+      return args.add(RValue::get(Addr), type);
     }
     // HLSL Change Ends.
     assert(E->getObjectKind() == OK_Ordinary);
