@@ -31,9 +31,18 @@ class HLSLOutParamBuilder {
   class DeclFinder : public StmtVisitor<DeclFinder> {
   public:
     VarDecl *Decl = nullptr;
+
+    // TODO: For correctness, when multiple decls are found all decls should be
+    // added to the Seen list.
     bool MultipleFound = false;
 
     DeclFinder() = default;
+
+    void VisitStmt(Stmt *S) {
+      for (Stmt *Child : S->children())
+        if (Child)
+          Visit(Child);
+    }
 
     void VisitDeclRefExpr(DeclRefExpr *DRE) {
       if (MultipleFound)
