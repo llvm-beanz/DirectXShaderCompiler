@@ -18,15 +18,19 @@ void fn() {
   CalledFunction(P.X, P);
 }
 
-// CHECK: [[TmpP:%[0-9A-Z]+]] = alloca %struct.Pup
+// CHECK: define internal void @"\01?fn@
+// CHECK-DAG: [[P:%[0-9A-Z]+]] = alloca %struct.Pup
+// CHECK-DAG: [[X:%[0-9A-Z]+]] = alloca float, align 4
+// CHECK-DAG: [[TmpX:%[0-9a-z.]+]] = alloca float
 
-// CHECK: [[X:%[0-9A-Z]+]] = alloca float, align 4
-// CHECK: [[P:%[0-9A-Z]+]] = alloca %struct.Pup, align 4
-// CHECK: call void @"\01?CalledFunction{{[@$?.A-Za-z0-9_]+}}"(float* dereferenceable(4) [[X]], %struct.Pup* [[P]])
+// CHECK: call void @"\01?CalledFunction{{[@$?.A-Za-z0-9_]+}}"(float* dereferenceable(4) [[X]], %struct.Pup*  dereferenceable(4) [[P]])
 
-// CHECK: [[TmpPPtr:%[0-9A-Z]+]] = bitcast %struct.Pup* [[TmpP]] to i8*
-// CHECK: [[PPtr:%[0-9A-Z]+]] = bitcast %struct.Pup* [[P]] to i8*
-// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[TmpPPtr]], i8* [[PPtr]], i64 4, i32 1, i1 false)
+// CHECK: [[PXPtr:%[0-9A-Z]+]] = getelementptr inbounds %struct.Pup, %struct.Pup* [[P]], i32 0, i32 0
+// CHECK: [[PXVal:%[0-9A-Z]+]] = load float, float* [[PXPtr]], align 4
+// CHECK: store float [[PXVal]], float* [[TmpX]]
 
-// CHECK: [[PDotX:%[0-9A-Z]+]] = getelementptr inbounds %struct.Pup, %struct.Pup* [[P]], i32 0, i32 0
-// CHECK: call void @"\01?CalledFunction{{[@$?.A-Za-z0-9_]+}}"(float* dereferenceable(4) [[PDotX]], %struct.Pup* [[TmpP]])
+// CHECK-DAG: call void @"\01?CalledFunction{{[@$?.A-Za-z0-9_]+}}"(float* dereferenceable(4) [[TmpX]], %struct.Pup*  dereferenceable(4) [[P]])
+// CHECK-DAG: [[PXPtr2:%[0-9A-Z]+]] = getelementptr inbounds %struct.Pup, %struct.Pup* [[P]], i32 0, i32 0
+
+// CHECK: [[TmpVal:%[0-9A-Z]+]] = load float, float* [[TmpX]]
+// CHECK: store float [[TmpVal]], float* [[PXPtr2]], align 4
