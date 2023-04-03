@@ -2937,24 +2937,28 @@ LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
     return EmitLValue(E->getBase());
   llvm::Type *Ty = ConvertTypeForMem(E->getType());
   // TODO: Use CreateAggTemp
-  llvm::AllocaInst *OutTemp = CreateTempAlloca(Ty, "hlsl.out");
+  llvm::Value *OutTemp;
 
   if (E->isInOut()) {
     RValue InVal = EmitAnyExprToTemp(E->getBase());
-    if (hlsl::IsHLSLMatType(E->getType())) {
-      // Use matrix store to keep major info.
-      CGM.getHLSLRuntime().EmitHLSLMatrixStore(*this, InVal.getScalarVal(),
-                                               OutTemp, E->getType());
+    if (!InVal.isScalar()) {
+      OutTemp = InVal.getAggregateAddr();
     } else {
-      llvm::Value *V =
-          InVal.isScalar()
-              ? InVal.getScalarVal()
-              : Builder.CreateLoad(InVal.getAggregateAddr(), "hlsl.in");
-      if (V->getType()->getScalarType()->isIntegerTy(1))
-        V = Builder.CreateZExt(V, Ty, "frombool");
-      (void)Builder.CreateStore(V, OutTemp);
+      OutTemp = CreateTempAlloca(Ty, "hlsl.out");
+      if (hlsl::IsHLSLMatType(E->getType())) {
+        // Use matrix store to keep major info.
+        CGM.getHLSLRuntime().EmitHLSLMatrixStore(*this, InVal.getScalarVal(),
+                                                 OutTemp, E->getType());
+      }
+      else {
+        llvm::Value *V = InVal.getScalarVal();
+        if (V->getType()->getScalarType()->isIntegerTy(1))
+          V = Builder.CreateZExt(V, Ty, "frombool");
+        (void)Builder.CreateStore(V, OutTemp);
+      }
     }
-  }
+  } else
+    OutTemp = CreateTempAlloca(Ty, "hlsl.out");
   LValue Result = MakeAddrLValue(OutTemp, E->getType());
   if (auto *OpV = E->getOpaqueValue())
     OpaqueValueMappingData::bind(*this, OpV, Result);
