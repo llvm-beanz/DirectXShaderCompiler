@@ -94,8 +94,14 @@ public:
 
     // If the analysis returned multiple possible decls, or no decl, or we've
     // seen the decl before, generate a HLSLOutParamExpr that can't be elided.
+    // Note: The DXIL IR passes are fragile to a bunch of cases when vectors are
+    // retained as parameter types to user-defined function calls. To work
+    // around that we always emit copies for vector arguments. This is not a
+    // regression because the HLParameterLegalization pass used to do the same
+    // thing.
     if (DF.MultipleFound || DF.Decl == nullptr ||
         DF.Decl->getType().getQualifiers().hasAddressSpace() ||
+        hlsl::IsHLSLVecType(Ty) || // This is a hack, see note above.
         SeenVars.count(DF.Decl) > 0 || !DF.Decl->hasLocalStorage())
       return ExprResult(
           HLSLOutParamExpr::Create(Ctx, Ty, Base, P->hasAttr<HLSLInOutAttr>()));
