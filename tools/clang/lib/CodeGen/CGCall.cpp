@@ -2591,25 +2591,30 @@ static bool isProvablyNonNull(llvm::Value *addr) {
 static void emitWriteback(CodeGenFunction &CGF,
                           const CallArgList::Writeback &writeback) {
   const LValue &srcLV = writeback.Source;
-  
+
   if (CGF.getLangOpts().HLSL) {
-    RValue TmpVal;
-    if (writeback.CastExpr)
-      TmpVal = CGF.EmitAnyExprToTemp(writeback.CastExpr);
-    else {
-      llvm::Value *value;
-      if (hlsl::IsHLSLMatType(srcLV.getType()))
-        value = CGF.CGM.getHLSLRuntime().EmitHLSLMatrixLoad(
-            CGF, writeback.Temporary, srcLV.getType());
+    if (writeback.CastExpr) {
+      RValue TmpVal = CGF.EmitAnyExprToTemp(writeback.CastExpr);
+      if (TmpVal.isScalar())
+        CGF.EmitStoreThroughLValue(TmpVal, srcLV);
       else
-        value = CGF.Builder.CreateLoad(writeback.Temporary);
-      TmpVal = RValue::get(value);
+        CGF.EmitAggregateCopy(srcLV.getAddress(), TmpVal.getAggregateAddr(),
+                              srcLV.getType());
+    } else {
+      if (srcLV.isSimple())
+        CGF.EmitAggregateCopy(srcLV.getAddress(), writeback.Temporary,
+                              srcLV.getType());
+      else {
+        llvm::Value *value;
+        if (hlsl::IsHLSLMatType(srcLV.getType()))
+          value = CGF.CGM.getHLSLRuntime().EmitHLSLMatrixLoad(
+              CGF, writeback.Temporary, srcLV.getType());
+        else
+          value = CGF.Builder.CreateLoad(writeback.Temporary);
+        RValue TmpVal = RValue::get(value);
+        CGF.EmitStoreThroughLValue(TmpVal, srcLV);
+      }
     }
-    if (TmpVal.isScalar())
-      CGF.EmitStoreThroughLValue(TmpVal, srcLV);
-    else
-      CGF.EmitAggregateCopy(srcLV.getAddress(), TmpVal.getAggregateAddr(),
-                            srcLV.getType());
     uint64_t Sz = CGF.CGM.getDataLayout().getTypeAllocSize(
         CGF.ConvertTypeForMem(srcLV.getType()));
     CGF.EmitLifetimeEnd(llvm::ConstantInt::get(CGF.Int64Ty, Sz),
