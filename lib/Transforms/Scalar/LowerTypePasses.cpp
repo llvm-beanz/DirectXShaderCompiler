@@ -274,7 +274,7 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
             ldVal = Builder.CreateLoad(V);
             ldVal = Builder.CreateInsertElement(ldVal, Elt, constIdx);
             Builder.CreateStore(ldVal, V);
-          } else {
+          } else if (StoreInst *stInst = dyn_cast<StoreInst>(GEPUser)) {
             // Change
             //    st val, a->x
             // into
@@ -282,7 +282,6 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
             //    tmp.x = val
             //    st tmp, a
             // Must be store inst here.
-            StoreInst *stInst = cast<StoreInst>(GEPUser);
             Value *val = stInst->getValueOperand();
             Value *ldVal = Builder.CreateLoad(V);
             ldVal = Builder.CreateInsertElement(ldVal, val, constIdx);
@@ -290,7 +289,8 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
             stInst->eraseFromParent();
           }
         }
-        GEP->eraseFromParent();
+        if (GEP->user_empty())
+          GEP->eraseFromParent();
       } else if (GEP->getNumIndices() == 1) {
         Value *Idx = *GEP->idx_begin();
         if (ConstantInt *C = dyn_cast<ConstantInt>(Idx)) {
