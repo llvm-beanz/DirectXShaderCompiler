@@ -17,6 +17,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Sema/Sema.h"
+#include "clang/Sema/SemaHLSL.h"
 #include "llvm/ADT/DenseSet.h"
 
 namespace clang {
@@ -54,6 +55,30 @@ class HLSLOutParamBuilder {
     }
   };
 
+  ExprResult CreateCasted(Sema &Sema, ParmVarDecl *P, Expr *Base, QualType Ty) {
+    ASTContext &Ctx = Sema.getASTContext();
+    ExprResult Res =
+        Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
+    if (Res.isInvalid())
+      return ExprError();
+    // After the cast, drop the reference type when creating the exprs.
+    Ty = Ty.getNonLValueExprType(Ctx);
+    HLSLOutParamExpr *OutExpr =
+        HLSLOutParamExpr::Create(Ctx, Ty, Res.get(),
+                                 P->hasAttr<HLSLInOutAttr>());
+    auto *OpV = new (Ctx) OpaqueValueExpr(P->getLocStart(), Ty, VK_LValue,
+                                          OK_Ordinary, OutExpr);
+    Res = Sema.PerformImplicitConversion(OpV, Base->getType(),
+                                          Sema::AA_Passing);
+    if (Res.isInvalid())
+      return ExprError();
+    OutExpr->setWriteback(Res.get());
+    OutExpr->setSrcLV(Base);
+    OutExpr->setOpaqueValue(OpV);
+    OpV->setSourceIsParent();
+    return ExprResult(OutExpr);
+  }
+
 public:
   HLSLOutParamBuilder() = default;
 
@@ -67,27 +92,14 @@ public:
       return ExprError();
     }
 
+    bool PossibleFlatConv =
+      hlsl::IsConversionToLessOrEqualElements(&Sema, Base, Ty, true);
+    bool RequiresConversion = Ty.getUnqualifiedType() != Base->getType().getUnqualifiedType();
+
     // If the unqualified types mismatch we may have some casting. Since this
     // results in a copy we can ignore qualifiers.
-    if (Ty.getUnqualifiedType() != Base->getType().getUnqualifiedType()) {
-      ExprResult Res =
-          Sema.PerformImplicitConversion(Base, Ty, Sema::AA_Passing);
-      if (Res.isInvalid())
-        return ExprError();
-      HLSLOutParamExpr *OutExpr = HLSLOutParamExpr::Create(
-          Ctx, Ty, Res.get(), P->hasAttr<HLSLInOutAttr>());
-      auto *OpV = new (Ctx) OpaqueValueExpr(P->getLocStart(), Ty, VK_LValue,
-                                            OK_Ordinary, OutExpr);
-      Res = Sema.PerformImplicitConversion(OpV, Base->getType(),
-                                           Sema::AA_Passing);
-      if (Res.isInvalid())
-        return ExprError();
-      OutExpr->setWriteback(Res.get());
-      OutExpr->setSrcLV(Base);
-      OutExpr->setOpaqueValue(OpV);
-      OpV->setSourceIsParent();
-      return ExprResult(OutExpr);
-    }
+    if (!PossibleFlatConv && RequiresConversion)
+      return CreateCasted(Sema, P, Base, Ty);
 
     DeclFinder DF;
     DF.Visit(Base);
@@ -102,9 +114,20 @@ public:
     if (DF.MultipleFound || DF.Decl == nullptr ||
         DF.Decl->getType().getQualifiers().hasAddressSpace() ||
         hlsl::IsHLSLVecType(Ty) || // This is a hack, see note above.
-        SeenVars.count(DF.Decl) > 0 || !DF.Decl->hasLocalStorage())
+        SeenVars.count(DF.Decl) > 0 || !DF.Decl->hasLocalStorage()) {
+      if (RequiresConversion)
+        return CreateCasted(Sema, P, Base, P->getType());
       return ExprResult(
           HLSLOutParamExpr::Create(Ctx, Ty, Base, P->hasAttr<HLSLInOutAttr>()));
+    }
+
+    if (RequiresConversion) {
+      ExprResult Res =
+        Sema.PerformImplicitConversion(Base, P->getType(), Sema::AA_Passing);
+      if (Res.isInvalid())
+        return ExprError();
+      Base = Res.get();
+    }
     // Add the decl to the seen list, and generate a HLSLOutParamExpr that can
     // be elided.
     SeenVars.insert(DF.Decl);
