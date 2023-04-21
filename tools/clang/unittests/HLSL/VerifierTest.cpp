@@ -35,6 +35,7 @@ public:
 
   TEST_METHOD(RunCppErrors)
   TEST_METHOD(RunCppErrorsHV2015)
+  TEST_METHOD(RunInOutTrunc)
   TEST_METHOD(RunVectorSyntax)
   TEST_METHOD(RunVectorSyntaxExactPrecision)
   TEST_METHOD(RunTypemodsSyntax)
