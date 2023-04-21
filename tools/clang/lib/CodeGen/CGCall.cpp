@@ -2931,6 +2931,12 @@ void CodeGenFunction::EmitCallArgs(CallArgList &Args,
     // Un-reverse the arguments we just evaluated so they match up with the LLVM
     // IR function.
     std::reverse(Args.begin() + CallArgsStart, Args.end());
+    
+    // HLSL Change Begin
+    // We also need to un-reverse the writebacks so that they are emitted left
+    // to right since the args were emitted right to left.
+    Args.reverseWritebacks();
+    // HLSL Change End
     return;
   }
 
