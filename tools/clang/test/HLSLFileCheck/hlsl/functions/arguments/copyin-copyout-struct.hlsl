@@ -30,6 +30,10 @@ void fn() {
 // CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[TmpPPtr]], i8* [[PPtr]], i64 4, i32 1, i1 false)
 // CHECK: [[PXPtr:%[0-9A-Z]+]] = getelementptr inbounds %struct.Pup, %struct.Pup* [[P]], i32 0, i32 0
 
-// CHECK-DAG: call void @"\01?CalledFunction{{[@$?.A-Za-z0-9_]+}}"(float* dereferenceable(4) [[PXPtr]], %struct.Pup*  dereferenceable(4) [[TmpP]])
-// CHECK: [[TmpPVal:%[0-9]+]] = load %struct.Pup, %struct.Pup* [[TmpP]]
-// CHECK: store %struct.Pup [[TmpPVal]], %struct.Pup* [[P]], align 4
+// CHECK: call void @"\01?CalledFunction{{[@$?.A-Za-z0-9_]+}}"
+// CHECK-SAME: (float* dereferenceable(4) [[PXPtr]], %struct.Pup*  dereferenceable(4) [[TmpP]])
+
+// CHECK-DAG: [[PPtr:%[0-9]+]] = bitcast %struct.Pup* [[P]] to i8*
+// CHECK-DAG: [[TmpPPtr:%[0-9]+]] = bitcast %struct.Pup* [[TmpP]] to i8*
+// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[PPtr]], i8* [[TmpPPtr]], i64 4, i32 1, i1 false)
+
