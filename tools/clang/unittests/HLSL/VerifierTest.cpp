@@ -54,6 +54,7 @@ public:
   TEST_METHOD(RunFunctions)
   TEST_METHOD(RunIncompleteType)
   TEST_METHOD(RunIndexingOperator)
+  TEST_METHOD(RunInOutTrunc)
   TEST_METHOD(RunIntrinsicExamples)
   TEST_METHOD(RunInvalidDeclTemplateArg)
   TEST_METHOD(RunMatrixAssignments)
@@ -259,6 +260,10 @@ TEST_F(VerifierTest, RunIncompleteType) {
 
 TEST_F(VerifierTest, RunIndexingOperator) {
   CheckVerifiesHLSL(L"indexing-operator.hlsl");
+}
+
+TEST_F(VerifierTest, RunInOutTrunc) {
+  CheckVerifiesHLSL(L"inout_trunc.hlsl");
 }
 
 TEST_F(VerifierTest, RunIntrinsicExamples) {
