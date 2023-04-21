@@ -129,6 +129,13 @@ namespace CodeGen {
     /// memory.
     bool isUsingInAlloca() const { return StackBase; }
 
+    // HLSL Change Begin
+    // Support reversing writebacks for MSVC ABI.
+    void reverseWritebacks() {
+      std::reverse(Writebacks.begin(), Writebacks.end());
+    }
+    // HLSL Change End
+
   private:
     SmallVector<Writeback, 1> Writebacks;
 
