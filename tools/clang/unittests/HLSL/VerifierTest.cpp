@@ -112,6 +112,7 @@ public:
   TEST_METHOD(RunBitFieldAnnotations)
   TEST_METHOD(RunUDTByteAddressBufferLoad)
   TEST_METHOD(RunObjectTemplateDiagDeferred)
+  TEST_METHOD(RunVectorMatrixBinOp)
   void CheckVerifies(const wchar_t *path) {
     WEX::TestExecution::SetVerifyOutput verifySettings(
         WEX::TestExecution::VerifyOutputSettings::LogOnlyFailures);
@@ -466,4 +467,8 @@ TEST_F(VerifierTest, RunUDTByteAddressBufferLoad) {
 
 TEST_F(VerifierTest, RunObjectTemplateDiagDeferred) {
   CheckVerifiesHLSL(L"object-template-diag-deferred.hlsl");
+}
+
+TEST_F(VerifierTest, RunVectorMatrixBinOp) {
+  CheckVerifiesHLSL(L"vector-matrix-binops.hlsl");
 }

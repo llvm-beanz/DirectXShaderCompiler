@@ -10407,10 +10407,6 @@ bool HLSLExternalSource::ValidateCast(SourceLocation OpLoc, Expr *sourceExpr,
           m_sema->Diag(OpLoc, diag::warn_hlsl_narrowing) << source << target;
         }
       }
-
-      if ((remarks & TYPE_CONVERSION_ELT_TRUNCATION) != 0) {
-        m_sema->Diag(OpLoc, diag::warn_hlsl_implicit_vector_truncation);
-      }
     }
   }
 
