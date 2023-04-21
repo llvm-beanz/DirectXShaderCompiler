@@ -3448,7 +3448,8 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
       
   // HLSL Change Starts
   case ICK_HLSLVector_Truncation:
-    Diag(From->getLocStart(), diag::warn_hlsl_implicit_vector_truncation);
+    if(CCK == CCK_ImplicitConversion)
+      Diag(From->getLocStart(), diag::warn_hlsl_implicit_vector_truncation);
     LLVM_FALLTHROUGH;
   case ICK_Flat_Conversion:
   case ICK_HLSL_Derived_To_Base:
