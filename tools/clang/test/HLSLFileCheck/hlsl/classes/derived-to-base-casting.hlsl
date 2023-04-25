@@ -79,5 +79,4 @@ void DerivedToBaseGS() {
 // CHECK-NEXT: DeclRefExpr {{0x[0-9a-fA-F]+}} <col:17> 'DerivedAgain' lvalue Var {{0x[0-9a-fA-F]+}} 'da1' 'DerivedAgain'
 // CHECK-NEXT: ImplicitCastExpr {{0x[0-9a-fA-F]+}} <col:23, col:37> 'DerivedAgain' <LValueToRValue>
 // CHECK-NEXT: CStyleCastExpr {{0x[0-9a-fA-F]+}} <col:23, col:37> 'DerivedAgain' lvalue <NoOp>
-// CHECK-NEXT: ImplicitCastExpr {{0x[0-9a-fA-F]+}} <col:37> 'DerivedAgain' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{0x[0-9a-fA-F]+}} <col:37> '__attribute__((address_space(3))) DerivedAgain' lvalue Var {{0x[0-9a-fA-F]+}} 'daGS' '__attribute__((address_space(3))) DerivedAgain'
