@@ -2615,10 +2615,12 @@ static void emitWriteback(CodeGenFunction &CGF,
         CGF.EmitStoreThroughLValue(TmpVal, srcLV);
       }
     }
-    uint64_t Sz = CGF.CGM.getDataLayout().getTypeAllocSize(
-        CGF.ConvertTypeForMem(srcLV.getType()));
-    CGF.EmitLifetimeEnd(llvm::ConstantInt::get(CGF.Int64Ty, Sz),
-                        writeback.Temporary);
+    if (CGF.CGM.getCodeGenOpts().HLSLEnableLifetimeMarkers) {
+      uint64_t Sz = CGF.CGM.getDataLayout().getTypeAllocSize(
+          CGF.ConvertTypeForMem(srcLV.getType()));
+      CGF.EmitLifetimeEnd(llvm::ConstantInt::get(CGF.Int64Ty, Sz),
+                          writeback.Temporary);
+    }
     return;
   }
 
