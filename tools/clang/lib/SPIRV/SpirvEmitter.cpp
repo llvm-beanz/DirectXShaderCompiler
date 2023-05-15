@@ -3410,14 +3410,7 @@ SpirvInstruction *SpirvEmitter::doCastExpr(const CastExpr *expr,
                                        subExpr->getExprLoc(), range);
   }
   case CastKind::CK_ArrayToPointerDecay: {
-    // Literal string to const string conversion falls under this category.
-    if (hlsl::IsStringLiteralType(subExprType) && hlsl::IsStringType(toType)) {
       return doExpr(subExpr, range);
-    } else {
-      emitError("implicit cast kind '%0' unimplemented", expr->getExprLoc())
-          << expr->getCastKindName() << expr->getSourceRange();
-      expr->dump();
-      return 0;
     }
   }
   default:
@@ -14230,8 +14223,11 @@ SpirvEmitter::doHLSLOutParamExpr(const HLSLOutParamExpr *Expr) {
 
 SpirvInstruction *
 SpirvEmitter::doHLSLArrayTemporaryExpr(const HLSLArrayTemporaryExpr *expr) {
-  assert(false && "Todo");
-  return nullptr;
+  auto *InitVal = doExpr(expr->getBase());
+  auto *TmpVar = spvBuilder.addFnVar(expr->getType(), expr->getLocStart(), "tmp.hlsl.array");
+  (void)spvBuilder.createCopyMemory(TmpVar->getAstResultType(), InitVal,
+                                     TmpVar, expr->getLocStart());
+  return TmpVar;
 }
 
 SpirvInstruction *SpirvEmitter::doOpaqueValueExpr(const OpaqueValueExpr *expr) {
