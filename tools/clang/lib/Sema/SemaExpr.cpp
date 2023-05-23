@@ -4667,9 +4667,9 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
         Entity.setParameterCFAudited();
 
       // HLSL Change begin
-      // If this is an array and not an oputput, generate an array temporary
-      // expression here rather than an RValue cast.
-      if (ProtoArgType->isArrayType() && !Param->isModifierOut())
+      // If this is a constant sized array and not an oputput, generate an array
+      // temporary expression here rather than an RValue cast.
+      if (ProtoArgType->isConstantArrayType() && !Param->isModifierOut())
         Arg = HLSLArrayTemporaryExpr::Create(getASTContext(), Arg);
       // HLSL Change end
 
