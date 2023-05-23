@@ -3410,8 +3410,7 @@ SpirvInstruction *SpirvEmitter::doCastExpr(const CastExpr *expr,
                                        subExpr->getExprLoc(), range);
   }
   case CastKind::CK_ArrayToPointerDecay: {
-      return doExpr(subExpr, range);
-    }
+    return doExpr(subExpr, range);
   }
   default:
     emitError("implicit cast kind '%0' unimplemented", expr->getExprLoc())
@@ -11616,8 +11615,8 @@ void SpirvEmitter::processCallShader(const CallExpr *callExpr) {
   // HLSL Func :
   // template<typename CallData>
   // void CallShader(in int sbtIndex, inout CallData arg)
-  if (const auto *implCastExpr = dyn_cast<CastExpr>(args[1])) {
-    if (const auto *arg = dyn_cast<DeclRefExpr>(implCastExpr->getSubExpr())) {
+  if (const auto *outParamExpr = dyn_cast<HLSLOutParamExpr>(args[1])) {
+    if (const auto *arg = dyn_cast<DeclRefExpr>(outParamExpr->getBase())) {
       if (const auto *varDecl = dyn_cast<VarDecl>(arg->getDecl())) {
         callDataType = varDecl->getType();
         callDataArg = varDecl;
@@ -11702,8 +11701,8 @@ void SpirvEmitter::processTraceRay(const CallExpr *callExpr) {
   //              inout RayPayload p)
   // where RayDesc = {float3 origin, float tMin, float3 direction, float tMax}
 
-  if (const auto *implCastExpr = dyn_cast<CastExpr>(args[7])) {
-    if (const auto *arg = dyn_cast<DeclRefExpr>(implCastExpr->getSubExpr())) {
+  if (const auto *outExpr = dyn_cast<HLSLOutParamExpr>(args[7])) {
+    if (const auto *arg = dyn_cast<DeclRefExpr>(outExpr->getBase())) {
       if (const auto *varDecl = dyn_cast<VarDecl>(arg->getDecl())) {
         rayPayloadType = varDecl->getType();
         rayPayloadArg = varDecl;
@@ -12889,7 +12888,7 @@ bool SpirvEmitter::emitEntryFunctionWrapper(const FunctionDecl *decl,
   // Create temporary variables for holding function call arguments
   llvm::SmallVector<SpirvInstruction *, 4> params;
   for (const auto *param : decl->params()) {
-    const auto paramType = param->getType();
+    const auto paramType = param->getType().getNonReferenceType();
     std::string tempVarName = "param.var." + param->getNameAsString();
     auto *tempVar =
         spvBuilder.addFnVar(paramType, param->getLocation(), tempVarName,
@@ -12971,8 +12970,9 @@ bool SpirvEmitter::emitEntryFunctionWrapper(const FunctionDecl *decl,
       // .Append() intrinsic method. No need to load the parameter since we
       // won't need to write back here.
       if (param->isUsed() && !spvContext.isGS())
-        loadedParam = spvBuilder.createLoad(param->getType(), params[i],
-                                            param->getLocStart());
+        loadedParam =
+            spvBuilder.createLoad(param->getType().getNonReferenceType(),
+                                  params[i], param->getLocStart());
 
       if (!declIdMapper.createStageOutputVar(param, loadedParam, false))
         return false;
