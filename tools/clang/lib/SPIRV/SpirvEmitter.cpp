@@ -8071,7 +8071,8 @@ const Expr *SpirvEmitter::collectArrayStructIndices(
     //   `-ImplicitCastExpr 'const T' lvalue <FlatConversion>
     //     `-ArraySubscriptExpr 'ConstantBuffer<T>':'ConstantBuffer<T>' lvalue
     if (auto *castExpr = dyn_cast<ImplicitCastExpr>(expr)) {
-      if (castExpr->getCastKind() == CK_FlatConversion) {
+      if (castExpr->getCastKind() == CK_FlatConversion ||
+          castExpr->getCastKind() == CK_ArrayToPointerDecay) {
         const auto *subExpr = castExpr->getSubExpr();
         const QualType subExprType = subExpr->getType();
         if (isConstantTextureBuffer(subExprType)) {
@@ -14357,6 +14358,8 @@ SpirvEmitter::doUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *expr) {
 
 SpirvInstruction *
 SpirvEmitter::doHLSLOutParamExpr(const HLSLOutParamExpr *Expr) {
+  if (Expr->canElide())
+    return doExpr(Expr->getBase());
   SpirvVariable *TmpVar = nullptr;
   if (Expr->isInOut()) {
     SpirvInstruction *InitVal = doExpr(Expr->getBase());
