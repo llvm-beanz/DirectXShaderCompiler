@@ -2433,6 +2433,10 @@ bool DeclResultIdMapper::createStageVars(
     QualType type, uint32_t arraySize, const llvm::StringRef namePrefix,
     llvm::Optional<SpirvInstruction *> invocationId, SpirvInstruction **value,
     bool noWriteBack, SemanticInfo *inheritSemantic) {
+  
+  // Look through references for stage variables.
+  type = type.getNonReferenceType();
+  
   assert(value);
   // invocationId should only be used for handling HS per-vertex output.
   if (invocationId.hasValue()) {
