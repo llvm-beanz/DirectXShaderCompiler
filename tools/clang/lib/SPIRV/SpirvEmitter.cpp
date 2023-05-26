@@ -12585,6 +12585,7 @@ bool SpirvEmitter::emitEntryFunctionWrapperForRayTracing(
 
 bool SpirvEmitter::processMeshOrAmplificationShaderAttributes(
     const FunctionDecl *decl, uint32_t *outVerticesArraySize) {
+  // TODO: All the `emitError` calls here should be moved to AST-based analysis.
   if (auto *numThreadsAttr = decl->getAttr<HLSLNumThreadsAttr>()) {
     uint32_t x, y, z;
     x = static_cast<uint32_t>(numThreadsAttr->getX());
@@ -12624,7 +12625,7 @@ bool SpirvEmitter::processMeshOrAmplificationShaderAttributes(
 
   for (uint32_t i = 0; i < decl->getNumParams(); i++) {
     const auto param = decl->getParamDecl(i);
-    const auto paramType = param->getType();
+    const auto paramType = param->getType().getNonReferenceType();
     const auto paramLoc = param->getLocation();
     if (param->hasAttr<HLSLVerticesAttr>() ||
         param->hasAttr<HLSLIndicesAttr>() ||
