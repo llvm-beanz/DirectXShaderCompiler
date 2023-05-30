@@ -167,6 +167,18 @@ private:
   SpirvInstruction *doUnaryOperator(const UnaryOperator *expr);
   SpirvInstruction *
   doUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *expr);
+  
+  SpirvInstruction *doHLSLOutParamExpr(const HLSLOutParamExpr *expr);
+  SpirvInstruction *
+  doHLSLArrayTemporaryExpr(const HLSLArrayTemporaryExpr *expr);
+  SpirvInstruction *doOpaqueValueExpr(const OpaqueValueExpr *expr);
+
+
+  /// Binds an lvalue to an opaque value expression.
+  void bindOpaqueValue(SpirvVariable *lvalue, const OpaqueValueExpr *opaqueVal);
+
+  /// Gets the lvalue for an opaque value.
+  SpirvVariable *getLValueForOpaqueValue(const OpaqueValueExpr *opaqueVal);
 
   /// Overload with pre computed SpirvEvalInfo.
   ///
@@ -1470,6 +1482,11 @@ private:
 
   /// ParentMap of the current function.
   std::unique_ptr<ParentMap> parentMap = nullptr;
+
+  /// Stores the mapping of OpaqueValueExprs to SpirvVariables.
+  ///
+  /// Note: 16 is an arbitrarily chosen value.
+  llvm::DenseMap<const OpaqueValueExpr *, SpirvVariable *> opaqueValueBindings;
 };
 
 void SpirvEmitter::doDeclStmt(const DeclStmt *declStmt) {

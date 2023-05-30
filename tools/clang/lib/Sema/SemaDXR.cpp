@@ -320,7 +320,7 @@ GetAllReadsReachedFromEntry(CFG &ShaderCFG, ArrayRef<PayloadUse> PayloadReads) {
 
 // Returns the record type of a payload declaration.
 CXXRecordDecl *GetPayloadType(const VarDecl *Payload) {
-  auto PayloadType = Payload->getType();
+  QualType PayloadType = Payload->getType().getNonReferenceType();
   if (PayloadType->isStructureOrClassType()) {
     return PayloadType->getAsCXXRecordDecl();
   }
@@ -1013,6 +1013,9 @@ DiagnosePayloadAccess(Sema &S, DxrShaderDiagnoseInfo &Info,
 const Stmt *IgnoreParensAndDecay(const Stmt *S) {
   for (;;) {
     switch (S->getStmtClass()) {
+    case Expr::HLSLOutParamExprClass:
+      S = cast<HLSLOutParamExpr>(S)->getBase();
+      break;
     case Stmt::ParenExprClass:
       S = cast<ParenExpr>(S)->getSubExpr();
       break;
@@ -1072,7 +1075,8 @@ bool DiagnosePayloadParameter(Sema &S, ParmVarDecl *Payload, FunctionDecl *FD,
     return false;
   }
 
-  CXXRecordDecl *Decl = Payload->getType()->getAsCXXRecordDecl();
+  CXXRecordDecl *Decl =
+      Payload->getType().getNonReferenceType()->getAsCXXRecordDecl();
   if (!Decl || Decl->isImplicit()) {
     // error: not a user defined type decl
     return false;

@@ -1837,12 +1837,7 @@ AddHLSLIntrinsicFunction(ASTContext &context, NamespaceDecl *NS,
     if (paramMods[i - 1].isAnyOut() ||
         paramMods[i - 1].GetKind() == hlsl::ParameterModifier::Kind::Ref) {
       QualType Ty = functionArgQualTypes[i];
-      // Aggregate type will be indirect param convert to pointer type.
-      // Don't need add reference for it.
-      if ((!Ty->isArrayType() && !Ty->isRecordType()) ||
-          hlsl::IsHLSLVecMatType(Ty)) {
-        functionArgQualTypes[i] = context.getLValueReferenceType(Ty);
-      }
+      functionArgQualTypes[i] = context.getLValueReferenceType(Ty);
     }
   }
 
@@ -7131,6 +7126,7 @@ unsigned HLSLExternalSource::GetNumConvertCheckElts(QualType leftType,
 }
 
 QualType HLSLExternalSource::GetNthElementType(QualType type, unsigned index) {
+  type = type.getNonReferenceType();
   if (type.isNull()) {
     return type;
   }
@@ -9159,6 +9155,10 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
   if (source->isFunctionType())
     return false;
 
+  // We cannot convert from non-lvalue to lvalue references.
+  if (target->isLValueReferenceType() && !sourceExpr->isLValue())
+    return false;
+
   // Convert to an r-value to begin with, with an exception for strings
   // since they are not first-class values and we want to preserve them as
   // literals.
@@ -9166,7 +9166,6 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
       sourceExpr->isLValue() && !target->isLValueReferenceType() &&
       sourceExpr->getStmtClass() != Expr::StringLiteralClass;
 
-  bool targetRef = target->isReferenceType();
   bool TargetIsAnonymous = false;
 
   // Initialize the output standard sequence if available.
@@ -9174,10 +9173,7 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
     // Set up a no-op conversion, other than lvalue to rvalue - HLSL does not
     // support references.
     standard->setAsIdentityConversion();
-    if (needsLValueToRValue) {
-      standard->First = ICK_Lvalue_To_Rvalue;
-    }
-
+    standard->First = clang::ICK_Identity;
     standard->setFromType(source);
     standard->setAllToTypes(target);
   }
@@ -9223,8 +9219,12 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
   if ((SourceInfo.EltKind == AR_OBJECT_CONSTANT_BUFFER ||
        SourceInfo.EltKind == AR_OBJECT_TEXTURE_BUFFER) &&
       TargetInfo.ShapeKind == AR_TOBJ_COMPOUND) {
-    if (standard)
+    if (standard) {
       standard->Second = ICK_Flat_Conversion;
+      if (needsLValueToRValue) {
+        standard->First = ICK_Lvalue_To_Rvalue;
+      }
+    }
     return hlsl::GetHLSLResourceResultType(source) == target;
   }
 
@@ -9351,13 +9351,7 @@ lSuccess:
   if (standard) {
     if (sourceExpr->isLValue()) {
       if (needsLValueToRValue) {
-        // We don't need LValueToRValue cast before casting a derived object
-        // to its base.
-        if (Second == ICK_HLSL_Derived_To_Base) {
-          standard->First = ICK_Identity;
-        } else {
-          standard->First = ICK_Lvalue_To_Rvalue;
-        }
+        standard->First = ICK_Lvalue_To_Rvalue;
       } else {
         switch (Second) {
         case ICK_NoReturn_Adjustment:
@@ -9366,8 +9360,8 @@ lSuccess:
           DXASSERT(false,
                    "We shouldn't be producing these implicit conversion kinds");
           break;
-        case ICK_Flat_Conversion:
         case ICK_HLSLVector_Splat:
+        case ICK_HLSLVector_Truncation:
           standard->First = ICK_Lvalue_To_Rvalue;
           break;
         default:
@@ -9411,13 +9405,6 @@ lSuccess:
 
     standard->Second = Second;
     standard->ComponentConversion = ComponentConversion;
-
-    // For conversion which change to RValue but targeting reference type
-    // Hold the conversion to codeGen
-    if (targetRef && standard->First == ICK_Lvalue_To_Rvalue) {
-      standard->First = ICK_Identity;
-      standard->Second = ICK_Identity;
-    }
   }
 
   AssignOpt(Remarks, remarks);

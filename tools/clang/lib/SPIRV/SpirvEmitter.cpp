@@ -1232,6 +1232,12 @@ SpirvInstruction *SpirvEmitter::doExpr(const Expr *expr,
   } else if (const auto *tmplParamExpr =
                  dyn_cast<SubstNonTypeTemplateParmExpr>(expr)) {
     result = doExpr(tmplParamExpr->getReplacement());
+  } else if (const auto *outParamExpr = dyn_cast<HLSLOutParamExpr>(expr)) {
+    result = doHLSLOutParamExpr(outParamExpr);
+  } else if (const auto *arrayTmpExpr = dyn_cast<HLSLArrayTemporaryExpr>(expr)) {
+    result = doHLSLArrayTemporaryExpr(arrayTmpExpr);
+  } else if (const auto *opaqueValExpr = dyn_cast<OpaqueValueExpr>(expr)) {
+    result = doOpaqueValueExpr(opaqueValExpr);
   } else {
     emitError("expression class '%0' unimplemented", expr->getExprLoc())
         << expr->getStmtClassName() << expr->getSourceRange();
@@ -2981,6 +2987,7 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
   llvm::SmallVector<SpirvInstruction *, 4> vars; // Variables for function call
   llvm::SmallVector<bool, 4> isTempVar;          // Temporary variable or not
   llvm::SmallVector<SpirvInstruction *, 4> args; // Evaluated arguments
+  llvm::SmallVector<std::pair<SpirvInstruction *, const HLSLOutParamExpr*>, 4> writebacks;
 
   if (const auto *memberCall = dyn_cast<CXXMemberCallExpr>(callExpr)) {
     const auto *memberFn = cast<CXXMethodDecl>(memberCall->getCalleeDecl());
@@ -3074,6 +3081,9 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
     }
 
     auto *argInst = doExpr(arg);
+
+    if (const auto *outParamExpr = dyn_cast<HLSLOutParamExpr>(arg))
+      writebacks.push_back(std::make_pair(argInst, outParamExpr));
 
     bool isArgGlobalVarWithResourceType =
         argInfo && argInfo->getStorageClass() != spv::StorageClass::Function &&
@@ -3619,15 +3629,7 @@ SpirvInstruction *SpirvEmitter::doCastExpr(const CastExpr *expr,
                                        subExpr->getExprLoc(), range);
   }
   case CastKind::CK_ArrayToPointerDecay: {
-    // Literal string to const string conversion falls under this category.
-    if (hlsl::IsStringLiteralType(subExprType) && hlsl::IsStringType(toType)) {
-      return doExpr(subExpr, range);
-    } else {
-      emitError("implicit cast kind '%0' unimplemented", expr->getExprLoc())
-          << expr->getCastKindName() << expr->getSourceRange();
-      expr->dump();
-      return 0;
-    }
+    return doExpr(subExpr, range);
   }
   default:
     emitError("implicit cast kind '%0' unimplemented", expr->getExprLoc())
@@ -8391,7 +8393,8 @@ const Expr *SpirvEmitter::collectArrayStructIndices(
     //   `-ImplicitCastExpr 'const T' lvalue <FlatConversion>
     //     `-ArraySubscriptExpr 'ConstantBuffer<T>':'ConstantBuffer<T>' lvalue
     if (auto *castExpr = dyn_cast<ImplicitCastExpr>(expr)) {
-      if (castExpr->getCastKind() == CK_FlatConversion) {
+      if (castExpr->getCastKind() == CK_FlatConversion ||
+          castExpr->getCastKind() == CK_ArrayToPointerDecay) {
         const auto *subExpr = castExpr->getSubExpr();
         const QualType subExprType = subExpr->getType();
         if (isConstantTextureBuffer(subExprType)) {
@@ -12216,8 +12219,8 @@ void SpirvEmitter::processCallShader(const CallExpr *callExpr) {
   // HLSL Func :
   // template<typename CallData>
   // void CallShader(in int sbtIndex, inout CallData arg)
-  if (const auto *implCastExpr = dyn_cast<CastExpr>(args[1])) {
-    if (const auto *arg = dyn_cast<DeclRefExpr>(implCastExpr->getSubExpr())) {
+  if (const auto *outParamExpr = dyn_cast<HLSLOutParamExpr>(args[1])) {
+    if (const auto *arg = dyn_cast<DeclRefExpr>(outParamExpr->getBase())) {
       if (const auto *varDecl = dyn_cast<VarDecl>(arg->getDecl())) {
         callDataType = varDecl->getType();
         callDataArg = varDecl;
@@ -12302,8 +12305,8 @@ void SpirvEmitter::processTraceRay(const CallExpr *callExpr) {
   //              inout RayPayload p)
   // where RayDesc = {float3 origin, float tMin, float3 direction, float tMax}
 
-  if (const auto *implCastExpr = dyn_cast<CastExpr>(args[7])) {
-    if (const auto *arg = dyn_cast<DeclRefExpr>(implCastExpr->getSubExpr())) {
+  if (const auto *outExpr = dyn_cast<HLSLOutParamExpr>(args[7])) {
+    if (const auto *arg = dyn_cast<DeclRefExpr>(outExpr->getBase())) {
       if (const auto *varDecl = dyn_cast<VarDecl>(arg->getDecl())) {
         rayPayloadType = varDecl->getType();
         rayPayloadArg = varDecl;
@@ -13170,7 +13173,7 @@ bool SpirvEmitter::processMeshOrAmplificationShaderAttributes(
 
   for (uint32_t i = 0; i < decl->getNumParams(); i++) {
     const auto param = decl->getParamDecl(i);
-    const auto paramType = param->getType();
+    const auto paramType = param->getType().getNonReferenceType();
     const auto paramLoc = param->getLocation();
     if (param->hasAttr<HLSLVerticesAttr>() ||
         param->hasAttr<HLSLIndicesAttr>() ||
@@ -13434,7 +13437,7 @@ bool SpirvEmitter::emitEntryFunctionWrapper(const FunctionDecl *decl,
   // Create temporary variables for holding function call arguments
   llvm::SmallVector<SpirvInstruction *, 4> params;
   for (const auto *param : decl->params()) {
-    const auto paramType = param->getType();
+    const auto paramType = param->getType().getNonReferenceType();
     std::string tempVarName = "param.var." + param->getNameAsString();
     auto *tempVar =
         spvBuilder.addFnVar(paramType, param->getLocation(), tempVarName,
@@ -15144,6 +15147,57 @@ bool SpirvEmitter::UpgradeToVulkanMemoryModelIfNeeded(
     return false;
   }
   return true;
+}
+
+SpirvInstruction *
+SpirvEmitter::doHLSLOutParamExpr(const HLSLOutParamExpr *Expr) {
+  if (Expr->canElide())
+    return doExpr(Expr->getBase());
+  SpirvVariable *TmpVar = nullptr;
+  if (Expr->isInOut()) {
+    SpirvInstruction *InitVal = doExpr(Expr->getBase());
+    if (!InitVal->isRValue())
+      InitVal =
+          spvBuilder.createLoad(Expr->getType(), InitVal, Expr->getLocStart());
+
+    TmpVar = createTemporaryVar(Expr->getType(), "hlsl.inout", InitVal,
+                                Expr->getLocStart());
+  } else {
+    TmpVar =
+        spvBuilder.addFnVar(Expr->getType(), Expr->getLocStart(), "hlsl.out");
+  }
+
+  if (const auto *OpaqueVal = Expr->getOpaqueValue())
+    bindOpaqueValue(TmpVar, OpaqueVal);
+
+  return TmpVar;
+}
+
+SpirvInstruction *
+SpirvEmitter::doHLSLArrayTemporaryExpr(const HLSLArrayTemporaryExpr *expr) {
+  auto *InitVal = doExpr(expr->getBase());
+  auto *TmpVar = spvBuilder.addFnVar(expr->getType(), expr->getLocStart(), "tmp.hlsl.array");
+  (void)spvBuilder.createCopyMemory(TmpVar->getAstResultType(), InitVal,
+                                     TmpVar, expr->getLocStart());
+  return TmpVar;
+}
+
+SpirvInstruction *SpirvEmitter::doOpaqueValueExpr(const OpaqueValueExpr *expr) {
+  return getLValueForOpaqueValue(expr);
+}
+
+void SpirvEmitter::bindOpaqueValue(SpirvVariable *lvalue,
+                                   const OpaqueValueExpr *opaqueVal) {
+  assert(opaqueValueBindings.count(opaqueVal) == 0 &&
+         "Opaque values cannot map to multiple lvalues.");
+  opaqueValueBindings.insert(std::make_pair(opaqueVal, lvalue));
+}
+
+SpirvVariable *
+SpirvEmitter::getLValueForOpaqueValue(const OpaqueValueExpr *opaqueVal) {
+  assert(opaqueValueBindings.count(opaqueVal) == 1 &&
+         "Looking for an unbound opaque value.");
+  return opaqueValueBindings.find(opaqueVal)->second;
 }
 
 } // end namespace spirv
