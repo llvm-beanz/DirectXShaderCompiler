@@ -720,7 +720,7 @@ SemanticInfo DeclResultIdMapper::getStageVarSemantic(const NamedDecl *decl) {
 bool DeclResultIdMapper::createStageOutputVar(const DeclaratorDecl *decl,
                                               SpirvInstruction *storedValue,
                                               bool forPCF) {
-  QualType type = getTypeOrFnRetType(decl);
+  QualType type = getTypeOrFnRetType(decl).getNonReferenceType();
   uint32_t arraySize = 0;
 
   // Output stream types (PointStream, LineStream, TriangleStream) are
