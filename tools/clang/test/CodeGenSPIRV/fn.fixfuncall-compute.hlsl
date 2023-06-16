@@ -10,16 +10,15 @@ float4 foo(inout float f0, inout int f1)
 // CHECK: [[s39:%\w+]] = OpVariable %_ptr_Function_int Function
 // CHECK: [[s36:%\w+]] = OpVariable %_ptr_Function_float Function
 // CHECK: [[s33:%\w+]] = OpAccessChain %_ptr_Uniform_float {{%\w+}} %int_0
+// CHECK: [[s34:%\w+]] = OpAccessChain %_ptr_Function_int {{%\w+}} %int_1
 // CHECK: [[s37:%\w+]] = OpLoad %float [[s33]]
 // CHECK:                OpStore [[s36]] [[s37]]
-// CHECK: [[s34:%\w+]] = OpAccessChain %_ptr_Function_int {{%\w+}} %int_1
 // CHECK: [[s40:%\w+]] = OpLoad %int [[s34]]
 // CHECK:                OpStore [[s39]] [[s40]]
 // CHECK: {{%\w+}} = OpFunctionCall %v4float %foo [[s36]] [[s39]]
 // CHECK: [[s41:%\w+]] = OpLoad %int [[s39]]
 // CHECK:                OpStore [[s34]] [[s41]]
 // CHECK: [[s38:%\w+]] = OpLoad %float [[s36]]
-// CHECK: [[s33:%\w+]] = OpAccessChain %_ptr_Uniform_float {{%\w+}} %int_0
 // CHECK:                OpStore [[s33]] [[s38]]
 
 struct Stru {
