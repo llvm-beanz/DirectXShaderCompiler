@@ -1,17 +1,17 @@
 // RUN: %dxc -E main -T lib_6_3 %s | FileCheck %s
 
 // Make sure all pointer operand of foo is from alloca.
-// CHECK:%[[A0:.*]] = alloca i32
-// CHECK:%[[A1:.*]] = alloca i32
-// CHECK:%[[A2:.*]] = alloca i32
-// CHECK:%[[A3:.*]] = alloca i32
-// CHECK:%[[A4:.*]] = alloca i32
-// CHECK:%[[A5:.*]] = alloca i32
-// CHECK:%[[A6:.*]] = alloca i32
+// CHECK: [[A0:%[0-9]+]] = alloca i32
+// CHECK: [[A1:%[0-9]+]] = alloca i32
+// CHECK: [[A2:%[0-9]+]] = alloca i32
+// CHECK: [[A3:%[0-9]+]] = alloca i32
+// CHECK: [[A4:%[0-9]+]] = alloca i32
+// CHECK: [[A5:%[0-9]+]] = alloca i32
+// CHECK: [[A6:%[0-9]+]] = alloca i32
 
-// CHECK:call void @"\01?foo{{[@$?.A-Za-z0-9_]+}}"(i32 0, i32* nonnull dereferenceable(4) %[[A0]], i32* nonnull dereferenceable(4) %[[A5]], i32* nonnull dereferenceable(4) %[[A6]])
-// CHECK:call void @"\01?foo{{[@$?.A-Za-z0-9_]+}}"(i32 0, i32* nonnull dereferenceable(4) %[[A4]], i32* nonnull dereferenceable(4) %[[A3]], i32* nonnull dereferenceable(4) %[[A6]])
-// CHECK:call void @"\01?foo{{[@$?.A-Za-z0-9_]+}}"(i32 0, i32* nonnull dereferenceable(4) %[[A2]], i32* nonnull dereferenceable(4) %[[A1]], i32* nonnull dereferenceable(4) %[[A6]])
+// CHECK: call void @"\01?foo{{[@$?.A-Za-z0-9_]+}}"(i32 0, i32* nonnull dereferenceable(4) [[A0]], i32* nonnull dereferenceable(4) [[A2]], i32* nonnull dereferenceable(4) [[A1]])
+// CHECK: call void @"\01?foo{{[@$?.A-Za-z0-9_]+}}"(i32 0, i32* nonnull dereferenceable(4) [[A4]], i32* nonnull dereferenceable(4) [[A3]], i32* nonnull dereferenceable(4) [[A1]])
+// CHECK: call void @"\01?foo{{[@$?.A-Za-z0-9_]+}}"(i32 0, i32* nonnull dereferenceable(4) [[A6]], i32* nonnull dereferenceable(4) [[A5]], i32* nonnull dereferenceable(4) [[A1]])
 
 struct DimStruct {
   uint2 Dims;
