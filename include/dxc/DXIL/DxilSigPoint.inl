@@ -13,10 +13,11 @@ import hctdb_instrhelp
 
 namespace hlsl {
 
-// Related points to a SigPoint that would contain the signature element for a "Shadow" element.
-// A "Shadow" element isn't actually accessed through that signature's Load/Store Input/Output.
-// Instead, it uses a dedicated intrinsic, but still requires that an entry exist in the signature
-// for compatibility purposes.
+// Related points to a SigPoint that would contain the signature element for a
+// "Shadow" element. A "Shadow" element isn't actually accessed through that
+// signature's Load/Store Input/Output. Instead, it uses a dedicated intrinsic,
+// but still requires that an entry exist in the signature for compatibility
+// purposes.
 // <py::lines('SIGPOINT-TABLE')>hctdb_instrhelp.get_sigpoint_table()</py>
 // SIGPOINT-TABLE:BEGIN
 //   SigPoint, Related, ShaderKind,    PackingKind,    SignatureKind
@@ -45,9 +46,11 @@ namespace hlsl {
 // SIGPOINT-TABLE:END
 
 const SigPoint SigPoint::ms_SigPoints[kNumSigPointRecords] = {
-#define DEF_SIGPOINT(spk, rspk, shk, pk, sigk) \
-  SigPoint(DXIL::SigPointKind::spk, #spk, DXIL::SigPointKind::rspk, DXIL::ShaderKind::shk, DXIL::SignatureKind::sigk, DXIL::PackingKind::pk),
-  DO_SIGPOINTS(DEF_SIGPOINT)
+#define DEF_SIGPOINT(spk, rspk, shk, pk, sigk)                                 \
+  SigPoint(DXIL::SigPointKind::spk, #spk, DXIL::SigPointKind::rspk,            \
+           DXIL::ShaderKind::shk, DXIL::SignatureKind::sigk,                   \
+           DXIL::PackingKind::pk),
+    DO_SIGPOINTS(DEF_SIGPOINT)
 #undef DEF_SIGPOINT
 };
 
@@ -91,44 +94,61 @@ const SigPoint SigPoint::ms_SigPoints[kNumSigPointRecords] = {
   ROW(CullPrimitive,          NA,           NA,       NA,           NA,           NA,       NA,       NA,         NA,           NA,       NA,       NA,       NA,           NA,       NotInSig,      NA,            NA,       NA,       NA,       NotPacked, NA)
 // INTERPRETATION-TABLE:END
 
-const VersionedSemanticInterpretation SigPoint::ms_SemanticInterpretationTable[(unsigned)DXIL::SemanticKind::Invalid][(unsigned)SigPoint::Kind::Invalid] = {
-#define _41 ,4,1
-#define _50 ,5,0
-#define _61 ,6,1
-#define _64 ,6,4
-#define _65 ,6,5
-#define DO_ROW(SEM, VSIn, VSOut, PCIn, HSIn, HSCPIn, HSCPOut, PCOut, DSIn, DSCPIn, DSOut, GSVIn, GSIn, GSOut, PSIn, PSOut, CSIn, MSIn, MSOut, MSPOut, ASIn) \
-  { VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::VSIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::VSOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::PCIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::HSIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::HSCPIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::HSCPOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::PCOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::DSIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::DSCPIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::DSOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::GSVIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::GSIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::GSOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::PSIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::PSOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::CSIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::MSIn), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::MSOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::MSPOut), \
-    VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::ASIn), \
+const VersionedSemanticInterpretation SigPoint::ms_SemanticInterpretationTable[(
+    unsigned)DXIL::SemanticKind::Invalid][(unsigned)SigPoint::Kind::Invalid] = {
+#define _41 , 4, 1
+#define _50 , 5, 0
+#define _61 , 6, 1
+#define _64 , 6, 4
+#define _65 , 6, 5
+#define DO_ROW(SEM, VSIn, VSOut, PCIn, HSIn, HSCPIn, HSCPOut, PCOut, DSIn,     \
+               DSCPIn, DSOut, GSVIn, GSIn, GSOut, PSIn, PSOut, CSIn, MSIn,     \
+               MSOut, MSPOut, ASIn)                                            \
+  {                                                                            \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::VSIn), \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::VSOut),                            \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::PCIn), \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::HSIn), \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::HSCPIn),                           \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::HSCPOut),                          \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::PCOut),                            \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::DSIn), \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::DSCPIn),                           \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::DSOut),                            \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::GSVIn),                            \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::GSIn), \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::GSOut),                            \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::PSIn), \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::PSOut),                            \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::CSIn), \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::MSIn), \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::MSOut),                            \
+      VersionedSemanticInterpretation(                                         \
+          DXIL::SemanticInterpretationKind::MSPOut),                           \
+      VersionedSemanticInterpretation(DXIL::SemanticInterpretationKind::ASIn), \
   },
-  DO_INTERPRETATION_TABLE(DO_ROW)
+    DO_INTERPRETATION_TABLE(DO_ROW)
 #undef DO_ROW
 };
 
 // -----------------------
 // SigPoint Implementation
 
-SigPoint::SigPoint(DXIL::SigPointKind spk, const char *name, DXIL::SigPointKind rspk, DXIL::ShaderKind shk, DXIL::SignatureKind sigk, DXIL::PackingKind pk) :
-  m_Kind(spk), m_RelatedKind(rspk), m_ShaderKind(shk), m_SignatureKind(sigk), m_pszName(name), m_PackingKind(pk)
-{}
+SigPoint::SigPoint(DXIL::SigPointKind spk, const char *name,
+                   DXIL::SigPointKind rspk, DXIL::ShaderKind shk,
+                   DXIL::SignatureKind sigk, DXIL::PackingKind pk)
+    : m_Kind(spk), m_RelatedKind(rspk), m_ShaderKind(shk),
+      m_SignatureKind(sigk), m_pszName(name), m_PackingKind(pk) {}
 
 DXIL::SignatureKind SigPoint::GetSignatureKindWithFallback() const {
   DXIL::SignatureKind sigKind = GetSignatureKind();
@@ -140,12 +160,16 @@ DXIL::SignatureKind SigPoint::GetSignatureKindWithFallback() const {
   return sigKind;
 }
 
-DXIL::SemanticInterpretationKind SigPoint::GetInterpretation(DXIL::SemanticKind SK, Kind K, unsigned MajorVersion, unsigned MinorVersion) {
+DXIL::SemanticInterpretationKind
+SigPoint::GetInterpretation(DXIL::SemanticKind SK, Kind K,
+                            unsigned MajorVersion, unsigned MinorVersion) {
   if (SK < DXIL::SemanticKind::Invalid && K < Kind::Invalid) {
-    const VersionedSemanticInterpretation& VSI = ms_SemanticInterpretationTable[(unsigned)SK][(unsigned)K];
+    const VersionedSemanticInterpretation &VSI =
+        ms_SemanticInterpretationTable[(unsigned)SK][(unsigned)K];
     if (VSI.Kind != DXIL::SemanticInterpretationKind::NA) {
       if (MajorVersion > (unsigned)VSI.Major ||
-          (MajorVersion == (unsigned)VSI.Major && MinorVersion >= (unsigned)VSI.Minor))
+          (MajorVersion == (unsigned)VSI.Major &&
+           MinorVersion >= (unsigned)VSI.Minor))
         return VSI.Kind;
     }
   }
@@ -161,17 +185,23 @@ SigPoint::Kind SigPoint::RecoverKind(DXIL::SemanticKind SK, Kind K) {
 // --------------
 // Static methods
 
-const SigPoint* SigPoint::GetSigPoint(Kind K) {
-  return ((unsigned)K < kNumSigPointRecords) ? &ms_SigPoints[(unsigned)K] : &ms_SigPoints[(unsigned)Kind::Invalid];
+const SigPoint *SigPoint::GetSigPoint(Kind K) {
+  return ((unsigned)K < kNumSigPointRecords)
+             ? &ms_SigPoints[(unsigned)K]
+             : &ms_SigPoints[(unsigned)Kind::Invalid];
 }
 
-DXIL::SigPointKind SigPoint::GetKind(DXIL::ShaderKind shaderKind, DXIL::SignatureKind sigKind, bool isPatchConstantFunction, bool isSpecialInput) {
+DXIL::SigPointKind SigPoint::GetKind(DXIL::ShaderKind shaderKind,
+                                     DXIL::SignatureKind sigKind,
+                                     bool isPatchConstantFunction,
+                                     bool isSpecialInput) {
   if (isSpecialInput) {
     switch (shaderKind) {
     case DXIL::ShaderKind::Hull:
       if (sigKind == DXIL::SignatureKind::Input)
-        return isPatchConstantFunction ? DXIL::SigPointKind::PCIn : DXIL::SigPointKind::HSIn;
-          break;
+        return isPatchConstantFunction ? DXIL::SigPointKind::PCIn
+                                       : DXIL::SigPointKind::HSIn;
+      break;
     case DXIL::ShaderKind::Geometry:
       if (sigKind == DXIL::SignatureKind::Input)
         return DXIL::SigPointKind::GSIn;
@@ -184,65 +214,82 @@ DXIL::SigPointKind SigPoint::GetKind(DXIL::ShaderKind shaderKind, DXIL::Signatur
   switch (shaderKind) {
   case DXIL::ShaderKind::Vertex:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::VSIn;
-    case DXIL::SignatureKind::Output: return DXIL::SigPointKind::VSOut;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::VSIn;
+    case DXIL::SignatureKind::Output:
+      return DXIL::SigPointKind::VSOut;
     default:
       break;
     }
     break;
   case DXIL::ShaderKind::Hull:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::HSCPIn;
-    case DXIL::SignatureKind::Output: return DXIL::SigPointKind::HSCPOut;
-    case DXIL::SignatureKind::PatchConstOrPrim: return DXIL::SigPointKind::PCOut;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::HSCPIn;
+    case DXIL::SignatureKind::Output:
+      return DXIL::SigPointKind::HSCPOut;
+    case DXIL::SignatureKind::PatchConstOrPrim:
+      return DXIL::SigPointKind::PCOut;
     default:
       break;
     }
     break;
   case DXIL::ShaderKind::Domain:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::DSCPIn;
-    case DXIL::SignatureKind::Output: return DXIL::SigPointKind::DSOut;
-    case DXIL::SignatureKind::PatchConstOrPrim: return DXIL::SigPointKind::DSIn;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::DSCPIn;
+    case DXIL::SignatureKind::Output:
+      return DXIL::SigPointKind::DSOut;
+    case DXIL::SignatureKind::PatchConstOrPrim:
+      return DXIL::SigPointKind::DSIn;
     default:
       break;
     }
     break;
   case DXIL::ShaderKind::Geometry:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::GSVIn;
-    case DXIL::SignatureKind::Output: return DXIL::SigPointKind::GSOut;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::GSVIn;
+    case DXIL::SignatureKind::Output:
+      return DXIL::SigPointKind::GSOut;
     default:
       break;
     }
     break;
   case DXIL::ShaderKind::Pixel:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::PSIn;
-    case DXIL::SignatureKind::Output: return DXIL::SigPointKind::PSOut;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::PSIn;
+    case DXIL::SignatureKind::Output:
+      return DXIL::SigPointKind::PSOut;
     default:
       break;
     }
     break;
   case DXIL::ShaderKind::Compute:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::CSIn;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::CSIn;
     default:
       break;
     }
     break;
   case DXIL::ShaderKind::Mesh:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::MSIn;
-    case DXIL::SignatureKind::Output: return DXIL::SigPointKind::MSOut;
-    case DXIL::SignatureKind::PatchConstOrPrim: return DXIL::SigPointKind::MSPOut;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::MSIn;
+    case DXIL::SignatureKind::Output:
+      return DXIL::SigPointKind::MSOut;
+    case DXIL::SignatureKind::PatchConstOrPrim:
+      return DXIL::SigPointKind::MSPOut;
     default:
       break;
     }
     break;
   case DXIL::ShaderKind::Amplification:
     switch (sigKind) {
-    case DXIL::SignatureKind::Input: return DXIL::SigPointKind::ASIn;
+    case DXIL::SignatureKind::Input:
+      return DXIL::SigPointKind::ASIn;
     default:
       break;
     }

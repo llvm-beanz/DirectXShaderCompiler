@@ -9,12 +9,12 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "dxc/Support/WinIncludes.h"
-#include "dxc/Support/WinFunctions.h"
 #include "dxc/DxilContainer/DxilContainer.h"
 #include "dxc/Support/ErrorCodes.h"
-#include "dxc/Support/Global.h"
 #include "dxc/Support/FileIOHelper.h"
+#include "dxc/Support/Global.h"
+#include "dxc/Support/WinFunctions.h"
+#include "dxc/Support/WinIncludes.h"
 #include "dxc/Support/dxcapi.impl.h"
 #include "dxc/Support/microcom.h"
 #include "dxc/dxcapi.h"
@@ -25,18 +25,18 @@
 
 #include "dxc/HLSL/DxilLinker.h"
 #include "dxc/HLSL/DxilValidation.h"
+#include "dxc/Support/HLSLOptions.h"
 #include "dxc/Support/Unicode.h"
 #include "dxc/Support/microcom.h"
 #include "dxc/dxcapi.internal.h"
 #include "dxcutil.h"
 #include "clang/Basic/Diagnostic.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
-#include "clang/Frontend/TextDiagnosticPrinter.h"
-#include "dxc/Support/HLSLOptions.h"
 
 using namespace hlsl;
 using namespace llvm;
@@ -92,10 +92,9 @@ public:
   DXC_MICROCOM_TM_CTOR(DxcLinker)
 
   // Register a library with name to ref it later.
-  HRESULT RegisterLibrary(
-      _In_opt_ LPCWSTR pLibName, // Name of the library.
-      _In_ IDxcBlob *pLib        // Library to add.
-  ) override;
+  HRESULT RegisterLibrary(_In_opt_ LPCWSTR pLibName, // Name of the library.
+                          _In_ IDxcBlob *pLib        // Library to add.
+                          ) override;
 
   // Links the shader and produces a shader blob that the Direct3D runtime can
   // use.
@@ -110,7 +109,7 @@ public:
       _In_ UINT32 argCount,          // Number of arguments
       _COM_Outptr_ IDxcOperationResult *
           *ppResult // Linker output status, buffer, and errors
-  ) override;
+      ) override;
 
   HRESULT STDMETHODCALLTYPE RegisterDxilContainerEventHandler(
       IDxcContainerEventsHandler *pHandler, UINT64 *pCookie) override {
@@ -130,7 +129,8 @@ public:
     return S_OK;
   }
 
-  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override {
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,
+                                           void **ppvObject) override {
     return DoBasicQueryInterface<IDxcLinker>(this, riid, ppvObject);
   }
 
@@ -148,17 +148,18 @@ public:
                  partSize - sizeof(hlsl::DxilCompilerVersion) >=
                      pDCV->VersionStringListSizeInBytes;
     if (valid && pDCV->VersionStringListSizeInBytes) {
-        const char *vStr = (const char *)(pDCV + 1);
-        valid = vStr[pDCV->VersionStringListSizeInBytes - 1] == 0;
+      const char *vStr = (const char *)(pDCV + 1);
+      valid = vStr[pDCV->VersionStringListSizeInBytes - 1] == 0;
     }
 
     DXASSERT(valid, "DxilCompilerVersion part malformed");
     if (!valid)
-        return false;
+      return false;
 
     CW2A pUtf8LibName(libName, CP_UTF8);
     std::string libNameStr = std::string(pUtf8LibName);
-    auto result = m_uniqueCompilerVersions.insert(DeserializedDxilCompilerVersion(pDCV));    
+    auto result =
+        m_uniqueCompilerVersions.insert(DeserializedDxilCompilerVersion(pDCV));
     m_libNameToCompilerVersionPart[libNameStr] = &(*result.first);
 
     return true;
@@ -175,7 +176,8 @@ private:
   std::unique_ptr<DxilLinker> m_pLinker;
   CComPtr<IDxcContainerEventsHandler> m_pDxcContainerEventsHandler;
   std::vector<CComPtr<IDxcBlob>> m_blobs; // Keep blobs live for lazy load.
-  std::map<std::string, const DeserializedDxilCompilerVersion*> m_libNameToCompilerVersionPart;
+  std::map<std::string, const DeserializedDxilCompilerVersion *>
+      m_libNameToCompilerVersionPart;
   std::set<DeserializedDxilCompilerVersion> m_uniqueCompilerVersions;
 };
 
@@ -205,22 +207,21 @@ DxcLinker::RegisterLibrary(_In_opt_ LPCWSTR pLibName, // Name of the library.
         pBlob->GetBufferPointer(), pBlob->GetBufferSize(), pModule,
         pDebugModule, m_Ctx, m_Ctx, DiagStream));
 
-
     // add an entry into the library to compiler version part map
     const hlsl::DxilContainerHeader *pHeader = hlsl::IsDxilContainerLike(
         pBlob->GetBufferPointer(), pBlob->GetBufferSize());
     const DxilPartHeader *pDPH = hlsl::GetDxilPartByType(
         pHeader, hlsl::DxilFourCC::DFCC_CompilerVersion);
     if (pDPH) {
-        const hlsl::DxilCompilerVersion *pDCV =
-            (const hlsl::DxilCompilerVersion *)(pDPH + 1);
-        // If the compiler version string is non-empty, add the struct to the
-        // map
-        if (!AddCompilerVersionMapEntry(pLibName, pDCV, pDPH->PartSize)) {
-          return E_INVALIDARG;
-        }
+      const hlsl::DxilCompilerVersion *pDCV =
+          (const hlsl::DxilCompilerVersion *)(pDPH + 1);
+      // If the compiler version string is non-empty, add the struct to the
+      // map
+      if (!AddCompilerVersionMapEntry(pLibName, pDCV, pDPH->PartSize)) {
+        return E_INVALIDARG;
+      }
     }
-    
+
     if (m_pLinker->RegisterLib(pUtf8LibName.m_psz, std::move(pModule),
                                std::move(pDebugModule))) {
       m_blobs.emplace_back(pBlob);
@@ -285,7 +286,7 @@ HRESULT STDMETHODCALLTYPE DxcLinker::Link(
     }
 
     std::string warnings;
-    //llvm::raw_string_ostream w(warnings);
+    // llvm::raw_string_ostream w(warnings);
     IFT(CreateMemoryStream(DxcGetThreadMallocNoRef(), &pDiagStream));
     raw_stream_ostream DiagStream(pDiagStream);
     llvm::DiagnosticPrinterRawOStream DiagPrinter(DiagStream);
@@ -300,8 +301,7 @@ HRESULT STDMETHODCALLTYPE DxcLinker::Link(
     bool needsValidation = !opts.DisableValidation;
     // Disable validation if ValVerMajor is 0 (offline target, never validate),
     // or pre-release library targets lib_6_1/lib_6_2.
-    if (opts.ValVerMajor == 0 ||
-        opts.TargetProfile == "lib_6_1" ||
+    if (opts.ValVerMajor == 0 || opts.TargetProfile == "lib_6_1" ||
         opts.TargetProfile == "lib_6_2") {
       needsValidation = false;
     }
@@ -318,7 +318,7 @@ HRESULT STDMETHODCALLTYPE DxcLinker::Link(
       CW2A pUtf8LibName(pLibNames[i], CP_UTF8);
       bSuccess &= m_pLinker->AttachLib(pUtf8LibName.m_psz);
 
-      cur_lib_name = std::string(pUtf8LibName);      
+      cur_lib_name = std::string(pUtf8LibName);
 
       // only libraries with compiler version parts are in the map
       auto result = m_libNameToCompilerVersionPart.find(cur_lib_name);
@@ -361,8 +361,8 @@ HRESULT STDMETHODCALLTYPE DxcLinker::Link(
 
     bool hasErrorOccurred = !bSuccess;
     if (bSuccess) {
-      std::unique_ptr<Module> pM = m_pLinker->Link(
-          opts.EntryPoint, pUtf8TargetProfile.m_psz, exportMap);
+      std::unique_ptr<Module> pM =
+          m_pLinker->Link(opts.EntryPoint, pUtf8TargetProfile.m_psz, exportMap);
       if (pM) {
         const IntrusiveRefCntPtr<clang::DiagnosticIDs> Diags(
             new clang::DiagnosticIDs);

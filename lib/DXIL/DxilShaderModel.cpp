@@ -9,39 +9,31 @@
 
 #include <limits.h>
 
-#include "dxc/DXIL/DxilShaderModel.h"
 #include "dxc/DXIL/DxilSemantic.h"
+#include "dxc/DXIL/DxilShaderModel.h"
 #include "dxc/Support/Global.h"
 
 #include "llvm/ADT/StringSwitch.h"
 
 #include <algorithm>
 
-
 namespace hlsl {
 
-ShaderModel::ShaderModel(Kind Kind, unsigned Major, unsigned Minor, const char *pszName,
-                         unsigned NumInputRegs, unsigned NumOutputRegs,
-                         bool bUAVs, bool bTypedUavs,  unsigned NumUAVRegs)
-: m_Kind(Kind)
-, m_Major(Major)
-, m_Minor(Minor)
-, m_pszName(pszName)
-, m_NumInputRegs(NumInputRegs)
-, m_NumOutputRegs(NumOutputRegs)
-, m_bTypedUavs(bTypedUavs)
-, m_NumUAVRegs(NumUAVRegs) {
-}
+ShaderModel::ShaderModel(Kind Kind, unsigned Major, unsigned Minor,
+                         const char *pszName, unsigned NumInputRegs,
+                         unsigned NumOutputRegs, bool bUAVs, bool bTypedUavs,
+                         unsigned NumUAVRegs)
+    : m_Kind(Kind), m_Major(Major), m_Minor(Minor), m_pszName(pszName),
+      m_NumInputRegs(NumInputRegs), m_NumOutputRegs(NumOutputRegs),
+      m_bTypedUavs(bTypedUavs), m_NumUAVRegs(NumUAVRegs) {}
 
 bool ShaderModel::operator==(const ShaderModel &other) const {
-    return m_Kind          == other.m_Kind
-        && m_Major         == other.m_Major
-        && m_Minor         == other.m_Minor
-        && strcmp(m_pszName,  other.m_pszName) == 0
-        && m_NumInputRegs  == other.m_NumInputRegs
-        && m_NumOutputRegs == other.m_NumOutputRegs
-        && m_bTypedUavs    == other.m_bTypedUavs
-        && m_NumUAVRegs    == other.m_NumUAVRegs;
+  return m_Kind == other.m_Kind && m_Major == other.m_Major &&
+         m_Minor == other.m_Minor && strcmp(m_pszName, other.m_pszName) == 0 &&
+         m_NumInputRegs == other.m_NumInputRegs &&
+         m_NumOutputRegs == other.m_NumOutputRegs &&
+         m_bTypedUavs == other.m_bTypedUavs &&
+         m_NumUAVRegs == other.m_NumUAVRegs;
 }
 
 bool ShaderModel::IsValid() const {
@@ -55,28 +47,27 @@ bool ShaderModel::IsValidForDxil() const {
   if (!IsValid())
     return false;
   switch (m_Major) {
-    case 6: {
-      switch (m_Minor) {
-      // clang-format off
+  case 6: {
+    switch (m_Minor) {
+    // clang-format off
       // Python lines need to be not formatted.
       /* <py::lines('VALRULE-TEXT')>hctdb_instrhelp.get_is_valid_for_dxil()</py>*/
-      // clang-format on
-      // VALRULE-TEXT:BEGIN
-      case 0:
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
+    // clang-format on
+    // VALRULE-TEXT:BEGIN
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
       // VALRULE-TEXT:END
-        return true;
-      case kOfflineMinor:
-        return m_Kind == Kind::Library;
-      }
+      return true;
+    case kOfflineMinor:
+      return m_Kind == Kind::Library;
     }
-    break;
+  } break;
   }
   return false;
 }
@@ -187,16 +178,35 @@ const ShaderModel *ShaderModel::GetByName(const char *pszName) {
   // [ps|vs|gs|hs|ds|cs|ms|as]_[major]_[minor]
   Kind kind;
   switch (pszName[0]) {
-  case 'p':   kind = Kind::Pixel;     break;
-  case 'v':   kind = Kind::Vertex;    break;
-  case 'g':   kind = Kind::Geometry;  break;
-  case 'h':   kind = Kind::Hull;      break;
-  case 'd':   kind = Kind::Domain;    break;
-  case 'c':   kind = Kind::Compute;   break;
-  case 'l':   kind = Kind::Library;   break;
-  case 'm':   kind = Kind::Mesh;      break;
-  case 'a':   kind = Kind::Amplification; break;
-  default:    return GetInvalid();
+  case 'p':
+    kind = Kind::Pixel;
+    break;
+  case 'v':
+    kind = Kind::Vertex;
+    break;
+  case 'g':
+    kind = Kind::Geometry;
+    break;
+  case 'h':
+    kind = Kind::Hull;
+    break;
+  case 'd':
+    kind = Kind::Domain;
+    break;
+  case 'c':
+    kind = Kind::Compute;
+    break;
+  case 'l':
+    kind = Kind::Library;
+    break;
+  case 'm':
+    kind = Kind::Mesh;
+    break;
+  case 'a':
+    kind = Kind::Amplification;
+    break;
+  default:
+    return GetInvalid();
   }
   unsigned Idx = 3;
   if (kind != Kind::Library) {
@@ -210,18 +220,29 @@ const ShaderModel *ShaderModel::GetByName(const char *pszName) {
 
   unsigned Major;
   switch (pszName[Idx++]) {
-  case '4': Major = 4;  break;
-  case '5': Major = 5;  break;
-  case '6': Major = 6;  break;
-  default:  return GetInvalid();
+  case '4':
+    Major = 4;
+    break;
+  case '5':
+    Major = 5;
+    break;
+  case '6':
+    Major = 6;
+    break;
+  default:
+    return GetInvalid();
   }
   if (pszName[Idx++] != '_')
     return GetInvalid();
 
   unsigned Minor;
   switch (pszName[Idx++]) {
-    case '0': Minor = 0;  break;
-    case '1': Minor = 1;  break;
+  case '0':
+    Minor = 0;
+    break;
+  case '1':
+    Minor = 1;
+    break;
   // clang-format off
   // Python lines need to be not formatted.
   /* <py::lines('VALRULE-TEXT')>hctdb_instrhelp.get_shader_model_by_name()</py>*/
@@ -263,14 +284,15 @@ const ShaderModel *ShaderModel::GetByName(const char *pszName) {
       break;
     }
   else return GetInvalid();
-  // VALRULE-TEXT:END
-    case 'x':
-      if (kind == Kind::Library && Major == 6) {
-        Minor = kOfflineMinor;
-        break;
-      }
-      else return GetInvalid();
-    default:  return GetInvalid();
+    // VALRULE-TEXT:END
+  case 'x':
+    if (kind == Kind::Library && Major == 6) {
+      Minor = kOfflineMinor;
+      break;
+    } else
+      return GetInvalid();
+  default:
+    return GetInvalid();
   }
   if (pszName[Idx++] != 0)
     return GetInvalid();
@@ -278,7 +300,8 @@ const ShaderModel *ShaderModel::GetByName(const char *pszName) {
   return Get(kind, Major, Minor);
 }
 
-void ShaderModel::GetDxilVersion(unsigned &DxilMajor, unsigned &DxilMinor) const {
+void ShaderModel::GetDxilVersion(unsigned &DxilMajor,
+                                 unsigned &DxilMinor) const {
   DXASSERT(IsValidForDxil(), "invalid shader model");
   DxilMajor = 1;
   switch (m_Minor) {
@@ -318,7 +341,8 @@ void ShaderModel::GetDxilVersion(unsigned &DxilMajor, unsigned &DxilMinor) const
   }
 }
 
-void ShaderModel::GetMinValidatorVersion(unsigned &ValMajor, unsigned &ValMinor) const {
+void ShaderModel::GetMinValidatorVersion(unsigned &ValMajor,
+                                         unsigned &ValMinor) const {
   DXASSERT(IsValidForDxil(), "invalid shader model");
   ValMajor = 1;
   switch (m_Minor) {
@@ -363,14 +387,13 @@ void ShaderModel::GetMinValidatorVersion(unsigned &ValMajor, unsigned &ValMinor)
 }
 
 static const char *ShaderModelKindNames[] = {
-    "ps", "vs", "gs", "hs", "ds", "cs", "lib",
-    "raygeneration", "intersection", "anyhit", "closesthit", "miss", "callable",
-    "ms", "as", "invalid",
+    "ps",           "vs",     "gs",         "hs",
+    "ds",           "cs",     "lib",        "raygeneration",
+    "intersection", "anyhit", "closesthit", "miss",
+    "callable",     "ms",     "as",         "invalid",
 };
 
-const char * ShaderModel::GetKindName() const {
-  return GetKindName(m_Kind);
-}
+const char *ShaderModel::GetKindName() const { return GetKindName(m_Kind); }
 
 const char *ShaderModel::GetKindName(Kind kind) {
   static_assert(static_cast<unsigned>(Kind::Invalid) ==
@@ -405,95 +428,95 @@ DXIL::ShaderKind ShaderModel::KindFromFullName(llvm::StringRef Name) {
 typedef ShaderModel SM;
 typedef Semantic SE;
 const ShaderModel ShaderModel::ms_ShaderModels[kNumShaderModels] = {
-  //                                  IR  OR   UAV?   TyUAV? UAV base
-  /* <py::lines('VALRULE-TEXT')>hctdb_instrhelp.get_shader_models()</py>*/
-  // VALRULE-TEXT:BEGIN
-  SM(Kind::Pixel, 4, 0, "ps_4_0", 32, 8, false, false, 0),
-  SM(Kind::Pixel, 4, 1, "ps_4_1", 32, 8, false, false, 0),
-  SM(Kind::Pixel, 5, 0, "ps_5_0", 32, 8, true, true, 64),
-  SM(Kind::Pixel, 5, 1, "ps_5_1", 32, 8, true, true, 64),
-  SM(Kind::Pixel, 6, 0, "ps_6_0", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Pixel, 6, 1, "ps_6_1", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Pixel, 6, 2, "ps_6_2", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Pixel, 6, 3, "ps_6_3", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Pixel, 6, 4, "ps_6_4", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Pixel, 6, 5, "ps_6_5", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Pixel, 6, 6, "ps_6_6", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Pixel, 6, 7, "ps_6_7", 32, 8, true, true, UINT_MAX),
-  SM(Kind::Vertex, 4, 0, "vs_4_0", 16, 16, false, false, 0),
-  SM(Kind::Vertex, 4, 1, "vs_4_1", 32, 32, false, false, 0),
-  SM(Kind::Vertex, 5, 0, "vs_5_0", 32, 32, true, true, 64),
-  SM(Kind::Vertex, 5, 1, "vs_5_1", 32, 32, true, true, 64),
-  SM(Kind::Vertex, 6, 0, "vs_6_0", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Vertex, 6, 1, "vs_6_1", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Vertex, 6, 2, "vs_6_2", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Vertex, 6, 3, "vs_6_3", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Vertex, 6, 4, "vs_6_4", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Vertex, 6, 5, "vs_6_5", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Vertex, 6, 6, "vs_6_6", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Vertex, 6, 7, "vs_6_7", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 4, 0, "gs_4_0", 16, 32, false, false, 0),
-  SM(Kind::Geometry, 4, 1, "gs_4_1", 32, 32, false, false, 0),
-  SM(Kind::Geometry, 5, 0, "gs_5_0", 32, 32, true, true, 64),
-  SM(Kind::Geometry, 5, 1, "gs_5_1", 32, 32, true, true, 64),
-  SM(Kind::Geometry, 6, 0, "gs_6_0", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 6, 1, "gs_6_1", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 6, 2, "gs_6_2", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 6, 3, "gs_6_3", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 6, 4, "gs_6_4", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 6, 5, "gs_6_5", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 6, 6, "gs_6_6", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Geometry, 6, 7, "gs_6_7", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 5, 0, "hs_5_0", 32, 32, true, true, 64),
-  SM(Kind::Hull, 5, 1, "hs_5_1", 32, 32, true, true, 64),
-  SM(Kind::Hull, 6, 0, "hs_6_0", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 6, 1, "hs_6_1", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 6, 2, "hs_6_2", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 6, 3, "hs_6_3", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 6, 4, "hs_6_4", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 6, 5, "hs_6_5", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 6, 6, "hs_6_6", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Hull, 6, 7, "hs_6_7", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 5, 0, "ds_5_0", 32, 32, true, true, 64),
-  SM(Kind::Domain, 5, 1, "ds_5_1", 32, 32, true, true, 64),
-  SM(Kind::Domain, 6, 0, "ds_6_0", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 6, 1, "ds_6_1", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 6, 2, "ds_6_2", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 6, 3, "ds_6_3", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 6, 4, "ds_6_4", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 6, 5, "ds_6_5", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 6, 6, "ds_6_6", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Domain, 6, 7, "ds_6_7", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Compute, 4, 0, "cs_4_0", 0, 0, false, false, 0),
-  SM(Kind::Compute, 4, 1, "cs_4_1", 0, 0, false, false, 0),
-  SM(Kind::Compute, 5, 0, "cs_5_0", 0, 0, true, true, 64),
-  SM(Kind::Compute, 5, 1, "cs_5_1", 0, 0, true, true, 64),
-  SM(Kind::Compute, 6, 0, "cs_6_0", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Compute, 6, 1, "cs_6_1", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Compute, 6, 2, "cs_6_2", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Compute, 6, 3, "cs_6_3", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Compute, 6, 4, "cs_6_4", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Compute, 6, 5, "cs_6_5", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Compute, 6, 6, "cs_6_6", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Compute, 6, 7, "cs_6_7", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Library, 6, 1, "lib_6_1", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Library, 6, 2, "lib_6_2", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Library, 6, 3, "lib_6_3", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Library, 6, 4, "lib_6_4", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Library, 6, 5, "lib_6_5", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Library, 6, 6, "lib_6_6", 32, 32, true, true, UINT_MAX),
-  SM(Kind::Library, 6, 7, "lib_6_7", 32, 32, true, true, UINT_MAX),
-  // lib_6_x is for offline linking only, and relaxes restrictions
-  SM(Kind::Library,  6, kOfflineMinor, "lib_6_x",  32, 32,  true,  true,  UINT_MAX),
-  SM(Kind::Mesh, 6, 5, "ms_6_5", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Mesh, 6, 6, "ms_6_6", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Mesh, 6, 7, "ms_6_7", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Amplification, 6, 5, "as_6_5", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Amplification, 6, 6, "as_6_6", 0, 0, true, true, UINT_MAX),
-  SM(Kind::Amplification, 6, 7, "as_6_7", 0, 0, true, true, UINT_MAX),
-  // Values before Invalid must remain sorted by Kind, then Major, then Minor.
-  SM(Kind::Invalid,  0, 0, "invalid", 0,  0,   false, false, 0),
-  // VALRULE-TEXT:END
+    //                                  IR  OR   UAV?   TyUAV? UAV base
+    /* <py::lines('VALRULE-TEXT')>hctdb_instrhelp.get_shader_models()</py>*/
+    // VALRULE-TEXT:BEGIN
+    SM(Kind::Pixel, 4, 0, "ps_4_0", 32, 8, false, false, 0),
+    SM(Kind::Pixel, 4, 1, "ps_4_1", 32, 8, false, false, 0),
+    SM(Kind::Pixel, 5, 0, "ps_5_0", 32, 8, true, true, 64),
+    SM(Kind::Pixel, 5, 1, "ps_5_1", 32, 8, true, true, 64),
+    SM(Kind::Pixel, 6, 0, "ps_6_0", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Pixel, 6, 1, "ps_6_1", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Pixel, 6, 2, "ps_6_2", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Pixel, 6, 3, "ps_6_3", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Pixel, 6, 4, "ps_6_4", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Pixel, 6, 5, "ps_6_5", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Pixel, 6, 6, "ps_6_6", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Pixel, 6, 7, "ps_6_7", 32, 8, true, true, UINT_MAX),
+    SM(Kind::Vertex, 4, 0, "vs_4_0", 16, 16, false, false, 0),
+    SM(Kind::Vertex, 4, 1, "vs_4_1", 32, 32, false, false, 0),
+    SM(Kind::Vertex, 5, 0, "vs_5_0", 32, 32, true, true, 64),
+    SM(Kind::Vertex, 5, 1, "vs_5_1", 32, 32, true, true, 64),
+    SM(Kind::Vertex, 6, 0, "vs_6_0", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Vertex, 6, 1, "vs_6_1", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Vertex, 6, 2, "vs_6_2", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Vertex, 6, 3, "vs_6_3", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Vertex, 6, 4, "vs_6_4", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Vertex, 6, 5, "vs_6_5", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Vertex, 6, 6, "vs_6_6", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Vertex, 6, 7, "vs_6_7", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 4, 0, "gs_4_0", 16, 32, false, false, 0),
+    SM(Kind::Geometry, 4, 1, "gs_4_1", 32, 32, false, false, 0),
+    SM(Kind::Geometry, 5, 0, "gs_5_0", 32, 32, true, true, 64),
+    SM(Kind::Geometry, 5, 1, "gs_5_1", 32, 32, true, true, 64),
+    SM(Kind::Geometry, 6, 0, "gs_6_0", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 6, 1, "gs_6_1", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 6, 2, "gs_6_2", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 6, 3, "gs_6_3", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 6, 4, "gs_6_4", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 6, 5, "gs_6_5", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 6, 6, "gs_6_6", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Geometry, 6, 7, "gs_6_7", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 5, 0, "hs_5_0", 32, 32, true, true, 64),
+    SM(Kind::Hull, 5, 1, "hs_5_1", 32, 32, true, true, 64),
+    SM(Kind::Hull, 6, 0, "hs_6_0", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 6, 1, "hs_6_1", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 6, 2, "hs_6_2", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 6, 3, "hs_6_3", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 6, 4, "hs_6_4", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 6, 5, "hs_6_5", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 6, 6, "hs_6_6", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Hull, 6, 7, "hs_6_7", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 5, 0, "ds_5_0", 32, 32, true, true, 64),
+    SM(Kind::Domain, 5, 1, "ds_5_1", 32, 32, true, true, 64),
+    SM(Kind::Domain, 6, 0, "ds_6_0", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 6, 1, "ds_6_1", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 6, 2, "ds_6_2", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 6, 3, "ds_6_3", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 6, 4, "ds_6_4", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 6, 5, "ds_6_5", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 6, 6, "ds_6_6", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Domain, 6, 7, "ds_6_7", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Compute, 4, 0, "cs_4_0", 0, 0, false, false, 0),
+    SM(Kind::Compute, 4, 1, "cs_4_1", 0, 0, false, false, 0),
+    SM(Kind::Compute, 5, 0, "cs_5_0", 0, 0, true, true, 64),
+    SM(Kind::Compute, 5, 1, "cs_5_1", 0, 0, true, true, 64),
+    SM(Kind::Compute, 6, 0, "cs_6_0", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Compute, 6, 1, "cs_6_1", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Compute, 6, 2, "cs_6_2", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Compute, 6, 3, "cs_6_3", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Compute, 6, 4, "cs_6_4", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Compute, 6, 5, "cs_6_5", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Compute, 6, 6, "cs_6_6", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Compute, 6, 7, "cs_6_7", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Library, 6, 1, "lib_6_1", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Library, 6, 2, "lib_6_2", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Library, 6, 3, "lib_6_3", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Library, 6, 4, "lib_6_4", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Library, 6, 5, "lib_6_5", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Library, 6, 6, "lib_6_6", 32, 32, true, true, UINT_MAX),
+    SM(Kind::Library, 6, 7, "lib_6_7", 32, 32, true, true, UINT_MAX),
+    // lib_6_x is for offline linking only, and relaxes restrictions
+    SM(Kind::Library,  6, kOfflineMinor, "lib_6_x",  32, 32,  true,  true,  UINT_MAX),
+    SM(Kind::Mesh, 6, 5, "ms_6_5", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Mesh, 6, 6, "ms_6_6", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Mesh, 6, 7, "ms_6_7", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Amplification, 6, 5, "as_6_5", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Amplification, 6, 6, "as_6_6", 0, 0, true, true, UINT_MAX),
+    SM(Kind::Amplification, 6, 7, "as_6_7", 0, 0, true, true, UINT_MAX),
+    // Values before Invalid must remain sorted by Kind, then Major, then Minor.
+    SM(Kind::Invalid,  0, 0, "invalid", 0,  0,   false, false, 0),
+    // VALRULE-TEXT:END
 };
 
 } // namespace hlsl
