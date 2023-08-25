@@ -49,7 +49,7 @@ bool ShaderModel::IsValidForDxil() const {
   switch (m_Major) {
   case 6: {
     switch (m_Minor) {
-    // clang-format off
+      // clang-format off
       // Python lines need to be not formatted.
       /* <py::lines('VALRULE-TEXT')>hctdb_instrhelp.get_is_valid_for_dxil()</py>*/
     // clang-format on
@@ -81,93 +81,96 @@ const ShaderModel *ShaderModel::Get(Kind Kind, unsigned Major, unsigned Minor) {
   /* <py::lines('VALRULE-TEXT')>hctdb_instrhelp.get_shader_model_get()</py>*/
   // VALRULE-TEXT:BEGIN
   const static std::pair<unsigned, unsigned> hashToIdxMap[] = {
-  {1024,0}, //ps_4_0
-  {1025,1}, //ps_4_1
-  {1280,2}, //ps_5_0
-  {1281,3}, //ps_5_1
-  {1536,4}, //ps_6_0
-  {1537,5}, //ps_6_1
-  {1538,6}, //ps_6_2
-  {1539,7}, //ps_6_3
-  {1540,8}, //ps_6_4
-  {1541,9}, //ps_6_5
-  {1542,10}, //ps_6_6
-  {1543,11}, //ps_6_7
-  {66560,12}, //vs_4_0
-  {66561,13}, //vs_4_1
-  {66816,14}, //vs_5_0
-  {66817,15}, //vs_5_1
-  {67072,16}, //vs_6_0
-  {67073,17}, //vs_6_1
-  {67074,18}, //vs_6_2
-  {67075,19}, //vs_6_3
-  {67076,20}, //vs_6_4
-  {67077,21}, //vs_6_5
-  {67078,22}, //vs_6_6
-  {67079,23}, //vs_6_7
-  {132096,24}, //gs_4_0
-  {132097,25}, //gs_4_1
-  {132352,26}, //gs_5_0
-  {132353,27}, //gs_5_1
-  {132608,28}, //gs_6_0
-  {132609,29}, //gs_6_1
-  {132610,30}, //gs_6_2
-  {132611,31}, //gs_6_3
-  {132612,32}, //gs_6_4
-  {132613,33}, //gs_6_5
-  {132614,34}, //gs_6_6
-  {132615,35}, //gs_6_7
-  {197888,36}, //hs_5_0
-  {197889,37}, //hs_5_1
-  {198144,38}, //hs_6_0
-  {198145,39}, //hs_6_1
-  {198146,40}, //hs_6_2
-  {198147,41}, //hs_6_3
-  {198148,42}, //hs_6_4
-  {198149,43}, //hs_6_5
-  {198150,44}, //hs_6_6
-  {198151,45}, //hs_6_7
-  {263424,46}, //ds_5_0
-  {263425,47}, //ds_5_1
-  {263680,48}, //ds_6_0
-  {263681,49}, //ds_6_1
-  {263682,50}, //ds_6_2
-  {263683,51}, //ds_6_3
-  {263684,52}, //ds_6_4
-  {263685,53}, //ds_6_5
-  {263686,54}, //ds_6_6
-  {263687,55}, //ds_6_7
-  {328704,56}, //cs_4_0
-  {328705,57}, //cs_4_1
-  {328960,58}, //cs_5_0
-  {328961,59}, //cs_5_1
-  {329216,60}, //cs_6_0
-  {329217,61}, //cs_6_1
-  {329218,62}, //cs_6_2
-  {329219,63}, //cs_6_3
-  {329220,64}, //cs_6_4
-  {329221,65}, //cs_6_5
-  {329222,66}, //cs_6_6
-  {329223,67}, //cs_6_7
-  {394753,68}, //lib_6_1
-  {394754,69}, //lib_6_2
-  {394755,70}, //lib_6_3
-  {394756,71}, //lib_6_4
-  {394757,72}, //lib_6_5
-  {394758,73}, //lib_6_6
-  {394759,74}, //lib_6_7
-  // lib_6_x is for offline linking only, and relaxes restrictions
-  {394767,75},//lib_6_x
-  {853509,76}, //ms_6_5
-  {853510,77}, //ms_6_6
-  {853511,78}, //ms_6_7
-  {919045,79}, //as_6_5
-  {919046,80}, //as_6_6
-  {919047,81}, //as_6_7
+      {1024, 0},    // ps_4_0
+      {1025, 1},    // ps_4_1
+      {1280, 2},    // ps_5_0
+      {1281, 3},    // ps_5_1
+      {1536, 4},    // ps_6_0
+      {1537, 5},    // ps_6_1
+      {1538, 6},    // ps_6_2
+      {1539, 7},    // ps_6_3
+      {1540, 8},    // ps_6_4
+      {1541, 9},    // ps_6_5
+      {1542, 10},   // ps_6_6
+      {1543, 11},   // ps_6_7
+      {66560, 12},  // vs_4_0
+      {66561, 13},  // vs_4_1
+      {66816, 14},  // vs_5_0
+      {66817, 15},  // vs_5_1
+      {67072, 16},  // vs_6_0
+      {67073, 17},  // vs_6_1
+      {67074, 18},  // vs_6_2
+      {67075, 19},  // vs_6_3
+      {67076, 20},  // vs_6_4
+      {67077, 21},  // vs_6_5
+      {67078, 22},  // vs_6_6
+      {67079, 23},  // vs_6_7
+      {132096, 24}, // gs_4_0
+      {132097, 25}, // gs_4_1
+      {132352, 26}, // gs_5_0
+      {132353, 27}, // gs_5_1
+      {132608, 28}, // gs_6_0
+      {132609, 29}, // gs_6_1
+      {132610, 30}, // gs_6_2
+      {132611, 31}, // gs_6_3
+      {132612, 32}, // gs_6_4
+      {132613, 33}, // gs_6_5
+      {132614, 34}, // gs_6_6
+      {132615, 35}, // gs_6_7
+      {197888, 36}, // hs_5_0
+      {197889, 37}, // hs_5_1
+      {198144, 38}, // hs_6_0
+      {198145, 39}, // hs_6_1
+      {198146, 40}, // hs_6_2
+      {198147, 41}, // hs_6_3
+      {198148, 42}, // hs_6_4
+      {198149, 43}, // hs_6_5
+      {198150, 44}, // hs_6_6
+      {198151, 45}, // hs_6_7
+      {263424, 46}, // ds_5_0
+      {263425, 47}, // ds_5_1
+      {263680, 48}, // ds_6_0
+      {263681, 49}, // ds_6_1
+      {263682, 50}, // ds_6_2
+      {263683, 51}, // ds_6_3
+      {263684, 52}, // ds_6_4
+      {263685, 53}, // ds_6_5
+      {263686, 54}, // ds_6_6
+      {263687, 55}, // ds_6_7
+      {328704, 56}, // cs_4_0
+      {328705, 57}, // cs_4_1
+      {328960, 58}, // cs_5_0
+      {328961, 59}, // cs_5_1
+      {329216, 60}, // cs_6_0
+      {329217, 61}, // cs_6_1
+      {329218, 62}, // cs_6_2
+      {329219, 63}, // cs_6_3
+      {329220, 64}, // cs_6_4
+      {329221, 65}, // cs_6_5
+      {329222, 66}, // cs_6_6
+      {329223, 67}, // cs_6_7
+      {394753, 68}, // lib_6_1
+      {394754, 69}, // lib_6_2
+      {394755, 70}, // lib_6_3
+      {394756, 71}, // lib_6_4
+      {394757, 72}, // lib_6_5
+      {394758, 73}, // lib_6_6
+      {394759, 74}, // lib_6_7
+      // lib_6_x is for offline linking only, and relaxes restrictions
+      {394767, 75}, // lib_6_x
+      {853509, 76}, // ms_6_5
+      {853510, 77}, // ms_6_6
+      {853511, 78}, // ms_6_7
+      {919045, 79}, // as_6_5
+      {919046, 80}, // as_6_6
+      {919047, 81}, // as_6_7
   };
   unsigned hash = (unsigned)Kind << 16 | Major << 8 | Minor;
-  auto pred = [](const std::pair<unsigned, unsigned>& elem, unsigned val){ return elem.first < val;};
-  auto it = std::lower_bound(std::begin(hashToIdxMap), std::end(hashToIdxMap), hash, pred);
+  auto pred = [](const std::pair<unsigned, unsigned> &elem, unsigned val) {
+    return elem.first < val;
+  };
+  auto it = std::lower_bound(std::begin(hashToIdxMap), std::end(hashToIdxMap),
+                             hash, pred);
   if (it == std::end(hashToIdxMap) || it->first != hash)
     return GetInvalid();
   return &ms_ShaderModels[it->second];
@@ -252,38 +255,38 @@ const ShaderModel *ShaderModel::GetByName(const char *pszName) {
     if (Major == 6) {
       Minor = 2;
       break;
-    }
-  else return GetInvalid();
+    } else
+      return GetInvalid();
   case '3':
     if (Major == 6) {
       Minor = 3;
       break;
-    }
-  else return GetInvalid();
+    } else
+      return GetInvalid();
   case '4':
     if (Major == 6) {
       Minor = 4;
       break;
-    }
-  else return GetInvalid();
+    } else
+      return GetInvalid();
   case '5':
     if (Major == 6) {
       Minor = 5;
       break;
-    }
-  else return GetInvalid();
+    } else
+      return GetInvalid();
   case '6':
     if (Major == 6) {
       Minor = 6;
       break;
-    }
-  else return GetInvalid();
+    } else
+      return GetInvalid();
   case '7':
     if (Major == 6) {
       Minor = 7;
       break;
-    }
-  else return GetInvalid();
+    } else
+      return GetInvalid();
     // VALRULE-TEXT:END
   case 'x':
     if (kind == Kind::Library && Major == 6) {
@@ -507,7 +510,8 @@ const ShaderModel ShaderModel::ms_ShaderModels[kNumShaderModels] = {
     SM(Kind::Library, 6, 6, "lib_6_6", 32, 32, true, true, UINT_MAX),
     SM(Kind::Library, 6, 7, "lib_6_7", 32, 32, true, true, UINT_MAX),
     // lib_6_x is for offline linking only, and relaxes restrictions
-    SM(Kind::Library,  6, kOfflineMinor, "lib_6_x",  32, 32,  true,  true,  UINT_MAX),
+    SM(Kind::Library, 6, kOfflineMinor, "lib_6_x", 32, 32, true, true,
+       UINT_MAX),
     SM(Kind::Mesh, 6, 5, "ms_6_5", 0, 0, true, true, UINT_MAX),
     SM(Kind::Mesh, 6, 6, "ms_6_6", 0, 0, true, true, UINT_MAX),
     SM(Kind::Mesh, 6, 7, "ms_6_7", 0, 0, true, true, UINT_MAX),
@@ -515,7 +519,7 @@ const ShaderModel ShaderModel::ms_ShaderModels[kNumShaderModels] = {
     SM(Kind::Amplification, 6, 6, "as_6_6", 0, 0, true, true, UINT_MAX),
     SM(Kind::Amplification, 6, 7, "as_6_7", 0, 0, true, true, UINT_MAX),
     // Values before Invalid must remain sorted by Kind, then Major, then Minor.
-    SM(Kind::Invalid,  0, 0, "invalid", 0,  0,   false, false, 0),
+    SM(Kind::Invalid, 0, 0, "invalid", 0, 0, false, false, 0),
     // VALRULE-TEXT:END
 };
 

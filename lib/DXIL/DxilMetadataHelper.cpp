@@ -7,10 +7,10 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "dxc/DXIL/DxilMetadataHelper.h"
 #include "dxc/DXIL/DxilCBuffer.h"
 #include "dxc/DXIL/DxilCounters.h"
 #include "dxc/DXIL/DxilFunctionProps.h"
+#include "dxc/DXIL/DxilMetadataHelper.h"
 #include "dxc/DXIL/DxilModule.h"
 #include "dxc/DXIL/DxilOperations.h"
 #include "dxc/DXIL/DxilResource.h"
@@ -2450,7 +2450,8 @@ void DxilMDHelper::EmitDxilCounters(const DxilCounters &counters) {
   // OPCODE-COUNTERS:BEGIN
   AddCounterIfNonZero(counters.array_local_bytes, "array_local_bytes", MDVals);
   AddCounterIfNonZero(counters.array_local_ldst, "array_local_ldst", MDVals);
-  AddCounterIfNonZero(counters.array_static_bytes, "array_static_bytes", MDVals);
+  AddCounterIfNonZero(counters.array_static_bytes, "array_static_bytes",
+                      MDVals);
   AddCounterIfNonZero(counters.array_static_ldst, "array_static_ldst", MDVals);
   AddCounterIfNonZero(counters.array_tgsm_bytes, "array_tgsm_bytes", MDVals);
   AddCounterIfNonZero(counters.array_tgsm_ldst, "array_tgsm_ldst", MDVals);

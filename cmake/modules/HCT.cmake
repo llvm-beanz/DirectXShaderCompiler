@@ -1,11 +1,15 @@
 option(HLSL_COPY_GENERATED_SOURCES "Copy generated sources if different" Off)
 
+option(HLSL_SKIP_GENERATING_SOURCES "Force skip generating sources" Off)
+mark_as_advanced(HLSL_SKIP_GENERATING_SOURCES)
+
 add_custom_target(HCTGen)
 
 find_program(clang_format NAMES clang-format)
 
-if (NOT clang_format AND HLSL_COPY_GENERATED_SOURCES)
-  message(FATAL_ERROR "Generating sources requires clang-format")
+if (NOT clang_format AND NOT HLSL_SKIP_GENERATING_SOURCES)
+  message(FATAL_ERROR "Generating sources requires clang-format.\n"
+                      "To bypass this error set HLSL_SKIP_GENERATING_SOURCES=On when configuring DXC.")
 endif ()
 
 if (WIN32 AND NOT DEFINED HLSL_AUTOCRLF)
@@ -44,12 +48,6 @@ function(add_hlsl_hctgen mode)
   if (NOT clang_format)
     return()
   endif ()
-
-  get_filename_component(output_extension ${full_output} LAST_EXT)
-
-  if (output_extension MATCHES "\.h|\.cpp|\.inl")
-    set(format_cmd COMMAND ${clang_format} -i ${temp_output})
-  endif ()
  
   set(temp_output ${CMAKE_CURRENT_BINARY_DIR}/${ARG_OUTPUT}.tmp)
   set(full_output ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_OUTPUT})
@@ -69,6 +67,12 @@ function(add_hlsl_hctgen mode)
   if(ARG_BUILD_DIR OR HLSL_COPY_GENERATED_SOURCES)
     set(copy_sources On)
   endif()
+
+  get_filename_component(output_extension ${full_output} LAST_EXT)
+
+  if (output_extension MATCHES "\.h|\.cpp|\.inl")
+    set(format_cmd COMMAND ${clang_format} -i ${temp_output})
+  endif ()
 
   if(ARG_CODE_TAG)
     set(input_flag --input ${full_output})
