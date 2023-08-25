@@ -619,14 +619,18 @@ TEST_F(FileTest, ForStmtPlainAssign) { runFileTest("cf.for.plain.hlsl"); }
 TEST_F(FileTest, ForStmtNestedForStmt) { runFileTest("cf.for.nested.hlsl"); }
 TEST_F(FileTest, ForStmtContinue) { runFileTest("cf.for.continue.hlsl"); }
 TEST_F(FileTest, ForStmtBreak) { runFileTest("cf.for.break.hlsl"); }
-TEST_F(FileTest, ForStmtShortCircuitedCond) { runFileTest("cf.for.short-circuited-cond.hlsl"); }
+TEST_F(FileTest, ForStmtShortCircuitedCond) {
+  runFileTest("cf.for.short-circuited-cond.hlsl");
+}
 
 // For while statements
 TEST_F(FileTest, WhileStmtPlain) { runFileTest("cf.while.plain.hlsl"); }
 TEST_F(FileTest, WhileStmtNested) { runFileTest("cf.while.nested.hlsl"); }
 TEST_F(FileTest, WhileStmtContinue) { runFileTest("cf.while.continue.hlsl"); }
 TEST_F(FileTest, WhileStmtBreak) { runFileTest("cf.while.break.hlsl"); }
-TEST_F(FileTest, WhileStmtShortCircuitedCond) { runFileTest("cf.while.short-circuited-cond.hlsl"); }
+TEST_F(FileTest, WhileStmtShortCircuitedCond) {
+  runFileTest("cf.while.short-circuited-cond.hlsl");
+}
 
 // For do statements
 TEST_F(FileTest, DoStmtPlain) { runFileTest("cf.do.plain.hlsl"); }
@@ -1234,11 +1238,15 @@ TEST_F(FileTest, IntrinsicsAsDouble) {
   runFileTest("intrinsics.asdouble.hlsl");
 }
 TEST_F(FileTest, IntrinsicsAsfloat) { runFileTest("intrinsics.asfloat.hlsl"); }
-TEST_F(FileTest, IntrinsicsAsfloat16) { runFileTest("intrinsics.asfloat16.hlsl"); }
+TEST_F(FileTest, IntrinsicsAsfloat16) {
+  runFileTest("intrinsics.asfloat16.hlsl");
+}
 TEST_F(FileTest, IntrinsicsAsint) { runFileTest("intrinsics.asint.hlsl"); }
 TEST_F(FileTest, IntrinsicsAsint16) { runFileTest("intrinsics.asint16.hlsl"); }
 TEST_F(FileTest, IntrinsicsAsuint) { runFileTest("intrinsics.asuint.hlsl"); }
-TEST_F(FileTest, IntrinsicsAsuint16) { runFileTest("intrinsics.asuint16.hlsl"); }
+TEST_F(FileTest, IntrinsicsAsuint16) {
+  runFileTest("intrinsics.asuint16.hlsl");
+}
 TEST_F(FileTest, IntrinsicsAsuintArgumentMustBeRValue) {
   runFileTest("intrinsics.asuint.rvalue.hlsl");
 }
@@ -1628,18 +1636,12 @@ TEST_F(FileTest, SM6WaveActiveAllEqualMatrix1x1) {
 TEST_F(FileTest, SM6WaveActiveAllEqualVulkan1_0) {
   runFileTest("sm6.wave-active-all-equal.vulkan1.0.hlsl", Expect::Failure);
 }
-TEST_F(FileTest, SM6WaveActiveSum) {
-  runFileTest("sm6.wave-active-sum.hlsl");
-}
+TEST_F(FileTest, SM6WaveActiveSum) { runFileTest("sm6.wave-active-sum.hlsl"); }
 TEST_F(FileTest, SM6WaveActiveProduct) {
   runFileTest("sm6.wave-active-product.hlsl");
 }
-TEST_F(FileTest, SM6WaveActiveMax) {
-  runFileTest("sm6.wave-active-max.hlsl");
-}
-TEST_F(FileTest, SM6WaveActiveMin) {
-  runFileTest("sm6.wave-active-min.hlsl");
-}
+TEST_F(FileTest, SM6WaveActiveMax) { runFileTest("sm6.wave-active-max.hlsl"); }
+TEST_F(FileTest, SM6WaveActiveMin) { runFileTest("sm6.wave-active-min.hlsl"); }
 TEST_F(FileTest, SM6WaveActiveBitAnd) {
   runFileTest("sm6.wave-active-bit-and.hlsl");
 }
@@ -1654,9 +1656,7 @@ TEST_F(FileTest, SM6WaveActiveCountBits) {
 }
 
 // Shader model 6.0 wave scan/prefix
-TEST_F(FileTest, SM6WavePrefixSum) {
-  runFileTest("sm6.wave-prefix-sum.hlsl");
-}
+TEST_F(FileTest, SM6WavePrefixSum) { runFileTest("sm6.wave-prefix-sum.hlsl"); }
 TEST_F(FileTest, SM6WavePrefixProduct) {
   runFileTest("sm6.wave-prefix-product.hlsl");
 }
@@ -1697,9 +1697,7 @@ TEST_F(FileTest, WaveOpNoTargetEnvError) {
 // SPIR-V specific
 TEST_F(FileTest, SpirvStorageClass) { runFileTest("spirv.storage-class.hlsl"); }
 
-TEST_F(FileTest, SpirvString) {
-  runFileTest("spirv.string.hlsl");
-}
+TEST_F(FileTest, SpirvString) { runFileTest("spirv.string.hlsl"); }
 
 TEST_F(FileTest, SpirvControlFlowMissingReturn) {
   runFileTest("spirv.cf.ret-missing.hlsl");
@@ -2802,9 +2800,7 @@ TEST_F(FileTest, UseRValueForMemberExprOfArraySubscriptExpr) {
 TEST_F(FileTest, ReduceLoadSize) { runFileTest("reduce.load.size.hlsl"); }
 
 // Test OpEntryPoint in the Vulkan1.2 target environment
-TEST_F(FileTest, Vk1p2EntryPoint) {
-  runFileTest("vk.1p2.entry-point.hlsl");
-}
+TEST_F(FileTest, Vk1p2EntryPoint) { runFileTest("vk.1p2.entry-point.hlsl"); }
 
 // Test deprecation of BufferBlock decoration after SPIR-V 1.3.
 TEST_F(FileTest, Vk1p2BlockDecoration) {
@@ -3123,9 +3119,7 @@ TEST_F(FileTest, ShaderDebugInfoSourceContinued) {
 TEST_F(FileTest, ShaderDebugInfoRuntimeArray) {
   runFileTest("shader.debug.runtimearray.hlsl");
 }
-TEST_F(FileTest, ShaderDebugInfoLine) {
-  runFileTest("shader.debug.line.hlsl");
-}
+TEST_F(FileTest, ShaderDebugInfoLine) { runFileTest("shader.debug.line.hlsl"); }
 TEST_F(FileTest, ShaderDebugInfoLineBranch) {
   runFileTest("shader.debug.line.branch.hlsl");
 }

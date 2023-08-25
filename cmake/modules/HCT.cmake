@@ -2,6 +2,12 @@ option(HLSL_COPY_GENERATED_SOURCES "Copy generated sources if different" Off)
 
 add_custom_target(HCTGen)
 
+find_program(clang_format NAMES clang-format)
+
+if (NOT clang_format AND HLSL_COPY_GENERATED_SOURCES)
+  message(FATAL_ERROR "Generating sources requires clang-format")
+endif ()
+
 if (WIN32 AND NOT DEFINED HLSL_AUTOCRLF)
   find_program(git_executable NAMES git git.exe git.cmd)
   execute_process(COMMAND ${git_executable} config --get core.autocrlf
@@ -34,6 +40,16 @@ function(add_hlsl_hctgen mode)
   if (NOT ARG_OUTPUT)
     message(FATAL_ERROR "add_hlsl_hctgen requires OUTPUT argument")
   endif()
+
+  if (NOT clang_format)
+    return()
+  endif ()
+
+  get_filename_component(output_extension ${full_output} LAST_EXT)
+
+  if (output_extension MATCHES "\.h|\.cpp|\.inl")
+    set(format_cmd COMMAND ${clang_format} -i ${temp_output})
+  endif ()
  
   set(temp_output ${CMAKE_CURRENT_BINARY_DIR}/${ARG_OUTPUT}.tmp)
   set(full_output ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_OUTPUT})
@@ -87,6 +103,7 @@ function(add_hlsl_hctgen mode)
                      COMMAND ${PYTHON_EXECUTABLE}
                              ${hctgen} ${force_lf}
                              ${mode} --output ${temp_output} ${input_flag}
+                     ${format_cmd}
                      COMMENT "Building ${ARG_OUTPUT}..."
                      DEPENDS ${hct_dependencies}
                      )
