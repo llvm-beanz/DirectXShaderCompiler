@@ -119,9 +119,9 @@ add_link_options(/guard:cf)
 endif(WIN32)
 
 # Enable CET Shadow Stack
-if(WIN32 AND NOT (CMAKE_GENERATOR_PLATFORM MATCHES "ARM.*"))
+if(NOT LLVM_ENABLE_SANITIZERS AND WIN32 AND NOT (CMAKE_GENERATOR_PLATFORM MATCHES "ARM.*"))
 add_link_options(/CETCOMPAT)
-endif(WIN32 AND NOT (CMAKE_GENERATOR_PLATFORM MATCHES "ARM.*"))
+endif(NOT LLVM_ENABLE_SANITIZERS AND WIN32 AND NOT (CMAKE_GENERATOR_PLATFORM MATCHES "ARM.*"))
 
 # HLSL Change Ends
 
@@ -352,6 +352,10 @@ endif( LLVM_USE_OPROFILE )
 set(LLVM_USE_SANITIZER "" CACHE STRING
   "Define the sanitizer used to build binaries and tests.")
 option(LLVM_OPTIMIZE_SANITIZED_BUILDS "Enable -O1 on sanitized builds" On)
+set(LLVM_UBSAN_FLAGS
+    "-fsanitize=undefined -fno-sanitize=vptr,function -fno-sanitize-recover=all"
+    CACHE STRING
+    "Compile flags set to enable UBSan. Only used if LLVM_USE_SANITIZER contains 'Undefined'.")
 
 option(LLVM_USE_SPLIT_DWARF
   "Use -gsplit-dwarf when compiling llvm." OFF)
@@ -648,7 +652,7 @@ set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
 # enable warnings as errors for debug build
 if (WIN32)
-  SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} /WX")
+  #SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} /WX")
 endif (WIN32)
 
 include(AddLLVM)

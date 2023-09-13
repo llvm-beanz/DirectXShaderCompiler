@@ -65,6 +65,17 @@
       "buildCommandArgs": "-v",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x86_x64" ]
+    },
+    {
+      "name": "x64-clang-cl-sanitizer",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "-C ${projectDir}\\cmake\\caches\\PredefinedParams.cmake -DLLVM_ENABLE_ASSERTIONS=On -DLLVM_LIT_ARGS=\"-v\" -DLLVM_USE_SANITIZER=\"Address;Undefined\" -DLLVM_TABLEGEN=${projectDir}\\out\\build\\x64-clang-cl-Release\\bin\\llvm-tblgen.exe -DCLANG_TABLEGEN=${projectDir}\\out\\build\\x64-clang-cl-Release\\bin\\clang-tblgen.exe",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "clang_cl_x64_x64" ]
     }
   ]
 }
