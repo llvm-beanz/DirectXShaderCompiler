@@ -1965,15 +1965,17 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
           if (NewEltGV == dbgOffset.base)
             continue;
 
-        if (GV != NewEltGV) {
-          GVDbgOffsetMap[NewEltGV] = dbgOffset;
-          // Remove GV from GVDbgOffsetMap.
-          GVDbgOffsetMap.erase(GV);
-          if (GV != dbgOffset.base) {
-            // Remove GV when it is replaced by NewEltGV and is not a base GV.
-            GV->removeDeadConstantUsers();
-            GV->eraseFromParent();
-            staticGVs.remove(GV);
+          if (GV != NewEltGV) {
+            GVDbgOffsetMap[NewEltGV] = dbgOffset;
+            // Remove GV from GVDbgOffsetMap.
+            GVDbgOffsetMap.erase(GV);
+            if (GV != dbgOffset.base) {
+              // Remove GV when it is replaced by NewEltGV and is not a base GV.
+              GV->removeDeadConstantUsers();
+              GV->eraseFromParent();
+              staticGVs.remove(GV);
+            }
+            GV = NewEltGV;
           }
         } else {
           // SROA_Parameter_HLSL has no access to a domtree, if one is needed,
@@ -5445,9 +5447,9 @@ void SROA_Parameter_HLSL::flattenArgument(
         if (Ty->isPointerTy())
           Ty = Ty->getPointerElementType();
         unsigned size = DL.getTypeAllocSize(Ty);
-#if 0  // HLSL Change
+#if 0 // HLSL Change
         DIExpression *DDIExp = DIB.createBitPieceExpression(debugOffset, size);
-#else  // HLSL Change
+#else // HLSL Change
         Type *argTy = Arg->getType();
         if (argTy->isPointerTy())
           argTy = argTy->getPointerElementType();
