@@ -7786,6 +7786,8 @@ def err_hlsl_ternary_scalar : Error<
 def warn_hlsl_structurize_exits_lifetime_markers_conflict : Warning <
    "structurize-returns skipped function '%0' due to incompatibility with lifetime markers. Use -disable-lifetime-markers to enable structurize-exits on this function.">,
   InGroup< HLSLStructurizeExitsLifetimeMarkersConflict >;
+
+def note_hlsl_2021_udt_casting : Note <"HLSL 2021 disallows implicit casting of user defined types.">;
 // HLSL Change Ends
 
 // SPIRV Change Starts

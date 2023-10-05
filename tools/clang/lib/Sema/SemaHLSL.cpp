@@ -637,6 +637,7 @@ enum TYPE_CONVERSION_REMARKS {
   TYPE_CONVERSION_IDENTICAL = 0x00000002,
   TYPE_CONVERSION_TO_VOID = 0x00000004,
   TYPE_CONVERSION_ELT_TRUNCATION = 0x00000008,
+  TYPE_CONVERSION_HLSL2021 = 0x0000000F,
 };
 
 BITWISE_ENUM_OPS(TYPE_CONVERSION_REMARKS)
@@ -9036,6 +9037,10 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
                (SourceInfo.ShapeKind == AR_TOBJ_COMPOUND ||
                 TargetInfo.ShapeKind == AR_TOBJ_COMPOUND) &&
                !TargetIsAnonymous) {
+      if (m_sema->getLangOpts().HLSLVersion == hlsl::LangStd::v2021) {
+        Remarks = TYPE_CONVERSION_HLSL2021;
+        AssignOpt(Remarks, remarks);
+      }
       // Not explicit, either are struct/class, not derived-to-base,
       // target is named (so explicit cast is possible),
       // and using strict UDT rules: disallow this implicit cast.
@@ -10379,7 +10384,7 @@ bool HLSLExternalSource::ValidateCast(SourceLocation OpLoc, Expr *sourceExpr,
 
   if (!CanConvert(OpLoc, sourceExpr, target, explicitConversion, &remarks,
                   standard)) {
-
+    bool hlsl2021Note = remarks & TYPE_CONVERSION_HLSL2021 != 0;
     //
     // Check whether the lack of explicit-ness matters.
     //
@@ -10406,6 +10411,8 @@ bool HLSLExternalSource::ValidateCast(SourceLocation OpLoc, Expr *sourceExpr,
 
       m_sema->Diag(OpLoc, diag::err_hlsl_cannot_convert)
           << explicitForDiagnostics << IsOutputParameter << source << target;
+      if (hlsl2021Note)
+        m_sema->Diag(OpLoc, diag::note_hlsl_2021_udt_casting);
     }
     return false;
   }
