@@ -10384,7 +10384,7 @@ bool HLSLExternalSource::ValidateCast(SourceLocation OpLoc, Expr *sourceExpr,
 
   if (!CanConvert(OpLoc, sourceExpr, target, explicitConversion, &remarks,
                   standard)) {
-    bool hlsl2021Note = remarks & TYPE_CONVERSION_HLSL2021 != 0;
+    bool hlsl2021Note = (remarks & TYPE_CONVERSION_HLSL2021) != 0;
     //
     // Check whether the lack of explicit-ness matters.
     //
