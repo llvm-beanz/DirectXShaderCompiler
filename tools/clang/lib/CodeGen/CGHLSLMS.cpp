@@ -212,7 +212,8 @@ private:
   void ConstructFieldAttributedAnnotation(DxilFieldAnnotation &fieldAnnotation,
                                           QualType fieldTy,
                                           bool bDefaultRowMajor);
-  LValue EmitResourceParamAnnotation(CodeGenFunction& CGF, const CastExpr *E) override;
+  LValue EmitResourceParamAnnotation(CodeGenFunction &CGF,
+                                     const CastExpr *E) override;
 
   std::unordered_map<Constant *, DxilFieldAnnotation> m_ConstVarAnnotationMap;
   StringSet<> m_PreciseOutputSet;

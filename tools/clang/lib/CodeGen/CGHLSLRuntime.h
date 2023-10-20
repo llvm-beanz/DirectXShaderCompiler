@@ -163,6 +163,9 @@ public:
   virtual void EmitHLSLMartrixCastForStoreOp(
       CodeGenFunction &CGF, llvm::SmallVector<llvm::Value *, 16> &IRCallArgs,
       llvm::SmallVector<clang::QualType, 16> &ArgTys) = 0;
+
+  virtual LValue EmitResourceParamAnnotation(CodeGenFunction &CGF,
+                                             const CastExpr *E) = 0;
 };
 
 /// Create an instance of a HLSL runtime class.
