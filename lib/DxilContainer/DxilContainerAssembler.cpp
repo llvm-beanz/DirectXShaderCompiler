@@ -36,6 +36,8 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/MC/StringTableBuilder.h"
+#include "llvm/Object/COFF.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <algorithm>
@@ -1187,6 +1189,105 @@ public:
   }
 };
 
+//////////////////////////////////////////////////////////
+// DxiSymbolTable - Writes SYM0 part
+class DxilSymbolTableWriter : public DxilPartWriter {
+  llvm::StringTableBuilder &StrTableBuilder;
+
+  // Modeled after the COFF "bigobj" symbol. This is almost identical in layout
+  // and usage. Close enough that COFF parsers should work on DXIL sybmols too.
+  struct DXILSymbol {
+    union {
+      char ShortName[8];
+      struct {
+        uint32_t Zeros;
+        uint32_t NameOffset;
+      } LongName;
+    } Name;
+
+    uint32_t Value;
+    uint32_t SectionIndex;
+    uint8_t BaseType;
+    uint8_t ComplexType;
+    uint8_t StorageClass;
+    uint8_t Unused; // Auxiliary symbol count are unused.
+  };
+
+  llvm::SmallVector<DXILSymbol, 16> Symbols;
+  llvm::SmallVector<StringRef, 16> Names;
+
+public:
+  DxilSymbolTableWriter(llvm::StringTableBuilder &S) : StrTableBuilder(S) {}
+
+  void addSymbol(StringRef Name, uint32_t Value, uint32_t SectionNumber,
+                 uint8_t BaseType, uint8_t ComplexType, uint8_t StorageClass) {
+    DXILSymbol Sym = {{{0, 0}}, Value, SectionNumber, BaseType, ComplexType,
+                      0,        0};
+    if (Name.size() <= 8) {
+      memcpy(&Sym.Name.ShortName, Name.data(), Name.size());
+      Names.push_back(""); // add an empty name to keep the fix-up simple later.
+    } else {
+      StrTableBuilder.add(Name);
+      Names.push_back(Name);
+    }
+    Symbols.push_back(Sym);
+  }
+
+  uint32_t size() const override {
+    return static_cast<uint32_t>(Symbols.size() *
+                                 sizeof(DxilSymbolTableWriter::DXILSymbol));
+  }
+
+  void write(AbstractMemoryStream *pStream) override {
+    for (auto It : llvm::zip(Symbols, Names))
+      if (!std::get<1>(It).empty())
+        std::get<0>(It).Name.LongName.NameOffset =
+            StrTableBuilder.getOffset(std::get<1>(It));
+    ULONG Written = 0;
+    IFT(pStream->Write(
+        static_cast<void *>(Symbols.data()),
+        sizeof(DxilSymbolTableWriter::DXILSymbol) * Symbols.size(), &Written));
+  }
+};
+
+//////////////////////////////////////////////////////////
+// DxiSymbolTable - Writes SYM0 part
+class DxilStringTableWriter : public DxilPartWriter {
+  llvm::StringTableBuilder StrTableBuilder;
+  uint32_t Size;
+
+public:
+  DxilStringTableWriter()
+      : StrTableBuilder(), Size(std::numeric_limits<uint32_t>::max()) {}
+
+  llvm::StringTableBuilder &getStringTableBuilder() { return StrTableBuilder; }
+
+  void finalize() {
+    StrTableBuilder.finalize(llvm::StringTableBuilder::WinCOFF);
+    Size = static_cast<uint32_t>(StrTableBuilder.data().size());
+    Size = (Size + 3) & ~0x03; // Round up to the next dword.
+  }
+
+  uint32_t size() const override {
+    assert(Size != std::numeric_limits<uint32_t>::max() &&
+           "size() called before finalize()");
+    return Size;
+  }
+
+  void write(AbstractMemoryStream *pStream) override {
+    llvm::StringRef Table = StrTableBuilder.data();
+    ULONG Written = 0;
+    IFT(pStream->Write(static_cast<const void *>(Table.data()), Table.size(),
+                       &Written));
+    
+    uint64_t Rem = Table.size() % sizeof(uint32_t);
+    if (Rem > 0) {
+      uint8_t Zeros[] = {0, 0, 0};
+      IFT(pStream->Write(&Zeros, sizeof(uint32_t) - Rem, &Written));
+    }
+  }
+};
+
 using namespace DXIL;
 
 class DxilRDATWriter : public DxilPartWriter {
@@ -1618,6 +1719,10 @@ public:
       IFTBOOL((Size % sizeof(uint32_t)) == 0, DXC_E_CONTAINER_INVALID);
     }
     m_Parts.emplace_back(FourCC, Size, Write);
+  }
+
+  size_t getPartCount() const {
+    return m_Parts.size();
   }
 
   uint32_t size() const override {
@@ -2078,6 +2183,8 @@ void hlsl::SerializeDxilContainerForModule(
         WriteProgramPart(pModule->GetShaderModel(), pProgramStream, pStream);
       });
 
+  uint32_t DXILPartIndex = static_cast<uint32_t>(writer.getPartCount());
+
   // Private data part should be added last when assembling the container
   // becasue there is no garuntee of aligned size
   if (pPrivateData) {
@@ -2088,6 +2195,32 @@ void hlsl::SerializeDxilContainerForModule(
           IFT(pStream->Write(pPrivateData, PrivateDataSize, &cbWritten));
         });
   }
+
+  std::unique_ptr<DxilStringTableWriter> StrTabWriter =
+      llvm::make_unique<DxilStringTableWriter>();
+  std::unique_ptr<DxilSymbolTableWriter> SymTabWriter =
+      llvm::make_unique<DxilSymbolTableWriter>(
+          StrTabWriter->getStringTableBuilder());
+
+  for (const auto &F : pModule->GetModule()->getFunctionList())
+    if (F.hasExternalLinkage() && !F.isDeclaration())
+      SymTabWriter->addSymbol(
+          F.getName(), 0, DXILPartIndex, COFF::IMAGE_SYM_TYPE_NULL,
+          COFF::IMAGE_SYM_DTYPE_FUNCTION, COFF::IMAGE_SYM_CLASS_EXTERNAL);
+
+  StrTabWriter->finalize();
+
+  writer.AddPart(hlsl::DFCC_SymbolTable, SymTabWriter->size(),
+                 [&SymTabWriter](AbstractMemoryStream *pStream) {
+                   SymTabWriter->write(pStream);
+                   return S_OK;
+                 });
+
+  writer.AddPart(hlsl::DFCC_StringTable, StrTabWriter->size(),
+                 [&StrTabWriter](AbstractMemoryStream *pStream) {
+                   StrTabWriter->write(pStream);
+                   return S_OK;
+                 });
 
   writer.write(pFinalStream);
 }

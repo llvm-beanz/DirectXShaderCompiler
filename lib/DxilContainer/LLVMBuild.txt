@@ -13,4 +13,4 @@
 type = Library
 name = DxilContainer
 parent = Libraries
-required_libraries = BitReader BitWriter Core DxcSupport IPA Support DXIL TransformUtils
+required_libraries = BitReader BitWriter Core MC DxcSupport IPA Support DXIL TransformUtils

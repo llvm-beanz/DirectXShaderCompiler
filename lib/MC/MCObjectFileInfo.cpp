@@ -272,7 +272,7 @@ void MCObjectFileInfo::initELFMCObjectFileInfo(Triple T) {
   case Triple::thumbeb:
     if (Ctx->getAsmInfo()->getExceptionHandlingType() == ExceptionHandling::ARM)
       break;
-    // Fallthrough if not using EHABI
+    LLVM_FALLTHROUGH; // HLSL Change
   case Triple::ppc:
   case Triple::x86:
     PersonalityEncoding = (RelocM == Reloc::PIC_)
