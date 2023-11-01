@@ -16,6 +16,7 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
+          git fetch --depth=1000 origin refs/pull/$PR_NUMBER/head:pull/$PR_NUMBER
           until git merge-base $GITHUB_SHA pull/$PR_NUMBER
             do
             depth=$((depth+1000))
