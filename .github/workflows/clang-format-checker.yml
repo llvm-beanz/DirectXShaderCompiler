@@ -14,10 +14,11 @@ jobs:
 
       - name: Find merge base
         run: |
-          until git merge-base $GITHUB_BASE_REF $GITHUB_HEAD_REF
+          until git merge-base $GITHUB_SHA pull/$PR_NUMBER
             do
             depth=$((depth+100))
-            git fetch --depth=$depth origin $GITHUB_BASE_REF && git fetch --depth=$depth origin $GITHUB_HEAD_REF
+            git fetch --depth=$depth origin $GITHUB_HEAD_REF
+            git fetch --depth=$depth origin refs/pull/$PR_NUMBER/head:pull/$PR_NUMBER
             if [ "$depth" -gt "10000" ]
             then
               exit 1
