@@ -831,8 +831,7 @@ static void ConstructFieldInterpolation(DxilFieldAnnotation &fieldAnnotation,
     fieldAnnotation.SetInterpolationMode(InterpMode);
 }
 
-static unsigned AlignBaseOffset(unsigned baseOffset, unsigned size, QualType Ty,
-                                bool bDefaultRowMajor) {
+static unsigned AlignBaseOffset(unsigned baseOffset, unsigned size, QualType Ty, bool bDefaultRowMajor) {
   // Do not align if resource, since resource isn't really here.
   if (IsHLSLResourceType(Ty))
     return baseOffset;
@@ -859,8 +858,7 @@ static unsigned AlignBaseOffset(unsigned baseOffset, unsigned size, QualType Ty,
     BT = hlsl::GetElementTypeOrType(Ty)->getAs<clang::BuiltinType>();
   }
   if (BT) {
-    if (BT->getKind() == clang::BuiltinType::Kind::Double ||
-        BT->getKind() == clang::BuiltinType::Kind::LongLong ||
+    if (BT->getKind() == clang::BuiltinType::Kind::Double || BT->getKind() == clang::BuiltinType::Kind::LongLong ||
         BT->getKind() == clang::BuiltinType::Kind::ULongLong)
       scalarSizeInBytes = 8;
     else if (BT->getKind() == clang::BuiltinType::Kind::Half ||
