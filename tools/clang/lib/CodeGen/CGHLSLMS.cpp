@@ -815,8 +815,7 @@ void CGMSHLSLRuntime::ConstructFieldAttributedAnnotation(
             dyn_cast<BuiltinType>(type->getCanonicalTypeInternal()))
       fieldAnnotation.SetCompType(BuiltinTyToCompTy(BTy, bSNorm, bUNorm));
   } else {
-    DXASSERT(!bSNorm && !bUNorm,
-             "snorm/unorm on invalid type, validate at handleHLSLTypeAttr");
+    DXASSERT(!bSNorm && !bUNorm, "snorm/unorm on invalid type, validate at handleHLSLTypeAttr");
   }
 }
 

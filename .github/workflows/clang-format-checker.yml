@@ -14,15 +14,15 @@ jobs:
 
       - name: Find merge base
         run: |
-        until git merge-base origin/$GITHUB_BASE_REF origin/$GITHUB_HEAD_REF > /dev/null
-          do
-          depth=$((depth+100))
-          git fetch --depth=$depth origin $GITHUB_BASE_REF && git fetch --depth=$depth origin $GITHUB_HEAD_REF
-          if [ "$depth" -gt "10000" ]
-          then
-            exit 1
-          fi
-        done
+          until git merge-base $GITHUB_BASE_REF $GITHUB_HEAD_REF
+            do
+            depth=$((depth+100))
+            git fetch --depth=$depth origin $GITHUB_BASE_REF && git fetch --depth=$depth origin $GITHUB_HEAD_REF
+            if [ "$depth" -gt "10000" ]
+            then
+              exit 1
+            fi
+          done
 
       - name: Get changed files
         id: changed-files
