@@ -1716,7 +1716,7 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
   // alloca. Big alloca will be split to smaller piece first, when process the
   // alloca, it will be alloca flattened from big alloca instead of a GEP of
   // big alloca.
-  auto size_cmp = [&DL](const Value *a0, const Value *a1) -> bool {
+  auto SizeCmp = [&DL](const Value *a0, const Value *a1) -> bool {
     Type *a0ty = a0->getType()->getPointerElementType();
     Type *a1ty = a1->getType()->getPointerElementType();
     bool isUnitSzStruct0 =
@@ -1729,17 +1729,16 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
       sz0 = getNestedLevelInStruct(a0ty);
       sz1 = getNestedLevelInStruct(a1ty);
     }
-    // If sizes are equal, and the new value is a GV,
-    // replace the existing node if it isn't GV or comes later alphabetically
-    // Thus, entries are sorted by size, global variableness, and then name
-    return sz0 < sz1 ||
-           (sz0 == sz1 && isa<GlobalVariable>(a1) &&
-            (!isa<GlobalVariable>(a0) || a0->getName() > a1->getName()));
+    return sz0 <= sz1;
   };
 
-  std::priority_queue<Value *, std::vector<Value *>,
-                      std::function<bool(Value *, Value *)>>
-      WorkList(size_cmp);
+  SmallVector<Value *, 32> WorkList;
+  auto PushSorted = [&SizeCmp, &WorkList](Value *New) {
+    auto InsertPoint = std::find_if(
+        WorkList.begin(), WorkList.end(),
+        [New, &SizeCmp](const Value *V) { return SizeCmp(V, New); });
+    WorkList.insert(InsertPoint, New);
+  };
 
   // Flatten internal global.
   llvm::SetVector<GlobalVariable *> staticGVs;
@@ -1760,7 +1759,7 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
   }
   // Add static GVs to work list.
   for (GlobalVariable *GV : staticGVs)
-    WorkList.push(GV);
+    PushSorted(GV);
 
   DenseMap<Function *, DominatorTree> domTreeMap;
   for (Function &F : M) {
@@ -1774,12 +1773,13 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
     for (BasicBlock::iterator I = BB.begin(), E = BB.end(); I != E; ++I)
       if (AllocaInst *A = dyn_cast<AllocaInst>(I)) {
         if (!A->user_empty()) {
-          WorkList.push(A);
+          PushSorted(A);
           // merge GEP use for the allocs
           dxilutil::MergeGepUse(A);
         }
       }
   }
+  std::stable_sort(WorkList.begin(), WorkList.end(), SizeCmp);
 
   // Establish debug metadata layout name in the context in advance so the name
   // is serialized in both debug and non-debug compilations.
@@ -1797,8 +1797,8 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
 
   bool Changed = false;
   while (!WorkList.empty()) {
-    Value *V = WorkList.top();
-    WorkList.pop();
+    Value *V = WorkList.back();
+    WorkList.pop_back();
 
     if (AllocaInst *AI = dyn_cast<AllocaInst>(V)) {
       // Handle dead allocas trivially.  These can be formed by SROA'ing arrays
@@ -1898,7 +1898,7 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
           // Push Elts into workList.
           for (unsigned EltIdx = 0; EltIdx < Elts.size(); ++EltIdx) {
             AllocaInst *EltAlloca = cast<AllocaInst>(Elts[EltIdx]);
-            WorkList.push(EltAlloca);
+            PushSorted(EltAlloca);
           }
 
           // Now erase any instructions that were made dead while rewriting the
@@ -1985,7 +1985,7 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
         unsigned offset = 0;
         // Push Elts into workList.
         for (auto iter = Elts.begin(); iter != Elts.end(); iter++) {
-          WorkList.push(*iter);
+          PushSorted(*iter);
           GlobalVariable *EltGV = cast<GlobalVariable>(*iter);
           if (bHasDbgInfo) {
             StringRef OriginEltName = EltGV->getName();
