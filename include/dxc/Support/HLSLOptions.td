@@ -181,6 +181,10 @@ def fnew_inlining_behavior : Flag<["-"], "fnew-inlining-behavior">,
   Group<hlslcomp_Group>, Flags<[CoreOption]>,
   HelpText<"Experimental option to use heuristics-driven late inlining and disable alwaysinline annotation for library shaders">;
 
+def flegacy_literals : Flag<["-"], "flegacy-literals">,
+  Group<hlslcomp_Group>, Flags<[CoreOption]>,
+  HelpText<"Legacy behavior for literal values">;
+
 
 def ftime_report : Flag<["-"], "ftime-report">, Group<hlslcomp_Group>, Flags<[CoreOption]>, HelpText<"Print time report">;
 def ftime_trace : Flag<["-"], "ftime-trace">,

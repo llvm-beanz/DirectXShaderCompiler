@@ -1,4 +1,4 @@
-// RUN: %dxc -Tlib_6_3   -verify -HV 2018 -enable-16bit-types %s
+// RUN: %dxc -Tlib_6_3 -flegacy-literals -verify -HV 2018 -enable-16bit-types %s
 
 // :FXC_VERIFY_ARGUMENTS: /E FontPixelShader /T ps_5_1 /Gec
 

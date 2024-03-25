@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -Wno-unused-value -HV 2018 -verify %s
-// RUN: %dxc -Tps_6_0 -Wno-unused-value -HV 2018 -verify %s
+// RUN: %dxc -Tlib_6_3 -Wno-unused-value -HV 2018 -flegacy-literals -verify %s
+// RUN: %dxc -Tps_6_0 -Wno-unused-value -HV 2018 -flegacy-literals -verify %s
 
 // To test with the classic compiler, run
 // %sdxroot%\tools\x86\fxc.exe /T ps_5_1 implicit-casts.hlsl

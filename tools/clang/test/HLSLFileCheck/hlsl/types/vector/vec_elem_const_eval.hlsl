@@ -1,4 +1,4 @@
-// RUN: %dxc -E main -T ps_6_0 -fcgl %s | FileCheck %s
+// RUN: %dxc -E main -T ps_6_0 -fcgl -flegacy-literals %s | FileCheck %s
 
 // Note: since we want to check that HLSLVectorElementExpr are constant evaluated,
 // we require -fcgl here to turn off further constant folding and other optimizations.

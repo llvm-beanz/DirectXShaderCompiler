@@ -1,4 +1,4 @@
-// RUN: %dxc -T cs_6_0 -HV 2018 -E main -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T cs_6_0 -HV 2018 -E main -fcgl -flegacy-literals %s -spirv | FileCheck %s
 
 // According to the SPIR-V spec (2.14. Relaxed Precision):
 // The RelaxedPrecision decoration can be applied to:

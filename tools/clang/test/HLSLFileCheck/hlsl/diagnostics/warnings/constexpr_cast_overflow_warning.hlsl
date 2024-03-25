@@ -1,7 +1,7 @@
-// RUN: %dxc -E real_lit_to_flt_warning -T vs_6_0 %s | FileCheck -check-prefix=CHK-FLT %s
-// RUN: %dxc -E real_lit_to_half_warning -T vs_6_0 %s | FileCheck -check-prefix=CHK-MINFLT1 %s
-// RUN: %dxc -E int_lit_to_half_warning -T vs_6_0 %s | FileCheck -check-prefix=CHK-MINFLT2 %s
-// RUN: %dxc -E real_lit_to_int_warning -T vs_6_0 %s | FileCheck -check-prefix=CHK-INT %s
+// RUN: %dxc -E real_lit_to_flt_warning -flegacy-literals -T vs_6_0 %s | FileCheck -check-prefix=CHK-FLT %s
+// RUN: %dxc -E real_lit_to_half_warning -flegacy-literals -T vs_6_0 %s | FileCheck -check-prefix=CHK-MINFLT1 %s
+// RUN: %dxc -E int_lit_to_half_warning -flegacy-literals -T vs_6_0 %s | FileCheck -check-prefix=CHK-MINFLT2 %s
+// RUN: %dxc -E real_lit_to_int_warning -flegacy-literals -T vs_6_0 %s | FileCheck -check-prefix=CHK-INT %s
 
 // Verify that when a constant is cast to a different type leading to overflow
 // a warning is generated notifying the same.

@@ -1,4 +1,4 @@
-// RUN: %dxc -T cs_6_0 %s | FileCheck %s
+// RUN: %dxc -T cs_6_0 -flegacy-literals %s | FileCheck %s
 
 // CHECK: void @main()
 // CHECK: call void @dx.op.bufferStore.i32(i32 69, %dx.types.Handle %1, i32 0, i32 undef, i32 -2147483648

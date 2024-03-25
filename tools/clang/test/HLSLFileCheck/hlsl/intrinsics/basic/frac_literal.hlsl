@@ -4,7 +4,7 @@
 // Also nvidia's documentation (https://developer.download.nvidia.com/cg/frac.html) on frac says: frac(v) = v - floor(v);
 // fxc seems to adhere to Nvidia's definition of frac. That is, frac(-1231.12121) evaluates to 0.878790 (not 0.12121).
 
-// RUN: %dxc -E main -T vs_6_0 %s | %FileCheck %s
+// RUN: %dxc -E main -T vs_6_0 -flegacy-literals %s | %FileCheck %s
 
 RWBuffer<float> fbuf;
 RWBuffer<float4> f4buf;

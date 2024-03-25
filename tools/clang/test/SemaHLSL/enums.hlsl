@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -HV 2017   -verify %s
-// RUN: %dxc -Tps_6_0 -HV 2017   -verify %s
+// RUN: %dxc -Tlib_6_3 -HV 2017 -flegacy-literals -verify %s
+// RUN: %dxc -Tps_6_0 -HV 2017 -flegacy-literals -verify %s
 
 enum MyEnum {
     ZERO,

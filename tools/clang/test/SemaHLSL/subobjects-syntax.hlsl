@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -Wno-unused-value -verify %s
-// RUN: %dxc -Tps_6_0 -Wno-unused-value -verify %s
+// RUN: %dxc -Tlib_6_3 -Wno-unused-value -flegacy-literals -verify %s
+// RUN: %dxc -Tps_6_0 -Wno-unused-value -flegacy-literals -verify %s
 
 string globalRs = "CBV(b0)";
 string localRs = "UAV(u0, visibility = SHADER_VISIBILITY_GEOMETRY)";

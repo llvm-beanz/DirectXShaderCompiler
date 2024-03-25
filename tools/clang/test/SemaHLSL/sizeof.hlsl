@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -Wno-unused-value -verify %s
-// RUN: %dxc -Tvs_6_0 -Wno-unused-value -verify %s
+// RUN: %dxc -Tlib_6_3 -Wno-unused-value -flegacy-literals -verify %s
+// RUN: %dxc -Tvs_6_0 -Wno-unused-value -flegacy-literals -verify %s
 
 // Tests usage of the sizeof operator
 

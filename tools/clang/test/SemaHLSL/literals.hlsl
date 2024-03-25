@@ -1,4 +1,4 @@
-// RUN: %dxc -Tlib_6_3 -Wno-unused-value -verify %s
+// RUN: %dxc -Tlib_6_3 -Wno-unused-value -flegacy-literals -verify %s
 
 // To test with the classic compiler, run
 // %sdxroot%\tools\x86\fxc.exe /T ps_5_1 literals.hlsl

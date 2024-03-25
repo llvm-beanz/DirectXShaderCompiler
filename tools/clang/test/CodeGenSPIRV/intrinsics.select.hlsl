@@ -1,5 +1,5 @@
-// RUN: %dxc -T ps_6_0 -E main -HV 2021 -fcgl  %s -spirv | FileCheck %s
-// RUN: %dxc -T ps_6_0 -E main -HV 2018 -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T ps_6_0 -E main -HV 2021 -fcgl -flegacy-literals %s -spirv | FileCheck %s
+// RUN: %dxc -T ps_6_0 -E main -HV 2018 -fcgl -flegacy-literals %s -spirv | FileCheck %s
 
 // CHECK: [[v3i0:%[0-9]+]] = OpConstantComposite %v3int %int_0 %int_0 %int_0
 

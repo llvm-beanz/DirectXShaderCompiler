@@ -1,4 +1,4 @@
-// RUN: %dxc -T cs_6_4 -HV 2021 -E main -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T cs_6_4 -HV 2021 -E main -fcgl -flegacy-literals  %s -spirv | FileCheck %s
 
 struct ColorRGB { 
     uint R : 8;

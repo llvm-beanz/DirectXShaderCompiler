@@ -1,4 +1,4 @@
-// RUN: %dxc -T ps_6_0 -E main -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T ps_6_0 -E main -fcgl -flegacy-literals %s -spirv | FileCheck %s
 
 // CHECK:  [[v4f1:%[0-9]+]] = OpConstantComposite %v4float %float_1 %float_1 %float_1 %float_1
 // CHECK: [[v4f25:%[0-9]+]] = OpConstantComposite %v4float %float_2_5 %float_2_5 %float_2_5 %float_2_5

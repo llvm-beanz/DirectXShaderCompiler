@@ -1,4 +1,4 @@
-// RUN: %dxc -Tlib_6_8 -verify %s
+// RUN: %dxc -Tlib_6_8 -flegacy-literals -verify %s
 
 // NodeDispatchGrid and NodeMaxDispatchGrid may only be used with Broadcasting launch nodes
 

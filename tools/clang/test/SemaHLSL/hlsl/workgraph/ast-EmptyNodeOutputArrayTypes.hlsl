@@ -1,4 +1,4 @@
-// RUN: %dxc -T lib_6_8 -ast-dump-implicit %s | FileCheck %s
+// RUN: %dxc -T lib_6_8 -ast-dump-implicit -flegacy-literals %s | FileCheck %s
 // This test verifies the AST of the EmptyNodeOutputArray type. The
 // source doesn't matter except that it forces a use to ensure the AST is fully
 // loaded by the external sema source.

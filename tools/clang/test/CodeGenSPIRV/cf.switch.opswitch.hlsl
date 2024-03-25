@@ -1,4 +1,4 @@
-// RUN: %dxc -T ps_6_0 -E main -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T ps_6_0 -E main -fcgl -flegacy-literals %s -spirv | FileCheck %s
 
 int foo() { return 200; }
 

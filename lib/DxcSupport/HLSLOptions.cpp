@@ -819,6 +819,8 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       Args.hasFlag(OPT_fdisable_loc_tracking, OPT_INVALID, false);
   opts.NewInlining =
       Args.hasFlag(OPT_fnew_inlining_behavior, OPT_INVALID, false);
+  opts.NonConformingLiterals =
+      Args.hasFlag(OPT_flegacy_literals, OPT_INVALID, false);
   opts.TimeReport = Args.hasFlag(OPT_ftime_report, OPT_INVALID, false);
   opts.TimeTrace = Args.hasFlag(OPT_ftime_trace, OPT_INVALID, false) ? "-" : "";
   opts.VerifyDiagnostics = Args.hasFlag(OPT_verify, OPT_INVALID, false);

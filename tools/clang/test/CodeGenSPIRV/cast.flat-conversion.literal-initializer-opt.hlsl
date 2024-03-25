@@ -1,4 +1,4 @@
-// RUN: %dxc -T ps_6_0 -E main %s -spirv | FileCheck %s
+// RUN: %dxc -T ps_6_0 -E main -flegacy-literals %s -spirv | FileCheck %s
 
 struct S {
   float f1;

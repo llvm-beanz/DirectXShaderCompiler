@@ -1,4 +1,4 @@
-// RUN: %dxc -T cs_6_6 -E main -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T cs_6_6 -E main -fcgl -flegacy-literals %s -spirv | FileCheck %s
 
 groupshared int dest_i;
 groupshared uint dest_u;

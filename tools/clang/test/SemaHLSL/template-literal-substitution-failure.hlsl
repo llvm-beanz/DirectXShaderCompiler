@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -HV 2021 -verify %s
-// RUN: %dxc -Tvs_6_0 -HV 2021 -verify %s
+// RUN: %dxc -Tlib_6_3 -HV 2021 -flegacy-literals -verify %s
+// RUN: %dxc -Tvs_6_0 -HV 2021 -flegacy-literals -verify %s
 
 RWStructuredBuffer<float> Output;
 

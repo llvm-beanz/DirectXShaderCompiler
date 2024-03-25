@@ -1,4 +1,4 @@
-// RUN: %dxc -T ps_6_0 -E main -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T ps_6_0 -E main -fcgl -flegacy-literals %s -spirv | FileCheck %s
 
 // Note: According to HLSL reference (https://msdn.microsoft.com/en-us/library/windows/desktop/ff471475(v=vs.85).aspx),
 // all RWByteAddressBuffer atomic methods must take unsigned integers as parameters.

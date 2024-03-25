@@ -1,4 +1,4 @@
-// RUN: %dxc -T ps_6_0 -HV 2018 -E main -fcgl  %s -spirv | FileCheck %s
+// RUN: %dxc -T ps_6_0 -HV 2018 -E main -fcgl -flegacy-literals %s -spirv | FileCheck %s
 
 // CHECK: [[v3i0:%[0-9]+]] = OpConstantComposite %v3int %int_0 %int_0 %int_0
 SamplerState gSS1;

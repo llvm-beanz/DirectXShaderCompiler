@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3  -Wno-unused-value  -verify %s
-// RUN: %dxc -Tvs_6_0 -Wno-unused-value -verify %s
+// RUN: %dxc -Tlib_6_3 -Wno-unused-value -flegacy-literals -verify %s
+// RUN: %dxc -Tvs_6_0 -Wno-unused-value -flegacy-literals -verify %s
 
 float overload1(float f) { return 1; }                        /* expected-note {{candidate function}} expected-note {{candidate function}} expected-note {{candidate function}} expected-note {{candidate function}} expected-note {{candidate function}} fxc-pass {{}} */
 double overload1(double f) { return 2; }                       /* expected-note {{candidate function}} expected-note {{candidate function}} expected-note {{candidate function}} expected-note {{candidate function}} expected-note {{candidate function}} fxc-pass {{}} */

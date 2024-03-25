@@ -168,6 +168,9 @@ public:
       hlsl::DXIL::DefaultLinkage::Default;
   /// Whether use row major as default matrix major.
   bool HLSLDefaultRowMajor = false;
+  // default to true here, but false in the API. This allows the rewriter to
+  // assume this is enabled, but the compiler forces it false.
+  bool HLSLNonConformingLiterals = true;
   // HLSL Change Ends
 
   bool SPIRV = false;  // SPIRV Change
