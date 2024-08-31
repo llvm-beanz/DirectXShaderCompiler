@@ -4758,58 +4758,104 @@ public:
   child_range children() { return child_range(&Base, &Base + 1); }
 };
 
-class HLSLOutParamExpr : public Expr {
-  Expr *Base;
-  Expr *Writeback;
-  Expr *SrcLV;
-  OpaqueValueExpr *OpaqueVal;
+/// This class represents temporary values used to represent inout and out
+/// arguments in HLSL. From the callee perspective these parameters are more or
+/// less __restrict__ T&. They are guaranteed to not alias any memory. inout
+/// parameters are initialized by the caller, and out parameters are references
+/// to uninitialized memory.
+///
+/// In the caller, the argument expression creates a temporary in local memory
+/// and the address of the temporary is passed into the callee. There may be
+/// implicit conversion sequences to initialize the temporary, and on expiration
+/// of the temporary an inverse conversion sequence is applied as a write-back
+/// conversion to the source l-value.
+///
+/// This AST node has three sub-expressions:
+///  - An OpaqueValueExpr with a source that is the argument lvalue expression.
+///  - An OpaqueValueExpr with a source that is an implicit conversion
+///    sequence from the source lvalue to the argument type.
+///  - An expression that assigns the second expression into the first,
+///    performing any necessary conversions.
+class HLSLOutArgExpr : public Expr {
+  friend class ASTStmtReader;
+
+  enum {
+    BaseLValue,
+    CastedTemporary,
+    WritebackCast,
+    NumSubExprs,
+  };
+
+  Stmt *SubExprs[NumSubExprs];
   bool IsInOut;
-  bool CanElide;
 
-  HLSLOutParamExpr(QualType Ty, Expr *Base, bool IsInOut, bool CanElide)
-      : Expr(HLSLOutParamExprClass, Ty, VK_LValue, OK_Ordinary,
-             Base->isTypeDependent(), Base->isValueDependent(),
-             Base->isInstantiationDependent(),
-             Base->containsUnexpandedParameterPack()),
-        Base(Base), Writeback(nullptr), SrcLV(nullptr), OpaqueVal(nullptr),
-        IsInOut(IsInOut), CanElide(CanElide) {}
-
-public:
-  static HLSLOutParamExpr *Create(const ASTContext &C, QualType Ty, Expr *Base,
-                                  bool IsInOut = false, bool CanElide = false);
-
-  const Expr *getBase() const { return Base; }
-  Expr *getBase() { return Base; }
-  void setBase(Expr *E) { Base = E; }
-
-  const Expr *getWriteback() const { return Writeback; }
-  Expr *getWriteback() { return Writeback; }
-  void setWriteback(Expr *E) { Writeback = E; }
-
-  const Expr *getSrcLV() const { return SrcLV ? SrcLV : Base; }
-  Expr *getSrcLV() { return SrcLV ? SrcLV : Base; }
-  void setSrcLV(Expr *E) { SrcLV = E; }
-
-  const OpaqueValueExpr *getOpaqueValue() const { return OpaqueVal; }
-  OpaqueValueExpr *getOpaqueValue() { return OpaqueVal; }
-  void setOpaqueValue(OpaqueValueExpr *E) { OpaqueVal = E; }
-
-  bool isInOut() const { return IsInOut; }
-  bool canElide() const { return CanElide; }
-
-  SourceLocation getLocStart() const LLVM_READONLY {
-    return Base->getLocStart();
+  HLSLOutArgExpr(QualType Ty, OpaqueValueExpr *B, OpaqueValueExpr *OpV,
+                 Expr *WB, bool IsInOut)
+      : Expr(HLSLOutArgExprClass, Ty, VK_LValue, OK_Ordinary,
+             B->getSourceExpr()->isTypeDependent(),
+             B->getSourceExpr()->isValueDependent(),
+             B->getSourceExpr()->isInstantiationDependent(),
+             B->getSourceExpr()->containsUnexpandedParameterPack()),
+        IsInOut(IsInOut) {
+    SubExprs[BaseLValue] = B;
+    SubExprs[CastedTemporary] = OpV;
+    SubExprs[WritebackCast] = WB;
+    assert(!Ty->isDependentType() && "HLSLOutArgExpr given a dependent type!");
   }
 
-  SourceLocation getLocEnd() const LLVM_READONLY { return Base->getLocEnd(); }
+  explicit HLSLOutArgExpr(EmptyShell Shell)
+      : Expr(HLSLOutArgExprClass, Shell) {}
+
+public:
+  static HLSLOutArgExpr *Create(const ASTContext &C, QualType Ty,
+                                OpaqueValueExpr *Base, OpaqueValueExpr *OpV,
+                                Expr *WB, bool IsInOut);
+  static HLSLOutArgExpr *CreateEmpty(const ASTContext &Ctx);
+
+  const OpaqueValueExpr *getOpaqueArgLValue() const {
+    return cast<OpaqueValueExpr>(SubExprs[BaseLValue]);
+  }
+  OpaqueValueExpr *getOpaqueArgLValue() {
+    return cast<OpaqueValueExpr>(SubExprs[BaseLValue]);
+  }
+
+  /// Return the l-value expression that was written as the argument
+  /// in source.  Everything else here is implicitly generated.
+  const Expr *getArgLValue() const {
+    return getOpaqueArgLValue()->getSourceExpr();
+  }
+  Expr *getArgLValue() { return getOpaqueArgLValue()->getSourceExpr(); }
+
+  const Expr *getWritebackCast() const {
+    return cast<Expr>(SubExprs[WritebackCast]);
+  }
+  Expr *getWritebackCast() { return cast<Expr>(SubExprs[WritebackCast]); }
+
+  const OpaqueValueExpr *getCastedTemporary() const {
+    return cast<OpaqueValueExpr>(SubExprs[CastedTemporary]);
+  }
+  OpaqueValueExpr *getCastedTemporary() {
+    return cast<OpaqueValueExpr>(SubExprs[CastedTemporary]);
+  }
+
+  /// returns true if the parameter is inout and false if the parameter is out.
+  bool isInOut() const { return IsInOut; }
+
+  SourceLocation getLocStart() const LLVM_READONLY {
+    return SubExprs[BaseLValue]->getLocStart();
+  }
+
+  SourceLocation getLocEnd() const LLVM_READONLY {
+    return SubExprs[BaseLValue]->getLocEnd();
+  }
 
   static bool classof(const Stmt *T) {
-    return T->getStmtClass() == HLSLOutParamExprClass;
+    return T->getStmtClass() == HLSLOutArgExprClass;
   }
 
   // Iterators
   child_range children() {
-    return child_range((Stmt **)&Base, (Stmt **)&Base + 1);
+    return child_range(&SubExprs[BaseLValue], &SubExprs[NumSubExprs]);
   }
 };
 

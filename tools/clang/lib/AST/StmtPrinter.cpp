@@ -1389,9 +1389,9 @@ void StmtPrinter::VisitHLSLVectorElementExpr(HLSLVectorElementExpr *Node) {
   OS << ".";
   OS << Node->getAccessor().getName();
 }
-void StmtPrinter::VisitHLSLOutParamExpr(HLSLOutParamExpr *Node) {
+void StmtPrinter::VisitHLSLOutArgExpr(HLSLOutArgExpr *Node) {
   OS << (Node->isInOut() ? "inout " : "out ");
-  PrintExpr(Node->getBase());
+  PrintExpr(Node->getArgLValue());
 }
 
 void StmtPrinter::VisitHLSLArrayTemporaryExpr(HLSLArrayTemporaryExpr *Node) {}

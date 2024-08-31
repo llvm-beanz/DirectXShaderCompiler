@@ -798,7 +798,7 @@ void StmtProfiler::VisitHLSLVectorElementExpr(const HLSLVectorElementExpr *S) {
   VisitName(&S->getAccessor());
 }
 
-void StmtProfiler::VisitHLSLOutParamExpr(const HLSLOutParamExpr *S) {
+void StmtProfiler::VisitHLSLOutArgExpr(const HLSLOutArgExpr *S) {
   VisitExpr(S);
 }
 

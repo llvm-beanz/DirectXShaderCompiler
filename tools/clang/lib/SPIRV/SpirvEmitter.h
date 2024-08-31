@@ -168,7 +168,7 @@ private:
   SpirvInstruction *
   doUnaryExprOrTypeTraitExpr(const UnaryExprOrTypeTraitExpr *expr);
   
-  SpirvInstruction *doHLSLOutParamExpr(const HLSLOutParamExpr *expr);
+  SpirvInstruction *doHLSLOutArgExpr(const HLSLOutArgExpr *expr);
   SpirvInstruction *
   doHLSLArrayTemporaryExpr(const HLSLArrayTemporaryExpr *expr);
   SpirvInstruction *doOpaqueValueExpr(const OpaqueValueExpr *expr);

@@ -3080,7 +3080,7 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
     break;
 
   // HLSL Change - Begin
-  case HLSLOutParamExprClass:
+  case HLSLOutArgExprClass:
     return true;
   // HLSL Change - End
 
@@ -4364,10 +4364,15 @@ ObjCSubscriptRefExpr *ObjCSubscriptRefExpr::Create(const ASTContext &C,
 
 // HLSL Change begin
 
-HLSLOutParamExpr *HLSLOutParamExpr::Create(const ASTContext &C, QualType Ty,
-                                           Expr *Base, bool IsInOut,
-                                           bool CanElide) {
-  return new (C) HLSLOutParamExpr(Ty, Base, IsInOut, CanElide);
+HLSLOutArgExpr *HLSLOutArgExpr::Create(const ASTContext &C, QualType Ty,
+                                       OpaqueValueExpr *Base,
+                                       OpaqueValueExpr *OpV, Expr *WB,
+                                       bool IsInOut) {
+  return new (C) HLSLOutArgExpr(Ty, Base, OpV, WB, IsInOut);
+}
+
+HLSLOutArgExpr *HLSLOutArgExpr::CreateEmpty(const ASTContext &C) {
+  return new (C) HLSLOutArgExpr(EmptyShell());
 }
 
 HLSLArrayTemporaryExpr *

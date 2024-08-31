@@ -7964,6 +7964,8 @@ def warn_hlsl_legacy_integer_literal_signedness: Warning<
   InGroup<HLSLLegacyLiterals>, DefaultIgnore;
 def err_hlsl_unsupported_semantic_index: Error<
   "'%0' is defined with semantic index %1, but only values 0 through %2 are supported">;
+def error_hlsl_inout_scalar_extension : Error<"illegal scalar extension cast on argument %0 to %select{|in}1out paramemter">;
+def error_hlsl_inout_lvalue : Error<"cannot bind non-lvalue argument %0 to %select{|in}1out paramemter">;
 // HLSL Change Ends
 
 // SPIRV Change Starts

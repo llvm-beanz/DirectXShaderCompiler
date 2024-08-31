@@ -15316,6 +15316,58 @@ void Sema::CheckHLSLArrayAccess(const Expr *expr) {
   }
 }
 
+ExprResult Sema::ActOnOutParamExpr(ParmVarDecl *Param, Expr *Arg) {
+  bool IsInOut = Param->hasAttr<HLSLInOutAttr>();
+  if (!Arg->isLValue()) {
+    Diag(Arg->getLocStart(), diag::error_hlsl_inout_lvalue)
+        << Arg << (IsInOut ? 1 : 0);
+    return ExprError();
+  }
+
+  ASTContext &Ctx = getASTContext();
+
+  QualType Ty = Param->getType().getNonLValueExprType(Ctx);
+
+  // HLSL allows implicit conversions from scalars to vectors, but not the
+  // inverse, so we need to disallow `inout` with scalar->vector or
+  // scalar->matrix conversions.
+  if (Arg->getType()->isScalarType() != Ty->isScalarType()) {
+    Diag(Arg->getLocStart(), diag::error_hlsl_inout_scalar_extension)
+        << Arg << (IsInOut ? 1 : 0);
+    return ExprError();
+  }
+
+  auto *ArgOpV = new (Ctx) OpaqueValueExpr(Param->getLocStart(), Arg->getType(),
+                                           VK_LValue, OK_Ordinary, Arg);
+
+  // Parameters are initialized via copy initialization. This allows for
+  // overload resolution of argument constructors.
+  InitializedEntity Entity =
+      InitializedEntity::InitializeParameter(Ctx, Ty, false);
+  ExprResult Res =
+      PerformCopyInitialization(Entity, Param->getLocStart(), ArgOpV);
+  if (Res.isInvalid())
+    return ExprError();
+  Expr *Base = Res.get();
+  // After the cast, drop the reference type when creating the exprs.
+  Ty = Ty.getNonLValueExprType(Ctx);
+  auto *OpV = new (Ctx)
+      OpaqueValueExpr(Param->getLocStart(), Ty, VK_LValue, OK_Ordinary, Base);
+
+  // Writebacks are performed with `=` binary operator, which allows for
+  // overload resolution on writeback result expressions.
+  Res =
+      ActOnBinOp(getCurScope(), Param->getLocStart(), tok::equal, ArgOpV, OpV);
+
+  if (Res.isInvalid())
+    return ExprError();
+  Expr *Writeback = Res.get();
+  auto *OutExpr =
+      HLSLOutArgExpr::Create(Ctx, Ty, ArgOpV, OpV, Writeback, IsInOut);
+
+  return ExprResult(OutExpr);
+}
+
 clang::QualType ApplyTypeSpecSignToParsedType(clang::Sema *self,
                                               clang::QualType &type,
                                               clang::TypeSpecifierSign TSS,

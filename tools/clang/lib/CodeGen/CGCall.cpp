@@ -2592,29 +2592,9 @@ static void emitWriteback(CodeGenFunction &CGF,
                           const CallArgList::Writeback &writeback) {
   const LValue &srcLV = writeback.Source;
 
-  if (CGF.getLangOpts().HLSL) {
-    if (writeback.CastExpr) {
-      RValue TmpVal = CGF.EmitAnyExprToTemp(writeback.CastExpr);
-      if (TmpVal.isScalar())
-        CGF.EmitStoreThroughLValue(TmpVal, srcLV);
-      else
-        CGF.EmitAggregateCopy(srcLV.getAddress(), TmpVal.getAggregateAddr(),
-                              srcLV.getType());
-    } else {
-      if (srcLV.isSimple())
-        CGF.EmitAggregateCopy(srcLV.getAddress(), writeback.Temporary,
-                              srcLV.getType());
-      else {
-        llvm::Value *value;
-        if (hlsl::IsHLSLMatType(srcLV.getType()))
-          value = CGF.CGM.getHLSLRuntime().EmitHLSLMatrixLoad(
-              CGF, writeback.Temporary, srcLV.getType());
-        else
-          value = CGF.Builder.CreateLoad(writeback.Temporary);
-        RValue TmpVal = RValue::get(value);
-        CGF.EmitStoreThroughLValue(TmpVal, srcLV);
-      }
-    }
+  if (writeback.CastExpr) {
+    CGF.EmitIgnoredExpr(writeback.CastExpr);
+
     if (CGF.CGM.getCodeGenOpts().HLSLEnableLifetimeMarkers) {
       uint64_t Sz = CGF.CGM.getDataLayout().getTypeAllocSize(
           CGF.ConvertTypeForMem(srcLV.getType()));
@@ -3038,27 +3018,10 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
       }
     }
 
-    // Add writeback for HLSLOutParamExpr.
-    if (const HLSLOutParamExpr *OE = dyn_cast<HLSLOutParamExpr>(E)) {
-      LValue LV = EmitLValue(E);
-      llvm::Value *Addr, *BaseAddr;
-      if (LV.isExtVectorElt()) {
-        llvm::Constant *VecElts = LV.getExtVectorElts();
-        BaseAddr = LV.getExtVectorAddr();
-        Addr = Builder.CreateGEP(
-            BaseAddr,
-            {Builder.getInt32(0), VecElts->getAggregateElement((unsigned)0)});
-      } else // LV.getAddress() will assert if this is not a simple LValue.
-        Addr = BaseAddr = LV.getAddress();
-
-      if (!OE->canElide()) {
-        uint64_t Sz = CGM.getDataLayout().getTypeAllocSize(
-            ConvertTypeForMem(LV.getType()));
-        EmitLifetimeStart(Sz, BaseAddr);
-        args.addWriteback(EmitLValue(OE->getSrcLV()), Addr, nullptr,
-                          OE->getWriteback());
-      }
-      return args.add(RValue::get(Addr), type);
+    // Add writeback for HLSLOutArgExpr.
+    if (const HLSLOutArgExpr *OE = dyn_cast<HLSLOutArgExpr>(E)) {
+      EmitHLSLOutArgExpr(OE, args, type);
+      return;
     }
     // HLSL Change Ends.
     assert(E->getObjectKind() == OK_Ordinary);

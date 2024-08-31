@@ -1013,8 +1013,8 @@ DiagnosePayloadAccess(Sema &S, DxrShaderDiagnoseInfo &Info,
 const Stmt *IgnoreParensAndDecay(const Stmt *S) {
   for (;;) {
     switch (S->getStmtClass()) {
-    case Expr::HLSLOutParamExprClass:
-      S = cast<HLSLOutParamExpr>(S)->getBase();
+    case Expr::HLSLOutArgExprClass:
+      S = cast<HLSLOutArgExpr>(S)->getArgLValue();
       break;
     case Stmt::ParenExprClass:
       S = cast<ParenExpr>(S)->getSubExpr();

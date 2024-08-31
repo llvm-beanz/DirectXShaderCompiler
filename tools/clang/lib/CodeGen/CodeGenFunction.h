@@ -1620,6 +1620,9 @@ public:
 
   void EmitAnyExprToExn(const Expr *E, llvm::Value *Addr);
 
+  /// EmitInitializationToLValue - Emit an initializer to an LValue.
+  void EmitInitializationToLValue(const Expr *E, LValue LV);
+
   /// EmitExprAsInit - Emits the code necessary to initialize a
   /// location in memory with the given initializer.
   void EmitExprAsInit(const Expr *init, const ValueDecl *D, LValue lvalue,
@@ -2467,7 +2470,8 @@ public:
   // HLSL Change begin
   LValue EmitExtMatrixElementExpr(const ExtMatrixElementExpr *E);
   LValue EmitHLSLVectorElementExpr(const HLSLVectorElementExpr *E);
-  LValue EmitHLSLOutParamExpr(const HLSLOutParamExpr *E);
+  void EmitHLSLOutArgExpr(const HLSLOutArgExpr *E, CallArgList &Args,
+                          QualType Ty);
   // HLSL Change end
   LValue EmitMemberExpr(const MemberExpr *E);
   LValue EmitObjCIsaExpr(const ObjCIsaExpr *E);

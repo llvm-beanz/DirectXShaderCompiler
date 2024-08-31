@@ -1232,8 +1232,8 @@ SpirvInstruction *SpirvEmitter::doExpr(const Expr *expr,
   } else if (const auto *tmplParamExpr =
                  dyn_cast<SubstNonTypeTemplateParmExpr>(expr)) {
     result = doExpr(tmplParamExpr->getReplacement());
-  } else if (const auto *outParamExpr = dyn_cast<HLSLOutParamExpr>(expr)) {
-    result = doHLSLOutParamExpr(outParamExpr);
+  } else if (const auto *outParamExpr = dyn_cast<HLSLOutArgExpr>(expr)) {
+    result = doHLSLOutArgExpr(outParamExpr);
   } else if (const auto *arrayTmpExpr = dyn_cast<HLSLArrayTemporaryExpr>(expr)) {
     result = doHLSLArrayTemporaryExpr(arrayTmpExpr);
   } else if (const auto *opaqueValExpr = dyn_cast<OpaqueValueExpr>(expr)) {
@@ -2987,7 +2987,7 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
   llvm::SmallVector<SpirvInstruction *, 4> vars; // Variables for function call
   llvm::SmallVector<bool, 4> isTempVar;          // Temporary variable or not
   llvm::SmallVector<SpirvInstruction *, 4> args; // Evaluated arguments
-  llvm::SmallVector<std::pair<SpirvInstruction *, const HLSLOutParamExpr*>, 4> writebacks;
+  llvm::SmallVector<std::pair<SpirvInstruction *, const HLSLOutArgExpr*>, 4> writebacks;
 
   if (const auto *memberCall = dyn_cast<CXXMemberCallExpr>(callExpr)) {
     const auto *memberFn = cast<CXXMethodDecl>(memberCall->getCalleeDecl());
@@ -3082,7 +3082,7 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
 
     auto *argInst = doExpr(arg);
 
-    if (const auto *outParamExpr = dyn_cast<HLSLOutParamExpr>(arg))
+    if (const auto *outParamExpr = dyn_cast<HLSLOutArgExpr>(arg))
       writebacks.push_back(std::make_pair(argInst, outParamExpr));
 
     bool isArgGlobalVarWithResourceType =
@@ -12222,8 +12222,8 @@ void SpirvEmitter::processCallShader(const CallExpr *callExpr) {
   // HLSL Func :
   // template<typename CallData>
   // void CallShader(in int sbtIndex, inout CallData arg)
-  if (const auto *outParamExpr = dyn_cast<HLSLOutParamExpr>(args[1])) {
-    if (const auto *arg = dyn_cast<DeclRefExpr>(outParamExpr->getBase())) {
+  if (const auto *outParamExpr = dyn_cast<HLSLOutArgExpr>(args[1])) {
+    if (const auto *arg = dyn_cast<DeclRefExpr>(outParamExpr->getArgLValue())) {
       if (const auto *varDecl = dyn_cast<VarDecl>(arg->getDecl())) {
         callDataType = varDecl->getType();
         callDataArg = varDecl;
@@ -12308,8 +12308,8 @@ void SpirvEmitter::processTraceRay(const CallExpr *callExpr) {
   //              inout RayPayload p)
   // where RayDesc = {float3 origin, float tMin, float3 direction, float tMax}
 
-  if (const auto *outExpr = dyn_cast<HLSLOutParamExpr>(args[7])) {
-    if (const auto *arg = dyn_cast<DeclRefExpr>(outExpr->getBase())) {
+  if (const auto *outExpr = dyn_cast<HLSLOutArgExpr>(args[7])) {
+    if (const auto *arg = dyn_cast<DeclRefExpr>(outExpr->getArgLValue())) {
       if (const auto *varDecl = dyn_cast<VarDecl>(arg->getDecl())) {
         rayPayloadType = varDecl->getType();
         rayPayloadArg = varDecl;
@@ -15153,12 +15153,10 @@ bool SpirvEmitter::UpgradeToVulkanMemoryModelIfNeeded(
 }
 
 SpirvInstruction *
-SpirvEmitter::doHLSLOutParamExpr(const HLSLOutParamExpr *Expr) {
-  if (Expr->canElide())
-    return doExpr(Expr->getBase());
+SpirvEmitter::doHLSLOutArgExpr(const HLSLOutArgExpr *Expr) {
   SpirvVariable *TmpVar = nullptr;
   if (Expr->isInOut()) {
-    SpirvInstruction *InitVal = doExpr(Expr->getBase());
+    SpirvInstruction *InitVal = doExpr(Expr->getArgLValue());
     if (!InitVal->isRValue())
       InitVal =
           spvBuilder.createLoad(Expr->getType(), InitVal, Expr->getLocStart());
@@ -15170,7 +15168,7 @@ SpirvEmitter::doHLSLOutParamExpr(const HLSLOutParamExpr *Expr) {
         spvBuilder.addFnVar(Expr->getType(), Expr->getLocStart(), "hlsl.out");
   }
 
-  if (const auto *OpaqueVal = Expr->getOpaqueValue())
+  if (const auto *OpaqueVal = Expr->getOpaqueArgLValue())
     bindOpaqueValue(TmpVar, OpaqueVal);
 
   return TmpVar;

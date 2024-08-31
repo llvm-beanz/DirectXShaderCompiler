@@ -840,6 +840,9 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
   case Expr::ObjCPropertyRefExprClass:
     llvm_unreachable("cannot emit a property reference directly");
 
+  case Expr::HLSLOutArgExprClass:
+    llvm_unreachable("cannot emit a out arg directly");
+
   case Expr::ObjCSelectorExprClass:
     return EmitObjCSelectorLValue(cast<ObjCSelectorExpr>(E));
   case Expr::ObjCIsaExprClass:
@@ -920,8 +923,6 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitExtMatrixElementExpr(cast<ExtMatrixElementExpr>(E));
   case Expr::HLSLVectorElementExprClass:
     return EmitHLSLVectorElementExpr(cast<HLSLVectorElementExpr>(E));
-  case Expr::HLSLOutParamExprClass:
-    return EmitHLSLOutParamExpr(cast<HLSLOutParamExpr>(E));
   case Expr::CXXThisExprClass:
     return MakeAddrLValue(LoadCXXThis(), E->getType());
   // HLSL Change Ends
@@ -2939,37 +2940,49 @@ CodeGenFunction::EmitExtMatrixElementExpr(const ExtMatrixElementExpr *E) {
   return MakeAddrLValue(Result, E->getType());
 }
 
-LValue CodeGenFunction::EmitHLSLOutParamExpr(const HLSLOutParamExpr *E) {
-  if (E->canElide())
-    return EmitLValue(E->getBase());
-  llvm::Type *Ty = ConvertTypeForMem(E->getType());
-  // TODO: Use CreateAggTemp
-  llvm::Value *OutTemp;
+void CodeGenFunction::EmitInitializationToLValue(const Expr *E, LValue LV) {
+  QualType Type = LV.getType();
+  switch (getEvaluationKind(Type)) {
+  case TEK_Complex:
+    EmitComplexExprIntoLValue(E, LV, /*isInit*/ true);
+    return;
+  case TEK_Aggregate:
+    EmitAggExpr(E, AggValueSlot::forLValue(LV, AggValueSlot::IsDestructed,
+                                           AggValueSlot::DoesNotNeedGCBarriers,
+                                           AggValueSlot::IsNotAliased));
+    return;
+  case TEK_Scalar:
+    if (LV.isSimple())
+      EmitScalarInit(E, /*D=*/nullptr, LV, /*Captured=*/false);
+    else
+      EmitStoreThroughLValue(RValue::get(EmitScalarExpr(E)), LV);
+    return;
+  }
+  llvm_unreachable("bad evaluation kind");
+}
 
-  if (E->isInOut()) {
-    RValue InVal = EmitAnyExprToTemp(E->getBase());
-    if (!InVal.isScalar()) {
-      OutTemp = InVal.getAggregateAddr();
-    } else {
-      OutTemp = CreateTempAlloca(Ty, "hlsl.out");
-      if (hlsl::IsHLSLMatType(E->getType())) {
-        // Use matrix store to keep major info.
-        CGM.getHLSLRuntime().EmitHLSLMatrixStore(*this, InVal.getScalarVal(),
-                                                 OutTemp, E->getType());
-      }
-      else {
-        llvm::Value *V = InVal.getScalarVal();
-        if (V->getType()->getScalarType()->isIntegerTy(1))
-          V = Builder.CreateZExt(V, Ty, "frombool");
-        (void)Builder.CreateStore(V, OutTemp);
-      }
-    }
-  } else
-    OutTemp = CreateTempAlloca(Ty, "hlsl.out");
-  LValue Result = MakeAddrLValue(OutTemp, E->getType());
-  if (auto *OpV = E->getOpaqueValue())
-    OpaqueValueMappingData::bind(*this, OpV, Result);
-  return Result;
+void CodeGenFunction::EmitHLSLOutArgExpr(const HLSLOutArgExpr *E,
+                                         CallArgList &Args, QualType Ty) {
+
+  // Emitting the casted temporary through an opaque value.
+  LValue BaseLV = EmitLValue(E->getArgLValue());
+  OpaqueValueMappingData::bind(*this, E->getOpaqueArgLValue(), BaseLV);
+
+  QualType ExprTy = E->getType();
+  llvm::AllocaInst *Address = CreateIRTemp(ExprTy);
+  LValue TempLV = MakeAddrLValue(Address, ExprTy);
+
+  if (E->isInOut())
+    EmitInitializationToLValue(E->getCastedTemporary()->getSourceExpr(),
+                               TempLV);
+
+  OpaqueValueMappingData::bind(*this, E->getCastedTemporary(), TempLV);
+
+  llvm::Value *Addr = TempLV.getAddress();
+  llvm::Type *ElTy = ConvertTypeForMem(TempLV.getType());
+
+  Args.addWriteback(BaseLV, Addr, nullptr, E->getWritebackCast());
+  Args.add(RValue::get(Addr), Ty);
 }
 
 LValue

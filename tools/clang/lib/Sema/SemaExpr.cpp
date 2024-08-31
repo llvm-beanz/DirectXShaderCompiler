@@ -45,7 +45,6 @@
 #include "clang/Sema/Template.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "clang/Sema/SemaHLSL.h" // HLSL Change
-#include "HLSLOutParamBuilder.h" // HLSL Change
 using namespace clang;
 using namespace sema;
 
@@ -4674,7 +4673,6 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
   unsigned NumParams = Proto->getNumParams();
   bool Invalid = false;
   unsigned ArgIx = 0;
-  HLSLOutParamBuilder HLSLBuilder; // HLSL Change
   // Continue to check argument types (even if we have too few/many args).
   for (unsigned i = FirstParam; i < NumParams; i++) {
     QualType ProtoArgType = Proto->getParamType(i);
@@ -4720,10 +4718,10 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
 
       // HLSL Change Begin - Optimize out parameters.
       if (Param->isModifierOut()) {
-        ExprResult ArgE = HLSLBuilder.Create(*this, Param, Arg);
-        if (ArgE.isInvalid())
-          return true; // TODO: Emit an error!
-        Arg = ArgE.getAs<Expr>();
+        ExprResult ArgExpr = ActOnOutParamExpr(Param, Arg);
+        if (ArgExpr.isInvalid())
+          return true;
+        Arg = ArgExpr.getAs<Expr>();
       } else {
         ExprResult ArgE = PerformCopyInitialization(
             Entity, SourceLocation(), Arg, IsListInitialization, AllowExplicit);

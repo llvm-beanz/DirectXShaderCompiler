@@ -3252,6 +3252,7 @@ public:
   StmtResult ActOnExprStmtError();
 
   StmtResult ActOnHlslDiscardStmt(SourceLocation Loc); // HLSL Change
+  ExprResult ActOnOutParamExpr(ParmVarDecl *Param, Expr *Arg);
   
   StmtResult ActOnNullStmt(SourceLocation SemiLoc,
                            bool HasLeadingEmptyMacro = false);

@@ -8196,16 +8196,10 @@ TreeTransform<Derived>::TransformHLSLVectorElementExpr(HLSLVectorElementExpr *E)
 
 template <typename Derived>
 ExprResult
-TreeTransform<Derived>::TransformHLSLOutParamExpr(HLSLOutParamExpr *E) {
-  ExprResult Base = getDerived().TransformExpr(E->getBase());
-  if (Base.isInvalid())
-    return ExprError();
-
-  if (!getDerived().AlwaysRebuild() && Base.get() == E->getBase())
-    return E;
-
-  return HLSLOutParamExpr::Create(getSema().Context, E->getType(), Base.get(),
-                                  E->isInOut(), E->canElide());
+TreeTransform<Derived>::TransformHLSLOutArgExpr(HLSLOutArgExpr *E) {
+  // We can transform the base expression and allow argument resolution to fill
+  // in the rest.
+  return getDerived().TransformExpr(E->getArgLValue());
 }
 
 template <typename Derived>

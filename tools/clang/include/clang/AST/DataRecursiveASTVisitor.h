@@ -2147,7 +2147,7 @@ DEF_TRAVERSE_STMT(ExtMatrixElementExpr, {})
 
 DEF_TRAVERSE_STMT(HLSLVectorElementExpr, {})
 
-DEF_TRAVERSE_STMT(HLSLOutParamExpr, {})
+DEF_TRAVERSE_STMT(HLSLOutArgExpr, {})
 
 DEF_TRAVERSE_STMT(HLSLArrayTemporaryExpr, {})
 // HLSL Change end.

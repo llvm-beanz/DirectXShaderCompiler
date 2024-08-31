@@ -2269,7 +2269,7 @@ DEF_TRAVERSE_STMT(DesignatedInitUpdateExpr, {})
 DEF_TRAVERSE_STMT(ExtVectorElementExpr, {})
 DEF_TRAVERSE_STMT(ExtMatrixElementExpr, {}) // HLSL Change
 DEF_TRAVERSE_STMT(HLSLVectorElementExpr, {}) // HLSL Change
-DEF_TRAVERSE_STMT(HLSLOutParamExpr, {}) // HLSL Change
+DEF_TRAVERSE_STMT(HLSLOutArgExpr, {}) // HLSL Change
 DEF_TRAVERSE_STMT(HLSLArrayTemporaryExpr, {}) // HLSL Change
 DEF_TRAVERSE_STMT(GNUNullExpr, {})
 DEF_TRAVERSE_STMT(ImplicitValueInitExpr, {})

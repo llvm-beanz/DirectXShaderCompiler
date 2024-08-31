@@ -30,7 +30,6 @@
 #include "clang/Sema/TemplateDeduction.h"
 #include "clang/Sema/SemaHLSL.h" // HLSL Change
 #include "clang/AST/HlslTypes.h" // HLSL Change
-#include "HLSLOutParamBuilder.h" // HLSL Change
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -12266,7 +12265,6 @@ Sema::BuildCallToObjectOfClassType(Scope *S, Expr *Obj,
   TheCall->setArg(0, Object.get());
 
   // Check the argument types.
-  HLSLOutParamBuilder HLSLBuilder; // HLSL Change
   for (unsigned i = 0; i != NumParams; i++) {
     Expr *Arg;
     if (i < Args.size()) {
@@ -12290,9 +12288,10 @@ Sema::BuildCallToObjectOfClassType(Scope *S, Expr *Obj,
       Arg = InputInit.getAs<Expr>();
       // HLSL Change Begin
       if (!IsError && Param->isModifierOut()) {
-          ExprResult ArgE = HLSLBuilder.Create(*this, Param, Arg);
-          IsError |= ArgE.isInvalid();
-          Arg = ArgE.getAs<Expr>();
+        ExprResult ArgExpr = ActOnOutParamExpr(Param, Arg);
+        if (ArgExpr.isInvalid())
+          return true;
+        Arg = ArgExpr.getAs<Expr>();
       }
       // HLSL Change End
     } else {
