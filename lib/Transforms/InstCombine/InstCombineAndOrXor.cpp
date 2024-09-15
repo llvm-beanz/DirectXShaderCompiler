@@ -18,6 +18,9 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Transforms/Utils/CmpInstAnalysis.h"
+
+#include "dxc/DXIL/DxilModule.h" // HLSL Change
+#include "dxc/DXIL/DxilOperations.h" // HLSL Change
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1410,6 +1413,52 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
     if (match(Op0, m_Xor(m_Not(m_Value(A)), m_Value(B))) &&
         match(Op1, m_Or(m_Specific(A), m_Specific(B))))
       return BinaryOperator::CreateAnd(A, B);
+    
+    ConstantInt *One = nullptr, *NegOne = nullptr;
+    // (A >> B) & ((1 << C) & -1)
+    // Lower shifts and ands to DXIL bitfield extraction. In the pattern above,
+    // A is the value to read from, B is the offset, and C is the width.
+    if ((match(Op0, m_LShr(m_Value(A), m_Value(B))) &&
+         match(Op1, m_Add(m_Shl(m_ConstantInt(One), m_Value(C)),
+                          m_ConstantInt(NegOne)))) ||
+        (match(Op1, m_LShr(m_Value(A), m_Value(B))) &&
+         match(Op0, m_Add(m_Shl(m_ConstantInt(One), m_Value(C)),
+                          m_ConstantInt(NegOne))))) {
+      // Verify that the constants are one and negative one, otherwise this is
+      // doing something very different!
+      if (One->getSExtValue() != 1 || NegOne->getSExtValue() != -1)
+        return nullptr;
+
+      // HLSL bitshifts RHS operands are defined to & by the size of teh type.
+      // If either of the shift values are and'd with 31 we should grab the
+      // pre-and'd value.
+
+      auto MatchMask = [](Value *V) -> Value * {
+        Value *ShVal = nullptr;
+        ConstantInt *ThirtyOne = nullptr;
+        if (match(V, m_And(m_Value(ShVal),m_ConstantInt(ThirtyOne)))) {
+          if (ThirtyOne->getSExtValue() == 31)
+            return ShVal;
+        }
+        return V;
+      };
+
+      B = MatchMask(B);
+      C = MatchMask(C);
+
+      // Transform the IR to call the Ibfe DXIL Op.
+      Module &M = *(I.getParent()->getParent()->getParent());
+      hlsl::DxilModule &DM = M.GetOrCreateDxilModule();
+      hlsl::OP *DXOpHelper = DM.GetOP();
+      Function *OpFn =
+          DXOpHelper->GetOpFunc(hlsl::DXIL::OpCode::Ibfe, I.getType());
+      if (!OpFn)
+        return nullptr;
+      Value *OpArg =
+          Builder->getInt32(static_cast<unsigned>(hlsl::DXIL::OpCode::Ibfe));
+      Value *NewFn = Builder->CreateCall(OpFn, {OpArg, A, C, B});
+      return ReplaceInstUsesWith(I, NewFn);
+    }
   }
 
   {
