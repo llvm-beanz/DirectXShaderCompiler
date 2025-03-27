@@ -363,7 +363,7 @@ void ShaderTesterImpl::initPipeline() {
     std::vector<char> computeShaderBuffer;
     ComPtr<ID3DBlob> computeShaderBlob;
     if (m_blob) {
-      bytecode = CD3DX12_SHADER_BYTECODE(m_blob.Get());
+bytecode = CD3DX12_SHADER_BYTECODE(m_blob.Get());
     } else if (m_filename.find(L".cso") != std::wstring::npos) {
       ReadFileToBuffer(m_filename, computeShaderBuffer);
       bytecode = CD3DX12_SHADER_BYTECODE(computeShaderBuffer.data(),
