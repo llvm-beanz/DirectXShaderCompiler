@@ -47,6 +47,20 @@ using namespace llvm;
 using namespace hlsl;
 using namespace hlsl::RDAT;
 
+// Helper function to safely read from potentially unaligned memory
+template <typename T>
+static T ReadUnaligned(const void* ptr) {
+  T value;
+  memcpy(&value, ptr, sizeof(T));
+  return value;
+}
+
+// Helper function to safely write to potentially unaligned memory
+template <typename T>
+static void WriteUnaligned(void* ptr, const T& value) {
+  memcpy(ptr, &value, sizeof(T));
+}
+
 static_assert((unsigned)PSVShaderKind::Invalid ==
                   (unsigned)DXIL::ShaderKind::Invalid,
               "otherwise, PSVShaderKind enum out of sync.");
@@ -543,7 +557,7 @@ static const uint32_t *CopyViewIDStateForOutputToPSV(
     PSVComponentMask ViewIDMask, PSVDependencyTable IOTable) {
   unsigned MaskDwords =
       PSVComputeMaskDwordsFromVectors(PSVALIGN4(OutputScalars) / 4);
-  if (ViewIDMask.IsValid()) {
+ if (ViewIDMask.IsValid()) {
     DXASSERT_NOMSG(!IOTable.Table ||
                    ViewIDMask.NumVectors == IOTable.OutputVectors);
     memcpy(ViewIDMask.Mask, pSrc, 4 * MaskDwords);
@@ -570,16 +584,18 @@ static uint32_t *CopyViewIDStateForOutputFromPSV(uint32_t *pOutputData,
   if (ViewIDMask.IsValid()) {
     DXASSERT_NOMSG(!IOTable.Table ||
                    ViewIDMask.NumVectors == IOTable.OutputVectors);
+    // Use safe access for potentially unaligned memory
     for (unsigned i = 0; i < MaskDwords; i++)
-      *(pOutputData++) = ViewIDMask.Mask[i];
+      WriteUnaligned<uint32_t>(pOutputData++, ViewIDMask.Mask[i]);
   }
   if (IOTable.IsValid() && IOTable.InputVectors && IOTable.OutputVectors) {
     DXASSERT_NOMSG((InputScalars <= IOTable.InputVectors * 4) &&
                    (IOTable.InputVectors * 4 - InputScalars < 4));
     DXASSERT_NOMSG((OutputScalars <= IOTable.OutputVectors * 4) &&
                    (IOTable.OutputVectors * 4 - OutputScalars < 4));
+    // Use safe access for potentially unaligned memory  
     for (unsigned i = 0; i < MaskDwords * InputScalars; i++)
-      *(pOutputData++) = IOTable.Table[i];
+      WriteUnaligned<uint32_t>(pOutputData++, IOTable.Table[i]);
   }
   return pOutputData;
 }
@@ -592,22 +608,22 @@ void hlsl::StoreViewIDStateToPSV(const uint32_t *pInputData,
   PSVShaderKind SK = static_cast<PSVShaderKind>(pInfo1->ShaderStage);
   const unsigned OutputStreams = SK == PSVShaderKind::Geometry ? 4 : 1;
   const uint32_t *pSrc = pInputData;
-  const uint32_t InputScalars = *(pSrc++);
+  uint32_t InputScalars = ReadUnaligned<uint32_t>(pSrc++);
   uint32_t OutputScalars[4];
   for (unsigned streamIndex = 0; streamIndex < OutputStreams; streamIndex++) {
-    OutputScalars[streamIndex] = *(pSrc++);
+    OutputScalars[streamIndex] = ReadUnaligned<uint32_t>(pSrc++);
     pSrc = CopyViewIDStateForOutputToPSV(
         pSrc, InputScalars, OutputScalars[streamIndex],
         PSV.GetViewIDOutputMask(streamIndex),
         PSV.GetInputToOutputTable(streamIndex));
   }
   if (SK == PSVShaderKind::Hull || SK == PSVShaderKind::Mesh) {
-    const uint32_t PCScalars = *(pSrc++);
+    uint32_t PCScalars = ReadUnaligned<uint32_t>(pSrc++);
     pSrc = CopyViewIDStateForOutputToPSV(pSrc, InputScalars, PCScalars,
                                          PSV.GetViewIDPCOutputMask(),
                                          PSV.GetInputToPCOutputTable());
   } else if (SK == PSVShaderKind::Domain) {
-    const uint32_t PCScalars = *(pSrc++);
+    uint32_t PCScalars = ReadUnaligned<uint32_t>(pSrc++);
     pSrc = CopyViewIDStateForOutputToPSV(pSrc, PCScalars, OutputScalars[0],
                                          PSVComponentMask(),
                                          PSV.GetPCInputToOutputTable());
@@ -650,21 +666,21 @@ unsigned hlsl::LoadViewIDStateFromPSV(unsigned *pOutputData,
                PCScalars) == OutputSizeInUInts,
            "otherwise, OutputSize doesn't match computed size.");
   unsigned *pStartOutputData = pOutputData;
-  *(pOutputData++) = InputScalars;
+  WriteUnaligned<uint32_t>(pOutputData++, InputScalars);
   for (unsigned streamIndex = 0; streamIndex < OutputStreams; streamIndex++) {
-    *(pOutputData++) = OutputScalars[streamIndex];
+    WriteUnaligned<uint32_t>(pOutputData++, OutputScalars[streamIndex]);
     pOutputData = CopyViewIDStateForOutputFromPSV(
         pOutputData, InputScalars, OutputScalars[streamIndex],
         PSV.GetViewIDOutputMask(streamIndex),
         PSV.GetInputToOutputTable(streamIndex));
   }
   if (SK == PSVShaderKind::Hull || SK == PSVShaderKind::Mesh) {
-    *(pOutputData++) = PCScalars;
+    WriteUnaligned<uint32_t>(pOutputData++, PCScalars);
     pOutputData = CopyViewIDStateForOutputFromPSV(
         pOutputData, InputScalars, PCScalars, PSV.GetViewIDPCOutputMask(),
         PSV.GetInputToPCOutputTable());
   } else if (SK == PSVShaderKind::Domain) {
-    *(pOutputData++) = PCScalars;
+    WriteUnaligned<uint32_t>(pOutputData++, PCScalars);
     pOutputData = CopyViewIDStateForOutputFromPSV(
         pOutputData, PCScalars, OutputScalars[0], PSVComponentMask(),
         PSV.GetPCInputToOutputTable());
