@@ -2098,10 +2098,17 @@ QualType Sema::BuildArrayType(QualType T, ArrayType::ArraySizeModifier ASM,
     if (ConstVal == 0) {
       // GCC accepts zero sized static arrays. We allow them when
       // we're not in a SFINAE context.
-      Diag(ArraySize->getLocStart(),
-           isSFINAEContext()? diag::err_typecheck_zero_array_size
-                            : diag::ext_typecheck_zero_array_size)
-        << ArraySize->getSourceRange();
+      // HLSL Change Begin - Disallow zero-sized arrays in HLSL 202x and later.
+      if (getLangOpts().HLSL &&
+          getLangOpts().HLSLVersion >= hlsl::LangStd::v202x)
+        Diag(ArraySize->getLocStart(), diag::err_typecheck_zero_array_size)
+            << /*HLSL*/ 1;
+      else
+        Diag(ArraySize->getLocStart(),
+             isSFINAEContext() ? diag::err_typecheck_zero_array_size
+                               : diag::ext_typecheck_zero_array_size)
+            << /*C++*/ 0;
+      // HLSL Change End
 
       if (ASM == ArrayType::Static) {
         Diag(ArraySize->getLocStart(),

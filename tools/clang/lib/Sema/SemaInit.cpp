@@ -1629,8 +1629,14 @@ void InitListChecker::CheckArrayType(const InitializedEntity &Entity,
     if (maxElements == Zero) {
       // Sizing an array implicitly to zero is not allowed by ISO C,
       // but is supported by GNU.
-      SemaRef.Diag(IList->getLocStart(),
-                    diag::ext_typecheck_zero_array_size);
+      // HLSL Change Begin - Disallow zero-sized arrays in HLSL 202x and later.
+      if (SemaRef.getLangOpts().HLSL &&
+          SemaRef.getLangOpts().HLSLVersion >= hlsl::LangStd::v202x)
+        SemaRef.Diag(IList->getLocStart(), diag::err_typecheck_zero_array_size)
+            << /*HLSL*/ 1;
+      else
+        SemaRef.Diag(IList->getLocStart(), diag::ext_typecheck_zero_array_size);
+      // HLSL Change End
     }
 
     DeclType = SemaRef.Context.getConstantArrayType(elementType, maxElements,

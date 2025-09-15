@@ -10463,7 +10463,15 @@ ParmVarDecl *Sema::CheckParameter(DeclContext *DC, SourceLocation StartLoc,
       Diag(NameLoc, diag::err_arg_with_address_space);
       New->setInvalidDecl();
     }
-  }   
+  }
+  // HLSL Change Starts
+  if (getLangOpts().HLSL && getLangOpts().HLSLVersion >= hlsl::LangStd::v202x) {
+    if (T->isIncompleteArrayType()) {
+      Diag(NameLoc, diag::err_hlsl_incomplete_array_param) << T;
+      New->setInvalidDecl();
+    } 
+  }
+  // HLSL Change Ends
 
   return New;
 }

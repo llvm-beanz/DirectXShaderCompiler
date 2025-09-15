@@ -4256,7 +4256,7 @@ def err_typecheck_invalid_restrict_invalid_pointee : Error<
 def ext_typecheck_zero_array_size : Extension<
   "zero size arrays are an extension">, InGroup<ZeroLengthArray>;
 def err_typecheck_zero_array_size : Error<
-  "zero-length arrays are not permitted in C++">;
+  "zero-length arrays are not permitted in %select{C++|HLSL}0">;
 def warn_typecheck_zero_static_array_size : Warning<
   "'static' has no effect on zero-length arrays">,
   InGroup<ArrayBounds>;
@@ -8051,6 +8051,9 @@ def err_hlsl_linalg_outer_prod_acc_vector_type_mismatch : Error<
   "input vectors of outerproductaccumulate must have the same element type">;
 def err_hlsl_linalg_outer_prod_acc_matrix_layout_must_be_outer_prod_acc_optimal : Error<
   "matrix layout for outerproductaccumulate must be %0">;
+
+def err_hlsl_incomplete_array_param : Error<
+  "function parameters of incomplete array type are incompatible with HLSL 202x and later">;
 
 // HLSL Change Ends
 
