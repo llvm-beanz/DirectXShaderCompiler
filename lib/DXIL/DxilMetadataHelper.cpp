@@ -3016,6 +3016,22 @@ void DxilMDHelper::LoadDxilCounters(DxilCounters &counters) const {
   }
 }
 
+void DxilMDHelper::EmitStringTable(const llvm::StringRef StrTab) {
+  NamedMDNode *StrTabMD = m_pModule->getOrInsertNamedMetadata("dx.strtab");
+  Metadata *MD[] = {MDString::get(m_pModule->getContext(), StrTab)};
+  StrTabMD->addOperand(MDNode::get(m_pModule->getContext(), MD));
+}
+
+void DxilMDHelper::LoadStringTable(std::vector<char> &StrTab) {
+  StrTab.clear();
+  NamedMDNode *StrTabMD = m_pModule->getNamedMetadata("dx.strtab");
+  if (!StrTabMD)
+    return;
+  MDNode *MD = StrTabMD->getOperand(0);
+  StringRef StrTabRef = StringMDToStringRef(MD->getOperand(0));
+  StrTab.insert(StrTab.end(), StrTabRef.begin(), StrTabRef.end());
+}
+
 //
 // DxilExtraPropertyHelper methods.
 //

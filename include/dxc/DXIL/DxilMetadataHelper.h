@@ -578,6 +578,9 @@ public:
   void EmitDxilCounters(const DxilCounters &counters);
   void LoadDxilCounters(DxilCounters &counters) const;
 
+  void EmitStringTable(const llvm::StringRef StrTab);
+  void LoadStringTable(std::vector<char> &StrTab);
+
   // Shader specific.
 private:
   llvm::MDTuple *

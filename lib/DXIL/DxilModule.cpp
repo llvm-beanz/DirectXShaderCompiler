@@ -1277,6 +1277,16 @@ void DxilModule::ResetSubobjects(DxilSubobjects *subobjects) {
   m_pSubobjects.reset(subobjects);
 }
 
+void DxilModule::SetStringTable(StringRef StrTab) {
+  assert(m_StrTab.empty() && "String table can only be set once.");
+  m_StrTab.insert(m_StrTab.end(), StrTab.begin(), StrTab.end());
+  if (m_StrTab.size() % 4 != 0) {
+    // Pad to 4-byte alignment.
+    size_t padding = 4 - (m_StrTab.size() % 4);
+    m_StrTab.insert(m_StrTab.end(), padding, 0);
+  }
+}
+
 bool DxilModule::StripSubobjectsFromMetadata() {
   NamedMDNode *pSubobjectsNamedMD =
       GetModule()->getNamedMetadata(DxilMDHelper::kDxilSubobjectsMDName);

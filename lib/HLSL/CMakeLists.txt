@@ -55,6 +55,7 @@ add_llvm_library(LLVMHLSL
   DxilNoOptLegalize.cpp
   DxilPoisonValues.cpp
   DxilDeleteRedundantDebugValues.cpp
+  DxilStringLowering.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/IR

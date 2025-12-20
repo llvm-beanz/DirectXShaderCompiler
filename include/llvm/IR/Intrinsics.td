@@ -633,6 +633,10 @@ def int_masked_scatter: Intrinsic<[],
 def int_bitset_test : Intrinsic<[llvm_i1_ty], [llvm_ptr_ty, llvm_metadata_ty],
                                 [IntrNoMem]>;
 
+// HLSL Change Starts - add hlsl specific intrinsics
+def int_string_to_offset : Intrinsic<[llvm_i32_ty], [llvm_ptr_ty], [IntrNoMem]>;
+// HLSL Change Ends - add hlsl specific intrinsics
+
 //===----------------------------------------------------------------------===//
 // Target-specific intrinsics
 //===----------------------------------------------------------------------===//

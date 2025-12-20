@@ -1040,11 +1040,14 @@ public:
             debugModule.reset(llvm::CloneModule(serializeModule.get()));
           }
 
+          llvm::StringRef StrTab =
+              serializeModule.get()->GetDxilModule().GetStringTable();
+
           dxcutil::AssembleInputs inputs(
               std::move(serializeModule), pOutputBlob, m_pMalloc,
               SerializeFlags, pOutputStream, 0, opts.GetPDBName(),
               &compiler.getDiagnostics(), &ShaderHashContent, pReflectionStream,
-              pRootSigStream, pRootSignatureBlob, pPrivateBlob);
+              pRootSigStream, pRootSignatureBlob, pPrivateBlob, StrTab);
 
           inputs.pVersionInfo = static_cast<IDxcVersionInfo *>(this);
 

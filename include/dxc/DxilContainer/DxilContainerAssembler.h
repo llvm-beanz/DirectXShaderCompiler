@@ -90,7 +90,8 @@ void SerializeDxilContainerForModule(
     DxilShaderHash *pShaderHashOut = nullptr,
     AbstractMemoryStream *pReflectionStreamOut = nullptr,
     AbstractMemoryStream *pRootSigStreamOut = nullptr,
-    void *pPrivateData = nullptr, size_t PrivateDataSize = 0);
+    void *pPrivateData = nullptr, size_t PrivateDataSize = 0,
+    llvm::StringRef StrTab = llvm::StringRef());
 void SerializeDxilContainerForRootSignature(
     hlsl::RootSignatureHandle *pRootSigHandle, AbstractMemoryStream *pStream);
 

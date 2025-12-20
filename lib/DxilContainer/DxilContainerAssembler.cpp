@@ -1898,7 +1898,7 @@ void hlsl::SerializeDxilContainerForModule(
     llvm::StringRef DebugName, SerializeDxilFlags Flags,
     DxilShaderHash *pShaderHashOut, AbstractMemoryStream *pReflectionStreamOut,
     AbstractMemoryStream *pRootSigStreamOut, void *pPrivateData,
-    size_t PrivateDataSize) {
+    size_t PrivateDataSize, llvm::StringRef StrTab) {
   llvm::TimeTraceScope TimeScope("SerializeDxilContainer", StringRef(""));
   // TODO: add a flag to update the module and remove information that is not
   // part of DXIL proper and is used only to assemble the container.
@@ -2199,6 +2199,14 @@ void hlsl::SerializeDxilContainerForModule(
       [&](AbstractMemoryStream *pStream) {
         WriteProgramPart(pModule->GetShaderModel(), pProgramStream, pStream);
       });
+
+  if (!StrTab.empty())
+    writer.AddPart(
+        hlsl::DFCC_StringTable, (uint32_t)StrTab.size(),
+        [StrTab](AbstractMemoryStream *pStream) {
+          ULONG cbWritten;
+          IFT(pStream->Write(StrTab.data(), StrTab.size(), &cbWritten));
+        });
 
   // Private data part should be added last when assembling the container
   // becasue there is no garuntee of aligned size

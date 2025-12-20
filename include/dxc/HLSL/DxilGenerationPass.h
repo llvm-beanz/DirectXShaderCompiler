@@ -151,4 +151,7 @@ void initializeDxilSimpleGVNEliminateRegionPass(llvm::PassRegistry &);
 ModulePass *createDxilModuleInitPass();
 void initializeDxilModuleInitPass(llvm::PassRegistry &);
 
+ModulePass *createDXILStringLoweringModulePass();
+void initializeDXILStringLoweringModulePass(llvm::PassRegistry &);
+
 } // namespace llvm

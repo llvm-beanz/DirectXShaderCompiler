@@ -7119,6 +7119,12 @@ class db_dxil(object):
             "Mutate resource to handle",
             [],
         )
+        add_pass(
+            "dxil-string-lowering",
+            "DXILStringLoweringModule",
+            "String Lowering",
+            []
+        )
 
         category_lib = "llvm"
         add_pass(

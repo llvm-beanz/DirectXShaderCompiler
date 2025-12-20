@@ -69,7 +69,7 @@ AssembleInputs::AssembleInputs(
     CComPtr<hlsl::AbstractMemoryStream> &pModuleBitcode, bool bDebugInfo,
     llvm::StringRef DebugName, clang::DiagnosticsEngine *pDiag,
     hlsl::DxilShaderHash *pShaderHashOut, AbstractMemoryStream *pReflectionOut,
-    AbstractMemoryStream *pRootSigOut)
+    AbstractMemoryStream *pRootSigOut, llvm::StringRef StrTab)
     : pM(std::move(pM)), pOutputContainerBlob(pOutputContainerBlob),
       pMalloc(pMalloc), SerializeFlags(SerializeFlags),
       pModuleBitcode(pModuleBitcode), bDebugInfo(bDebugInfo),

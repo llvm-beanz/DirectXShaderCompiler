@@ -54,13 +54,15 @@ AssembleInputs::AssembleInputs(
     uint32_t ValidationFlags, llvm::StringRef DebugName,
     clang::DiagnosticsEngine *pDiag, hlsl::DxilShaderHash *pShaderHashOut,
     AbstractMemoryStream *pReflectionOut, AbstractMemoryStream *pRootSigOut,
-    CComPtr<IDxcBlob> pRootSigBlob, CComPtr<IDxcBlob> pPrivateBlob)
+    CComPtr<IDxcBlob> pRootSigBlob, CComPtr<IDxcBlob> pPrivateBlob,
+    llvm::StringRef StrTab)
     : pM(std::move(pM)), pOutputContainerBlob(pOutputContainerBlob),
       pMalloc(pMalloc), SerializeFlags(SerializeFlags),
       ValidationFlags(ValidationFlags), pModuleBitcode(pModuleBitcode),
       DebugName(DebugName), pDiag(pDiag), pShaderHashOut(pShaderHashOut),
       pReflectionOut(pReflectionOut), pRootSigOut(pRootSigOut),
-      pRootSigBlob(pRootSigBlob), pPrivateBlob(pPrivateBlob) {}
+      pRootSigBlob(pRootSigBlob), pPrivateBlob(pPrivateBlob),
+      StringTable(StrTab) {}
 
 void GetValidatorVersion(unsigned *pMajor, unsigned *pMinor) {
   if (pMajor == nullptr || pMinor == nullptr)
@@ -93,13 +95,13 @@ void AssembleToContainer(AssembleInputs &inputs) {
         inputs.pVersionInfo, pContainerStream, inputs.DebugName,
         inputs.SerializeFlags, inputs.pShaderHashOut, inputs.pReflectionOut,
         inputs.pRootSigOut, inputs.pPrivateBlob->GetBufferPointer(),
-        inputs.pPrivateBlob->GetBufferSize());
+        inputs.pPrivateBlob->GetBufferSize(), inputs.StringTable);
   } else {
     SerializeDxilContainerForModule(
         &inputs.pM->GetOrCreateDxilModule(), inputs.pModuleBitcode,
         inputs.pVersionInfo, pContainerStream, inputs.DebugName,
         inputs.SerializeFlags, inputs.pShaderHashOut, inputs.pReflectionOut,
-        inputs.pRootSigOut);
+        inputs.pRootSigOut, nullptr, 0, inputs.StringTable);
   }
   inputs.pOutputContainerBlob.Release();
   IFT(pContainerStream.QueryInterface(&inputs.pOutputContainerBlob));

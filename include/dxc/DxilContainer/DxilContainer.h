@@ -98,6 +98,7 @@ enum DxilFourCC {
   DFCC_ShaderSourceInfo = DXIL_FOURCC('S', 'R', 'C', 'I'),
   DFCC_ShaderPDBInfo = DXIL_FOURCC('P', 'D', 'B', 'I'),
   DFCC_CompilerVersion = DXIL_FOURCC('V', 'E', 'R', 'S'),
+  DFCC_StringTable = DXIL_FOURCC('S', 'T', 'A', 'B'),
 };
 
 #undef DXIL_FOURCC

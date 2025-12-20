@@ -1,6 +1,6 @@
 {
   "IntrinsicOpCodes": {
-    "Num_Intrinsics": 405,
+    "Num_Intrinsics": 406,
     "IOP_AcceptHitAndEndSearch": 0,
     "IOP_AddUint64": 1,
     "IOP_AllMemoryBarrier": 2,
@@ -405,6 +405,7 @@
     "IOP_TriangleObjectPosition": 401,
     "MOP_CandidateTriangleObjectPosition": 402,
     "MOP_CommittedTriangleObjectPosition": 403,
-    "MOP_DxHitObject_TriangleObjectPosition": 404
+    "MOP_DxHitObject_TriangleObjectPosition": 404,
+    "IOP___builtin_hlsl_string_to_offset": 405
   }
 }

@@ -1034,6 +1034,7 @@ HRESULT ValidateDxilContainerParts(llvm::Module *pModule,
     case DFCC_ResourceDef:
     case DFCC_ShaderStatistics:
     case DFCC_PrivateData:
+    case DFCC_StringTable:
       break;
     case DFCC_DXIL:
     case DFCC_ShaderDebugInfoDXIL: {

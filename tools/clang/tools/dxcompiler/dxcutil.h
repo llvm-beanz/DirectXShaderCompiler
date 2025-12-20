@@ -54,7 +54,8 @@ struct AssembleInputs {
                  hlsl::AbstractMemoryStream *pReflectionOut = nullptr,
                  hlsl::AbstractMemoryStream *pRootSigOut = nullptr,
                  CComPtr<IDxcBlob> pRootSigBlob = nullptr,
-                 CComPtr<IDxcBlob> pPrivateBlob = nullptr);
+                 CComPtr<IDxcBlob> pPrivateBlob = nullptr,
+                llvm::StringRef StrTab = llvm::StringRef());
   std::unique_ptr<llvm::Module> pM;
   CComPtr<IDxcBlob> &pOutputContainerBlob;
   IDxcVersionInfo *pVersionInfo = nullptr;
@@ -69,6 +70,7 @@ struct AssembleInputs {
   hlsl::AbstractMemoryStream *pRootSigOut = nullptr;
   CComPtr<IDxcBlob> pRootSigBlob = nullptr;
   CComPtr<IDxcBlob> pPrivateBlob = nullptr;
+  llvm::StringRef StringTable = llvm::StringRef();
 };
 HRESULT ValidateAndAssembleToContainer(AssembleInputs &inputs);
 HRESULT
