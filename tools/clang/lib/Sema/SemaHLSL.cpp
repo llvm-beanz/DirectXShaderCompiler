@@ -4239,7 +4239,7 @@ public:
   TypedefDecl *GetStringTypedef() {
     if (m_hlslStringTypedef == nullptr) {
       m_hlslStringTypedef =
-          CreateGlobalTypedef(m_context, "string", m_hlslStringType);
+          CreateGlobalTypedef(m_context, "string", m_context->getPointerType(m_context->CharTy.withConst()));
       m_hlslStringType = m_context->getTypeDeclType(m_hlslStringTypedef);
     }
     DXASSERT_NOMSG(m_hlslStringTypedef != nullptr);
@@ -15605,7 +15605,7 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
     }
     const char *PrevSpec = nullptr;
     unsigned DiagID = 0;
-    if (!isStatic) {
+    if (!isStatic && !isParameter) {
       D.getMutableDeclSpec().SetStorageClassSpec(
           *this, DeclSpec::SCS_static, D.getLocStart(), PrevSpec, DiagID,
           Context.getPrintingPolicy());

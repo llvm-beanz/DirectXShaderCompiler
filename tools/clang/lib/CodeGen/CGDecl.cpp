@@ -1771,7 +1771,7 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
       if (RD && RD->hasNonTrivialDestructor())
         pushDestroy(QualType::DK_cxx_destructor, DeclPtr, Ty);
     }
-  } else {
+  } /*else {
     // HLSL Change Starts
     if (getLangOpts().HLSL && Arg->getType()->isPointerTy()) {
       // HLSL doesn't have pointer.
@@ -1785,7 +1785,7 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
       DoStore = false;
       DeclPtr = Arg;
     }
-    // HLSL Change Ends
+    // HLSL Change Ends*/
     else {
       // Otherwise, create a temporary to hold the value.
       llvm::AllocaInst *Alloc =
@@ -1794,7 +1794,7 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
       Alloc->setAlignment(Align.getQuantity());
       DeclPtr = Alloc;
       DoStore = true;
-    }
+    //}
   }
 
   LValue lv = MakeAddrLValue(DeclPtr, Ty, Align);
