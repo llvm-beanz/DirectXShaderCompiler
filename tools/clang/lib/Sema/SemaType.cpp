@@ -4259,7 +4259,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       // parameter packs in the type of the non-type template parameter, then
       // it expands those parameter packs.
       // HLSL Change Starts
-      if (LangOpts.HLSL) {
+      if (LangOpts.HLSL && LangOpts.HLSLVersion < hlsl::LangStd::v202x) {
         S.Diag(D.getEllipsisLoc(), diag::err_hlsl_variadic_templates);
         break;
       }

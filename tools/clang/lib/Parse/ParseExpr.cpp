@@ -1938,7 +1938,7 @@ ExprResult Parser::ParseUnaryExprOrTypeTraitExpression() {
   ConsumeToken();
 
   // [C++11] 'sizeof' '...' '(' identifier ')'
-  if (Tok.is(tok::ellipsis) && OpTok.is(tok::kw_sizeof) && !getLangOpts().HLSL) { // HLSL Change
+  if (Tok.is(tok::ellipsis) && OpTok.is(tok::kw_sizeof) && getLangOpts().HLSL && getLangOpts().HLSLVersion >= hlsl::LangStd::v202x) { // HLSL Change
     SourceLocation EllipsisLoc = ConsumeToken();
     SourceLocation LParenLoc, RParenLoc;
     IdentifierInfo *Name = nullptr;
@@ -2793,7 +2793,7 @@ bool Parser::ParseExpressionList(SmallVectorImpl<Expr *> &Exprs,
 
     if (Tok.is(tok::ellipsis)) {
       // HLSL Change Starts
-      if (getLangOpts().HLSL) {
+      if (getLangOpts().HLSL && getLangOpts().HLSLVersion < hlsl::LangStd::v202x) {
         Diag(Tok, diag::err_hlsl_variadic_templates);
         SkipUntil(tok::r_paren, StopBeforeMatch);
         Actions.CorrectDelayedTyposInExpr(Expr);

@@ -516,7 +516,7 @@ Decl *Parser::ParseTypeParameter(unsigned Depth, unsigned Position) {
   SourceLocation EllipsisLoc;
   if (TryConsumeToken(tok::ellipsis, EllipsisLoc)) {
     // HLSL Change Starts
-    if (getLangOpts().HLSL) {
+    if (getLangOpts().HLSL && getLangOpts().HLSLVersion < hlsl::LangStd::v202x) {
       Diag(EllipsisLoc, diag::err_hlsl_variadic_templates);
       return nullptr;
     }
@@ -620,9 +620,9 @@ Parser::ParseTemplateTemplateParameter(unsigned Depth, unsigned Position) {
   SourceLocation EllipsisLoc;
   if (TryConsumeToken(tok::ellipsis, EllipsisLoc)) {
     // HLSL Change Starts
-    if (getLangOpts().HLSL)
+    if (getLangOpts().HLSL && getLangOpts().HLSLVersion < hlsl::LangStd::v202x)
       Diag(EllipsisLoc, diag::err_hlsl_variadic_templates);
-    else 
+    else
       // HLSL Change Ends
       Diag(EllipsisLoc, getLangOpts().CPlusPlus11
                             ? diag::warn_cxx98_compat_variadic_templates
@@ -1294,7 +1294,7 @@ Parser::ParseTemplateArgumentList(TemplateArgList &TemplateArgs) {
     SourceLocation EllipsisLoc;
     if (TryConsumeToken(tok::ellipsis, EllipsisLoc))
     { // HLSL Change Starts
-      if (getLangOpts().HLSL) {
+      if (getLangOpts().HLSL && getLangOpts().HLSLVersion < hlsl::LangStd::v202x) {
         Diag(EllipsisLoc, diag::err_hlsl_unsupported_construct) << "ellipsis";
         SkipUntil(tok::comma, tok::greater, StopAtSemi | StopBeforeMatch);
         return true;
