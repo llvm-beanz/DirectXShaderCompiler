@@ -1,41 +1,86 @@
 namespace dx {
-template <int, typename...> struct tuple_impl;
+namespace _detail  {
+template <typename... T>
+struct size_impl;
 
-template <typename HEAD> struct tuple_impl<0, HEAD> {
-  HEAD head;
+template <>
+struct size_impl<> {
+  static uint size() {
+    return 0;
+  }
+
+}; 
+template <typename First, typename... Rest>
+struct size_impl<First, Rest...> {
+
+  static uint size() {
+    return (sizeof(First) + 3) / 4 + size_impl<Rest...>::size();
+  }
 };
 
-template <int N, typename HEAD, typename... TAIL>
-struct tuple_impl<N, HEAD, TAIL...> {
-  HEAD head;
-  tuple_impl<N - 1, TAIL...> tail;
+template <typename ... T>
+struct store_impl;
+
+template<>
+struct store_impl<> {
+  static void store(RWByteAddressBuffer Buffer, uint Offset) {
+  }
 };
 
-template <typename... T> struct tuple {
-  tuple_impl<sizeof...(T) - 1, T...> values;
+template <typename First, typename... Rest>
+struct store_impl<First, Rest...> {
+  static void store(RWByteAddressBuffer Buffer, uint Offset, First FirstArg, Rest... RestArgs) {
+    Buffer.Store<First>(Offset, FirstArg);
+    Offset += ((sizeof(First) + 3) / 4) * 4;
+    store_impl<Rest...>::store(Buffer, Offset, RestArgs...);
+  }
 };
+
+} // namespace _detail
+
+template <typename ...Args>
+uint NumDwords() {
+  return _detail::size_impl<Args...>::size();
+}
+
+template <typename... T>
+void StoreArgs(RWByteAddressBuffer Buffer, uint Offset, T... Args) {
+  _detail::store_impl<T...>::store(Buffer, Offset, Args...);
+}
+
 
 RWByteAddressBuffer DebugOutput : register(u0, space9);
-groupshared uint OutputOffset = 0;
+groupshared uint OutputOffset;
 
 struct MessagePrefix {
   uint LaneCount;
+  uint StrOffset;
   uint Size;
 };
 
-template <typename... T> void printf(string Str, T... Args) {
-  using ArgTuple_t = tuple<uint, uint, T...>;
-  ArgTuple_t ArgStruct = {WaveGetLaneIndex(), __builtin_hlsl_string_to_offset(Str), Args...};
-  uint WaveOffset = WavePrefixSum(1) - 1;
-  uint WaveCount = WaveActiveSum(1);
-  uint ThreadOffset =
-      OutputOffset + sizeof(MessagePrefix) + (WaveOffset * sizeof(ArgTuple_t));
+void InitializeDebugStream() {
   if (WaveIsFirstLane()) {
-    MessagePrefix Prefix = {WaveCount, sizeof(ArgTuple_t)};
-    DebugOutput.Store<MessagePrefix>(OutputOffset, Prefix);
-    OutputOffset += sizeof(MessagePrefix) + (WaveCount * sizeof(ArgTuple_t));
+    OutputOffset = 0;
+    DebugOffset = 0;
   }
-  DebugOutput.Store<ArgTuple_t>(ThreadOffset, ArgStruct);
+  GroupMemoryBarrierWithGroupSync();
 }
 
-} // namespace hlsl
+template <typename... T> void printf(string Str, T... Args) {
+  uint WaveIndex = WavePrefixSum(1);
+  uint WaveCount = WaveActiveSum(1);
+  uint StrOffset = __builtin_hlsl_string_to_offset(Str);
+  uint ArgSize = NumDwords<T...>() * 4;
+  uint ThreadOffset =
+      OutputOffset + sizeof(MessagePrefix) + (WaveIndex * ArgSize);
+  uint StartOffset = OutputOffset;
+  if (WaveIsFirstLane()) {
+    MessagePrefix Prefix = {WaveCount, StrOffset, ArgSize};
+    DebugOutput.Store<MessagePrefix>(OutputOffset, Prefix);
+    OutputOffset += sizeof(MessagePrefix) + (WaveCount * ArgSize);
+    GroupMemoryBarrierWithGroupSync();
+  }
+  StoreArgs(DebugOutput, ThreadOffset, Args...);
+}
+
+} // namespace dx
