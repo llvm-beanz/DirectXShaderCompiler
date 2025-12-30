@@ -55,7 +55,7 @@ struct AssembleInputs {
                  hlsl::AbstractMemoryStream *pRootSigOut = nullptr,
                  CComPtr<IDxcBlob> pRootSigBlob = nullptr,
                  CComPtr<IDxcBlob> pPrivateBlob = nullptr,
-                llvm::StringRef StrTab = llvm::StringRef());
+                 llvm::StringRef StrTab = llvm::StringRef());
   std::unique_ptr<llvm::Module> pM;
   CComPtr<IDxcBlob> &pOutputContainerBlob;
   IDxcVersionInfo *pVersionInfo = nullptr;
