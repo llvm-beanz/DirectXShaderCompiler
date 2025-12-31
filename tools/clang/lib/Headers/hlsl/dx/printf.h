@@ -59,27 +59,26 @@ struct MessagePrefix {
 };
 
 void InitializeDebugStream() {
-  if (WaveIsFirstLane()) {
+  if (WaveIsFirstLane())
     OutputOffset = 0;
-    DebugOffset = 0;
-  }
   GroupMemoryBarrierWithGroupSync();
 }
 
 template <typename... T> void printf(string Str, T... Args) {
-  uint WaveIndex = WavePrefixSum(1);
-  uint WaveCount = WaveActiveSum(1);
+  uint ThreadIndex = WavePrefixSum(1);
+  uint ThreadCount = WaveActiveSum(1);
   uint StrOffset = __builtin_hlsl_string_to_offset(Str);
   uint ArgSize = NumDwords<T...>() * 4;
-  uint ThreadOffset =
-      OutputOffset + sizeof(MessagePrefix) + (WaveIndex * ArgSize);
-  uint StartOffset = OutputOffset;
+  uint MessageSize = sizeof(MessagePrefix) + (ThreadCount * ArgSize);
+  uint StartOffset = 0;
   if (WaveIsFirstLane()) {
-    MessagePrefix Prefix = {WaveCount, StrOffset, ArgSize};
-    DebugOutput.Store<MessagePrefix>(OutputOffset, Prefix);
-    OutputOffset += sizeof(MessagePrefix) + (WaveCount * ArgSize);
-    GroupMemoryBarrierWithGroupSync();
+    InterlockedAdd(OutputOffset, MessageSize, StartOffset);
+    MessagePrefix Prefix = {ThreadCount, StrOffset, ArgSize};
+    DebugOutput.Store<MessagePrefix>(StartOffset, Prefix);
   }
+  StartOffset = WaveReadLaneFirst(StartOffset);
+  uint ThreadOffset =
+      StartOffset + sizeof(MessagePrefix) + (ThreadIndex * ArgSize);
   StoreArgs(DebugOutput, ThreadOffset, Args...);
 }
 
