@@ -50,7 +50,6 @@ void StoreArgs(RWByteAddressBuffer Buffer, uint Offset, T... Args) {
 
 
 RWByteAddressBuffer DebugOutput : register(u0, space9);
-groupshared uint OutputOffset;
 
 struct MessagePrefix {
   uint LaneCount;
@@ -59,9 +58,10 @@ struct MessagePrefix {
 };
 
 void InitializeDebugStream() {
-  if (WaveIsFirstLane())
-    OutputOffset = 0;
-  GroupMemoryBarrierWithGroupSync();
+  if (WaveIsFirstLane()) {
+    uint Unused = 0;
+    DebugOutput.InterlockedCompareExchange(0, 0, 4, Unused);
+  }
 }
 
 template <typename... T> void printf(string Str, T... Args) {
@@ -72,7 +72,7 @@ template <typename... T> void printf(string Str, T... Args) {
   uint MessageSize = sizeof(MessagePrefix) + (ThreadCount * ArgSize);
   uint StartOffset = 0;
   if (WaveIsFirstLane()) {
-    InterlockedAdd(OutputOffset, MessageSize, StartOffset);
+    DebugOutput.InterlockedAdd(0, MessageSize, StartOffset);
     MessagePrefix Prefix = {ThreadCount, StrOffset, ArgSize};
     DebugOutput.Store<MessagePrefix>(StartOffset, Prefix);
   }
