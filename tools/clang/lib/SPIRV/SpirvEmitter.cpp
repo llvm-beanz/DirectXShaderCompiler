@@ -2034,6 +2034,28 @@ void SpirvEmitter::doVarDecl(const VarDecl *decl) {
     return;
   }
 
+  // Considering the following example:
+  //
+  // ```cpp
+  //  template<typename T> const static T MyClass<T>::myVar[2] = { 1, 2 };
+  //  [...]
+  //  int use = MyClass<int>::myVar[0];
+  // ```
+  //
+  // The AST will contain 2 variable declarations:
+  //  - VarDecl for the template declaration
+  //  - VarDecl for the template instantiation
+  // One of them is not yet defined (InitExpr will have the type void), the
+  // other is the actual instantiation, hence will have the proper type. They
+  // can be differentiated by looking at the declaration context:
+  //  - the undefined ones will be in the template declaration context.
+  // We must not create a variable for the template declaration but wait
+  // for the instantiation (if any).
+  auto *RC = dyn_cast<clang::CXXRecordDecl>(decl->getDeclContext());
+  auto *TC = RC ? RC->getDescribedClassTemplate() : nullptr;
+  if (decl->getInit() && TC)
+    return;
+
   // We cannot handle external initialization of column-major matrices now.
   if (isExternalVar(decl) &&
       isOrContainsNonFpColMajorMatrix(astContext, spirvOptions, decl->getType(),
@@ -9323,6 +9345,9 @@ SpirvEmitter::processIntrinsicCallExpr(const CallExpr *callExpr) {
                                            /*groupSync*/ true,
                                            /*isAllBarrier*/ true);
     break;
+  case hlsl::IntrinsicOp::IOP_DebugBreak:
+    retVal = spvBuilder.createNonSemanticDebugBreakExtInst(srcLoc);
+    break;
   case hlsl::IntrinsicOp::IOP_GetRemainingRecursionLevels:
     retVal = processIntrinsicGetRemainingRecursionLevels(callExpr);
     break;
@@ -9469,6 +9494,22 @@ SpirvEmitter::processIntrinsicCallExpr(const CallExpr *callExpr) {
   case hlsl::IntrinsicOp::IOP_WaveActiveCountBits:
     retVal = processWaveCountBits(callExpr, spv::GroupOperation::Reduce);
     break;
+  case hlsl::IntrinsicOp::IOP_GetGroupWaveIndex: {
+    featureManager.requestTargetEnv(SPV_ENV_VULKAN_1_1, "GetGroupWaveIndex",
+                                    srcLoc);
+    const QualType retType = callExpr->getCallReturnType(astContext);
+    auto *var =
+        declIdMapper.getBuiltinVar(spv::BuiltIn::SubgroupId, retType, srcLoc);
+    retVal = spvBuilder.createLoad(retType, var, srcLoc, srcRange);
+  } break;
+  case hlsl::IntrinsicOp::IOP_GetGroupWaveCount: {
+    featureManager.requestTargetEnv(SPV_ENV_VULKAN_1_1, "GetGroupWaveCount",
+                                    srcLoc);
+    const QualType retType = callExpr->getCallReturnType(astContext);
+    auto *var =
+        declIdMapper.getBuiltinVar(spv::BuiltIn::NumSubgroups, retType, srcLoc);
+    retVal = spvBuilder.createLoad(retType, var, srcLoc, srcRange);
+  } break;
   case hlsl::IntrinsicOp::IOP_WaveActiveUSum:
   case hlsl::IntrinsicOp::IOP_WaveActiveSum:
   case hlsl::IntrinsicOp::IOP_WaveActiveUProduct:
@@ -9527,6 +9568,7 @@ SpirvEmitter::processIntrinsicCallExpr(const CallExpr *callExpr) {
     retVal = processWaveQuadAnyAll(callExpr, hlslOpcode);
     break;
   case hlsl::IntrinsicOp::IOP_abort:
+  case hlsl::IntrinsicOp::IOP_DxIsDebuggerPresent:
   case hlsl::IntrinsicOp::IOP_GetRenderTargetSampleCount:
   case hlsl::IntrinsicOp::IOP_GetRenderTargetSamplePosition: {
     emitError("no equivalent for %0 intrinsic function in Vulkan", srcLoc)
@@ -12556,8 +12598,6 @@ SpirvEmitter::processIntrinsicAsType(const CallExpr *callExpr) {
     const Expr *arg2 = callExpr->getArg(2);
 
     SpirvInstruction *value = doExpr(arg0);
-    SpirvInstruction *lowbits = doExpr(arg1);
-    SpirvInstruction *highbits = doExpr(arg2);
 
     QualType elemType = QualType();
     uint32_t rowCount = 0;
@@ -12580,9 +12620,8 @@ SpirvEmitter::processIntrinsicAsType(const CallExpr *callExpr) {
       return nullptr;
     }
 
-    spvBuilder.createStore(lowbits, lowbitsResult, loc, range);
-    spvBuilder.createStore(highbits, highbitsResult, loc, range);
-
+    processAssignment(arg1, lowbitsResult, false, nullptr, range);
+    processAssignment(arg2, highbitsResult, false, nullptr, range);
     return nullptr;
   }
   default:

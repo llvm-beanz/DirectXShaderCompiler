@@ -31,6 +31,7 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExternalASTSource.h"
 #include "clang/AST/HlslTypes.h"
+#include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/Specifiers.h"
@@ -211,6 +212,7 @@ enum ArBasicKind {
   AR_OBJECT_ACCELERATION_STRUCT,
   AR_OBJECT_USER_DEFINED_TYPE,
   AR_OBJECT_TRIANGLE_INTERSECTION_ATTRIBUTES,
+  AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS,
 
   // subobjects
   AR_OBJECT_STATE_OBJECT_CONFIG,
@@ -252,6 +254,9 @@ enum ArBasicKind {
 
   // Shader Execution Reordering
   AR_OBJECT_HIT_OBJECT,
+
+  // Linear Algebra
+  AR_OBJECT_LINALG_MATRIX,
 
   AR_BASIC_MAXIMUM_COUNT
 };
@@ -567,6 +572,7 @@ const UINT g_uBasicKindProps[] = {
     LICOMPTYPE_ACCELERATION_STRUCT, // AR_OBJECT_ACCELERATION_STRUCT
     LICOMPTYPE_USER_DEFINED_TYPE,   // AR_OBJECT_USER_DEFINED_TYPE
     0, // AR_OBJECT_TRIANGLE_INTERSECTION_ATTRIBUTES
+    LICOMPTYPE_BUILTIN_TRIANGLE_POSITIONS, // AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS
 
     // subobjects
     0, // AR_OBJECT_STATE_OBJECT_CONFIG,
@@ -606,6 +612,9 @@ const UINT g_uBasicKindProps[] = {
 
     // Shader Execution Reordering
     LICOMPTYPE_HIT_OBJECT, // AR_OBJECT_HIT_OBJECT,
+
+    // Linear Algebra
+    LICOMPTYPE_LINALG_MATRIX, // AR_OBJECT_LINALG_MATRIX,
 
     // AR_BASIC_MAXIMUM_COUNT
 };
@@ -669,18 +678,19 @@ enum ArTypeObjectKind {
   AR_TOBJ_INVALID, // Flag for an unassigned / unavailable object type.
   AR_TOBJ_VOID,  // Represents the type for functions with not returned valued.
   AR_TOBJ_BASIC, // Represents a primitive type.
-  AR_TOBJ_COMPOUND,  // Represents a struct or class.
-  AR_TOBJ_INTERFACE, // Represents an interface.
-  AR_TOBJ_POINTER,   // Represents a pointer to another type.
-  AR_TOBJ_OBJECT,    // Represents a built-in object.
-  AR_TOBJ_ARRAY,     // Represents an array of other types.
-  AR_TOBJ_MATRIX,    // Represents a matrix of basic types.
-  AR_TOBJ_VECTOR,    // Represents a vector of basic types.
-  AR_TOBJ_QUALIFIER, // Represents another type plus an ArTypeQualifier.
-  AR_TOBJ_INNER_OBJ, // Represents a built-in inner object, such as an
-                     // indexer object used to implement .mips[1].
-  AR_TOBJ_STRING,    // Represents a string
-  AR_TOBJ_DEPENDENT, // Dependent type for template.
+  AR_TOBJ_COMPOUND,     // Represents a struct or class.
+  AR_TOBJ_INTERFACE,    // Represents an interface.
+  AR_TOBJ_POINTER,      // Represents a pointer to another type.
+  AR_TOBJ_OBJECT,       // Represents a built-in object.
+  AR_TOBJ_ARRAY,        // Represents an array of other types.
+  AR_TOBJ_MATRIX,       // Represents a matrix of basic types.
+  AR_TOBJ_VECTOR,       // Represents a vector of basic types.
+  AR_TOBJ_QUALIFIER,    // Represents another type plus an ArTypeQualifier.
+  AR_TOBJ_INNER_OBJ,    // Represents a built-in inner object, such as an
+                        // indexer object used to implement .mips[1].
+  AR_TOBJ_STRING,       // Represents a string
+  AR_TOBJ_DEPENDENT,    // Dependent type for template.
+  AR_TOBJ_LINALG_MATRIX // LinAlg Matric type
 };
 
 enum TYPE_CONVERSION_FLAGS {
@@ -1134,6 +1144,9 @@ static const ArBasicKind g_ResourceCT[] = {AR_OBJECT_HEAP_RESOURCE,
 
 static const ArBasicKind g_RayDescCT[] = {AR_OBJECT_RAY_DESC, AR_BASIC_UNKNOWN};
 
+static const ArBasicKind g_BuiltInTrianglePositionsCT[] = {
+    AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS, AR_BASIC_UNKNOWN};
+
 static const ArBasicKind g_RayQueryCT[] = {AR_OBJECT_RAY_QUERY,
                                            AR_BASIC_UNKNOWN};
 
@@ -1247,6 +1260,10 @@ static const ArBasicKind g_AnyOutputRecordCT[] = {
 static const ArBasicKind g_DxHitObjectCT[] = {AR_OBJECT_HIT_OBJECT,
                                               AR_BASIC_UNKNOWN};
 
+// Linear Algebra
+static const ArBasicKind g_LinAlgMatrixCT[] = {AR_OBJECT_LINALG_MATRIX,
+                                               AR_BASIC_UNKNOWN};
+
 #ifdef ENABLE_SPIRV_CODEGEN
 static const ArBasicKind g_VKBufferPointerCT[] = {AR_OBJECT_VK_BUFFER_POINTER,
                                                   AR_BASIC_UNKNOWN};
@@ -1300,15 +1317,17 @@ const ArBasicKind *g_LegalIntrinsicCompTypes[] = {
     g_SInt16Or32OnlyCT,     // LICOMPTYPE_SINT16_OR_32_ONLY
     g_AnySamplerCT,         // LICOMPTYPE_ANY_SAMPLER
 
-    g_ByteAddressBufferCT,       // LICOMPTYPE_BYTEADDRESSBUFFER
-    g_RWByteAddressBufferCT,     // LICOMPTYPE_RWBYTEADDRESSBUFFER
-    g_NodeRecordOrUAVCT,         // LICOMPTYPE_NODE_RECORD_OR_UAV
-    g_AnyOutputRecordCT,         // LICOMPTYPE_ANY_NODE_OUTPUT_RECORD
-    g_GroupNodeOutputRecordsCT,  // LICOMPTYPE_GROUP_NODE_OUTPUT_RECORDS
-    g_ThreadNodeOutputRecordsCT, // LICOMPTYPE_THREAD_NODE_OUTPUT_RECORDS
-    g_DxHitObjectCT,             // LICOMPTYPE_HIT_OBJECT
-    g_RayQueryCT,                // LICOMPTYPE_RAY_QUERY
-    g_LinAlgCT,                  // LICOMPTYPE_LINALG
+    g_ByteAddressBufferCT,        // LICOMPTYPE_BYTEADDRESSBUFFER
+    g_RWByteAddressBufferCT,      // LICOMPTYPE_RWBYTEADDRESSBUFFER
+    g_NodeRecordOrUAVCT,          // LICOMPTYPE_NODE_RECORD_OR_UAV
+    g_AnyOutputRecordCT,          // LICOMPTYPE_ANY_NODE_OUTPUT_RECORD
+    g_GroupNodeOutputRecordsCT,   // LICOMPTYPE_GROUP_NODE_OUTPUT_RECORDS
+    g_ThreadNodeOutputRecordsCT,  // LICOMPTYPE_THREAD_NODE_OUTPUT_RECORDS
+    g_DxHitObjectCT,              // LICOMPTYPE_HIT_OBJECT
+    g_RayQueryCT,                 // LICOMPTYPE_RAY_QUERY
+    g_LinAlgMatrixCT,             // LICOMPTYPE_LINALG_MATRIX
+    g_LinAlgCT,                   // LICOMPTYPE_LINALG
+    g_BuiltInTrianglePositionsCT, // LICOMPTYPE_BUILTIN_TRIANGLE_POSITIONS
 #ifdef ENABLE_SPIRV_CODEGEN
     g_VKBufferPointerCT, // LICOMPTYPE_VK_BUFFER_POINTER
 #endif
@@ -1379,6 +1398,7 @@ static const ArBasicKind g_ArBasicKindsAsTypes[] = {
 
     AR_OBJECT_WAVE, AR_OBJECT_RAY_DESC, AR_OBJECT_ACCELERATION_STRUCT,
     AR_OBJECT_TRIANGLE_INTERSECTION_ATTRIBUTES,
+    AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS,
 
     // subobjects
     AR_OBJECT_STATE_OBJECT_CONFIG, AR_OBJECT_GLOBAL_ROOT_SIGNATURE,
@@ -1404,7 +1424,10 @@ static const ArBasicKind g_ArBasicKindsAsTypes[] = {
     AR_OBJECT_THREAD_NODE_OUTPUT_RECORDS, AR_OBJECT_GROUP_NODE_OUTPUT_RECORDS,
 
     // Shader Execution Reordering
-    AR_OBJECT_HIT_OBJECT};
+    AR_OBJECT_HIT_OBJECT,
+
+    // LinAlg Matrix
+    AR_OBJECT_LINALG_MATRIX};
 
 // Count of template arguments for basic kind of objects that look like
 // templates (one or more type arguments).
@@ -1487,6 +1510,7 @@ static const uint8_t g_ArBasicKindsTemplateCount[] = {
     0, // AR_OBJECT_RAY_DESC
     0, // AR_OBJECT_ACCELERATION_STRUCT
     0, // AR_OBJECT_TRIANGLE_INTERSECTION_ATTRIBUTES
+    0, // AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS
 
     0, // AR_OBJECT_STATE_OBJECT_CONFIG,
     0, // AR_OBJECT_GLOBAL_ROOT_SIGNATURE,
@@ -1524,6 +1548,9 @@ static const uint8_t g_ArBasicKindsTemplateCount[] = {
 
     // Shader Execution Reordering
     0, // AR_OBJECT_HIT_OBJECT,
+
+    // LinAlg Matrix
+    0, // AR_OBJECT_LINALG_MATRIX,
 };
 
 C_ASSERT(_countof(g_ArBasicKindsAsTypes) ==
@@ -1636,6 +1663,7 @@ static const SubscriptOperatorRecord g_ArBasicKindsSubscripts[] = {
     {0, MipsFalse, SampleFalse}, // AR_OBJECT_RAY_DESC
     {0, MipsFalse, SampleFalse}, // AR_OBJECT_ACCELERATION_STRUCT
     {0, MipsFalse, SampleFalse}, // AR_OBJECT_TRIANGLE_INTERSECTION_ATTRIBUTES
+    {0, MipsFalse, SampleFalse}, // AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS
 
     {0, MipsFalse, SampleFalse}, // AR_OBJECT_STATE_OBJECT_CONFIG,
     {0, MipsFalse, SampleFalse}, // AR_OBJECT_GLOBAL_ROOT_SIGNATURE,
@@ -1674,6 +1702,9 @@ static const SubscriptOperatorRecord g_ArBasicKindsSubscripts[] = {
 
     // Shader Execution Reordering
     {0, MipsFalse, SampleFalse}, // AR_OBJECT_HIT_OBJECT,
+
+    // LinAlg Matrix
+    {0, MipsFalse, SampleFalse}, // AR_OBJECT_LINALG_MATRIX
 };
 
 C_ASSERT(_countof(g_ArBasicKindsAsTypes) == _countof(g_ArBasicKindsSubscripts));
@@ -1803,6 +1834,7 @@ static const char *g_ArBasicTypeNames[] = {
     "RaytracingAccelerationStructure",
     "user defined type",
     "BuiltInTriangleIntersectionAttributes",
+    "BuiltInTrianglePositions",
 
     // subobjects
     "StateObjectConfig",
@@ -1841,6 +1873,9 @@ static const char *g_ArBasicTypeNames[] = {
 
     // Shader Execution Reordering
     "HitObject",
+
+    // LinAlg Matrix
+    "__builtin_LinAlgMatrix",
 };
 
 C_ASSERT(_countof(g_ArBasicTypeNames) == AR_BASIC_MAXIMUM_COUNT);
@@ -2813,6 +2848,31 @@ AddBuiltInTriangleIntersectionAttributes(ASTContext &context,
   return attributesDecl;
 }
 
+// struct BuiltInTrianglePositions
+// {
+//   float3 p0, p1, p2;
+// };
+static CXXRecordDecl *CreateBuiltInTrianglePositions(ASTContext &context,
+                                                     QualType float3Ty) {
+  DeclContext *curDC = context.getTranslationUnitDecl();
+  IdentifierInfo &positionsId = context.Idents.get(
+      StringRef("BuiltInTrianglePositions"), tok::TokenKind::identifier);
+  CXXRecordDecl *positionsDecl = CXXRecordDecl::Create(
+      context, TagTypeKind::TTK_Struct, curDC, NoLoc, NoLoc, &positionsId,
+      nullptr, DelayTypeCreationTrue);
+  positionsDecl->addAttr(
+      FinalAttr::CreateImplicit(context, FinalAttr::Keyword_final));
+  positionsDecl->startDefinition();
+  // float3 p0, p1, p2;
+  CreateSimpleField(context, positionsDecl, "p0", float3Ty);
+  CreateSimpleField(context, positionsDecl, "p1", float3Ty);
+  CreateSimpleField(context, positionsDecl, "p2", float3Ty);
+  positionsDecl->completeDefinition();
+  positionsDecl->setImplicit(true);
+  curDC->addDecl(positionsDecl);
+  return positionsDecl;
+}
+
 //
 // Subobjects
 
@@ -3599,11 +3659,21 @@ private:
       case LICOMPTYPE_UINT:
         paramTypes.push_back(context.UnsignedIntTy);
         break;
+      case LICOMPTYPE_BOOL:
+        paramTypes.push_back(context.BoolTy);
+        break;
       case LICOMPTYPE_VOID:
         paramTypes.push_back(context.VoidTy);
         break;
       case LICOMPTYPE_HIT_OBJECT:
         paramTypes.push_back(GetBasicKindType(AR_OBJECT_HIT_OBJECT));
+        break;
+      case LICOMPTYPE_LINALG_MATRIX:
+        paramTypes.push_back(GetBasicKindType(AR_OBJECT_LINALG_MATRIX));
+        break;
+      case LICOMPTYPE_BUILTIN_TRIANGLE_POSITIONS:
+        paramTypes.push_back(
+            GetBasicKindType(AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS));
         break;
 #ifdef ENABLE_SPIRV_CODEGEN
       case LICOMPTYPE_VK_BUFFER_POINTER: {
@@ -3824,6 +3894,10 @@ private:
             LookupVectorType(HLSLScalarType::HLSLScalarType_float, 2);
         recordDecl =
             AddBuiltInTriangleIntersectionAttributes(*m_context, float2Type);
+      } else if (kind == AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS) {
+        QualType float3Ty =
+            LookupVectorType(HLSLScalarType::HLSLScalarType_float, 3);
+        recordDecl = CreateBuiltInTrianglePositions(*m_context, float3Ty);
       } else if (IsSubobjectBasicKind(kind)) {
         switch (kind) {
         case AR_OBJECT_STATE_OBJECT_CONFIG:
@@ -4459,6 +4533,10 @@ public:
     if (type->isPointerType()) {
       return hlsl::IsPointerStringType(type) ? AR_TOBJ_STRING : AR_TOBJ_POINTER;
     }
+    if (type->isAttributedLinAlgMatrixType() ||
+        type->isDependentAttributedLinAlgMatrixType()) {
+      return AR_TOBJ_LINALG_MATRIX;
+    }
     if (type->isDependentType()) {
       return AR_TOBJ_DEPENDENT;
     }
@@ -4861,6 +4939,7 @@ public:
     case AR_OBJECT_RAY_DESC:
     case AR_OBJECT_HIT_OBJECT:
     case AR_OBJECT_TRIANGLE_INTERSECTION_ATTRIBUTES:
+    case AR_OBJECT_BUILTIN_TRIANGLE_POSITIONS:
     case AR_OBJECT_RWTEXTURE2DMS:
     case AR_OBJECT_RWTEXTURE2DMS_ARRAY:
 
@@ -4889,6 +4968,9 @@ public:
       size_t index = match - g_ArBasicKindsAsTypes;
       return m_context->getTagDeclType(this->m_objectTypeDecls[index]);
     }
+
+    case AR_OBJECT_LINALG_MATRIX:
+      return m_context->LinAlgMatrixTy;
 
     case AR_OBJECT_SAMPLER1D:
     case AR_OBJECT_SAMPLER2D:
@@ -6746,6 +6828,17 @@ bool HLSLExternalSource::MatchArguments(
         }
       }
       m_sema->Diag(pCallArg->getExprLoc(), diag::err_hlsl_ray_desc_required);
+      badArgIdx = iArg;
+      return false;
+    }
+
+    if (pIntrinsicArg->uLegalComponentTypes == LICOMPTYPE_LINALG_MATRIX) {
+      if (TypeInfoShapeKind == AR_TOBJ_LINALG_MATRIX) {
+        ++iArg;
+        continue;
+      }
+      m_sema->Diag(pCallArg->getExprLoc(),
+                   diag::err_hlsl_linalg_attributed_matrix_required);
       badArgIdx = iArg;
       return false;
     }
@@ -12971,6 +13064,22 @@ void DiagnoseEntryAttrAllowedOnStage(clang::Sema *self,
         }
         break;
       }
+      case clang::attr::HLSLGroupSharedLimit: {
+        switch (shaderKind) {
+        case DXIL::ShaderKind::Compute:
+        case DXIL::ShaderKind::Mesh:
+        case DXIL::ShaderKind::Amplification:
+        case DXIL::ShaderKind::Node:
+          break;
+        default:
+          self->Diag(pAttr->getRange().getBegin(),
+                     diag::err_hlsl_attribute_unsupported_stage)
+              << "GroupSharedLimit"
+              << "compute, mesh, node, or amplification";
+          break;
+        }
+        break;
+      }
       }
     }
   }
@@ -13603,7 +13712,8 @@ bool FlattenedTypeIterator::considerLeaf() {
     ArTypeObjectKind objectKind = m_source.GetTypeObjectKind(tracker.Type);
     if (objectKind != ArTypeObjectKind::AR_TOBJ_BASIC &&
         objectKind != ArTypeObjectKind::AR_TOBJ_OBJECT &&
-        objectKind != ArTypeObjectKind::AR_TOBJ_STRING) {
+        objectKind != ArTypeObjectKind::AR_TOBJ_STRING &&
+        objectKind != ArTypeObjectKind::AR_TOBJ_LINALG_MATRIX) {
       if (pushTrackerForType(tracker.Type, tracker.CurrentExpr)) {
         result = considerLeaf();
       }
@@ -13821,6 +13931,11 @@ bool FlattenedTypeIterator::pushTrackerForType(
   }
   case ArTypeObjectKind::AR_TOBJ_STRING: {
     // Strings have no sub-types.
+    m_typeTrackers.push_back(FlattenedTypeIterator::FlattenedTypeTracker(
+        type.getCanonicalType(), 1, expression));
+    return true;
+  }
+  case ArTypeObjectKind::AR_TOBJ_LINALG_MATRIX: {
     m_typeTrackers.push_back(FlattenedTypeIterator::FlattenedTypeTracker(
         type.getCanonicalType(), 1, expression));
     return true;
@@ -14474,6 +14589,21 @@ void Sema::DiagnoseHLSLDeclAttr(const Decl *D, const Attr *A) {
   HLSLExternalSource *ExtSource = HLSLExternalSource::FromSema(this);
   const bool IsGCAttr = isa<HLSLGloballyCoherentAttr>(A);
   const bool IsRCAttr = isa<HLSLReorderCoherentAttr>(A);
+  const bool IsExportAttr = isa<HLSLExportAttr>(A);
+  const bool IsNoInlineAttr = isa<NoInlineAttr>(A);
+  if (IsExportAttr || IsNoInlineAttr) {
+    if (const FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
+      for (ParmVarDecl *PVD : FD->parameters()) {
+        if (PVD->hasAttr<HLSLGroupSharedAttr>()) {
+          Diag(A->getLocation(), diag::err_hlsl_varmodifiersna)
+              << "groupshared"
+              << "export/noinline"
+              << "parameter";
+          return;
+        }
+      }
+    }
+  }
   if (IsGCAttr || IsRCAttr) {
     const ValueDecl *TD = cast<ValueDecl>(D);
     if (TD->getType()->isDependentType())
@@ -14655,6 +14785,13 @@ void hlsl::HandleDeclAttributeForHLSL(Sema &S, Decl *D, const AttributeList &A,
       VD->setType(
           S.Context.getAddrSpaceQualType(VD->getType(), DXIL::kTGSMAddrSpace));
     }
+    if (ParmVarDecl *VD = dyn_cast<ParmVarDecl>(D))
+      VD->setType(S.Context.getLValueReferenceType(VD->getType()));
+    break;
+  case AttributeList::AT_HLSLGroupSharedLimit:
+    declAttr = ::new (S.Context) HLSLGroupSharedLimitAttr(
+        A.getRange(), S.Context, ValidateAttributeIntArg(S, A),
+        A.getAttributeSpellingListIndex());
     break;
   case AttributeList::AT_HLSLUniform:
     declAttr = ::new (S.Context) HLSLUniformAttr(
@@ -14996,6 +15133,7 @@ void hlsl::HandleDeclAttributeForHLSL(Sema &S, Decl *D, const AttributeList &A,
   }
 
   if (declAttr != nullptr) {
+    S.DiagnoseHLSLDeclAttr(D, declAttr);
     DXASSERT_NOMSG(Handled);
     D->addAttr(declAttr);
 
@@ -15749,7 +15887,17 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
       break;
     case AttributeList::AT_HLSLGroupShared:
       isGroupShared = true;
-      if (!isGlobal) {
+      if (isParameter && getLangOpts().HLSLVersion < hlsl::LangStd::v202x)
+        Diag(pAttr->getLoc(), diag::warn_hlsl_groupshared_202x);
+      if (isParameter && (usageIn || usageOut)) {
+        Diag(pAttr->getLoc(), diag::err_hlsl_varmodifiersna)
+            << (usageIn && usageOut ? "'inout'"
+                : usageIn           ? "'in'"
+                                    : "'out'")
+            << pAttr->getName() << declarationType;
+        result = false;
+      }
+      if (!(isGlobal || isParameter)) {
         Diag(pAttr->getLoc(), diag::err_hlsl_varmodifierna)
             << pAttr->getName() << declarationType << pAttr->getRange();
         result = false;
@@ -15785,6 +15933,10 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
       if (!isParameter) {
         Diag(pAttr->getLoc(), diag::err_hlsl_usage_not_on_parameter)
             << pAttr->getName() << pAttr->getRange();
+        result = false;
+      } else if (isGroupShared) {
+        Diag(pAttr->getLoc(), diag::err_hlsl_varmodifiersna)
+            << pAttr->getName() << "'groupshared'" << declarationType;
         result = false;
       }
       if (!IsUsageAttributeCompatible(pAttr->getKind(), usageIn, usageOut)) {
@@ -17678,4 +17830,258 @@ void DiagnoseEntry(Sema &S, FunctionDecl *FD) {
   }
   }
 }
+
+// Returns false on error
+static bool verifyLinAlgMatrixSizeArg(Sema &S, Expr *Arg, bool &IsDependent,
+                                      size_t &OutValue) {
+  QualType QT = Arg->getType();
+
+  // Check that the type is an integer type.
+  if (!QT->isIntegerType()) {
+    S.Diag(Arg->getExprLoc(),
+           diag::err_hlsl_linalg_matrix_attribute_arg_not_int_or_enum)
+        << 0 << Arg->getSourceRange();
+    return false;
+  }
+
+  // That's all we can do for dependent expressions.
+  if (Arg->isValueDependent()) {
+    IsDependent = true;
+    return true;
+  }
+
+  // Check that it is a constant value.
+  llvm::APSInt APVal;
+  if (!Arg->isIntegerConstantExpr(APVal, S.Context)) {
+    S.Diag(Arg->getExprLoc(),
+           diag::err_hlsl_linalg_matrix_attribute_arg_not_constant_value)
+        << Arg << Arg->getSourceRange();
+    return false;
+  }
+
+  // Check that the value is a valid range.
+  int64_t Value = APVal.getLimitedValue();
+  if (Value < 0) {
+    S.Diag(Arg->getExprLoc(),
+           diag::err_hlsl_linalg_matrix_dim_must_be_greater_than_zero)
+        << Arg->getSourceRange();
+    return false;
+  }
+
+  OutValue = (size_t)Value;
+  return true;
+}
+
+// Returns false on error
+template <typename EnumT>
+static bool verifyLinAlgMatrixEnumArg(Sema &S, Expr *Arg, const char *EnumName,
+                                      unsigned MinValue, unsigned MaxValue,
+                                      bool &IsDependent, EnumT &OutValue) {
+  QualType QT = Arg->getType();
+
+  // Check that the type is an integer or enumeration type.
+  if (!QT->isIntegralOrEnumerationType()) {
+    S.Diag(Arg->getExprLoc(),
+           diag::err_hlsl_linalg_matrix_attribute_arg_not_int_or_enum)
+        << 1 << Arg->getSourceRange();
+    return false;
+  }
+
+  // That's all we can do for dependent expressions.
+  if (Arg->isValueDependent()) {
+    IsDependent = true;
+    return true;
+  }
+
+  // Check that it is a constant value.
+  llvm::APSInt APVal;
+  if (!Arg->isIntegerConstantExpr(APVal, S.Context)) {
+    S.Diag(Arg->getExprLoc(),
+           diag::err_hlsl_linalg_matrix_attribute_arg_not_constant_value)
+        << Arg->getSourceRange();
+    return false;
+  }
+
+  // Check that the value is a valid range.
+  int64_t Value = APVal.getLimitedValue();
+  if (Value < (int64_t)MinValue || Value > (int64_t)MaxValue) {
+    S.Diags.Report(Arg->getExprLoc(),
+                   diag::err_hlsl_linalg_matrix_invalid_enum_attribute_value)
+        << EnumName
+        << std::to_string(Value) // DiagnosticBuilder does not support uint64_t
+                                 // so we convert to string first
+        << MinValue << MaxValue;
+    return false;
+  }
+
+  OutValue = (EnumT)Value;
+  return true;
+}
+
+// Returns false on error
+bool CreateAttributedLinAlgMatrixType(
+    clang::Sema &S, clang::QualType WrappedTy, clang::Expr *ComponentTyExpr,
+    clang::Expr *RowsExpr, clang::Expr *ColsExpr, clang::Expr *UseExpr,
+    clang::Expr *ScopeExpr, clang::QualType &OutType) {
+
+  bool IsDependent = false;
+
+  // Verify component type argument.
+  hlsl::DXIL::ComponentType CompTyValue = hlsl::DXIL::ComponentType::Invalid;
+  if (!verifyLinAlgMatrixEnumArg<hlsl::DXIL::ComponentType>(
+          S, ComponentTyExpr, "ComponentEnum",
+          static_cast<unsigned>(hlsl::DXIL::ComponentType::I1),
+          static_cast<unsigned>(hlsl::DXIL::ComponentType::LastEntry) - 1,
+          IsDependent, CompTyValue))
+    return false;
+
+  // Verify size arguments
+  size_t RowsValue = 0;
+  size_t ColsValue = 0;
+  if (!verifyLinAlgMatrixSizeArg(S, RowsExpr, IsDependent, RowsValue) ||
+      !verifyLinAlgMatrixSizeArg(S, ColsExpr, IsDependent, ColsValue))
+    return false;
+
+  // Verify matrix Use argument.
+  hlsl::DXIL::MatrixUse UseValue = hlsl::DXIL::MatrixUse::A;
+  if (!verifyLinAlgMatrixEnumArg<hlsl::DXIL::MatrixUse>(
+          S, UseExpr, "MatrixUseEnum",
+          static_cast<unsigned>(hlsl::DXIL::MatrixUse::A),
+          static_cast<unsigned>(hlsl::DXIL::MatrixUse::Accumulator),
+          IsDependent, UseValue))
+    return false;
+
+  // Verify matrix Scope argument.
+  hlsl::DXIL::MatrixScope ScopeValue = hlsl::DXIL::MatrixScope::Thread;
+  if (!verifyLinAlgMatrixEnumArg<hlsl::DXIL::MatrixScope>(
+          S, ScopeExpr, "MatrixScopeEnum",
+          static_cast<unsigned>(hlsl::DXIL::MatrixScope::Thread),
+          static_cast<unsigned>(hlsl::DXIL::MatrixScope::ThreadGroup),
+          IsDependent, ScopeValue))
+    return false;
+
+  // Create one of tyhe two LinAlg Matrix attributed types based on whether
+  // it has dependent attributes or not.
+  if (IsDependent)
+    OutType = S.Context.getDependentAttributedLinAlgMatrixType(
+        WrappedTy, ComponentTyExpr, RowsExpr, ColsExpr, UseExpr, ScopeExpr);
+  else
+    OutType = S.Context.getAttributedLinAlgMatrixType(
+        WrappedTy, CompTyValue, RowsValue, ColsValue, UseValue, ScopeValue);
+  return true;
+}
+
+// Returns true on error
+bool HandleLinAlgMatrixAttributes(clang::Sema &S, clang::AttributeList &Attr,
+                                  clang::QualType &Type) {
+
+  assert(Attr.getKind() == AttributeList::AT_HLSLLinAlgMatrixAttributes &&
+         "unexpected attribute");
+
+  QualType CanonTy = Type.getCanonicalType();
+  if (!CanonTy->isLinAlgMatrixType()) {
+    const auto *LinAlgMTy = cast<BuiltinType>(S.getASTContext().LinAlgMatrixTy);
+    PrintingPolicy PP(S.getLangOpts());
+    S.Diag(Attr.getLoc(),
+           diag::err_hlsl_linalg_matrix_attribute_on_invalid_type)
+        << LinAlgMTy->getName(PP) << Attr.getLoc();
+    return true;
+  }
+
+  if (Attr.getNumArgs() != 5) {
+    S.Diag(Attr.getLoc(), diag::err_attribute_wrong_number_arguments)
+        << Attr.getName() << 5;
+    Attr.setInvalid();
+    return true;
+  }
+
+  QualType ResultType;
+  if (!CreateAttributedLinAlgMatrixType(
+          S, CanonTy, Attr.getArgAsExpr(0), Attr.getArgAsExpr(1),
+          Attr.getArgAsExpr(2), Attr.getArgAsExpr(3), Attr.getArgAsExpr(4),
+          ResultType))
+    return true;
+
+  Type = ResultType;
+  return false;
+}
+
+std::string
+ConvertLinAlgMatrixComponentTypeToString(hlsl::DXIL::ComponentType CompType) {
+  switch (CompType) {
+  case DXIL::ComponentType::I1:
+    return "ComponentType::I1";
+  case DXIL::ComponentType::I16:
+    return "ComponentType::I16";
+  case DXIL::ComponentType::U16:
+    return "ComponentType::U16";
+  case DXIL::ComponentType::I32:
+    return "ComponentType::I32";
+  case DXIL::ComponentType::U32:
+    return "ComponentType::U32";
+  case DXIL::ComponentType::I64:
+    return "ComponentType::I64";
+  case DXIL::ComponentType::U64:
+    return "ComponentType::U64";
+  case DXIL::ComponentType::F16:
+    return "ComponentType::F16";
+  case DXIL::ComponentType::F32:
+    return "ComponentType::F32";
+  case DXIL::ComponentType::F64:
+    return "ComponentType::F64";
+  case DXIL::ComponentType::SNormF16:
+    return "ComponentType::SNormF16";
+  case DXIL::ComponentType::UNormF16:
+    return "ComponentType::UNormF16";
+  case DXIL::ComponentType::SNormF32:
+    return "ComponentType::SNormF32";
+  case DXIL::ComponentType::UNormF32:
+    return "ComponentType::UNormF32";
+  case DXIL::ComponentType::SNormF64:
+    return "ComponentType::SNormF64";
+  case DXIL::ComponentType::UNormF64:
+    return "ComponentType::UNormF64";
+  case DXIL::ComponentType::PackedS8x32:
+    return "ComponentType::PackedS8x32";
+  case DXIL::ComponentType::PackedU8x32:
+    return "ComponentType::PackedU8x32";
+  case DXIL::ComponentType::U8:
+    return "ComponentType::U8";
+  case DXIL::ComponentType::I8:
+    return "ComponentType::I8";
+  case DXIL::ComponentType::F8_E4M3:
+    return "ComponentType::F8_E4M3";
+  case DXIL::ComponentType::F8_E5M2:
+    return "ComponentType::F8_E5M2";
+  default:
+    llvm_unreachable("Unknown ComponentType");
+  }
+}
+
+std::string ConvertLinAlgMatrixUseToString(hlsl::DXIL::MatrixUse Use) {
+  switch (Use) {
+  case hlsl::DXIL::MatrixUse::A:
+    return "MatrixUse::A";
+  case hlsl::DXIL::MatrixUse::B:
+    return "MatrixUse::B";
+  case hlsl::DXIL::MatrixUse::Accumulator:
+    return "MatrixUse::Accumulator";
+  default:
+    llvm_unreachable("Unknown MatrixUse");
+  }
+}
+
+std::string ConvertLinAlgMatrixScopeToString(hlsl::DXIL::MatrixScope Scope) {
+  switch (Scope) {
+  case hlsl::DXIL::MatrixScope::Thread:
+    return "MatrixScope::Thread";
+  case hlsl::DXIL::MatrixScope::ThreadGroup:
+    return "MatrixScope::ThreadGroup";
+  case hlsl::DXIL::MatrixScope::Wave:
+    return "MatrixScope::Wave";
+  default:
+    llvm_unreachable("Unknown MatrixScope");
+  }
+}
+
 } // namespace hlsl

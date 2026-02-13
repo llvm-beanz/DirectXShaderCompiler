@@ -233,6 +233,7 @@ def Borland : LangOpt<"Borland">;
 def CUDA : LangOpt<"CUDA">;
 def COnly : LangOpt<"CPlusPlus", 1>;
 def SPIRV : LangOpt<"SPIRV">; // SPIRV Change
+def HLSL : LangOpt<"HLSL">;   // HLSL Change
 
 // Defines targets for target-specific attributes. The list of strings should
 // specify architectures for which the target applies, based off the ArchType
@@ -669,6 +670,11 @@ def HLSLMaxTessFactor: InheritableAttr {
 def HLSLNumThreads: InheritableAttr {
   let Spellings = [CXX11<"", "numthreads", 2015>];
   let Args = [IntArgument<"X">, IntArgument<"Y">, IntArgument<"Z">];
+  let Documentation = [Undocumented];
+}
+def HLSLGroupSharedLimit: InheritableAttr {
+  let Spellings = [CXX11<"", "GroupSharedLimit", 2017>];
+  let Args = [IntArgument<"Limit">];
   let Documentation = [Undocumented];
 }
 def HLSLRootSignature: InheritableAttr {
@@ -1223,6 +1229,13 @@ def HLSLUnboundedSparseNodes : InheritableParamAttr {
   let Documentation = [Undocumented];
 }
 
+def HLSLLinAlgMatrixAttributes : TypeAttr {
+  let Spellings = [CXX11<"", "__LinAlgMatrix_Attributes", 2015>];
+  let LangOpts = [HLSL];
+  let Args = [ExprArgument<"ComponentTy">, ExprArgument<"M">, ExprArgument<"N">,
+              ExprArgument<"Use">, ExprArgument<"Scope">];
+  let Documentation = [Undocumented];
+}
 // HLSL Change Ends
 
 // SPIRV Change Starts

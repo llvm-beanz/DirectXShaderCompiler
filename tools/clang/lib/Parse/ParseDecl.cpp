@@ -843,6 +843,7 @@ void Parser::ParseGNUAttributeArgs(IdentifierInfo *AttrName,
     case AttributeList::AT_HLSLMaxVertexCount:
     case AttributeList::AT_HLSLUnroll:
     case AttributeList::AT_HLSLWaveSize:
+    case AttributeList::AT_HLSLGroupSharedLimit:
     case AttributeList::AT_NoInline:
       // The following are not accepted in [attribute(param)] syntax:
       // case AttributeList::AT_HLSLCentroid:
@@ -3355,11 +3356,20 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
       if (!AttrsLastTime)
         ProhibitAttributes(attrs);
       else {
-        // Reject C++11 attributes that appertain to decl specifiers as
-        // we don't support any C++11 attributes that appertain to decl
-        // specifiers. This also conforms to what g++ 4.8 is doing.
-        ProhibitCXX11Attributes(attrs);
-
+        // HLSL Change Start
+        // Reject attributes that aren't type attributes. Unknown attributes
+        // are diagnosed elsewhere.
+        AttributeList *Attr = attrs.getList();
+        while (Attr) {
+          if (!Attr->isTypeAttr() &&
+              Attr->getKind() != AttributeList::UnknownAttribute) {
+            Diag(Attr->getLoc(), diag::err_attribute_not_type_attr)
+                << Attr->getName();
+            Attr->setInvalid();
+          }
+          Attr = Attr->getNext();
+        }
+        // HLSL Change End
         DS.takeAttributesFrom(attrs);
       }
 
@@ -3370,7 +3380,7 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
 
     case tok::l_square:
     case tok::kw_alignas:
-      if (!getLangOpts().CPlusPlus11 || !isCXX11AttributeSpecifier())
+      if (!isCXX11AttributeSpecifier()) // HLSL Change
         goto DoneWithDeclSpec;
 
       ProhibitAttributes(attrs);
