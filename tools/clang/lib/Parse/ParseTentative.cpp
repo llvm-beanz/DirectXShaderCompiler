@@ -1571,7 +1571,7 @@ bool Parser::isCXXDeclarationSpecifierAType() {
     return true;
 
   case tok::kw_auto:
-    return getLangOpts().CPlusPlus11;
+    return getLangOpts().CPlusPlus11 || getLangOpts().HLSLVersion >= hlsl::LangStd::v2021;
 
   case tok::kw__Atomic:
     // "_Atomic foo"
