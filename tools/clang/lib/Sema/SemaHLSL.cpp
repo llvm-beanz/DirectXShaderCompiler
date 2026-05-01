@@ -4575,12 +4575,17 @@ public:
       assert(parsedType != HLSLScalarType_unknown &&
              "otherwise, TryParseHLSLScalarType should not have succeeded.");
       if (rowCount == 0 && colCount == 0) { // scalar
-        // In SPIR-V mode, int8_t/uint8_t are not reserved HLSL built-ins;
-        // they may be user-defined type aliases via vk::SpirvType.
+        // In SPIR-V mode, int8_t/uint8_t are not reserved HLSL built-ins
+        // when SM < 6.10; they may be user-defined type aliases via
+        // vk::SpirvType. For SM 6.10+, use the HLSL built-in types.
         if (getSema()->getLangOpts().SPIRV) {
           if (parsedType == HLSLScalarType_int8 ||
-              parsedType == HLSLScalarType_uint8)
-            return false;
+              parsedType == HLSLScalarType_uint8) {
+            const hlsl::ShaderModel *SM = hlsl::ShaderModel::GetByName(
+                getSema()->getLangOpts().HLSLProfile.c_str());
+            if (!SM || !SM->IsSM610Plus())
+              return false;
+          }
         }
         bool IsValidForSM = DiagnoseHLSLScalarType(parsedType, R.getNameLoc());
         TypedefDecl *typeDecl = LookupScalarTypeDef(parsedType);
