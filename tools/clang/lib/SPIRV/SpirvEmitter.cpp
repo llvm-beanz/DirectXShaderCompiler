@@ -3914,10 +3914,10 @@ SpirvInstruction *SpirvEmitter::doCastExpr(const CastExpr *expr,
     if (hlsl::IsStringLiteralType(subExprType) && hlsl::IsStringType(toType)) {
       return doExpr(subExpr, range);
     } else {
-      emitError("implicit cast kind '%0' unimplemented", expr->getExprLoc())
-          << expr->getCastKindName() << expr->getSourceRange();
-      expr->dump();
-      return nullptr;
+      // Array-to-pointer decay: in SPIRV, arrays are accessed through access
+      // chains, so we return the underlying array pointer as-is. Array element
+      // access will use OpAccessChain on top of this.
+      return doExpr(subExpr, range);
     }
   }
   case CastKind::CK_ToVoid:
