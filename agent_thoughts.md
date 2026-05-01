@@ -261,3 +261,67 @@ as `'char'`. This is expected behavior in Clang.
   `'char' is a reserved keyword in HLSL` in SM < 6.10.
 - `int8_char_implicit_conversions.hlsl`: Verifies narrowing warnings for
   `int → char` and `uint → unsigned char` conversions.
+
+## Phase 8: SPIRV SPV_KHR_8bit_storage Support
+
+### Goal
+
+Add proper SPIRV support for `int8_t`/`uint8_t` when SM 6.10 is specified, emitting the
+`SPV_KHR_8bit_storage` extension and the required capabilities.
+
+### Changes made
+
+#### 1. `FeatureManager.h` — Extension enum
+
+Added `KHR_8bit_storage` before `KHR_16bit_storage` in the `Extension` enum.
+
+#### 2. `FeatureManager.cpp` — Registration and suppression
+
+- `getExtensionSymbol`: maps `"SPV_KHR_8bit_storage"` → `Extension::KHR_8bit_storage`
+- `getExtensionName`: reverse mapping
+- `isExtensionRequiredForTargetEnv`: added Vulkan 1.2 check — `SPV_KHR_8bit_storage` was
+  promoted to SPIR-V 1.5 core (Vulkan 1.2), so the `OpExtension` instruction is suppressed
+  for Vulkan 1.2+ targets (capabilities are still emitted).
+
+#### 3. `CapabilityVisitor.cpp` — Capability emission
+
+In `addCapabilityForType()`, extended the struct-type handling block to detect 8-bit integer
+members via `SpirvType::isOrContainsType<IntegerType, 8>`:
+
+- `PushConstant` storage class → `StoragePushConstant8`
+- `UniformBuffer` interface → `UniformAndStorageBuffer8BitAccess`
+- `StorageBuffer` interface → `StorageBuffer8BitAccess`
+
+This mirrors the existing 16-bit handling in the same function.
+
+#### 4. `AlignmentSizeCalculator.cpp` — Layout for 8-bit types
+
+Added `SChar`, `Char_S`, `UChar`, `Char_U` cases (the AST types for `int8_t` / `uint8_t` /
+`char` / `unsigned char`) returning `{1, 1}` (1-byte alignment, 1-byte size). Without this,
+the fallthrough to `emitError("unimplemented")` caused compilation errors.
+
+#### 5. `SemaHLSL.cpp` — Enable int8_t/uint8_t as HLSL built-ins in SPIRV/SM 6.10
+
+`LookupUnqualified` previously returned `false` for `int8_t`/`uint8_t` in SPIRV mode to let
+users define their own aliases via `vk::SpirvType`. Updated the condition to only bypass for
+SM < 6.10. For SM 6.10+, the HLSL built-in types are used, enabling proper SPIRV codegen.
+
+Existing SPIRV tests (SM 6.0 + inline `uint8_t` via `vk::SpirvType`) are unaffected.
+
+### New test files (CodeGenSPIRV)
+
+| File | Checks |
+|------|--------|
+| `vk.layout.8bit-types.cbuffer.hlsl` | `UniformAndStorageBuffer8BitAccess`, extension, byte offsets |
+| `vk.layout.8bit-types.sbuffer.hlsl` | `StorageBuffer8BitAccess`, extension, byte offsets, stride=8 |
+| `vk.layout.8bit-types.pc.hlsl` | `StoragePushConstant8`, extension, byte offsets |
+| `vk.layout.8bit-types.cbuffer.vk12.hlsl` | Capability present, extension suppressed for Vulkan 1.2 |
+
+### Key insight
+
+The SPIRV `LowerTypeVisitor.cpp` already mapped `SChar`/`UChar` to 8-bit SPIRV integer types.
+The `CapabilityVisitor.cpp` already emitted `Int8` capability. What was missing was:
+1. The extension name registration
+2. The storage-context-sensitive capability emission
+3. The alignment/size calculation for SPIRV layout
+4. Lifting the SM 6.10 guard in SPIRV's `LookupUnqualified`
