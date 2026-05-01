@@ -43,6 +43,9 @@ uint8_t CompType::GetSizeInBits() const {
     return 0;
   case Kind::I1:
     return 1;
+  case Kind::I8:
+  case Kind::U8:
+    return 8;
   case Kind::SNormF16:
   case Kind::UNormF16:
   case Kind::I16:
@@ -83,6 +86,10 @@ CompType CompType::getI32() { return CompType(Kind::I32); }
 
 CompType CompType::getI64() { return CompType(Kind::I64); }
 
+CompType CompType::getI8() { return CompType(Kind::I8); }
+
+CompType CompType::getU8() { return CompType(Kind::U8); }
+
 CompType CompType::getU16() { return CompType(Kind::U16); }
 
 CompType CompType::getU32() { return CompType(Kind::U32); }
@@ -112,12 +119,14 @@ bool CompType::IsFloatTy() const {
 bool CompType::IsIntTy() const { return IsSIntTy() || IsUIntTy(); }
 
 bool CompType::IsSIntTy() const {
-  return m_Kind == Kind::I16 || m_Kind == Kind::I32 || m_Kind == Kind::I64;
+  return m_Kind == Kind::I8 || m_Kind == Kind::I16 || m_Kind == Kind::I32 ||
+         m_Kind == Kind::I64;
 }
 
 bool CompType::IsUIntTy() const {
-  return m_Kind == Kind::U16 || m_Kind == Kind::U32 || m_Kind == Kind::U64 ||
-         m_Kind == Kind::PackedS8x32 || m_Kind == Kind::PackedU8x32;
+  return m_Kind == Kind::U8 || m_Kind == Kind::U16 || m_Kind == Kind::U32 ||
+         m_Kind == Kind::U64 || m_Kind == Kind::PackedS8x32 ||
+         m_Kind == Kind::PackedU8x32;
 }
 
 bool CompType::IsBoolTy() const { return m_Kind == Kind::I1; }
@@ -158,10 +167,18 @@ bool CompType::Is16Bit() const {
   }
 }
 
+bool CompType::Is8Bit() const {
+  return m_Kind == Kind::I8 || m_Kind == Kind::U8;
+}
+
 CompType CompType::GetBaseCompType() const {
   switch (m_Kind) {
   case Kind::I1:
     return CompType(Kind::I1);
+  case Kind::I8:
+    return CompType(Kind::I8);
+  case Kind::U8:
+    return CompType(Kind::U8);
   case Kind::I16:
     LLVM_FALLTHROUGH;
   case Kind::PackedS8x32:
@@ -211,6 +228,8 @@ bool CompType::HasMinPrec() const {
   case Kind::UNormF16:
     return true;
   case Kind::I1:
+  case Kind::I8:
+  case Kind::U8:
   case Kind::PackedS8x32:
   case Kind::PackedU8x32:
   case Kind::I32:
@@ -234,6 +253,9 @@ Type *CompType::GetLLVMType(LLVMContext &Ctx) const {
   switch (m_Kind) {
   case Kind::I1:
     return (Type *)Type::getInt1Ty(Ctx);
+  case Kind::I8:
+  case Kind::U8:
+    return (Type *)Type::getInt8Ty(Ctx);
   case Kind::I16:
   case Kind::U16:
     return (Type *)Type::getInt16Ty(Ctx);
@@ -268,6 +290,9 @@ PointerType *CompType::GetLLVMPtrType(LLVMContext &Ctx,
   switch (m_Kind) {
   case Kind::I1:
     return Type::getInt1PtrTy(Ctx, AddrSpace);
+  case Kind::I8:
+  case Kind::U8:
+    return Type::getInt8PtrTy(Ctx, AddrSpace);
   case Kind::I16:
   case Kind::U16:
     return Type::getInt16PtrTy(Ctx, AddrSpace);
@@ -305,6 +330,8 @@ CompType CompType::GetCompType(Type *type) {
   LLVMContext &Ctx = type->getContext();
   if (type == Type::getInt1Ty(Ctx))
     return CompType(Kind::I1);
+  if (type == Type::getInt8Ty(Ctx))
+    return CompType(Kind::I8);
   if (type == Type::getInt16Ty(Ctx))
     return CompType(Kind::I16);
   if (type == Type::getInt32Ty(Ctx))
@@ -326,7 +353,8 @@ static const char *s_TypeKindNames[(unsigned)CompType::Kind::LastEntry] = {
     "invalid",   "i1",        "i16",       "u16",       "i32",
     "u32",       "i64",       "u64",       "f16",       "f32",
     "f64",       "snorm_f16", "unorm_f16", "snorm_f32", "unorm_f32",
-    "snorm_f64", "unorm_f64", "p32i8",     "p32u8",
+    "snorm_f64", "unorm_f64", "p32i8",     "p32u8",     "i8",
+    "u8",        "f8_e4m3fn", "f8_e5m2",
 };
 
 const char *CompType::GetName() const {
@@ -338,7 +366,8 @@ static const char *s_TypeKindHLSLNames[(unsigned)CompType::Kind::LastEntry] = {
     "int",          "uint",          "int64_t",        "uint64_t",
     "half",         "float",         "double",         "snorm_half",
     "unorm_half",   "snorm_float",   "unorm_float",    "snorm_double",
-    "unorm_double", "int8_t_packed", "uint8_t_packed",
+    "unorm_double", "int8_t_packed", "uint8_t_packed", "int8_t",
+    "uint8_t",      "float8_e4m3fn", "float8_e5m2",
 };
 
 static const char
@@ -347,7 +376,8 @@ static const char
         "int",          "uint",          "int64_t",        "uint64_t",
         "min16float",   "float",         "double",         "snorm_min16f",
         "unorm_min16f", "snorm_float",   "unorm_float",    "snorm_double",
-        "unorm_double", "int8_t_packed", "uint8_t_packed",
+        "unorm_double", "int8_t_packed", "uint8_t_packed", "int8_t",
+        "uint8_t",      "float8_e4m3fn", "float8_e5m2",
 };
 
 const char *CompType::GetHLSLName(bool MinPrecision) const {

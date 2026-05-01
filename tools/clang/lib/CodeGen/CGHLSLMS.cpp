@@ -623,6 +623,12 @@ static CompType::Kind BuiltinTyToCompTy(const BuiltinType *BTy, bool bSNorm,
   case BuiltinType::UInt8_4Packed:
     kind = CompType::Kind::PackedU8x32;
     break;
+  case BuiltinType::SChar:
+    kind = CompType::Kind::I8;
+    break;
+  case BuiltinType::UChar:
+    kind = CompType::Kind::U8;
+    break;
   // HLSL Changes end
   case BuiltinType::UInt:
     kind = CompType::Kind::U32;
@@ -879,6 +885,12 @@ static unsigned AlignBaseOffset(unsigned baseOffset, unsigned size, QualType Ty,
              BT->getKind() == clang::BuiltinType::Kind::Short ||
              BT->getKind() == clang::BuiltinType::Kind::UShort)
       scalarSizeInBytes = 2;
+    else if (BT->getKind() == clang::BuiltinType::Kind::SChar ||
+             BT->getKind() == clang::BuiltinType::Kind::UChar) {
+      // i8 types use 1-byte packing in cbuffer (4 values per 32-bit slot).
+      scalarSizeInBytes = 1;
+      size = 1;
+    }
   }
 
   return AlignBufferOffsetInLegacy(baseOffset, size, scalarSizeInBytes,
@@ -1268,8 +1280,14 @@ unsigned CGMSHLSLRuntime::AddTypeAnnotation(QualType Ty,
                              b64Bit);
   }
   // Skip element types.
-  if (IsElementInputOutputType(paramTy))
+  if (IsElementInputOutputType(paramTy)) {
+    // i8 types use 1-byte cbuffer packing despite 4-byte LLVM ABI alignment.
+    const clang::BuiltinType *BT = paramTy->getAs<clang::BuiltinType>();
+    if (BT && (BT->getKind() == clang::BuiltinType::Kind::SChar ||
+               BT->getKind() == clang::BuiltinType::Kind::UChar))
+      return 1;
     return size;
+  }
   else if (IsHLSLStreamOutputType(Ty)) {
     return AddTypeAnnotation(GetHLSLOutputPatchElementType(Ty), dxilTypeSys,
                              arrayEltSize);

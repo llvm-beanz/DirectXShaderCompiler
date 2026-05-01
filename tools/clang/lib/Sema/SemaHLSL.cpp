@@ -2362,15 +2362,13 @@ static bool CombineBasicTypes(ArBasicKind LeftKind, ArBasicKind RightKind,
 
   DXASSERT(uBits != BPROP_BITS0,
            "CombineBasicTypes: uBits should not be zero at this point");
-  DXASSERT(uBits != BPROP_BITS8,
-           "CombineBasicTypes: 8-bit types not supported at this time");
 
   if (bMinPrecisionResult) {
     DXASSERT(
         uBits < BPROP_BITS32,
         "CombineBasicTypes: min-precision result must be less than 32-bits");
   } else {
-    DXASSERT(uBits > BPROP_BITS12,
+    DXASSERT(uBits > BPROP_BITS12 || uBits == BPROP_BITS8,
              "CombineBasicTypes: 10 or 12 bit result must be min precision");
   }
   if (bFloatResult) {
@@ -2406,6 +2404,10 @@ static bool CombineBasicTypes(ArBasicKind LeftKind, ArBasicKind RightKind,
   } else {
     // int or unsigned int
     switch (uBits) {
+    case BPROP_BITS8:
+      *pOutKind =
+          (uResultFlags & BPROP_UNSIGNED) ? AR_BASIC_UINT8 : AR_BASIC_INT8;
+      break;
     case BPROP_BITS12:
       *pOutKind = AR_BASIC_MIN12INT;
       break;
@@ -4506,12 +4508,28 @@ public:
       case HLSLScalarType_float16:
       case HLSLScalarType_float32:
       case HLSLScalarType_float64:
+      case HLSLScalarType_int8:
       case HLSLScalarType_int16:
       case HLSLScalarType_int32:
+      case HLSLScalarType_uint8:
       case HLSLScalarType_uint16:
       case HLSLScalarType_uint32:
         m_sema->Diag(Loc, diag::err_hlsl_unsupported_keyword_for_version)
             << HLSLScalarTypeNames[type] << "2018";
+        return false;
+      default:
+        break;
+      }
+    }
+    // int8_t and uint8_t require shader model 6.10 or later.
+    const hlsl::ShaderModel *SM =
+        hlsl::ShaderModel::GetByName(getSema()->getLangOpts().HLSLProfile.c_str());
+    if (SM && !SM->IsSM610Plus()) {
+      switch (type) {
+      case HLSLScalarType_int8:
+      case HLSLScalarType_uint8:
+        m_sema->Diag(Loc, diag::err_hlsl_unsupported_keyword_for_version)
+            << HLSLScalarTypeNames[type] << "shader model 6.10";
         return false;
       default:
         break;
@@ -4557,6 +4575,13 @@ public:
       assert(parsedType != HLSLScalarType_unknown &&
              "otherwise, TryParseHLSLScalarType should not have succeeded.");
       if (rowCount == 0 && colCount == 0) { // scalar
+        // In SPIR-V mode, int8_t/uint8_t are not reserved HLSL built-ins;
+        // they may be user-defined type aliases via vk::SpirvType.
+        if (getSema()->getLangOpts().SPIRV) {
+          if (parsedType == HLSLScalarType_int8 ||
+              parsedType == HLSLScalarType_uint8)
+            return false;
+        }
         if (!DiagnoseHLSLScalarType(parsedType, R.getNameLoc()))
           return false;
         TypedefDecl *typeDecl = LookupScalarTypeDef(parsedType);
@@ -4825,6 +4850,10 @@ public:
         return AR_BASIC_INT32;
       case BuiltinType::UInt:
         return AR_BASIC_UINT32;
+      case BuiltinType::SChar:
+        return AR_BASIC_INT8;
+      case BuiltinType::UChar:
+        return AR_BASIC_UINT8;
       case BuiltinType::Short:
         return AR_BASIC_INT16;
       case BuiltinType::UShort:
@@ -4934,9 +4963,9 @@ public:
     case AR_BASIC_LITERAL_INT:
       return HLSLScalarType_int_lit;
     case AR_BASIC_INT8:
-      return HLSLScalarType_int;
+      return HLSLScalarType_int8;
     case AR_BASIC_UINT8:
-      return HLSLScalarType_uint;
+      return HLSLScalarType_uint8;
     case AR_BASIC_INT16:
       return HLSLScalarType_int16;
     case AR_BASIC_UINT16:
@@ -4992,9 +5021,9 @@ public:
     case AR_BASIC_LITERAL_INT:
       return m_context->LitIntTy;
     case AR_BASIC_INT8:
-      return m_context->IntTy;
+      return m_context->SignedCharTy;
     case AR_BASIC_UINT8:
-      return m_context->UnsignedIntTy;
+      return m_context->UnsignedCharTy;
     case AR_BASIC_INT16:
       return m_context->ShortTy;
     case AR_BASIC_UINT16:
@@ -6020,6 +6049,16 @@ public:
             return true;
           }
           if (ResAttr && IsTyped(ResAttr->getResKind())) {
+            // Disallow int8_t/uint8_t in typed buffers and textures.
+            QualType EltType = IsVectorType(m_sema, argType)
+                                   ? hlsl::GetHLSLVecElementType(argType)
+                                   : argType;
+            ArBasicKind EltKind = GetTypeElementKind(EltType);
+            if (EltKind == AR_BASIC_INT8 || EltKind == AR_BASIC_UINT8) {
+              m_sema->Diag(argLoc.getLocation(),
+                           diag::err_hlsl_unsupported_typedbuffer_template_parameter);
+              return true;
+            }
             // Check vectors for being too large.
             if (IsVectorType(m_sema, argType)) {
               unsigned NumElt = hlsl::GetElementCount(argType);
@@ -6611,6 +6650,8 @@ void HLSLExternalSource::AddBaseTypes() {
   m_baseTypes[HLSLScalarType_uint_min16] = m_context->Min16UIntTy;
   m_baseTypes[HLSLScalarType_int8_4packed] = m_context->Int8_4PackedTy;
   m_baseTypes[HLSLScalarType_uint8_4packed] = m_context->UInt8_4PackedTy;
+  m_baseTypes[HLSLScalarType_int8] = m_context->SignedCharTy;
+  m_baseTypes[HLSLScalarType_uint8] = m_context->UnsignedCharTy;
   m_baseTypes[HLSLScalarType_float_lit] = m_context->LitFloatTy;
   m_baseTypes[HLSLScalarType_int_lit] = m_context->LitIntTy;
   m_baseTypes[HLSLScalarType_int16] = m_context->ShortTy;
