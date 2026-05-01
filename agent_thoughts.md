@@ -181,3 +181,83 @@ assertion and add a comment explaining the new invariant.
    silently ignored.
 3. The LLVM `not` tool is the correct way to write tests that expect compiler
    errors; `set -o pipefail` makes any non-zero dxc exit propagate otherwise.
+
+## Phase 7: Addressing COPILOT-TODO Feedback and char/unsigned char Support
+
+### COPILOT-TODO items addressed
+
+Four test files had `// COPILOT-TODO:` comments requesting fixes:
+
+1. **int8_errors.hlsl** and **int8_errors_typed_buf.hlsl** and
+   **int8_implicit_conversions.hlsl** — all requested conversion from
+   FileCheck to Clang's `-verify` mechanism for diagnostic tests.
+
+2. **int8_vectors.hlsl** — requested adding native i8 vector overloads to
+   `rawBufferVectorLoad`/`rawBufferVectorStore` and updating the test.
+
+### Fix: duplicate SM diagnostics in LookupUnqualified
+
+**Discovery**: When DXC compiled `int8_t bad_var;` with SM < 6.10, the error
+"int8_t is only allowed for HLSL shader model 6.10 and above." fired three
+times at the same source location. This made `-verify` impossible since a
+single `// expected-error` would only match one occurrence.
+
+**Root cause**: `LookupUnqualified` was returning `false` after emitting the
+SM error. Clang's lookup retry logic then repeated the lookup multiple times,
+re-emitting the diagnostic each time.
+
+**Fix**: Changed `LookupUnqualified` in `SemaHLSL.cpp` to add the typedef to
+the lookup result even when `DiagnoseHLSLScalarType` returns false (i.e., when
+the SM check fails). The error is still emitted exactly once. Returning `true`
+prevents Clang from retrying the lookup.
+
+### Fix: native i8 vector overloads for rawBufferVectorLoad/Store
+
+**Discovery**: `isMinPrecisionType` in `HLOperationLower.cpp` incorrectly
+classified i8 as a min-precision type due to the HLSL legacy data layout
+string `i8:32` (32-bit ABI size vs 8-bit primitive size). This caused int8_t
+vectors to be widened to i32 vectors before using `rawBufferVectorLoad/Store`,
+so the native i8 overloads were never reached.
+
+**Fix 1**: Added an early return in `isMinPrecisionType` to exclude i8 (and
+preserve the existing i1 exclusion) from min-precision classification.
+
+**Fix 2**: Updated `hctdb.py` and `DxilOperations.cpp` to add i8 (`8`) to the
+`oload_types` string for both `RawBufferVectorLoad` and `RawBufferVectorStore`,
+changing the bitmasks from `0x4e7`/`0xe7` to `0x4f7`/`0xf7`.
+
+**Result**: `int8_t2` vectors now use `rawBufferVectorLoad.v2i8` / 
+`rawBufferVectorStore.v2i8` (native), and `uint8_t4` uses `v4i8`. The element
+stride in the structured buffer still reflects the host HLSL layout (i8:32),
+so `int8_t2` → stride=8, `uint8_t4` → stride=16.
+
+### Feature: char and unsigned char as int8_t/uint8_t alternatives
+
+**Request**: Add support for `char` and `unsigned char` as aliases for
+`int8_t` and `uint8_t` respectively, starting from SM 6.10.
+
+**Discovery**: `char` was unconditionally reserved in HLSL in `ParseDecl.cpp`
+via `goto HLSLReservedKeyword`. Plain `char` maps to `BuiltinType::Char_S`
+(on signed-char platforms like x86), while `unsigned char` produces
+`BuiltinType::Char_U`.
+
+**Changes**:
+- `ParseDecl.cpp`: Made `kw_char` conditional — only reserved below SM 6.10.
+  For SM 6.10+, falls through to normal type specifier handling.
+- `SemaHLSL.cpp`: Added `Char_S` → `AR_BASIC_INT8` and `Char_U` →
+  `AR_BASIC_UINT8` to the type mapping switch.
+- `CGHLSLMS.cpp`: Added `Char_S`/`Char_U` cases alongside `SChar`/`UChar`
+  in `GetTypeInfo`, cbuffer offset calculation, and annotation size.
+
+**Lesson**: Plain `char` vs `signed char` produce different type names in
+diagnostic messages: `int8_t` shows as `'signed char'`, while `char` shows
+as `'char'`. This is expected behavior in Clang.
+
+### New test files
+
+- `int8_char_types.hlsl`: Verifies `char`/`unsigned char` produce
+  `rawBufferLoad/Store.i8`, `sext`/`zext` for widening, in SM 6.10.
+- `int8_char_types_errors.hlsl`: Verifies `char` is rejected with
+  `'char' is a reserved keyword in HLSL` in SM < 6.10.
+- `int8_char_implicit_conversions.hlsl`: Verifies narrowing warnings for
+  `int → char` and `uint → unsigned char` conversions.
