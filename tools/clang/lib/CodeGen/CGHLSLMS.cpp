@@ -624,9 +624,11 @@ static CompType::Kind BuiltinTyToCompTy(const BuiltinType *BTy, bool bSNorm,
     kind = CompType::Kind::PackedU8x32;
     break;
   case BuiltinType::SChar:
+  case BuiltinType::Char_S: // plain 'char' on signed-char platforms
     kind = CompType::Kind::I8;
     break;
   case BuiltinType::UChar:
+  case BuiltinType::Char_U: // plain 'char' on unsigned-char platforms
     kind = CompType::Kind::U8;
     break;
   // HLSL Changes end
@@ -886,7 +888,9 @@ static unsigned AlignBaseOffset(unsigned baseOffset, unsigned size, QualType Ty,
              BT->getKind() == clang::BuiltinType::Kind::UShort)
       scalarSizeInBytes = 2;
     else if (BT->getKind() == clang::BuiltinType::Kind::SChar ||
-             BT->getKind() == clang::BuiltinType::Kind::UChar) {
+             BT->getKind() == clang::BuiltinType::Kind::UChar ||
+             BT->getKind() == clang::BuiltinType::Kind::Char_S ||
+             BT->getKind() == clang::BuiltinType::Kind::Char_U) {
       // i8 types use 1-byte packing in cbuffer (4 values per 32-bit slot).
       scalarSizeInBytes = 1;
       size = 1;
@@ -1284,7 +1288,9 @@ unsigned CGMSHLSLRuntime::AddTypeAnnotation(QualType Ty,
     // i8 types use 1-byte cbuffer packing despite 4-byte LLVM ABI alignment.
     const clang::BuiltinType *BT = paramTy->getAs<clang::BuiltinType>();
     if (BT && (BT->getKind() == clang::BuiltinType::Kind::SChar ||
-               BT->getKind() == clang::BuiltinType::Kind::UChar))
+               BT->getKind() == clang::BuiltinType::Kind::UChar ||
+               BT->getKind() == clang::BuiltinType::Kind::Char_S ||
+               BT->getKind() == clang::BuiltinType::Kind::Char_U))
       return 1;
     return size;
   }

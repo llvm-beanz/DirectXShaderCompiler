@@ -4064,7 +4064,14 @@ HLSLReservedKeyword:
                                      DiagID, Policy);
       break;
     case tok::kw_char:
-      if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - char is reserved for HLSL
+      if (getLangOpts().HLSL) {
+        // In HLSL, 'char' is reserved except in SM 6.10+ where it aliases
+        // int8_t (signed char). Check the shader model from the profile string.
+        const hlsl::ShaderModel *SM =
+            hlsl::ShaderModel::GetByName(getLangOpts().HLSLProfile.c_str());
+        if (!SM || !SM->IsSM610Plus())
+          goto HLSLReservedKeyword;
+      } // HLSL Change - allow 'char' as int8_t alias in SM 6.10+
       isInvalid = DS.SetTypeSpecType(DeclSpec::TST_char, Loc, PrevSpec,
                                      DiagID, Policy);
       break;
