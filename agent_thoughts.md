@@ -118,3 +118,66 @@ Six test files created:
 
 4. **SPIR-V mode exclusion** — SPIR-V frontend has its own `uint8_t` type alias that predates
    HLSL SM 6.10. Guard the HLSL int8/uint8 type registration behind `!context.getLangOpts().SPIRV`.
+
+## Phase 6: Test Improvement Pass (COPILOT-TODO Feedback)
+
+### Pre-existing test failures
+
+`int8_errors.hlsl` and `int8_errors_typed_buf.hlsl` failed because lit sets
+`-o pipefail` and dxc exits with code 5 when it emits compilation errors.
+The fix is to use `not %dxc` (LLVM's `not` tool inverts the exit code), which
+is the standard pattern throughout the LLVM/clang test suite.
+
+### Ground-truth-first approach
+
+Rather than guessing CHECK patterns, I compiled every test case with `dxc` and
+read the actual DXIL output before writing a single FileCheck line.  Key
+findings that differed from the original test expectations:
+
+- **int8_t vector rawBuffer ops use v2i32/v4i32**, not v2i8/v4i8.  The
+  rawBufferVectorLoad/Store overload bitmask 0x4e7 excludes the i8 bit (0x10).
+- **Scalar int8_t fields in StructuredBuffers are 4-byte padded**.  Multiple
+  consecutive int8_t fields are NOT packed together.
+- **int8_t4 in a StructuredBuffer is 4-byte aligned**, not 16-byte.
+- **cbuffer int8_t arrays**: each element in its own 16-byte slot, but a
+  subsequent non-array field can pack into the unused portion of the last slot.
+- **RWByteAddressBuffer**: stores use `rawBufferStore.i8`; loads use
+  `rawBufferLoad.i32` + `trunc`.
+- **Explicit int8→int32 sign-extend**: `shl i32 N, 24` + `ashr i32 N, 24`.
+  **uint8→uint32 zero-extend**: `and i32 N, 255`.
+- **Implicit narrowing** produces `-Wconversion`:
+  `"conversion from larger type 'int' to smaller type 'signed char'"`.
+
+### Compiler bug discovered and fixed
+
+While running `int8_cbuffer_packing.hlsl` against the debug build
+(PredefinedParams.cmake has empty `CMAKE_BUILD_TYPE`, enabling assertions),
+an assertion fired in `AlignCBufferOffset`:
+
+```cpp
+DXASSERT(scalarSizeInBytes == 1 || !(offset & 1), "otherwise we have an invalid offset.");
+```
+
+Root cause: `int8_t arr[4]` leaves offset at 48+1=49 (odd), then the
+subsequent `int` field calls `AlignCBufferOffset` with offset=49 and type=i32.
+`AlignBufferOffsetInLegacy` correctly rounds 49 → 52, so the assertion was
+firing on valid input.  The assertion pre-dated int8_t support and assumed
+no type smaller than 16 bits could produce an odd offset.  Fix: remove the
+assertion and add a comment explaining the new invariant.
+
+### New test files
+
+- `int8_cbuffer_packing.hlsl`: cbuffer vector and array packing rules.
+- `int8_conversions.hlsl`: explicit scalar/vector conversion patterns.
+- `int8_implicit_conversions.hlsl`: `-Wconversion` diagnostic tests.
+
+### Lessons learned
+
+1. Always compile test inputs against the real compiler before writing
+   FileCheck patterns.  The DXIL emitted for int8_t is often surprising
+   (e.g., vector widening to i32).
+2. Debug builds catch real bugs.  The PredefinedParams.cmake build with
+   assertions enabled found a spurious `DXASSERT` that release builds
+   silently ignored.
+3. The LLVM `not` tool is the correct way to write tests that expect compiler
+   errors; `set -o pipefail` makes any non-zero dxc exit propagate otherwise.
