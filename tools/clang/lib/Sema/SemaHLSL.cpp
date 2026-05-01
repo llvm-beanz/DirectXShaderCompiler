@@ -4582,12 +4582,17 @@ public:
               parsedType == HLSLScalarType_uint8)
             return false;
         }
-        if (!DiagnoseHLSLScalarType(parsedType, R.getNameLoc()))
-          return false;
+        bool IsValidForSM = DiagnoseHLSLScalarType(parsedType, R.getNameLoc());
         TypedefDecl *typeDecl = LookupScalarTypeDef(parsedType);
         if (!typeDecl)
           return false;
+        // Add the declaration even when it is invalid for the current shader
+        // model.  This prevents cascading "unknown type name" errors and
+        // repeated re-lookups of the same identifier after the SM diagnostic
+        // has already been emitted.
         R.addDecl(typeDecl);
+        if (!IsValidForSM)
+          return true;
       } else if (rowCount == 0) { // vector
         TypedefDecl *qts = LookupVectorShorthandType(parsedType, colCount);
         R.addDecl(qts);
@@ -4852,7 +4857,11 @@ public:
         return AR_BASIC_UINT32;
       case BuiltinType::SChar:
         return AR_BASIC_INT8;
+      case BuiltinType::Char_S: // plain 'char' on signed-char platforms
+        return AR_BASIC_INT8;
       case BuiltinType::UChar:
+        return AR_BASIC_UINT8;
+      case BuiltinType::Char_U: // plain 'char' on unsigned-char platforms
         return AR_BASIC_UINT8;
       case BuiltinType::Short:
         return AR_BASIC_INT16;
