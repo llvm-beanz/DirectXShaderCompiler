@@ -67,16 +67,16 @@ void GCStore(globallycoherent RWByteAddressBuffer Buf) {
 }
 
 
-void getNonGCBufPAram(inout globallycoherent RWByteAddressBuffer PGCBuf) {
-  PGCBuf = NonGCBuf; // expected-warning{{implicit conversion from 'RWByteAddressBuffer' to 'globallycoherent RWByteAddressBuffer __restrict' adds globallycoherent annotation}}
+void getNonGCBufPAram(inout globallycoherent RWByteAddressBuffer PGCBuf) { // expected-error{{'globallycoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer &'}} expected-note{{'globallycoherent' can only be applied to UAV or RWDispatchNodeInputRecord objects}}
+  PGCBuf = NonGCBuf; // expected-warning{{implicit conversion from 'RWByteAddressBuffer' to 'globallycoherent RWByteAddressBuffer' adds globallycoherent annotation}}
 }
 
 static globallycoherent RWByteAddressBuffer SGCBufArr[2] = NonGCBufArr; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'globallycoherent RWByteAddressBuffer [2]' adds globallycoherent annotation}}
 static globallycoherent RWByteAddressBuffer SGCBufMultiArr0[2] = NonGCBufMultiArr[0]; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'globallycoherent RWByteAddressBuffer [2]' adds globallycoherent annotation}}
 static globallycoherent RWByteAddressBuffer SGCBufMultiArr1[2][2] = NonGCBufMultiArr; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2][2]' to 'globallycoherent RWByteAddressBuffer [2][2]' adds globallycoherent annotation}}
 
-void getNonGCBufArrParam(inout globallycoherent RWByteAddressBuffer PGCBufArr[2]) {
-  PGCBufArr = NonGCBufArr; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'globallycoherent RWByteAddressBuffer __restrict[2]' adds globallycoherent annotation}}
+void getNonGCBufArrParam(inout globallycoherent RWByteAddressBuffer PGCBufArr[2]) { // expected-error{{'globallycoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer (&)[2]'}} expected-note{{'globallycoherent' can only be applied to UAV or RWDispatchNodeInputRecord objects}}
+  PGCBufArr = NonGCBufArr; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'globallycoherent RWByteAddressBuffer [2]' adds globallycoherent annotation}}
 }
 
 [shader("compute")]

@@ -49,11 +49,11 @@ void GCStore(globallycoherent RWByteAddressBuffer Buf) {
   Buf.Store(0, 0);
 }
 
-void getPromoteToGCParam(inout globallycoherent RWByteAddressBuffer PGCBuf) {
-  PGCBuf = RCBuf; // expected-warning{{implicit conversion from 'reordercoherent RWByteAddressBuffer' to 'globallycoherent RWByteAddressBuffer __restrict' promotes reordercoherent to globallycoherent annotation}}
+void getPromoteToGCParam(inout globallycoherent RWByteAddressBuffer PGCBuf) { // expected-error{{'globallycoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer &'}} expected-note{{'globallycoherent' can only be applied to UAV or RWDispatchNodeInputRecord objects}}
+  PGCBuf = RCBuf; // expected-warning{{implicit conversion from 'reordercoherent RWByteAddressBuffer' to 'globallycoherent RWByteAddressBuffer' promotes reordercoherent to globallycoherent annotation}}
 }
-void getDemoteToRCParam(inout reordercoherent RWByteAddressBuffer PRCBuf) {
-  PRCBuf = GCBuf; // expected-warning{{implicit conversion from 'globallycoherent RWByteAddressBuffer' to 'reordercoherent RWByteAddressBuffer __restrict' demotes globallycoherent to reordercoherent annotation}}
+void getDemoteToRCParam(inout reordercoherent RWByteAddressBuffer PRCBuf) { // expected-error{{'reordercoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer &'}} expected-note{{'reordercoherent' can only be applied to UAV objects}}
+  PRCBuf = GCBuf; // expected-warning{{implicit conversion from 'globallycoherent RWByteAddressBuffer' to 'reordercoherent RWByteAddressBuffer' demotes globallycoherent to reordercoherent annotation}}
 }
 
 static reordercoherent RWByteAddressBuffer SRCDemoteBufArr[2] = GCBufArr; // expected-warning{{implicit conversion from 'globallycoherent RWByteAddressBuffer [2]' to 'reordercoherent RWByteAddressBuffer [2]' demotes globallycoherent to reordercoherent annotation}}
@@ -64,11 +64,11 @@ static globallycoherent RWByteAddressBuffer SRCPromoteBufArr[2] = RCBufArr; // e
 static globallycoherent RWByteAddressBuffer SRCPromoteBufMultiArr0[2] = RCBufMultiArr[0]; // expected-warning{{implicit conversion from 'reordercoherent RWByteAddressBuffer [2]' to 'globallycoherent RWByteAddressBuffer [2]' promotes reordercoherent to globallycoherent annotation}}
 static globallycoherent RWByteAddressBuffer SRCPromoteBufMultiArr1[2][2] = RCBufMultiArr; // expected-warning{{implicit conversion from 'reordercoherent RWByteAddressBuffer [2][2]' to 'globallycoherent RWByteAddressBuffer [2][2]' promotes reordercoherent to globallycoherent annotation}}
 
-void getPromoteToGCParamArr(inout globallycoherent RWByteAddressBuffer PGCBufArr[2]) {
-  PGCBufArr = RCBufArr; // expected-warning{{implicit conversion from 'reordercoherent RWByteAddressBuffer [2]' to 'globallycoherent RWByteAddressBuffer __restrict[2]' promotes reordercoherent to globallycoherent annotation}}
+void getPromoteToGCParamArr(inout globallycoherent RWByteAddressBuffer PGCBufArr[2]) { // expected-error{{'globallycoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer (&)[2]'}} expected-note{{'globallycoherent' can only be applied to UAV or RWDispatchNodeInputRecord objects}}
+  PGCBufArr = RCBufArr; // expected-warning{{implicit conversion from 'reordercoherent RWByteAddressBuffer [2]' to 'globallycoherent RWByteAddressBuffer [2]' promotes reordercoherent to globallycoherent annotation}}
 }
-void getDemoteToRCParamArr(inout reordercoherent RWByteAddressBuffer PRCBufArr[2]) {
-  PRCBufArr = GCBufArr; // expected-warning{{implicit conversion from 'globallycoherent RWByteAddressBuffer [2]' to 'reordercoherent RWByteAddressBuffer __restrict[2]' demotes globallycoherent to reordercoherent annotation}}
+void getDemoteToRCParamArr(inout reordercoherent RWByteAddressBuffer PRCBufArr[2]) { // expected-error{{'reordercoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer (&)[2]'}} expected-note{{'reordercoherent' can only be applied to UAV objects}}
+  PRCBufArr = GCBufArr; // expected-warning{{implicit conversion from 'globallycoherent RWByteAddressBuffer [2]' to 'reordercoherent RWByteAddressBuffer [2]' demotes globallycoherent to reordercoherent annotation}}
 }
 
 globallycoherent RWByteAddressBuffer getGCBuf() {
