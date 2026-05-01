@@ -2643,16 +2643,16 @@ static const OP::OpCodeProperty CoreOps_OpCodeProps[] = {
      "rawBufferVectorLoad",
      Attribute::ReadOnly,
      1,
-     {{0x4e7}},
-     {{0xe7}}}, // Overloads: hfwidl<hfwidl
+     {{0x4f7}},
+     {{0xf7}}}, // Overloads: 8hfwidl<8hfwidl
     {OC::RawBufferVectorStore,
      "RawBufferVectorStore",
      OCC::RawBufferVectorStore,
      "rawBufferVectorStore",
      Attribute::None,
      1,
-     {{0x4e7}},
-     {{0xe7}}}, // Overloads: hfwidl<hfwidl
+     {{0x4f7}},
+     {{0xf7}}}, // Overloads: 8hfwidl<8hfwidl
 
     {OC::ReservedD0,
      "ReservedD0",

@@ -4323,8 +4323,13 @@ static SmallVector<Value *, 10> GetBufLoadArgs(ResLoadHelper helper,
 }
 
 static bool isMinPrecisionType(Type *EltTy, const DataLayout &DL) {
-  return !EltTy->isIntegerTy(1) &&
-         DL.getTypeAllocSizeInBits(EltTy) > EltTy->getPrimitiveSizeInBits();
+  // i1 (bool) and i8 are not min-precision types even though the HLSL legacy
+  // data layout gives i8 a 32-bit ABI footprint (i8:32).  Min-precision
+  // types are specifically 16-bit values (half, min16float, min16int, etc.)
+  // whose alloc size is widened to 32 bits.
+  if (EltTy->isIntegerTy(1) || EltTy->isIntegerTy(8))
+    return false;
+  return DL.getTypeAllocSizeInBits(EltTy) > EltTy->getPrimitiveSizeInBits();
 }
 
 static Type *widenMinPrecisionType(Type *Ty, LLVMContext &Ctx,
