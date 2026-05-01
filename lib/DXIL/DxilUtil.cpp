@@ -79,6 +79,7 @@ unsigned GetLegacyCBufferFieldElementSize(DxilFieldAnnotation &fieldAnnotation,
   CompType compType = fieldAnnotation.GetCompType();
   unsigned compSize = compType.Is64Bit()                                 ? 8
                       : compType.Is16Bit() && !typeSys.UseMinPrecision() ? 2
+                      : compType.Is8Bit()                                ? 1
                                                                          : 4;
   unsigned fieldSize = compSize;
   if (Ty->isVectorTy()) {
@@ -1255,6 +1256,15 @@ Value *TryReplaceBaseCastWithGep(Value *V) {
     }
 
     // If we found a path from the src to dest, create the getelementptr now.
+    // Don't transform if the bitcast is used as a memcpy source or dest;
+    // doing so would create a struct-field GEP that prevents LowerMemcpy from
+    // attributing the memcpy to the parent struct alloca (bStructElt issue).
+    if (SrcElTy == DstElTy && NumZeros > 0) {
+      for (const User *U : BCO->users()) {
+        if (isa<MemCpyInst>(U))
+          return nullptr;
+      }
+    }
     if (SrcElTy == DstElTy) {
       IRBuilder<> Builder(BCO->getContext());
       StringRef Name = "";

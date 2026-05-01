@@ -639,34 +639,42 @@ void DxilMutateResourceToHandle::mutateCandidates(Module &M) {
       Type *MSrcEltTy = mutateToHandleTy(GEP->getSourceElementType());
       GEP->setSourceElementType(MSrcEltTy);
     } else if (GEPOperator *GEPO = dyn_cast<GEPOperator>(V)) {
-      // GEP operator not support setSourceElementType.
+      // GEP operator does not support setSourceElementType.
       // Create a new GEP here.
       Constant *C = cast<Constant>(GEPO->getPointerOperand());
       IRBuilder<> B(C->getContext());
-      // Make sure C is mutated so the GEP get correct sourceElementType.
+      // Make sure C is mutated so the GEP gets correct sourceElementType.
       C->mutateType(mutateToHandleTy(C->getType()));
 
-      // Collect user of GEPs, then replace all use with undef.
-      SmallVector<Use *, 2> Uses;
-      for (Use &U : GEPO->uses()) {
-        Uses.emplace_back(&U);
-      }
+      // If the GEP's result type doesn't change, there is no need to recreate
+      // it.  The GEP may have more indices than the new (mutated) source element
+      // type can accommodate; attempting to fold a GEP with extra indices into
+      // the new source type would produce an invalid GEP and crash. Such GEPs
+      // appear only in llvm.used-like contexts where the source element type is
+      // irrelevant, so we can leave them in place.
+      if (MTy == Ty)
+        continue;
 
       SmallVector<Value *, 2> idxList(GEPO->idx_begin(), GEPO->idx_end());
-      Type *Ty = GEPO->getType();
-      GEPO->replaceAllUsesWith(UndefValue::get(Ty));
-      StringRef Name = GEPO->getName();
+
+      // Create new GEP with the updated source element type (inferred from
+      // mutated C->getType()). Must be done BEFORE replaceAllUsesWith so that
+      // the new constant is distinct from GEPO in the constant map.
+      Value *newGO = B.CreateGEP(C, idxList);
 
       // GO and newGO will be same constant except has different
       // sourceElementType. ConstantMap think they're the same constant. Have to
       // remove GO first before create newGO.
+      //
+      // Use replaceAllUsesWith(newGO) directly rather than collecting Use*
+      // pointers and manually updating them. When a user is a Constant (e.g., a
+      // ConstantArray in llvm.used), replaceAllUsesWith triggers
+      // handleOperandChange which correctly rebuilds the constant. Collecting
+      // Use* pointers before the replacement is unsafe because
+      // handleOperandChange may destroy the old constant and free its Use
+      // objects, leaving dangling pointers.
+      GEPO->replaceAllUsesWith(newGO);
       C->removeDeadConstantUsers();
-
-      Value *newGO = B.CreateGEP(C, idxList, Name);
-      // update uses.
-      for (Use *U : Uses) {
-        U->set(newGO);
-      }
       continue;
     }
     V->mutateType(MTy);

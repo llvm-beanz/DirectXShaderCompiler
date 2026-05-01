@@ -8420,24 +8420,44 @@ Value *GenerateCBLoadLegacy(Value *handle, Value *legacyIdx,
   Type *halfTy = Type::getHalfTy(EltTy->getContext());
   Type *i64Ty = Type::getInt64Ty(EltTy->getContext());
   Type *i16Ty = Type::getInt16Ty(EltTy->getContext());
+  Type *i32Ty = Type::getInt32Ty(EltTy->getContext());
 
   bool is64 = (EltTy == doubleTy) | (EltTy == i64Ty);
   bool is16 = (EltTy == halfTy || EltTy == i16Ty) && !hlslOP->UseMinPrecision();
-  DXASSERT_LOCALVAR(is16, (is16 && channelOffset < 8) || channelOffset < 4,
-                    "legacy cbuffer don't across 16 bytes register.");
+  bool is8 = EltTy->isIntegerTy(8);
+  // channelOffset is in byte units (0-15 per 16-byte register).
+  DXASSERT(channelOffset < 16,
+           "legacy cbuffer does not cross 16 bytes register.");
+
+  if (is8) {
+    // Load as i32, extract the appropriate byte via shift and truncate.
+    Function *CBLoad = hlslOP->GetOpFunc(OP::OpCode::CBufferLoadLegacy, i32Ty);
+    Value *loadLegacy = Builder.CreateCall(CBLoad, {OpArg, handle, legacyIdx});
+    unsigned i32Slot = channelOffset / 4;
+    unsigned subByte = channelOffset % 4;
+    Value *slot = Builder.CreateExtractValue(loadLegacy, i32Slot);
+    if (subByte) {
+      Value *shift = hlslOP->GetU32Const(subByte * 8);
+      slot = Builder.CreateLShr(slot, shift);
+    }
+    return Builder.CreateTrunc(slot, EltTy);
+  }
+
   if (is64) {
     Function *CBLoad = hlslOP->GetOpFunc(OP::OpCode::CBufferLoadLegacy, EltTy);
     Value *loadLegacy = Builder.CreateCall(CBLoad, {OpArg, handle, legacyIdx});
-    DXASSERT((channelOffset & 1) == 0,
-             "channel offset must be even for double");
-    unsigned eltIdx = channelOffset >> 1;
+    DXASSERT((channelOffset & 7) == 0,
+             "channel offset must be 8-byte aligned for double");
+    unsigned eltIdx = channelOffset / 8;
     Value *Result = Builder.CreateExtractValue(loadLegacy, eltIdx);
     return Result;
   }
 
   Function *CBLoad = hlslOP->GetOpFunc(OP::OpCode::CBufferLoadLegacy, EltTy);
   Value *loadLegacy = Builder.CreateCall(CBLoad, {OpArg, handle, legacyIdx});
-  return Builder.CreateExtractValue(loadLegacy, channelOffset);
+  if (is16)
+    return Builder.CreateExtractValue(loadLegacy, channelOffset / 2);
+  return Builder.CreateExtractValue(loadLegacy, channelOffset / 4);
 }
 
 Value *GenerateCBLoadLegacy(Value *handle, Value *legacyIdx,
@@ -8454,19 +8474,42 @@ Value *GenerateCBLoadLegacy(Value *handle, Value *legacyIdx,
   Type *i64Ty = Type::getInt64Ty(EltTy->getContext());
   Type *halfTy = Type::getHalfTy(EltTy->getContext());
   Type *shortTy = Type::getInt16Ty(EltTy->getContext());
+  Type *i32Ty = Type::getInt32Ty(EltTy->getContext());
 
   bool is64 = (EltTy == doubleTy) | (EltTy == i64Ty);
   bool is16 =
       (EltTy == shortTy || EltTy == halfTy) && !hlslOP->UseMinPrecision();
-  DXASSERT((is16 && channelOffset + vecSize <= 8) ||
-               (channelOffset + vecSize) <= 4,
-           "legacy cbuffer don't across 16 bytes register.");
+  bool is8 = EltTy->isIntegerTy(8);
+  // channelOffset is in byte units (0-15 per 16-byte register).
+  DXASSERT(channelOffset + vecSize <= 16,
+           "legacy cbuffer does not cross 16 bytes register.");
+
+  if (is8) {
+    // Load as i32 and extract each byte via shift and truncate.
+    Function *CBLoad = hlslOP->GetOpFunc(OP::OpCode::CBufferLoadLegacy, i32Ty);
+    Value *loadLegacy = Builder.CreateCall(CBLoad, {OpArg, handle, legacyIdx});
+    Value *Result = UndefValue::get(VectorType::get(EltTy, vecSize));
+    for (unsigned i = 0; i < vecSize; ++i) {
+      unsigned byteOff = channelOffset + i;
+      unsigned i32Slot = byteOff / 4;
+      unsigned subByte = byteOff % 4;
+      Value *slot = Builder.CreateExtractValue(loadLegacy, i32Slot);
+      Value *shifted = subByte > 0
+                           ? Builder.CreateLShr(slot, hlslOP->GetU32Const(subByte * 8))
+                           : slot;
+      Value *elem = Builder.CreateTrunc(shifted, EltTy);
+      Result = Builder.CreateInsertElement(Result, elem, i);
+    }
+    return Result;
+  }
+
   if (is16) {
     Function *CBLoad = hlslOP->GetOpFunc(OP::OpCode::CBufferLoadLegacy, EltTy);
     Value *loadLegacy = Builder.CreateCall(CBLoad, {OpArg, handle, legacyIdx});
     Value *Result = UndefValue::get(VectorType::get(EltTy, vecSize));
     for (unsigned i = 0; i < vecSize; ++i) {
-      Value *NewElt = Builder.CreateExtractValue(loadLegacy, channelOffset + i);
+      Value *NewElt =
+          Builder.CreateExtractValue(loadLegacy, channelOffset / 2 + i);
       Result = Builder.CreateInsertElement(Result, NewElt, i);
     }
     return Result;
@@ -8480,7 +8523,8 @@ Value *GenerateCBLoadLegacy(Value *handle, Value *legacyIdx,
     if (vecSize < smallVecSize)
       smallVecSize = vecSize;
     for (unsigned i = 0; i < smallVecSize; ++i) {
-      Value *NewElt = Builder.CreateExtractValue(loadLegacy, channelOffset + i);
+      Value *NewElt =
+          Builder.CreateExtractValue(loadLegacy, channelOffset / 8 + i);
       Result = Builder.CreateInsertElement(Result, NewElt, i);
     }
     if (vecSize > 2) {
@@ -8500,7 +8544,8 @@ Value *GenerateCBLoadLegacy(Value *handle, Value *legacyIdx,
   Value *loadLegacy = Builder.CreateCall(CBLoad, {OpArg, handle, legacyIdx});
   Value *Result = UndefValue::get(VectorType::get(EltTy, vecSize));
   for (unsigned i = 0; i < vecSize; ++i) {
-    Value *NewElt = Builder.CreateExtractValue(loadLegacy, channelOffset + i);
+    Value *NewElt =
+        Builder.CreateExtractValue(loadLegacy, channelOffset / 4 + i);
     Result = Builder.CreateInsertElement(Result, NewElt, i);
   }
   return Result;
@@ -8867,20 +8912,12 @@ void TranslateCBGepLegacy(GetElementPtrInst *GEP, Value *handle,
       DxilStructAnnotation *annotation = dxilTypeSys.GetStructAnnotation(ST);
       fieldAnnotation = &annotation->GetFieldAnnotation(immIdx);
 
-      unsigned idxInc = 0;
-      unsigned structOffset = 0;
-      if (fieldAnnotation->GetCompType().Is16Bit() &&
-          !hlslOP->UseMinPrecision()) {
-        structOffset = fieldAnnotation->GetCBufferOffset() >> 1;
-        channel += structOffset;
-        idxInc = channel >> 3;
-        channel = channel & 0x7;
-      } else {
-        structOffset = fieldAnnotation->GetCBufferOffset() >> 2;
-        channel += structOffset;
-        idxInc = channel >> 2;
-        channel = channel & 0x3;
-      }
+      // Use byte-offset units for channel.  This is correct for all scalar
+      // types (i8 packed 1-byte, i16 2-byte-aligned, i32 4-byte-aligned,
+      // i64 8-byte-aligned) because GetCBufferOffset() returns bytes.
+      channel += fieldAnnotation->GetCBufferOffset();
+      unsigned idxInc = channel >> 4;  // 16 bytes per cbuffer register
+      channel = channel & 0xF;
       if (idxInc)
         legacyIndex =
             Builder.CreateAdd(legacyIndex, hlslOP->GetU32Const(idxInc));
@@ -8917,18 +8954,16 @@ void TranslateCBGepLegacy(GetElementPtrInst *GEP, Value *handle,
       // Indexing on vector.
       if (bImmIdx) {
         if (immIdx < GEPIt->getVectorNumElements()) {
+          Type *VecEltTy = GEPIt->getVectorElementType();
+          // Use 1-byte element size for i8 (packed); use data layout for others.
           const unsigned vectorElmSize =
-              DL.getTypeAllocSize(GEPIt->getVectorElementType());
-          const bool bIs16bitType = vectorElmSize == 2;
+              VecEltTy->isIntegerTy(8) ? 1 : DL.getTypeAllocSize(VecEltTy);
           const unsigned tempOffset = vectorElmSize * immIdx;
-          const unsigned numChannelsPerRow = bIs16bitType ? 8 : 4;
-          const unsigned channelInc =
-              bIs16bitType ? tempOffset >> 1 : tempOffset >> 2;
-
-          DXASSERT((channel + channelInc) < numChannelsPerRow,
+          // channel is in byte units (0-15 per register).
+          DXASSERT((channel + tempOffset) < 16,
                    "vector should not cross cb register");
-          channel += channelInc;
-          if (channel == numChannelsPerRow) {
+          channel += tempOffset;
+          if (channel == 16) {
             // Get to another row.
             // Update index and channel.
             channel = 0;
@@ -9300,11 +9335,11 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
   if (CallInst *userCall = dyn_cast<CallInst>(user)) {
     HLOpcodeGroup group = // user call?
         hlsl::GetHLOpcodeGroupByName(userCall->getCalledFunction());
-    unsigned opcode = GetHLOpcode(userCall);
     // For case element type of structure buffer is not structure type.
     if (baseOffset == nullptr)
       baseOffset = OP->GetU32Const(0);
     if (group == HLOpcodeGroup::HLIntrinsic) {
+      unsigned opcode = GetHLOpcode(userCall);
       IntrinsicOp IOP = static_cast<IntrinsicOp>(opcode);
       switch (IOP) {
       case IntrinsicOp::MOP_Load: {
@@ -9442,6 +9477,9 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
     Phi->eraseFromParent();
   } else {
     // should only used by GEP
+    if (!isa<GetElementPtrInst>(user)) {
+      DXASSERT(false, "user is not GEP in TranslateStructBufSubscriptUser");
+    }
     GetElementPtrInst *GEP = cast<GetElementPtrInst>(user);
     Type *Ty = GEP->getType()->getPointerElementType();
 
@@ -9457,7 +9495,6 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
 
     for (auto U = GEP->user_begin(); U != GEP->user_end();) {
       Value *GEPUser = *(U++);
-
       TranslateStructBufSubscriptUser(cast<Instruction>(GEPUser), handle,
                                       ResKind, bufIdx, baseOffset, status, OP,
                                       DL);
