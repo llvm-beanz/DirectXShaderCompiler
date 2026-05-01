@@ -3105,9 +3105,10 @@ static void ValidateFunctionBody(Function *F, ValidationContext &ValCtx) {
         if (IntegerType *IT = dyn_cast<IntegerType>(op->getType())) {
           unsigned BW = IT->getBitWidth();
           if (BW == 8) {
-            // We always fail if we see i8 as operand type of a non-lifetime
-            // instruction.
-            ValCtx.EmitInstrError(&I, ValidationRule::TypesI8);
+            // Allow i8 as operand type for SM 6.10+.
+            if (!ValCtx.DxilMod.GetShaderModel()->IsSM610Plus()) {
+              ValCtx.EmitInstrError(&I, ValidationRule::TypesI8);
+            }
           } else {
             ValidateType(IT, ValCtx);
           }
@@ -3122,10 +3123,13 @@ static void ValidateFunctionBody(Function *F, ValidationContext &ValCtx) {
       if (IntegerType *IT = dyn_cast<IntegerType>(Ty)) {
         unsigned BW = IT->getBitWidth();
         if (BW == 8) {
-          // Allow i8* cast for llvm.lifetime.* intrinsics.
-          if (!SupportsLifetimeIntrinsics || !isa<BitCastInst>(I) ||
-              !onlyUsedByLifetimeMarkers(&I)) {
-            ValCtx.EmitInstrError(&I, ValidationRule::TypesI8);
+          // Allow i8 types for SM 6.10+, or i8* cast for llvm.lifetime.*
+          // intrinsics in older shader models.
+          if (!ValCtx.DxilMod.GetShaderModel()->IsSM610Plus()) {
+            if (!SupportsLifetimeIntrinsics || !isa<BitCastInst>(I) ||
+                !onlyUsedByLifetimeMarkers(&I)) {
+              ValCtx.EmitInstrError(&I, ValidationRule::TypesI8);
+            }
           }
         } else {
           ValidateType(IT, ValCtx);
@@ -4129,6 +4133,16 @@ static void ValidateResource(hlsl::DxilResource &Res,
   case DXIL::ComponentType::F16:
   case DXIL::ComponentType::I16:
   case DXIL::ComponentType::U16:
+    break;
+  case DXIL::ComponentType::I8:
+  case DXIL::ComponentType::U8:
+    // I8/U8 are allowed in structured buffers for SM 6.10+,
+    // but disallowed in typed buffers and textures.
+    if (!Res.IsStructuredBuffer() && !Res.IsRawBuffer()) {
+      ValCtx.EmitResourceError(&Res, ValidationRule::SmInvalidResourceCompType);
+    } else if (!ValCtx.DxilMod.GetShaderModel()->IsSM610Plus()) {
+      ValCtx.EmitResourceError(&Res, ValidationRule::SmInvalidResourceCompType);
+    }
     break;
   default:
     if (!Res.IsStructuredBuffer() && !Res.IsRawBuffer() &&

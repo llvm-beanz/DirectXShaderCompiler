@@ -3640,7 +3640,7 @@ class db_dxil(object):
             "RawBufferLoad",
             "RawBufferLoad",
             "reads from a raw buffer and structured buffer",
-            "hfwidl",
+            "hfd8wil",
             "ro",
             [
                 db_dxil_param(0, "$r", "", "the loaded value"),
@@ -3673,7 +3673,7 @@ class db_dxil(object):
             "RawBufferStore",
             "RawBufferStore",
             "writes to a RWByteAddressBuffer or RWStructuredBuffer",
-            "hfwidl",
+            "hfd8wil",
             "",
             [
                 db_dxil_param(0, "v", "", ""),

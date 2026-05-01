@@ -1250,16 +1250,16 @@ static const OP::OpCodeProperty CoreOps_OpCodeProps[] = {
      "rawBufferLoad",
      Attribute::ReadOnly,
      1,
-     {{0xe7}},
-     {{0x0}}}, // Overloads: hfwidl
+     {{0xf7}},
+     {{0x0}}}, // Overloads: hfd8wil
     {OC::RawBufferStore,
      "RawBufferStore",
      OCC::RawBufferStore,
      "rawBufferStore",
      Attribute::None,
      1,
-     {{0xe7}},
-     {{0x0}}}, // Overloads: hfwidl
+     {{0xf7}},
+     {{0x0}}}, // Overloads: hfd8wil
 
     // Raytracing object space uint System Values
     {OC::InstanceID,
