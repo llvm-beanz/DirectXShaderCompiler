@@ -1,3 +1,4 @@
+// REQUIRES: dxil-1-10
 // RUN: %dxc -E main -T ms_6_8 %s -Fo %t
 // RUN: %dxa %t -dumppsv | FileCheck %s
 
@@ -6,6 +7,7 @@
 // CHECK-NEXT:  Mesh Shader
 // CHECK-NEXT:  MeshOutputTopology=triangle
 // CHECK-NEXT:  NumThreads=(32,1,1)
+// CHECK-NEXT:  NumBytesGroupSharedMemory: 64
 // CHECK-NEXT:  MinimumExpectedWaveLaneCount: 0
 // CHECK-NEXT:  MaximumExpectedWaveLaneCount: 4294967295
 // CHECK-NEXT:  UsesViewID: true
@@ -126,7 +128,7 @@
 // CHECK-NEXT: Outputs affected by ViewID as a bitmask for stream 0:
 // CHECK-NEXT:    ViewID influencing Outputs[0] : 0  1  2  3  4  8  12  16
 // CHECK-NEXT: PCOutputs affected by ViewID as a bitmask:
-// CHECK-NEXT:    ViewID influencing PCOutputs :  None
+// CHECK-NEXT:    ViewID influencing PCOutputs :  3
 // CHECK-NEXT: Outputs affected by inputs as a table of bitmasks for stream 0:
 // CHECK-NEXT: Inputs contributing to computation of Outputs[0]:  None
 
@@ -189,7 +191,7 @@ void main(
       op.normal = mpl.normal;
       op.malnor = gsMem[tig / 3 + 1];
       op.alnorm = mpl.alnorm;
-      op.ormaln = mpl.ormaln;
+      op.ormaln = mpl.ormaln + vid;
       op.layer[0] = mpl.layer[0];
       op.layer[1] = mpl.layer[1];
       op.layer[2] = mpl.layer[2];

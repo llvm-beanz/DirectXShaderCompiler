@@ -19,16 +19,22 @@
 #include "dxc/Support/Unicode.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <optional>
+
 using namespace llvm::opt;
 using namespace dxc;
 using namespace hlsl;
 using namespace hlsl::options;
+#ifdef ENABLE_SPIRV_CODEGEN
+using namespace clang::spirv;
+#endif
 
 #define PREFIX(NAME, VALUE) static const char *const NAME[] = VALUE;
 #include "dxc/Support/HLSLOptions.inc"
@@ -160,6 +166,24 @@ llvm::StringRef DxcOpts::GetPDBName() const {
   return llvm::StringRef();
 }
 
+bool DxcOpts::ProduceDxModule() const {
+
+  return !AstDump && !OptDump &&
+#ifdef ENABLE_SPIRV_CODEGEN
+         !GenSPIRV &&
+#endif
+         !DumpDependencies && !VerifyDiagnostics && !IsRootSignatureProfile() &&
+         Preprocess.empty();
+}
+
+bool DxcOpts::ProduceFullContainer() const {
+  return DxcOpts::ProduceDxModule() && !CodeGenHighLevel;
+}
+
+bool DxcOpts::NeedsValidation() const {
+  return ProduceFullContainer() && !DisableValidation;
+}
+
 MainArgs::MainArgs(int argc, const wchar_t **argv, int skipArgCount) {
   if (argc > skipArgCount) {
     Utf8StringVector.reserve(argc - skipArgCount);
@@ -206,33 +230,6 @@ MainArgs &MainArgs::operator=(const MainArgs &other) {
 StringRefWide::StringRefWide(llvm::StringRef value) {
   if (!value.empty())
     m_value = Unicode::UTF8ToWideStringOrThrow(value.data());
-}
-
-static bool GetTargetVersionFromString(llvm::StringRef ref, unsigned *major,
-                                       unsigned *minor) {
-  *major = *minor = -1;
-  unsigned len = ref.size();
-  if (len < 6 || len > 11) // length: ps_6_0 to rootsig_1_0
-    return false;
-  if (ref[len - 4] != '_' || ref[len - 2] != '_')
-    return false;
-
-  char cMajor = ref[len - 3];
-  char cMinor = ref[len - 1];
-
-  if (cMajor >= '0' && cMajor <= '9')
-    *major = cMajor - '0';
-  else
-    return false;
-
-  if (cMinor == 'x')
-    *minor = 0xF;
-  else if (cMinor >= '0' && cMinor <= '9')
-    *minor = cMinor - '0';
-  else
-    return false;
-
-  return true;
 }
 
 // Copied from CompilerInvocation since we parse our own diagnostic arguments
@@ -320,6 +317,46 @@ static bool handleVkShiftArgs(const InputArgList &args, OptSpecifier id,
   return true;
 }
 
+// Parses the given flag |id| in |args|. If present and valid, sets |info| to
+// the correct value. Returns true if parsing succeeded. Returns false if
+// parsing failed, and outputs in |errors| a message using |name| as pretty name
+// for the flag.
+static bool
+handleFixedBinding(const InputArgList &args, OptSpecifier id,
+                   std::optional<SpirvCodeGenOptions::BindingInfo> *info,
+                   llvm::StringRef name, llvm::raw_ostream &errors) {
+  const auto values = args.getAllArgValues(id);
+  if (values.size() == 0) {
+    *info = std::nullopt;
+    return true;
+  }
+
+  if (!args.hasArg(OPT_spirv)) {
+    errors << name << " requires -spirv";
+    return false;
+  }
+
+  assert(values.size() == 2);
+
+  size_t output[2] = {0, 0};
+  for (unsigned i = 0; i < 2; ++i) {
+    int number = 0;
+    if (llvm::StringRef(values[i]).getAsInteger(10, number)) {
+      errors << "invalid " << name << " argument: '" << values[i] << "'";
+      return false;
+    }
+    if (number < 0) {
+      errors << "expected positive integer for " << name
+             << ", got: " << values[i];
+      return false;
+    }
+    output[i] = number;
+  }
+
+  *info = {output[0], output[1]};
+  return true;
+}
+
 // Check if any options that are unsupported with SPIR-V are used.
 static bool hasUnsupportedSpirvOption(const InputArgList &args,
                                       llvm::raw_ostream &errors) {
@@ -362,6 +399,60 @@ LangStd parseHLSLVersion(llvm::StringRef Ver) {
       .Case("202x", hlsl::LangStd::v202x)
       .Default(hlsl::LangStd::vError);
 }
+
+// Returns the preprocess output filename based on /P or /Po flags,
+// or empty string if neither is set.
+static std::string getPreprocessOutput(InputArgList &Args,
+                                       llvm::raw_ostream &Errors) {
+  if (Args.hasFlag(OPT_P, OPT_INVALID, false)) {
+    // cl.exe-compatible /P: preprocess to <inputname>.i, or use /Fi to
+    // override.
+    llvm::SmallString<128> Path(Args.getLastArgValue(OPT_INPUT));
+    llvm::sys::path::replace_extension(Path, "i");
+    return Args.getLastArgValue(OPT_Fi, Path).str();
+  }
+
+  if (!Args.hasFlag(OPT_Po, OPT_INVALID, false))
+    return "";
+
+  // /Po: backward-compatible preprocessing (deprecated, use /P instead).
+  // Default preprocess filename is InputName.i.
+  llvm::SmallString<128> Path(Args.getLastArgValue(OPT_INPUT));
+  llvm::sys::path::replace_extension(Path, "i");
+  // Try to get preprocess filename from Fi.
+  std::string Result = Args.getLastArgValue(OPT_Fi, Path).str();
+
+  // Hack to support fxc style /Po preprocess_filename.
+  // When there're more than 1 Input file, use the input which is after /Po
+  // as preprocess.
+  if (!Args.hasArg(OPT_Fi)) {
+    std::vector<std::string> Inputs = Args.getAllArgValues(OPT_INPUT);
+    if (Inputs.size() > 1) {
+      llvm::opt::Arg *PoArg = Args.getLastArg(OPT_Po);
+      std::string LastInput = Inputs.back();
+      llvm::opt::Arg *PrevInputArg = nullptr;
+      for (llvm::opt::Arg *InputArg : Args.filtered(OPT_INPUT)) {
+        // Find Input after /Po.
+        if ((PoArg->getIndex() + 1) == InputArg->getIndex()) {
+          Result = InputArg->getValue();
+          if (LastInput == Result && PrevInputArg) {
+            // When InputArg is last Input, update it to other Input so
+            // Args.getLastArgValue(OPT_INPUT) get expect Input.
+            InputArg->getValues()[0] = PrevInputArg->getValues()[0];
+          }
+          break;
+        }
+        PrevInputArg = InputArg;
+      }
+    }
+  }
+  Errors << "warning: /Po is deprecated, please use /P";
+  if (!Result.empty() && Result != Path.str())
+    Errors << " /Fi " << Result;
+  Errors << " instead.\n";
+  return Result;
+}
+
 namespace options {
 
 /// Reads all options from the given argument strings, populates opts, and
@@ -546,40 +637,7 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
   opts.UseInstructionNumbers = Args.hasFlag(OPT_Ni, OPT_INVALID, false);
   opts.UseInstructionByteOffsets = Args.hasFlag(OPT_No, OPT_INVALID, false);
   opts.UseHexLiterals = Args.hasFlag(OPT_Lx, OPT_INVALID, false);
-  if (Args.hasFlag(OPT_P, OPT_INVALID, false)) {
-    // Default preprocess filename is InputName.i.
-    llvm::SmallString<128> Path(Args.getLastArgValue(OPT_INPUT));
-    llvm::sys::path::replace_extension(Path, "i");
-    // Try to get preprocess filename from Fi.
-    opts.Preprocess = Args.getLastArgValue(OPT_Fi, Path).str();
-    // Hack to support fxc style /P preprocess_filename.
-    // When there're more than 1 Input file, use the input which is after /P as
-    // preprocess.
-    if (!Args.hasArg(OPT_Fi)) {
-      std::vector<std::string> Inputs = Args.getAllArgValues(OPT_INPUT);
-      if (Inputs.size() > 1) {
-        llvm::opt::Arg *PArg = Args.getLastArg(OPT_P);
-        std::string LastInput = Inputs.back();
-        llvm::opt::Arg *PrevInputArg = nullptr;
-        for (llvm::opt::Arg *InputArg : Args.filtered(OPT_INPUT)) {
-          // Find Input after /P.
-          if ((PArg->getIndex() + 1) == InputArg->getIndex()) {
-            opts.Preprocess = InputArg->getValue();
-            if (LastInput == opts.Preprocess && PrevInputArg) {
-              // When InputArg is last Input, update it to other Input so
-              // Args.getLastArgValue(OPT_INPUT) get expect Input.
-              InputArg->getValues()[0] = PrevInputArg->getValues()[0];
-            }
-            errors << "warning: -P " << opts.Preprocess
-                   << " is deprecated, please use -P -Fi " << opts.Preprocess
-                   << " instead.\n";
-            break;
-          }
-          PrevInputArg = InputArg;
-        }
-      }
-    }
-  }
+  opts.Preprocess = getPreprocessOutput(Args, errors);
   opts.AstDumpImplicit =
       Args.hasFlag(OPT_ast_dump_implicit, OPT_INVALID, false);
   // -ast-dump-implicit should imply -ast-dump.
@@ -707,8 +765,10 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
   // Check options only allowed in shader model >= 6.2FPDenormalMode
   unsigned Major = 0;
   unsigned Minor = 0;
+  llvm::StringRef Stage;
   if (!opts.TargetProfile.empty()) {
-    if (!GetTargetVersionFromString(opts.TargetProfile, &Major, &Minor)) {
+    if (!hlsl::ShaderModel::ParseTargetProfile(opts.TargetProfile, Stage, Major,
+                                               Minor)) {
       errors << "unable to parse shader model.";
       return 1;
     }
@@ -826,6 +886,7 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
   opts.TimeReport = Args.hasFlag(OPT_ftime_report, OPT_INVALID, false);
   opts.TimeTrace = Args.hasFlag(OPT_ftime_trace, OPT_INVALID, false) ? "-" : "";
   opts.VerifyDiagnostics = Args.hasFlag(OPT_verify, OPT_INVALID, false);
+  opts.Verbose = Args.hasFlag(OPT_verbose, OPT_INVALID, false);
   if (Args.hasArg(OPT_ftime_trace_EQ))
     opts.TimeTrace = Args.getLastArgValue(OPT_ftime_trace_EQ);
   if (Arg *A = Args.getLastArg(OPT_ftime_trace_granularity_EQ)) {
@@ -988,20 +1049,6 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
     opts.ValVerMinor = (unsigned long)minor64;
   }
 
-  llvm::StringRef valSelectStr = Args.getLastArgValue(OPT_select_validator);
-  if (!valSelectStr.empty()) {
-    opts.SelectValidator = llvm::StringSwitch<ValidatorSelection>(valSelectStr)
-                               .Case("auto", ValidatorSelection::Auto)
-                               .Case("internal", ValidatorSelection::Internal)
-                               .Case("external", ValidatorSelection::External)
-                               .Default(ValidatorSelection::Invalid);
-    if (opts.SelectValidator == ValidatorSelection::Invalid) {
-      errors << "Unsupported value '" << valSelectStr
-             << "for -select-validator option.";
-      return 1;
-    }
-  }
-
   if (opts.IsLibraryProfile() && Minor == 0xF) {
     if (opts.ValVerMajor != UINT_MAX && opts.ValVerMajor != 0) {
       errors << "Offline library profile cannot be used with non-zero "
@@ -1044,6 +1091,8 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
 
   addDiagnosticArgs(Args, OPT_W_Group, OPT_W_value_Group, opts.Warnings);
 
+  opts.GenMetal = Args.hasFlag(OPT_metal, OPT_INVALID, false);
+
   // SPIRV Change Starts
 #ifdef ENABLE_SPIRV_CODEGEN
   opts.GenSPIRV = Args.hasFlag(OPT_spirv, OPT_INVALID, false);
@@ -1053,6 +1102,8 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       Args.hasFlag(OPT_fvk_use_dx_position_w, OPT_INVALID, false);
   opts.SpirvOptions.supportNonzeroBaseInstance =
       Args.hasFlag(OPT_fvk_support_nonzero_base_instance, OPT_INVALID, false);
+  opts.SpirvOptions.supportNonzeroBaseVertex =
+      Args.hasFlag(OPT_fvk_support_nonzero_base_vertex, OPT_INVALID, false);
   opts.SpirvOptions.useGlLayout =
       Args.hasFlag(OPT_fvk_use_gl_layout, OPT_INVALID, false);
   opts.SpirvOptions.useDxLayout =
@@ -1081,12 +1132,15 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       Args.hasFlag(OPT_fspv_preserve_bindings, OPT_INVALID, false);
   opts.SpirvOptions.preserveInterface =
       Args.hasFlag(OPT_fspv_preserve_interface, OPT_INVALID, false);
-  opts.SpirvOptions.allowRWStructuredBufferArrays =
-      Args.hasFlag(OPT_fvk_allow_rwstructuredbuffer_arrays, OPT_INVALID, false);
   opts.SpirvOptions.enableMaximalReconvergence =
       Args.hasFlag(OPT_fspv_enable_maximal_reconvergence, OPT_INVALID, false);
   opts.SpirvOptions.useVulkanMemoryModel =
       Args.hasFlag(OPT_fspv_use_vulkan_memory_model, OPT_INVALID, false);
+  opts.SpirvOptions.useUnknownImageFormat =
+      Args.hasFlag(OPT_fspv_use_unknown_image_format, OPT_INVALID, false);
+
+  opts.SpirvOptions.useDescriptorHeap = Args.hasFlag(
+      OPT_fspv_use_descriptor_heap, OPT_fspv_use_emulated_heap, false);
 
   if (!handleVkShiftArgs(Args, OPT_fvk_b_shift, "b", &opts.SpirvOptions.bShift,
                          errors) ||
@@ -1106,6 +1160,18 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       opts.SpirvOptions.stageIoOrder != "decl") {
     errors << "unknown Vulkan stage I/O location assignment order: "
            << opts.SpirvOptions.stageIoOrder;
+    return 1;
+  }
+
+  if (!handleFixedBinding(Args, OPT_fvk_bind_resource_heap,
+                          &opts.SpirvOptions.resourceHeapBinding,
+                          "-fvk-bind-resource-heap", errors) ||
+      !handleFixedBinding(Args, OPT_fvk_bind_sampler_heap,
+                          &opts.SpirvOptions.samplerHeapBinding,
+                          "-fvk-bind-sampler-heap", errors) ||
+      !handleFixedBinding(Args, OPT_fvk_bind_counter_heap,
+                          &opts.SpirvOptions.counterHeapBinding,
+                          "-fvk-bind-counter-heap", errors)) {
     return 1;
   }
 
@@ -1232,11 +1298,11 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       Args.hasFlag(OPT_fspv_reflect, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_fix_func_call_arguments, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_print_all, OPT_INVALID, false) ||
+      Args.hasFlag(OPT_fspv_use_emulated_heap, OPT_INVALID, false) ||
+      Args.hasFlag(OPT_fspv_use_descriptor_heap, OPT_INVALID, false) ||
       Args.hasFlag(OPT_Wno_vk_ignored_features, OPT_INVALID, false) ||
       Args.hasFlag(OPT_Wno_vk_emulated_features, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fvk_auto_shift_bindings, OPT_INVALID, false) ||
-      Args.hasFlag(OPT_fvk_allow_rwstructuredbuffer_arrays, OPT_INVALID,
-                   false) ||
       !Args.getLastArgValue(OPT_fvk_stage_io_order_EQ).empty() ||
       !Args.getLastArgValue(OPT_fspv_debug_EQ).empty() ||
       !Args.getLastArgValue(OPT_fspv_extension_EQ).empty() ||
@@ -1247,13 +1313,31 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       !Args.getLastArgValue(OPT_fvk_b_shift).empty() ||
       !Args.getLastArgValue(OPT_fvk_t_shift).empty() ||
       !Args.getLastArgValue(OPT_fvk_s_shift).empty() ||
-      !Args.getLastArgValue(OPT_fvk_u_shift).empty()) {
+      !Args.getLastArgValue(OPT_fvk_u_shift).empty() ||
+      !Args.getLastArgValue(OPT_fvk_bind_resource_heap).empty() ||
+      !Args.getLastArgValue(OPT_fvk_bind_sampler_heap).empty() ||
+      !Args.getLastArgValue(OPT_fvk_bind_counter_heap).empty()) {
     errors << "SPIR-V CodeGen not available. "
               "Please recompile with -DENABLE_SPIRV_CODEGEN=ON.";
     return 1;
   }
 #endif // ENABLE_SPIRV_CODEGEN
   // SPIRV Change Ends
+
+#ifndef ENABLE_METAL_CODEGEN
+  if (opts.GenMetal) {
+    errors << "Metal CodeGen not available. "
+              "Please rebuild with Metal IR Converter installed.";
+    return 1;
+  }
+#endif
+
+  if (opts.GenMetal) {
+    if (!opts.AssemblyCode.empty() || opts.OutputObject.empty()) {
+      errors << "Disassembly of Metal IR not supported (yet).";
+      return 1;
+    }
+  }
 
   // Validation for DebugInfo here because spirv uses same DebugInfo opt,
   // and legacy wrappers will add EmbedDebug in this case, leading to this
@@ -1320,9 +1404,10 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
   return 0;
 }
 
-/// Sets up the specified DxcDllSupport instance as per the given options.
-int SetupDxcDllSupport(const DxcOpts &opts, dxc::DxcDllSupport &dxcSupport,
-                       llvm::raw_ostream &errors) {
+/// Sets up a SpecificDllLoader instance as per the given options.
+int SetupSpecificDllLoader(const DxcOpts &opts,
+                           dxc::SpecificDllLoader &dxcSupport,
+                           llvm::raw_ostream &errors) {
   if (!opts.ExternalLib.empty()) {
     DXASSERT(!opts.ExternalFn.empty(), "else ReadDxcOpts should have failed");
     HRESULT hrLoad = dxcSupport.InitializeForDll(opts.ExternalLib.data(),

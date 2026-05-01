@@ -33,6 +33,7 @@ _Bool g_Bool; // expected-error {{unknown type name '_Bool'}}
 _vector int altivec_vector; // expected-error {{expected unqualified-id}} expected-error {{unknown type name '_vector'}}
 
 restrict int g_restrict; // expected-error {{expected unqualified-id}} expected-error {{unknown type name 'restrict'}}
+volatile int g_volatile; // expected-error {{'volatile' is a reserved keyword in HLSL}}
 
 __underlying_type(int) g_underlying_type; // expected-error {{__underlying_type is unsupported in HLSL}}
 _Atomic(something) g_Atomic; // expected-error {{'_Atomic' is a reserved keyword in HLSL}} expected-error {{HLSL requires a type specifier for all declarations}}
@@ -56,7 +57,7 @@ struct s_with_friend {
 };
 
 typedef int (*fn_int_const)(int) const; // expected-error {{expected ';' after top level declarator}} expected-error {{pointers are unsupported in HLSL}} expected-warning {{declaration does not declare anything}}
-typedef int (*fn_int_volatile)(int) volatile; // expected-error {{expected ';' after top level declarator}} expected-error {{pointers are unsupported in HLSL}} expected-warning {{declaration does not declare anything}}
+typedef int (*fn_int_volatile)(int) volatile; // expected-error {{'volatile' is a reserved keyword in HLSL}} expected-error {{expected ';' after top level declarator}} expected-error {{pointers are unsupported in HLSL}} expected-warning {{declaration does not declare anything}}
 
 void fn_throw() throw() { } // expected-error {{exception specification is unsupported in HLSL}}
 
@@ -352,12 +353,7 @@ class c_outer_typedef {
   typedef int local_int; // expected-error {{nested typedefs are not supported in HLSL}}
 };
 
-class c_outer_fn {
-  int fn() {
-    class local_class { int j; };
-    typedef int local_int;
-  }
-};
+typedef float3 c_outer_td;
 
 class c_public {
 public: int i; // expected-error {{'public' is a reserved keyword in HLSL}}
@@ -572,8 +568,7 @@ void expressions()
   internal->fn();                 // expected-error {{operator is not supported}}
   local_i = (int3) { 1, 2, 3 };   // expected-error {{compound literal is unsupported in HLSL}}
 
-  // `class` ok, but component count should be checked earlier (1 to 4 uniform components):
-  Texture2D<::c_outer_fn> local_texture;
+  Texture2D<::c_outer_td> local_texture;
 
   ::new local_new; // expected-error {{new' is a reserved keyword in HLSL}}
   ::template foo local_template; // expected-error {{'template' is a reserved keyword in HLSL}} expected-error {{unknown type name 'foo'}}

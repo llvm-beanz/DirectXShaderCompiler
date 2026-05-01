@@ -46,6 +46,7 @@ class Attr;
 class VarDecl;
 class HLSLRootSignatureAttr;
 class CastExpr;
+class AttributedLinAlgMatrixType;
 
 namespace CodeGen {
 class CodeGenModule;
@@ -138,7 +139,7 @@ public:
 
   virtual void FinishAutoVar(CodeGenFunction &CGF, const VarDecl &D,
                              llvm::Value *V) = 0;
-  virtual const clang::Expr *CheckReturnStmtGLCMismatch(
+  virtual const clang::Expr *CheckReturnStmtCoherenceMismatch(
       CodeGenFunction &CGF, const clang::Expr *RV, const clang::ReturnStmt &S,
       clang::QualType FnRetTy,
       const std::function<void(const VarDecl *, llvm::Value *)> &TmpArgMap) = 0;
@@ -165,6 +166,8 @@ public:
       llvm::SmallVector<clang::QualType, 16> &ArgTys) = 0;
   virtual LValue EmitResourceParamAnnotation(CodeGenFunction &CGF,
                                              const CastExpr *E) = 0;
+  virtual llvm::Type *ConvertAttributedLinAlgMatrixType(
+      const clang::AttributedLinAlgMatrixType *T) = 0;
 };
 
 /// Create an instance of a HLSL runtime class.

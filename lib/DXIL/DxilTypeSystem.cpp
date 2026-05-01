@@ -175,31 +175,13 @@ void DxilPayloadFieldAnnotation::AddPayloadFieldQualifier(
 DXIL::PayloadAccessQualifier
 DxilPayloadFieldAnnotation::GetPayloadFieldQualifier(
     DXIL::PayloadAccessShaderStage shaderStage) const {
+  if (!HasAnnotations())
+    return DXIL::PayloadAccessQualifier::ReadWrite;
 
   int bitOffset = GetBitOffsetForShaderStage(shaderStage);
-
-  // default type is always ReadWrite
-  DXIL::PayloadAccessQualifier accessType =
-      DXIL::PayloadAccessQualifier::ReadWrite;
-
-  const unsigned readBit =
-      static_cast<unsigned>(DXIL::PayloadAccessQualifier::Read);
-  const unsigned writeBit =
-      static_cast<unsigned>(DXIL::PayloadAccessQualifier::Write);
-
   unsigned accessBits = m_bitmask >> bitOffset;
-  if (accessBits & readBit) {
-    // set Read if the first bit is set
-    accessType = DXIL::PayloadAccessQualifier::Read;
-  }
-  if (accessBits & writeBit) {
-
-    // set Write only if the second bit set, if both are set set to ReadWrite
-    accessType = accessType == DXIL::PayloadAccessQualifier::ReadWrite
-                     ? DXIL::PayloadAccessQualifier::Write
-                     : DXIL::PayloadAccessQualifier::ReadWrite;
-  }
-  return accessType;
+  return (DXIL::PayloadAccessQualifier)(
+      accessBits & DXIL::PayloadAccessQualifierValidMaskPerStage);
 }
 
 bool DxilPayloadFieldAnnotation::HasAnnotations() const {
@@ -254,14 +236,17 @@ void DxilStructAnnotation::SetCBufferSize(unsigned size) {
 void DxilStructAnnotation::MarkEmptyStruct() {
   if (m_ResourcesContained == HasResources::True)
     m_ResourcesContained = HasResources::Only;
+  else if (m_TargetTypesContained == HasTargetTypes::True)
+    m_TargetTypesContained = HasTargetTypes::Only;
   else
     m_FieldAnnotations.clear();
 }
 bool DxilStructAnnotation::IsEmptyStruct() {
   return m_FieldAnnotations.empty();
 }
-bool DxilStructAnnotation::IsEmptyBesidesResources() {
+bool DxilStructAnnotation::IsEmptyBesidesResourcesAndTargetTypes() const {
   return m_ResourcesContained == HasResources::Only ||
+         m_TargetTypesContained == HasTargetTypes::Only ||
          m_FieldAnnotations.empty();
 }
 
@@ -272,6 +257,14 @@ void DxilStructAnnotation::SetContainsResources() {
 }
 bool DxilStructAnnotation::ContainsResources() const {
   return m_ResourcesContained != HasResources::False;
+}
+
+void DxilStructAnnotation::SetContainsTargetTypes() {
+  if (m_TargetTypesContained == HasTargetTypes::False)
+    m_TargetTypesContained = HasTargetTypes::True;
+}
+bool DxilStructAnnotation::ContainsTargetTypes() const {
+  return m_TargetTypesContained != HasTargetTypes::False;
 }
 
 // For template args, GetNumTemplateArgs() will return 0 if not a template
@@ -409,6 +402,13 @@ void DxilTypeSystem::FinishStructAnnotation(DxilStructAnnotation &SA) {
   for (unsigned i = 0; i < SA.GetNumFields() && !SA.ContainsResources(); i++) {
     if (IsResourceContained(ST->getElementType(i)))
       SA.SetContainsResources();
+  }
+
+  // Update target type containment
+  for (unsigned i = 0; i < SA.GetNumFields() && !SA.ContainsTargetTypes();
+       i++) {
+    if (IsTargetTypeContained(ST->getElementType(i)))
+      SA.SetContainsTargetTypes();
   }
 
   // Mark if empty
@@ -872,20 +872,36 @@ void DxilTypeSystem::SetMinPrecision(bool bMinPrecision) {
   m_LowPrecisionMode = mode;
 }
 
-bool DxilTypeSystem::IsResourceContained(llvm::Type *Ty) {
+bool DxilTypeSystem::IsResourceContained(llvm::Type *Ty) const {
   // strip pointer/array
   if (Ty->isPointerTy())
     Ty = Ty->getPointerElementType();
   if (Ty->isArrayTy())
     Ty = Ty->getArrayElementType();
 
-  if (auto ST = dyn_cast<StructType>(Ty)) {
-    if (dxilutil::IsHLSLResourceType(Ty)) {
+  if (auto *ST = dyn_cast<StructType>(Ty)) {
+    if (dxilutil::IsHLSLResourceType(Ty))
       return true;
-    } else if (auto SA = GetStructAnnotation(ST)) {
+    else if (auto *SA = GetStructAnnotation(ST))
       if (SA->ContainsResources())
         return true;
-    }
+  }
+  return false;
+}
+
+bool DxilTypeSystem::IsTargetTypeContained(llvm::Type *Ty) const {
+  // strip pointer/array
+  if (Ty->isPointerTy())
+    Ty = Ty->getPointerElementType();
+  if (Ty->isArrayTy())
+    Ty = Ty->getArrayElementType();
+
+  if (auto *ST = dyn_cast<StructType>(Ty)) {
+    if (dxilutil::IsHLSLKnownTargetType(Ty))
+      return true;
+    else if (auto *SA = GetStructAnnotation(ST))
+      if (SA->ContainsTargetTypes())
+        return true;
   }
   return false;
 }

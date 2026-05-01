@@ -637,6 +637,7 @@ ShaderFlags ShaderFlags::CollectShaderFlags(const Function *F,
           hasViewID = true;
           break;
         case DXIL::OpCode::AllocateRayQuery:
+        case DXIL::OpCode::AllocateRayQuery2:
         case DXIL::OpCode::GeometryIndex:
           hasRaytracingTier1_1 = true;
           break;
@@ -727,6 +728,10 @@ ShaderFlags ShaderFlags::CollectShaderFlags(const Function *F,
         case DXIL::OpCode::BarrierByNodeRecordHandle:
           if (OP::BarrierRequiresGroup(CI))
             requiresGroup = true;
+          break;
+        case DXIL::OpCode::GetGroupWaveIndex:
+        case DXIL::OpCode::GetGroupWaveCount:
+          requiresGroup = true;
           break;
         default:
           // Normal opcodes.
