@@ -1,14 +1,8 @@
-// RUN: not %dxc -E main -T ps_6_0 %s 2>&1 | FileCheck %s
+// RUN: %dxc -E main -T ps_6_0 -verify %s
 
 // Test that int8_t and uint8_t are rejected below SM 6.10.
-// CHECK: int8_t is only allowed for HLSL shader model 6.10 and above.
-// CHECK: uint8_t is only allowed for HLSL shader model 6.10 and above.
 
-int8_t  bad_int8;
-uint8_t bad_uint8;
+int8_t  bad_int8;  // expected-error{{int8_t is only allowed for HLSL shader model 6.10 and above.}}
+uint8_t bad_uint8; // expected-error{{uint8_t is only allowed for HLSL shader model 6.10 and above.}}
 
 float4 main() : SV_Target { return 0; }
-
-// COPILOT-TODO: Diagnostic tests should use the -verify option and check for
-// specific error messages with // expected-error comments, rather than relying
-// on FileCheck to match error text in the compiler output.

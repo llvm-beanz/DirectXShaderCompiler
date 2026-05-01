@@ -1,10 +1,9 @@
-// RUN: not %dxc -E main -T cs_6_10 %s 2>&1 | FileCheck %s
+// RUN: %dxc -E main -T cs_6_10 -verify %s
 
 // Test that int8_t is rejected in typed buffers (Buffer<>, Texture2D<>, etc.)
 // and allowed in raw/structured buffers.
 
-// CHECK: elements of typed buffers and textures must be scalars or vectors
-Buffer<int8_t> typed_buf : register(t0);
+Buffer<int8_t> typed_buf : register(t0); // expected-error{{elements of typed buffers and textures must be scalars or vectors}} expected-error{{invalid register specification, expected 'b', 'c', or 'i' binding}}
 
 RWStructuredBuffer<int8_t> structured_buf : register(u0);  // OK
 
@@ -12,7 +11,3 @@ RWStructuredBuffer<int8_t> structured_buf : register(u0);  // OK
 void main() {
   structured_buf[0] = 42;
 }
-
-// COPILOT-TODO: Diagnostic tests should use the -verify option and check for
-// specific error messages with // expected-error comments, rather than relying
-// on FileCheck to match error text in the compiler output.

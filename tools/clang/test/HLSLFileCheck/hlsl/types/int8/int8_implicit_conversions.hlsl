@@ -1,4 +1,4 @@
-// RUN: %dxc -E main -T cs_6_10 %s 2>&1 | FileCheck %s
+// RUN: %dxc -E main -T cs_6_10 -verify %s
 
 // Test that implicit narrowing conversions to int8_t/uint8_t produce warnings,
 // while widening conversions from int8_t/uint8_t to larger types do not.
@@ -13,17 +13,14 @@ RWStructuredBuffer<int4>    i32v4buf : register(u5);
 [numthreads(1, 1, 1)]
 void main() {
   // Implicit int32 -> int8: narrowing, expect warning.
-  // CHECK: warning: conversion from larger type 'int' to smaller type 'signed char'
   int big = i32buf[0];
-  i8buf[0] = big;
+  i8buf[0] = big; // expected-warning{{conversion from larger type 'int' to smaller type 'signed char', possible loss of data}}
 
   // Implicit uint32 -> uint8: narrowing, expect warning.
-  // CHECK: warning: conversion from larger type 'uint' to smaller type 'unsigned char'
   uint ubig = u32buf[0];
-  u8buf[0] = ubig;
+  u8buf[0] = ubig; // expected-warning{{conversion from larger type 'uint' to smaller type 'unsigned char', possible loss of data}}
 
   // Implicit int8 -> int32: widening, no warning expected.
-  // CHECK-NOT: warning:{{.*}}signed char{{.*}}int
   int8_t small = i8buf[1];
   i32buf[1] = small;
 
@@ -32,11 +29,6 @@ void main() {
   u32buf[1] = usmall;
 
   // Implicit int4 -> int8_t4 vector: narrowing, expect warning.
-  // CHECK: warning: conversion from larger type 'int4' to smaller type 'vector<signed char, 4>'
   int4 bigvec = i32v4buf[0];
-  i8v4buf[0] = bigvec;
+  i8v4buf[0] = bigvec; // expected-warning{{conversion from larger type 'int4' to smaller type 'vector<signed char, 4>', possible loss of data}}
 }
-
-// COPILOT-TODO: Diagnostic tests should use the -verify option and check for
-// specific error messages with // expected-error comments, rather than relying
-// on FileCheck to match error text in the compiler output.
