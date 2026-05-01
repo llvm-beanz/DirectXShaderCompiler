@@ -1,4 +1,4 @@
-// RUN: %dxc -E main -T cs_6_10 %s 2>&1 | FileCheck %s
+// RUN: not %dxc -E main -T cs_6_10 %s 2>&1 | FileCheck %s
 
 // Test that int8_t is rejected in typed buffers (Buffer<>, Texture2D<>, etc.)
 // and allowed in raw/structured buffers.
