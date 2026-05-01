@@ -49,8 +49,3 @@ float4 main() : SV_Target {
   int r = s.a + s.b + s.c + s.d + s.e + g + h;
   return r;
 }
-
-// COPILOT-TODO: We should test the positioning of vectors of int8/uint8 which
-// should require 32-bit alignment and not pack across 4-byte boundaries. We
-// should also test that arrays of int8/uint8 follow cbuffer array packing rules
-// (each element aligned to 16 bytes, no packing across elements).
