@@ -178,6 +178,7 @@ bool FeatureManager::requestTargetEnv(spv_target_env requestedEnv,
 Extension FeatureManager::getExtensionSymbol(llvm::StringRef name) {
   return llvm::StringSwitch<Extension>(name)
       .Case("KHR", Extension::KHR)
+      .Case("SPV_KHR_8bit_storage", Extension::KHR_8bit_storage)
       .Case("SPV_KHR_16bit_storage", Extension::KHR_16bit_storage)
       .Case("SPV_KHR_device_group", Extension::KHR_device_group)
       .Case("SPV_KHR_multiview", Extension::KHR_multiview)
@@ -237,6 +238,8 @@ const char *FeatureManager::getExtensionName(Extension symbol) {
   switch (symbol) {
   case Extension::KHR:
     return "KHR";
+  case Extension::KHR_8bit_storage:
+    return "SPV_KHR_8bit_storage";
   case Extension::KHR_16bit_storage:
     return "SPV_KHR_16bit_storage";
   case Extension::KHR_device_group:
@@ -345,6 +348,17 @@ bool FeatureManager::isExtensionRequiredForTargetEnv(Extension ext) const {
     // are therefore not required to be emitted for that target environment.
     switch (ext) {
     case Extension::KHR_non_semantic_info:
+      required = false;
+      break;
+    default:
+      break;
+    }
+  }
+  if (required && targetEnv >= SPV_ENV_VULKAN_1_2) {
+    // The following extensions are incorporated into Vulkan 1.2 or above, and
+    // are therefore not required to be emitted for that target environment.
+    switch (ext) {
+    case Extension::KHR_8bit_storage:
       required = false;
       break;
     default:

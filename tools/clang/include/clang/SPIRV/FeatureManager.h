@@ -31,6 +31,7 @@ namespace spirv {
 /// A list of SPIR-V extensions known to our CodeGen.
 enum class Extension {
   KHR = 0,
+  KHR_8bit_storage,
   KHR_16bit_storage,
   KHR_device_group,
   KHR_fragment_shading_rate,
