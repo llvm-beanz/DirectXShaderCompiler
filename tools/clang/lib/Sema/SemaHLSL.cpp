@@ -12687,6 +12687,10 @@ DiagnoseElementTypes(Sema &S, SourceLocation Loc, QualType Ty, bool &Empty,
   if (Ty.isNull() || Ty->isDependentType())
     return false;
 
+  // Parameters to inout/out functions are stored as reference types in the
+  // AST. Strip the reference before checking element types.
+  Ty = Ty.getNonReferenceType();
+
   const bool CheckLongVec = LongVecDiagContext != TypeDiagContext::Valid;
   const bool CheckObjects = ObjDiagContext != TypeDiagContext::Valid;
 
