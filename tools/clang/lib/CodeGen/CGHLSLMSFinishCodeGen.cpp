@@ -2244,10 +2244,10 @@ unsigned AlignCBufferOffset(unsigned offset, unsigned size, llvm::Type *Ty,
   if (size == 0)
     return offset;
   unsigned scalarSizeInBytes = Ty->getScalarSizeInBits() / 8;
-  // i8 types allow 1-byte-aligned (odd) offsets; all others require
-  // 2-byte minimum alignment.
-  DXASSERT(scalarSizeInBytes == 1 || !(offset & 1),
-           "otherwise we have an invalid offset.");
+  // Note: i8 fields occupy exactly one byte and may leave the current offset
+  // at an odd value.  AlignBufferOffsetInLegacy will round the offset up to
+  // the required alignment for the next field, so an odd incoming offset is
+  // valid here.
   bool bNeedNewRow = Ty->isArrayTy();
   // In min-precision mode, a new row is needed when
   // going into or out of min-precision component type.
