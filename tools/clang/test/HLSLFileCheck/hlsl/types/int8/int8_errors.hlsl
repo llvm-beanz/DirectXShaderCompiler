@@ -8,3 +8,7 @@ int8_t  bad_int8;
 uint8_t bad_uint8;
 
 float4 main() : SV_Target { return 0; }
+
+// COPILOT-TODO: Diagnostic tests should use the -verify option and check for
+// specific error messages with // expected-error comments, rather than relying
+// on FileCheck to match error text in the compiler output.

@@ -36,3 +36,7 @@ void main() {
   int4 bigvec = i32v4buf[0];
   i8v4buf[0] = bigvec;
 }
+
+// COPILOT-TODO: Diagnostic tests should use the -verify option and check for
+// specific error messages with // expected-error comments, rather than relying
+// on FileCheck to match error text in the compiler output.

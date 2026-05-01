@@ -18,7 +18,6 @@ I've added comments to some of the tests prefixed with the string "//
 COPILOT-TODO:", can you read those comments and address the feedback? When
 you're done remove the "//COPILOT-TODO:" comments.
 
-We should also add tests to verify implicit and explicit conversions of 8-bit
-types and vectors of 8-bit elements to ensure that they follow the correct
-rules. For implicit conversions we should see the compiler generate conversion
-warnings and have tests that verify those.
+The added diagnostics refer to `char` types. Can you also add tests to ensure
+that the `char` and `unsigned char` types parse correctly and work as
+alternatives to `int8_t` and `uint8_t` respectively?

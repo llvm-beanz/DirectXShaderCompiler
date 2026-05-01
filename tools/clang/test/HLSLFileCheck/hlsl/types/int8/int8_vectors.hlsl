@@ -33,3 +33,7 @@ void main() {
   // CHECK: rawBufferVectorStore.v4i32
   v4buf[1] = v4;
 }
+
+// COPILOT-TODO: This test is currently verifying the wrong behavior. We should
+// add i8 vector overloads to rawBufferVectorLoad/Store and update this test to
+// check for those instead of the current widening behavior.
