@@ -22,3 +22,9 @@ void main() {
   // CHECK: rawBufferVectorStore.v4i32
   v4buf[1] = v4;
 }
+
+// COPILOT-TODO: These seem to be checking for the incorrect overloads. These
+// cases should be loading and storing using the v2i8/v4i8 overloads instead of
+// v2i32/v4i32. We should verify that the correct overloads are being used for
+// vector types and that the correct number of bytes are being loaded/stored for
+// int8_t/uint8_t vectors.

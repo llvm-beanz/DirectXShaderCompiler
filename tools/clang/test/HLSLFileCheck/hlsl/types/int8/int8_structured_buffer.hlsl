@@ -58,3 +58,13 @@ void main() {
   S2 loaded2 = sbuf2[0];
   ubuf2[1] = loaded2;
 }
+
+// COPILOT-TODO: We should also test that int8_t/uint8_t fields in structs used
+// with structured buffers are correctly aligned and padded according to HLSL
+// rules, and that the correct offsets are used for loads/stores. We should test
+// various struct layouts (e.g. int8_t followed by int, int followed by int8_t,
+// multiple int8_t fields in a row, etc.). We should also test that vector types
+// like int8_t4 are stored/loaded using the correct number of bytes and
+// alignment. We should also test that int8_t/uint8_t can be used in
+// RWByteAddressBuffer and that the correct byte offsets are used for
+// loads/stores there as well.

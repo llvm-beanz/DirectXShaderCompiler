@@ -66,3 +66,8 @@ void main() {
   int sz = sizeof(int8_t);
   ibuf[12] = (int8_t)(sz == 1 ? 1 : 0);
 }
+
+// COPILOT-TODO: wee should also test shift operators (<<, >>) and comparisons
+// (==, !=, <, >, <=, >=) for int8_t and uint8_t. We should also test operators
+// on vector types like int8_t2, uint8_t4, etc. to ensure they generate the
+// expected code.
