@@ -2239,11 +2239,15 @@ bool RetrieveLastElementType(Type *Ty, Type *&EltTy) {
 unsigned AlignCBufferOffset(unsigned offset, unsigned size, llvm::Type *Ty,
                             bool bRowMajor, bool bMinPrecMode,
                             bool &bCurRowIsMinPrec) {
-  DXASSERT(!(offset & 1), "otherwise we have an invalid offset.");
   // resources, empty structure, or structures with only resources have
   // zero size, and need no alignment.
   if (size == 0)
     return offset;
+  unsigned scalarSizeInBytes = Ty->getScalarSizeInBits() / 8;
+  // i8 types allow 1-byte-aligned (odd) offsets; all others require
+  // 2-byte minimum alignment.
+  DXASSERT(scalarSizeInBytes == 1 || !(offset & 1),
+           "otherwise we have an invalid offset.");
   bool bNeedNewRow = Ty->isArrayTy();
   // In min-precision mode, a new row is needed when
   // going into or out of min-precision component type.
@@ -2267,15 +2271,15 @@ unsigned AlignCBufferOffset(unsigned offset, unsigned size, llvm::Type *Ty,
       }
     } else {
       DXASSERT_NOMSG(Ty->isVectorTy() || Ty->isSingleValueType());
-      // vector or scalar
-      bMinPrec = bMinPrecMode && Ty->getScalarSizeInBits() < 32;
+      // vector or scalar: only 16-bit types count as min-precision.
+      // i8 types (8-bit) are full-precision DXIL 1.10 types, not min-prec.
+      bMinPrec = bMinPrecMode && Ty->getScalarSizeInBits() == 16;
     }
     if (bMinPrecMode) {
       bNeedNewRow |= bCurRowIsMinPrec != bMinPrec;
       bCurRowIsMinPrec = bMinPrec;
     }
   }
-  unsigned scalarSizeInBytes = Ty->getScalarSizeInBits() / 8;
 
   return AlignBufferOffsetInLegacy(offset, size, scalarSizeInBytes,
                                    bNeedNewRow);
@@ -2307,6 +2311,10 @@ unsigned AllocateDxilConstantBuffer(
     unsigned size = C->GetRangeSize();
     llvm::Type *Ty = C->GetHLSLType()->getPointerElementType();
     auto fieldAnnotation = constVarAnnotationMap.at(C->GetGlobalSymbol());
+    // i8 cbuffer variables are represented in LLVM as i32 (host layout), but
+    // require 1-byte packing alignment.  Use the actual i8 type for alignment.
+    if (fieldAnnotation.GetCompType().Is8Bit())
+      Ty = llvm::Type::getInt8Ty(Ty->getContext());
     bool bRowMajor = HLMatrixType::isa(Ty)
                          ? fieldAnnotation.GetMatrixAnnotation().Orientation ==
                                MatrixOrientation::RowMajor
