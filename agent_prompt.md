@@ -14,10 +14,10 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-I've added comments to some of the tests prefixed with the string "//
-COPILOT-TODO:", can you read those comments and address the feedback? When
-you're done remove the "//COPILOT-TODO:" comments.
+Can you now add support for SPIRV properly respecting the SPIRV extension
+(https://github.khronos.org/SPIRV-Registry/extensions/KHR/SPV_KHR_8bit_storage.html)?
 
-The added diagnostics refer to `char` types. Can you also add tests to ensure
-that the `char` and `unsigned char` types parse correctly and work as
-alternatives to `int8_t` and `uint8_t` respectively?
+Since the int8 types are only supported when SM 6.10 is specified, this
+shouldn't cause any of the existing SPIRV tests that define int8 using inline
+spirv feature to fail. Please add appropriate tests to cover the SPIRV
+generation.
