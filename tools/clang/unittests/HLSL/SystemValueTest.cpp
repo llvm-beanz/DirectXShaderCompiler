@@ -109,7 +109,7 @@ public:
       IFT(library->CreateBlobFromFile(path.c_str(), nullptr, &m_pSource));
     }
 
-    LPCWSTR entry, profile;
+    LPCWSTR entry = nullptr, profile = nullptr;
     wchar_t profile_buf[] = L"vs_6_1";
     switch (shaderKind) {
     case DXIL::ShaderKind::Vertex:
@@ -146,7 +146,7 @@ public:
       break;
     case DXIL::ShaderKind::Library:
     case DXIL::ShaderKind::Invalid:
-      assert(!"invalid shaderKind");
+      VERIFY_SUCCEEDED(false && "invalid shaderKind");
       break;
     }
     if (Major == 0) {
