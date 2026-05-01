@@ -178,6 +178,12 @@ private:
   SpirvInstruction *doHLSLOutArgExpr(const HLSLOutArgExpr *expr);
   SpirvInstruction *
   doHLSLArrayTemporaryExpr(const HLSLArrayTemporaryExpr *expr);
+
+  /// If \p argExpr is an HLSLOutArgExpr, loads the out value from \p tmpVar
+  /// and stores it back to the original argument lvalue (copy-out semantics).
+  void processHLSLOutArgWriteback(const Expr *argExpr,
+                                  SpirvInstruction *tmpVar,
+                                  SourceLocation loc);
   SpirvInstruction *doOpaqueValueExpr(const OpaqueValueExpr *expr);
 
 
@@ -1122,7 +1128,8 @@ private:
                                        SpirvInstruction **constOffset,
                                        SpirvInstruction **varOffset,
                                        SpirvInstruction **clamp,
-                                       SpirvInstruction **status);
+                                       SpirvInstruction **status,
+                                       const Expr **statusArgExpr = nullptr);
 
   /// \brief Processes .Load() method call for Buffer/RWBuffer and texture
   /// objects.

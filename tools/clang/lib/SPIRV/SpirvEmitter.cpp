@@ -3507,6 +3507,37 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
     }
   }
 
+  // Perform copy-out writebacks for HLSLOutArgExpr arguments. Each
+  // HLSLOutArgExpr creates a temporary (hlsl.out / hlsl.inout) that is passed
+  // to the callee. After the call returns, the temporary value must be copied
+  // back to the original argument lvalue.
+  for (auto &wb : writebacks) {
+    SpirvInstruction *tmpVar = wb.first;
+    const HLSLOutArgExpr *outParamExpr = wb.second;
+    const SourceLocation loc = outParamExpr->getLocStart();
+
+    QualType tmpType = outParamExpr->getType();
+    const Expr *argLValueExpr = outParamExpr->getArgLValue();
+    QualType argType = argLValueExpr->getType();
+
+    // Load the out value from the temporary variable.
+    SpirvInstruction *val = spvBuilder.createLoad(tmpType, tmpVar, loc);
+    val->setRValue();
+
+    // Cast from the parameter type to the argument type if they differ.
+    if (!paramTypeMatchesArgType(tmpType, argType)) {
+      QualType elementType;
+      if (isVectorType(tmpType, &elementType) && isScalarType(argType)) {
+        val = spvBuilder.createCompositeExtract(elementType, val, {0}, loc);
+        tmpType = elementType;
+      }
+      val = castToType(val, tmpType, argType, loc);
+    }
+
+    // Store the (possibly cast) value back to the original argument lvalue.
+    processAssignment(argLValueExpr, val, false, nullptr);
+  }
+
   return retVal;
 }
 
@@ -4203,8 +4234,7 @@ SpirvEmitter::processByteAddressBufferStructuredBufferGetDimensions(
                                   llvm::APInt(32, 4u)),
         expr->getExprLoc(), range);
   }
-  spvBuilder.createStore(doExpr(expr->getArg(0)), length,
-                         expr->getArg(0)->getLocStart(), range);
+  processAssignment(expr->getArg(0), length, false, nullptr, range);
 
   if (isStructuredBuf) {
     // For (RW)StructuredBuffer, the stride of the runtime array (which is the
@@ -4216,8 +4246,7 @@ SpirvEmitter::processByteAddressBufferStructuredBufferGetDimensions(
                                           /*isRowMajor*/ llvm::None, &stride);
     auto *sizeInstr = spvBuilder.getConstantInt(astContext.UnsignedIntTy,
                                                 llvm::APInt(32, size));
-    spvBuilder.createStore(doExpr(expr->getArg(1)), sizeInstr,
-                           expr->getArg(1)->getLocStart(), range);
+    processAssignment(expr->getArg(1), sizeInstr, false, nullptr, range);
   }
 
   return nullptr;
@@ -4259,12 +4288,16 @@ SpirvInstruction *SpirvEmitter::processRWByteAddressBufferAtomicMethods(
         range);
     if (isCompareExchange) {
       auto *resultAddress = expr->getArg(3);
-      QualType resultType = resultAddress->getType();
+      // When wrapped in HLSLOutArgExpr, getType() returns param type (uint).
+      // Use the actual lvalue type for casting.
+      const Expr *resultLV = resultAddress;
+      if (const auto *outExpr = dyn_cast<HLSLOutArgExpr>(resultAddress))
+        resultLV = outExpr->getArgLValue();
+      QualType resultType = resultLV->getType();
       if (resultType != astContext.UnsignedIntTy)
         originalVal = castToInt(originalVal, astContext.UnsignedIntTy,
                                 resultType, expr->getArg(3)->getLocStart());
-      spvBuilder.createStore(doExpr(expr->getArg(3)), originalVal,
-                             expr->getArg(3)->getLocStart(), range);
+      processAssignment(expr->getArg(3), originalVal, false, nullptr, range);
     }
   } else {
     const Expr *value = expr->getArg(1);
@@ -4287,11 +4320,16 @@ SpirvInstruction *SpirvEmitter::processRWByteAddressBufferAtomicMethods(
         spv::MemorySemanticsMask::MaskNone, valueInstr,
         expr->getCallee()->getExprLoc(), range);
     if (expr->getNumArgs() > 2) {
+      // When wrapped in HLSLOutArgExpr, getType() returns param type (uint).
+      // Use the actual lvalue type for casting.
+      const Expr *resultArg = expr->getArg(2);
+      const Expr *resultLV = resultArg;
+      if (const auto *outExpr = dyn_cast<HLSLOutArgExpr>(resultArg))
+        resultLV = outExpr->getArgLValue();
       originalVal = castToType(originalVal, astContext.UnsignedIntTy,
-                               expr->getArg(2)->getType(),
-                               expr->getArg(2)->getLocStart(), range);
-      spvBuilder.createStore(doExpr(expr->getArg(2)), originalVal,
-                             expr->getArg(2)->getLocStart(), range);
+                               resultLV->getType(),
+                               resultArg->getLocStart(), range);
+      processAssignment(resultArg, originalVal, false, nullptr, range);
     }
   }
 
@@ -4417,8 +4455,7 @@ SpirvEmitter::processBufferTextureGetDimensions(const CXXMemberCallExpr *expr) {
                                               QualType type) {
     id = castToType(id, type, outputArg->getType(), outputArg->getExprLoc(),
                     range);
-    spvBuilder.createStore(doExpr(outputArg, range), id,
-                           outputArg->getLocStart(), range);
+    processAssignment(outputArg, id, false, nullptr, range);
   };
 
   if ((typeName == "Texture1D" && numArgs > 1) ||
@@ -4658,6 +4695,7 @@ SpirvInstruction *SpirvEmitter::processTextureGatherRGBACmpRGBA(
   }
 
   auto *status = hasStatusArg ? doExpr(expr->getArg(numArgs - 1)) : nullptr;
+  const Expr *statusArgExpr = hasStatusArg ? expr->getArg(numArgs - 1) : nullptr;
 
   if (needsEmulation) {
     const auto elemType = hlsl::GetHLSLVecElementType(callee->getReturnType());
@@ -4675,16 +4713,20 @@ SpirvInstruction *SpirvEmitter::processTextureGatherRGBACmpRGBA(
       texels[i] =
           spvBuilder.createCompositeExtract(elemType, gatherRet, {i}, loc);
     }
-    return spvBuilder.createCompositeConstruct(
+    auto *retVal = spvBuilder.createCompositeConstruct(
         retType, {texels[0], texels[1], texels[2], texels[3]}, loc);
+    processHLSLOutArgWriteback(statusArgExpr, status, loc);
+    return retVal;
   }
 
-  return spvBuilder.createImageGather(
+  auto *retVal = spvBuilder.createImageGather(
       retType, imageType, image, sampler, coordinate,
       spvBuilder.getConstantInt(astContext.IntTy,
                                 llvm::APInt(32, component, true)),
       compareVal, constOffset, varOffset, constOffsets,
       /*sampleNumber*/ nullptr, status, loc);
+  processHLSLOutArgWriteback(statusArgExpr, status, loc);
+  return retVal;
 }
 
 SpirvInstruction *
@@ -4747,14 +4789,16 @@ SpirvEmitter::processTextureGatherCmp(const CXXMemberCallExpr *expr) {
                              &varOffset);
 
   const auto retType = callee->getReturnType();
-  const auto status =
-      hasStatusArg ? doExpr(expr->getArg(numArgs - 1)) : nullptr;
+  const auto *statusArg = hasStatusArg ? expr->getArg(numArgs - 1) : nullptr;
+  const auto status = statusArg ? doExpr(statusArg) : nullptr;
 
-  return spvBuilder.createImageGather(
+  auto *retVal = spvBuilder.createImageGather(
       retType, imageType, image, sampler, coordinate,
       /*component*/ nullptr, comparator, constOffset, varOffset,
       /*constOffsets*/ nullptr,
       /*sampleNumber*/ nullptr, status, loc);
+  processHLSLOutArgWriteback(statusArg, status, loc);
+  return retVal;
 }
 
 SpirvInstruction *SpirvEmitter::processBufferTextureLoad(
@@ -5897,7 +5941,8 @@ SpirvInstruction *SpirvEmitter::createImageSample(
 void SpirvEmitter::handleOptionalTextureSampleArgs(
     const CXXMemberCallExpr *expr, uint32_t index,
     SpirvInstruction **constOffset, SpirvInstruction **varOffset,
-    SpirvInstruction **clamp, SpirvInstruction **status) {
+    SpirvInstruction **clamp, SpirvInstruction **status,
+    const Expr **statusArgExpr) {
   uint32_t numArgs = expr->getNumArgs();
 
   bool hasOffsetArg = index < numArgs &&
@@ -5919,6 +5964,8 @@ void SpirvEmitter::handleOptionalTextureSampleArgs(
   if (index >= numArgs)
     return;
 
+  if (statusArgExpr)
+    *statusArgExpr = expr->getArg(index);
   *status = doExpr(expr->getArg(index));
 }
 
@@ -5980,27 +6027,31 @@ SpirvEmitter::processTextureSampleGather(const CXXMemberCallExpr *expr,
   SpirvInstruction *constOffset = nullptr, *varOffset = nullptr;
   SpirvInstruction *clamp = nullptr;
   SpirvInstruction *status = nullptr;
+  const Expr *statusArgExpr = nullptr;
   handleOptionalTextureSampleArgs(expr, offsetIndex, &constOffset, &varOffset,
-                                  &clamp, &status);
+                                  &clamp, &status, &statusArgExpr);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
+  SpirvInstruction *retVal;
   if (isSample) {
     addDerivativeGroupExecutionMode();
-    return createImageSample(retType, imageType, image, sampler, coordinate,
-                             /*compareVal*/ nullptr, /*bias*/ nullptr,
-                             /*lod*/ nullptr, std::make_pair(nullptr, nullptr),
-                             constOffset, varOffset,
-                             /*constOffsets*/ nullptr, /*sampleNumber*/ nullptr,
-                             /*minLod*/ clamp, status,
-                             expr->getCallee()->getLocStart(), range);
+    retVal = createImageSample(retType, imageType, image, sampler, coordinate,
+                               /*compareVal*/ nullptr, /*bias*/ nullptr,
+                               /*lod*/ nullptr, std::make_pair(nullptr, nullptr),
+                               constOffset, varOffset,
+                               /*constOffsets*/ nullptr, /*sampleNumber*/ nullptr,
+                               /*minLod*/ clamp, status,
+                               expr->getCallee()->getLocStart(), range);
   } else {
-    return spvBuilder.createImageGather(
+    retVal = spvBuilder.createImageGather(
         retType, imageType, image, sampler, coordinate,
         // .Gather() doc says we return four components of red data.
         spvBuilder.getConstantInt(astContext.IntTy, llvm::APInt(32, 0)),
         /*compareVal*/ nullptr, constOffset, varOffset,
         /*constOffsets*/ nullptr, /*sampleNumber*/ nullptr, status, loc, range);
   }
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -6071,21 +6122,24 @@ SpirvEmitter::processTextureSampleBiasLevel(const CXXMemberCallExpr *expr,
   SpirvInstruction *constOffset = nullptr, *varOffset = nullptr;
   SpirvInstruction *clamp = nullptr;
   SpirvInstruction *status = nullptr;
+  const Expr *statusArgExpr = nullptr;
   handleOptionalTextureSampleArgs(expr, offsetIndex, &constOffset, &varOffset,
-                                  &clamp, &status);
+                                  &clamp, &status, &statusArgExpr);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
 
   if (!lod)
     addDerivativeGroupExecutionMode();
 
-  return createImageSample(
+  auto *retVal = createImageSample(
       retType, imageType, image, sampler, coordinate,
       /*compareVal*/ nullptr, bias, lod, std::make_pair(nullptr, nullptr),
       constOffset, varOffset,
       /*constOffsets*/ nullptr, /*sampleNumber*/ nullptr,
       /*minLod*/ clamp, status, expr->getCallee()->getLocStart(),
       expr->getSourceRange());
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -6138,17 +6192,20 @@ SpirvEmitter::processTextureSampleGrad(const CXXMemberCallExpr *expr) {
   SpirvInstruction *constOffset = nullptr, *varOffset = nullptr;
   SpirvInstruction *clamp = nullptr;
   SpirvInstruction *status = nullptr;
+  const Expr *statusArgExpr = nullptr;
   handleOptionalTextureSampleArgs(expr, offsetIndex, &constOffset, &varOffset,
-                                  &clamp, &status);
+                                  &clamp, &status, &statusArgExpr);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
-  return createImageSample(
+  auto *retVal = createImageSample(
       retType, imageType, image, sampler, coordinate,
       /*compareVal*/ nullptr, /*bias*/ nullptr,
       /*lod*/ nullptr, std::make_pair(ddx, ddy), constOffset, varOffset,
       /*constOffsets*/ nullptr, /*sampleNumber*/ nullptr,
       /*minLod*/ clamp, status, expr->getCallee()->getLocStart(),
       expr->getSourceRange());
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -6201,19 +6258,22 @@ SpirvEmitter::processTextureSampleCmp(const CXXMemberCallExpr *expr) {
   SpirvInstruction *constOffset = nullptr, *varOffset = nullptr;
   SpirvInstruction *clamp = nullptr;
   SpirvInstruction *status = nullptr;
+  const Expr *statusArgExpr = nullptr;
   handleOptionalTextureSampleArgs(expr, offsetIndex, &constOffset, &varOffset,
-                                  &clamp, &status);
+                                  &clamp, &status, &statusArgExpr);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
 
   addDerivativeGroupExecutionMode();
 
-  return createImageSample(
+  auto *retVal = createImageSample(
       retType, imageType, image, sampler, coordinate, compareVal,
       /*bias*/ nullptr, /*lod*/ nullptr, std::make_pair(nullptr, nullptr),
       constOffset, varOffset, /*constOffsets*/ nullptr,
       /*sampleNumber*/ nullptr, /*minLod*/ clamp, status,
       expr->getCallee()->getLocStart(), expr->getSourceRange());
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -6272,18 +6332,21 @@ SpirvEmitter::processTextureSampleCmpBias(const CXXMemberCallExpr *expr) {
   SpirvInstruction *constOffset = nullptr, *varOffset = nullptr;
   SpirvInstruction *clamp = nullptr;
   SpirvInstruction *status = nullptr;
+  const Expr *statusArgExpr = nullptr;
   handleOptionalTextureSampleArgs(expr, offsetIndex, &constOffset, &varOffset,
-                                  &clamp, &status);
+                                  &clamp, &status, &statusArgExpr);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
 
   addDerivativeGroupExecutionMode();
 
-  return createImageSample(
+  auto *retVal = createImageSample(
       retType, imageType, image, sampler, coordinate, compareVal, bias,
       /*lod*/ nullptr, std::make_pair(nullptr, nullptr), constOffset, varOffset,
       /*constOffsets*/ nullptr, /*sampleNumber*/ nullptr, /*minLod*/ clamp,
       status, expr->getCallee()->getLocStart(), expr->getSourceRange());
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -6343,16 +6406,19 @@ SpirvEmitter::processTextureSampleCmpGrad(const CXXMemberCallExpr *expr) {
   SpirvInstruction *constOffset = nullptr, *varOffset = nullptr;
   SpirvInstruction *clamp = nullptr;
   SpirvInstruction *status = nullptr;
+  const Expr *statusArgExpr = nullptr;
   handleOptionalTextureSampleArgs(expr, offsetIndex, &constOffset, &varOffset,
-                                  &clamp, &status);
+                                  &clamp, &status, &statusArgExpr);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
-  return createImageSample(
+  auto *retVal = createImageSample(
       retType, imageType, image, sampler, coordinate, compareVal,
       /*bias*/ nullptr, /*lod*/ nullptr, std::make_pair(ddx, ddy), constOffset,
       varOffset, /*constOffsets*/ nullptr, /*sampleNumber*/ nullptr,
       /*minLod*/ clamp, status, expr->getCallee()->getLocStart(),
       expr->getSourceRange());
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -6413,17 +6479,20 @@ SpirvEmitter::processTextureSampleCmpLevelZero(const CXXMemberCallExpr *expr) {
   SpirvInstruction *constOffset = nullptr, *varOffset = nullptr;
   SpirvInstruction *clamp = nullptr;
   SpirvInstruction *status = nullptr;
+  const Expr *statusArgExpr = nullptr;
   handleOptionalTextureSampleArgs(expr, offsetIndex, &constOffset, &varOffset,
-                                  &clamp, &status);
+                                  &clamp, &status, &statusArgExpr);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
 
-  return createImageSample(
+  auto *retVal = createImageSample(
       retType, imageType, image, sampler, coordinate, compareVal,
       /*bias*/ nullptr, /*lod*/ lod, std::make_pair(nullptr, nullptr),
       constOffset, varOffset, /*constOffsets*/ nullptr,
       /*sampleNumber*/ nullptr, /*clamp*/ nullptr, status,
       expr->getCallee()->getLocStart(), expr->getSourceRange());
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -6549,14 +6618,20 @@ SpirvEmitter::processBufferTextureLoad(const CXXMemberCallExpr *expr) {
       isTextureMS(objectType) || isSampledTextureMS(objectType);
   const bool hasStatusArg =
       expr->getArg(numArgs - 1)->getType()->isUnsignedIntegerType();
-  auto *status = hasStatusArg ? doExpr(expr->getArg(numArgs - 1)) : nullptr;
+  const Expr *statusArgExpr = hasStatusArg ? expr->getArg(numArgs - 1) : nullptr;
+  auto *status = statusArgExpr ? doExpr(statusArgExpr) : nullptr;
 
   auto loc = expr->getExprLoc();
   auto range = expr->getSourceRange();
-  if (isBuffer(objectType) || isRWBuffer(objectType) || isRWTexture(objectType))
-    return processBufferTextureLoad(object, doExpr(locationArg),
-                                    /*constOffset*/ nullptr, /*lod*/ nullptr,
-                                    /*residencyCode*/ status, loc, range);
+  if (isBuffer(objectType) || isRWBuffer(objectType) || isRWTexture(objectType)) {
+    auto *retVal = processBufferTextureLoad(object, doExpr(locationArg),
+                                            /*constOffset*/ nullptr,
+                                            /*lod*/ nullptr,
+                                            /*residencyCode*/ status, loc,
+                                            range);
+    processHLSLOutArgWriteback(statusArgExpr, status, loc);
+    return retVal;
+  }
 
   // Subtract 1 for status (if it exists), and 1 for sampleIndex (if it exists),
   // and 1 for location.
@@ -6595,8 +6670,10 @@ SpirvEmitter::processBufferTextureLoad(const CXXMemberCallExpr *expr) {
       return nullptr;
     }
 
-    return processBufferTextureLoad(object, coordinate, constOffset, lod,
-                                    status, loc, range);
+    auto *retVal = processBufferTextureLoad(object, coordinate, constOffset, lod,
+                                            status, loc, range);
+    processHLSLOutArgWriteback(statusArgExpr, status, loc);
+    return retVal;
   }
   emitError("Load() of the given object type unimplemented",
             object->getExprLoc());
@@ -7264,6 +7341,14 @@ SpirvEmitter::processAssignment(const Expr *lhs, SpirvInstruction *rhs,
                                 const bool isCompoundAssignment,
                                 SpirvInstruction *lhsPtr, SourceRange range) {
   lhs = lhs->IgnoreParenNoopCasts(astContext);
+
+  // For HLSLOutArgExpr, bypass the temporary and store directly to the original
+  // argument lvalue. This handles out params in intrinsic functions where the
+  // SPIRV emitter generates the result value and assigns it directly.
+  if (const auto *outExpr = dyn_cast<HLSLOutArgExpr>(lhs)) {
+    lhs = outExpr->getArgLValue();
+    lhsPtr = nullptr;
+  }
 
   // Assigning to vector swizzling should be handled differently.
   if (SpirvInstruction *result = tryToAssignToVectorElements(lhs, rhs, range))
@@ -8688,7 +8773,7 @@ void SpirvEmitter::assignToMSOutIndices(
   uint32_t numValues = 1;
   {
     const auto *varTypeDecl =
-        astContext.getAsConstantArrayType(decl->getType());
+        astContext.getAsConstantArrayType(decl->getType().getNonReferenceType());
     QualType varType = varTypeDecl->getElementType();
     if (!isVectorType(varType, nullptr, &numVertices)) {
       assert(isScalarType(varType));
@@ -10461,6 +10546,10 @@ bool isValidOutputArgument(const Expr *expr) {
   if (const ImplicitCastExpr *cast = dyn_cast<ImplicitCastExpr>(expr))
     return isValidOutputArgument(cast->getSubExpr());
 
+  // HLSLOutArgExpr wraps an out/inout argument; validate its underlying lvalue.
+  if (const HLSLOutArgExpr *outArg = dyn_cast<HLSLOutArgExpr>(expr))
+    return isValidOutputArgument(outArg->getArgLValue());
+
   // For call operators, we trust the LValue() method.
   // Haven't found a cases where this is not true.
   if (const CXXOperatorCallExpr *call = dyn_cast<CXXOperatorCallExpr>(expr))
@@ -10546,11 +10635,16 @@ SpirvEmitter::processIntrinsicInterlockedMethod(const CallExpr *expr,
       return;
     }
 
-    const auto outputArgType = outputArg->getType();
+    // When outputArg is a HLSLOutArgExpr, getType() returns the param type.
+    // We need the actual lvalue type for the cast.
+    const Expr *lvalueArg = outputArg;
+    if (const auto *outExpr = dyn_cast<HLSLOutArgExpr>(outputArg))
+      lvalueArg = outExpr->getArgLValue();
+    const auto outputArgType = lvalueArg->getType();
     if (baseType != outputArgType)
       toWrite =
           castToInt(toWrite, baseType, outputArgType, dest->getLocStart());
-    spvBuilder.createStore(doExpr(outputArg), toWrite, callExpr->getExprLoc());
+    processAssignment(outputArg, toWrite, false, nullptr, callExpr->getSourceRange());
   };
 
   // If a vector swizzling of a texture is done as an argument of an
@@ -11253,7 +11347,12 @@ SpirvInstruction *SpirvEmitter::processIntrinsicModf(const CallExpr *callExpr) {
   const auto loc = callExpr->getLocStart();
   const auto range = callExpr->getSourceRange();
   const auto argType = arg->getType();
-  const auto ipType = ipArg->getType();
+  // When ipArg is wrapped in HLSLOutArgExpr, getType() returns the param type
+  // (float), but the actual write-back target may be int. Get the real type.
+  const Expr *ipLVExpr = ipArg;
+  if (const auto *outExpr = dyn_cast<HLSLOutArgExpr>(ipArg))
+    ipLVExpr = outExpr->getArgLValue();
+  const auto ipType = ipLVExpr->getType();
   const auto returnType = callExpr->getType();
   auto *argInstr = doExpr(arg);
 
@@ -11481,7 +11580,7 @@ SpirvEmitter::processIntrinsicFrexp(const CallExpr *callExpr) {
   const auto loc = callExpr->getExprLoc();
   const auto range = callExpr->getSourceRange();
   auto *argInstr = doExpr(arg);
-  auto *expInstr = doExpr(callExpr->getArg(1));
+  const Expr *expArg = callExpr->getArg(1);
 
   // For scalar and vector argument types.
   {
@@ -11506,7 +11605,7 @@ SpirvEmitter::processIntrinsicFrexp(const CallExpr *callExpr) {
       // results.
       auto *exponentFloat = spvBuilder.createUnaryOp(
           spv::Op::OpConvertSToF, returnType, exponentInt, loc, range);
-      spvBuilder.createStore(expInstr, exponentFloat, loc, range);
+      processAssignment(expArg, exponentFloat, false, nullptr, range);
       return spvBuilder.createCompositeExtract(argType, frexp, {0}, loc, range);
     }
   }
@@ -11545,7 +11644,7 @@ SpirvEmitter::processIntrinsicFrexp(const CallExpr *callExpr) {
       }
       auto *exponentsResult = spvBuilder.createCompositeConstruct(
           returnType, exponents, loc, range);
-      spvBuilder.createStore(expInstr, exponentsResult, loc, range);
+      processAssignment(expArg, exponentsResult, false, nullptr, range);
       return spvBuilder.createCompositeConstruct(returnType, mantissas,
                                                  callExpr->getLocEnd(), range);
     }
@@ -13015,13 +13114,13 @@ SpirvEmitter::processIntrinsicSinCos(const CallExpr *callExpr) {
   auto *sin = processIntrinsicUsingGLSLInst(
       sincosExpr, GLSLstd450::GLSLstd450Sin,
       /*actPerRowForMatrices*/ true, srcLoc, srcRange);
-  spvBuilder.createStore(doExpr(callExpr->getArg(1)), sin, srcLoc, srcRange);
+  processAssignment(callExpr->getArg(1), sin, false, nullptr, srcRange);
 
   // Perform Cos and store results in argument 2.
   auto *cos = processIntrinsicUsingGLSLInst(
       sincosExpr, GLSLstd450::GLSLstd450Cos,
       /*actPerRowForMatrices*/ true, srcLoc, srcRange);
-  spvBuilder.createStore(doExpr(callExpr->getArg(2)), cos, srcLoc, srcRange);
+  processAssignment(callExpr->getArg(2), cos, false, nullptr, srcRange);
   return nullptr;
 }
 
@@ -17099,8 +17198,9 @@ SpirvEmitter::doHLSLOutArgExpr(const HLSLOutArgExpr *Expr) {
         spvBuilder.addFnVar(Expr->getType(), Expr->getLocStart(), "hlsl.out");
   }
 
-  if (const auto *OpaqueVal = Expr->getOpaqueArgLValue())
-    bindOpaqueValue(TmpVar, OpaqueVal);
+  // Bind the CastedTemporary opaque value to TmpVar so that the writeback
+  // expression can read the out value from the temporary.
+  bindOpaqueValue(TmpVar, Expr->getCastedTemporary());
 
   return TmpVar;
 }
@@ -17116,6 +17216,36 @@ SpirvEmitter::doHLSLArrayTemporaryExpr(const HLSLArrayTemporaryExpr *expr) {
 
 SpirvInstruction *SpirvEmitter::doOpaqueValueExpr(const OpaqueValueExpr *expr) {
   return getLValueForOpaqueValue(expr);
+}
+
+void SpirvEmitter::processHLSLOutArgWriteback(const Expr *argExpr,
+                                              SpirvInstruction *tmpVar,
+                                              SourceLocation loc) {
+  if (!argExpr || !tmpVar)
+    return;
+  const auto *outParamExpr = dyn_cast<HLSLOutArgExpr>(argExpr);
+  if (!outParamExpr)
+    return;
+
+  QualType tmpType = outParamExpr->getType();
+  const Expr *argLVExpr = outParamExpr->getArgLValue();
+  QualType argType = argLVExpr->getType();
+
+  SpirvInstruction *val = spvBuilder.createLoad(tmpType, tmpVar, loc);
+  val->setRValue();
+
+  // Cast from parameter type to argument type when they differ.
+  if (tmpType.getCanonicalType().getUnqualifiedType() !=
+      argType.getCanonicalType().getUnqualifiedType()) {
+    QualType elementType;
+    if (isVectorType(tmpType, &elementType) && isScalarType(argType)) {
+      val = spvBuilder.createCompositeExtract(elementType, val, {0}, loc);
+      tmpType = elementType;
+    }
+    val = castToType(val, tmpType, argType, loc);
+  }
+
+  processAssignment(argLVExpr, val, false, nullptr);
 }
 
 void SpirvEmitter::bindOpaqueValue(SpirvVariable *lvalue,
