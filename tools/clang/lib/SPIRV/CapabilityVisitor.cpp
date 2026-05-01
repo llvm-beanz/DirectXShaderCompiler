@@ -230,6 +230,19 @@ void CapabilityVisitor::addCapabilityForType(const SpirvType *type,
         addCapability(spv::Capability::StorageUniformBufferBlock16);
       }
     }
+    if (SpirvType::isOrContainsType<IntegerType, 8>(structType)) {
+      addExtension(Extension::KHR_8bit_storage, "8-bit types in resource",
+                   loc);
+      if (sc == spv::StorageClass::PushConstant) {
+        addCapability(spv::Capability::StoragePushConstant8);
+      } else if (structType->getInterfaceType() ==
+                 StructInterfaceType::UniformBuffer) {
+        addCapability(spv::Capability::UniformAndStorageBuffer8BitAccess);
+      } else if (structType->getInterfaceType() ==
+                 StructInterfaceType::StorageBuffer) {
+        addCapability(spv::Capability::StorageBuffer8BitAccess);
+      }
+    }
     for (auto field : structType->getFields())
       addCapabilityForType(field.type, loc, sc);
   }
