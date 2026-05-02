@@ -810,3 +810,92 @@ multi-session task.
     block walks past `AttributedType` sugar in addition to typedefs.
     Don't `getNonReferenceType()` before that block unless you also
     arrange for the orientation lookup to survive the desugar.
+
+## Session 6 — `as-groupshared-payload-matrix.hlsl`
+
+The previous session left this test failing and labeled it
+"multi-session," speculating that the deletion of
+`HLLegalizeParameter.cpp` was the root cause. That hypothesis was
+wrong. The actual bug was localized to `HLMatrixLowerPass`:
+
+The shader takes a matrix subscript on a `bool2x2` field of a
+groupshared `MeshPayload` nested in `GSStruct[2]`. CodeGen emits an
+`addrspacecast` from the matrix lvalue in addrspace(3) to the generic
+address space because the `dx.hl.subscript.colMajor[]` HL intrinsic's
+signature uses generic-address-space matrix pointers. By the time
+`hlmatrixlower` runs, `scalarrepl-param-hlsl` has already split the
+matrix into its lowered `[4 x i32]` storage, so the IR shape at this
+stage is:
+
+```
+%g = getelementptr ..., [N x %struct.GSStruct.0] addrspace(3)* @gs.split, ...
+%a = addrspacecast [4 x i32] addrspace(3)* %g to %class.matrix.bool.2.2*
+%c = call <2 x i32>* @dx.hl.subscript.colMajor[]...(i32 1, %class.matrix.bool.2.2* %a, ...)
+```
+
+`HLMatrixLowerPass::lowerHLMatSubscript` calls
+`tryGetLoweredPtrOperand(MatPtr)`, which only succeeds for stub calls,
+function arguments, or allocas. For an addrspacecast rooted at a
+**global variable** (whose top-level type isn't a pure matrix or
+matrix-array, so `lowerGlobal` skipped it), it returns nullptr. Then
+`lowerHLMatSubscript` early-returns because `RootPtr` isn't an
+`Argument`, leaving the HL subscript call in the module. The
+validator subsequently rejects the call as "not a DXIL function" and
+reports the surrounding `bitcast`/`addrspacecast` chain.
+
+The fix adds a narrow special case to `lowerHLMatSubscript` only.
+When `MatPtr` is an `AddrSpaceCastInst` whose source roots in a
+`GlobalVariable` or `AllocaInst` (through GEPs), we either
+1. bitcast the source to its lowered vector type
+   (`HLMatrixType::getLoweredType`) when it's still a matrix-typed
+   pointer, or
+2. use the source directly if it's already a lowered array/vector
+   pointer (the post-scalarrepl shape we observe in practice).
+
+Either way we set `RootPtr = SrcRoot`, so `AllowLoweredPtrGEPs`
+becomes `true` and `HLMatrixSubscriptUseReplacer` GEPs straight into
+the lowered storage. This handles all the dynamic and constant
+subscript shapes the test exercises, and keeps the result in
+`addrspace(3)` so loads/stores remain valid groupshared accesses.
+
+Why narrow? `tryGetLoweredPtrOperand` is shared by `lowerHLLoad`,
+`lowerHLStore`, `lowerCallArgs`, and `lowerNonHLCall`. Some of those
+callers (notably `lowerNonHLCall`) bitcast the lowered pointer back
+to the original argument type — which would assert if we silently
+peeled an `addrspacecast` and changed the address space. Confining
+the fix to subscript lowering avoids regressing the rest.
+
+`HLMatrixSubscriptUseReplacer` already handles array-typed lowered
+storage (see the `LoweredTy->isVectorTy() ? ... : ArrayType`
+branch in `loadVector`), so case (2) above needs no companion
+change.
+
+Full matrix loads/stores on the same groupshared lvalue (e.g.,
+`int2x2 mat = gs[j].pld[i].mat;`) already worked because `lowerHLLoad`
+and `lowerHLStore` defer to "HL signature lower" when
+`tryGetLoweredPtrOperand` returns null, rather than dropping the call.
+Only the subscript path was actually broken.
+
+### Commit
+
+6. `[HLSL] Lower matrix subscript on groupshared lvalues` — recognize
+   the addrspacecast pattern in `lowerHLMatSubscript` so HL subscript
+   intrinsics on groupshared-rooted matrix lvalues lower to direct
+   GEPs into the lowered storage instead of leaking past matrix
+   lowering.
+
+### Lessons
+
+19. **`tryGetLoweredPtrOperand` only handles allocas and shader
+    arguments; globals fall through.** For matrix lvalues rooted in
+    global variables (especially groupshared structs that contain a
+    matrix field), the helper returns nullptr because `lowerGlobal`
+    only fires on globals whose top-level type is a matrix or
+    matrix-array. Subscript / load / store call sites must handle
+    this case themselves if they want to lower instead of leaking.
+
+20. **CodeGen's `addrspacecast` for matrix subscripts persists past
+    `hlsl-dxil-cleanup-addrspacecast`.** That pass intentionally
+    skips `CallInst` users (it does not rewrite call signatures), so
+    any addrspacecast that feeds an HL intrinsic survives into matrix
+    lowering. Don't rely on the cleanup pass to remove these.
