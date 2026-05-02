@@ -14,37 +14,13 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-When I build this locally I'm still seeing test failures:
+The SemaExprCXX changes you made in the last session are wrong. We want that
+diagnostic. If tests are failing because it is firing, you should update the
+test cases.
 
-********************
-Failing Tests (20):
-    Clang :: CodeGenSPIRV/coopmatrix_muladd_test.hlsl
-    Clang :: CodeGenSPIRV/rayquery_init_expr.hlsl
-    Clang :: HLSLFileCheckLit/hlsl/operators/swizzle/swizzleBitfieldNotAllowed.hlsl
-    Clang :: LitDXILValidation/GroupShared/groupshared_shadermodels.hlsl
-    Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchDxil
-    Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchHLSL
-    Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchSamples
-    Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchShaderTargets
-    Clang-Unit :: HLSL/ClangHLSLTests/PixTest.DebugInstrumentation_VectorAllocaWrite_Structs
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.AtomicsInvalidDests
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.CallableParamIsStruct
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.RayAttrIsStruct
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.RayPayloadIsStruct
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.RayShaderExtraArg
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.RayShaderWithSignaturesFail
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.ShaderFunctionReturnTypeVoid
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.WhenMissingPayloadThenFail
-    Clang-Unit :: HLSL/ClangHLSLTests/ValidationTest.WhenPayloadSizeTooSmallThenFail
-    Clang-Unit :: HLSL/ClangHLSLTests/VerifierTest.RunCppErrors
-    Clang-Unit :: HLSL/ClangHLSLTests/VerifierTest.RunCppErrorsHV2015
+The whole point of this branch is that parameters should be references, so toyr
+change to ParmVarDecl::updateOutParamToRefType is wrong and should be reverted.
 
-  Expected Passes    : 4584
-  Expected Failures  : 9
-  Unsupported Tests  : 32
-  Unexpected Failures: 20
-
-Please address all test failures on this branch even any that may have been
-pre-existing.
-
-See the test_output.txt file for the full logs of my local test run.
+I think we should remove all the code that elides copies at the AST-level. That
+seems to be problematic and any case where it is safe to elide the copy we will
+see the copies eliminated by the IR optimizer after inlining.
