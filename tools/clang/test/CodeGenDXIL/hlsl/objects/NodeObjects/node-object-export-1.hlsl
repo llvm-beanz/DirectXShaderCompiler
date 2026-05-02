@@ -20,12 +20,12 @@ DispatchNodeInputRecord<RECORD> foo(DispatchNodeInputRecord<RECORD> input) {
   return input;
 }
 
-// CHECK:   define void @"\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nocapture readonly )?}}%input, %"struct.DispatchNodeInputRecord<RECORD>"* noalias {{(nocapture )?}}%output)
+// CHECK:   define void @"\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nocapture readonly )?}}%input, %"struct.DispatchNodeInputRecord<RECORD>"* noalias {{(nocapture )?}}dereferenceable(4) %output)
 export
 void bar(DispatchNodeInputRecord<RECORD> input, out DispatchNodeInputRecord<RECORD> output) {
 
 // CHECK: %[[TMP:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>"{{(, align 8)?}}
-// CHECK: call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nonnull |noalias )?}}sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* %input)
+// CHECK: call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nonnull |noalias )?}}sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{[^ ,)]+}})
 // CHECK: %[[BarLd:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[TMP]]{{(, align 8)?}}
 // CHECK: store %"struct.DispatchNodeInputRecord<RECORD>" %[[BarLd]], %"struct.DispatchNodeInputRecord<RECORD>"* %output{{(, align 4)?}}
 
@@ -45,12 +45,12 @@ DispatchNodeInputRecord<RECORD> foo2(DispatchNodeInputRecord<RECORD> input) {
   return input;
 }
 
-// CHECK:   define void @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nocapture readonly )?}}%input, %"struct.DispatchNodeInputRecord<RECORD>"* noalias {{(nocapture )?}}%output)
+// CHECK:   define void @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nocapture readonly )?}}%input, %"struct.DispatchNodeInputRecord<RECORD>"* noalias {{(nocapture )?}}dereferenceable(4) %output)
 [noinline]
 export
 void bar2(DispatchNodeInputRecord<RECORD> input, out DispatchNodeInputRecord<RECORD> output) {
 // FCGL: %[[TMP:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>", align 4
-// FCGL: call void @"\01?foo2@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* %input)
+// FCGL: call void @"\01?foo2@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{[^ ,)]+}})
 // FCGL: %[[Bar2Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[TMP]]
 // FCGL: store %"struct.DispatchNodeInputRecord<RECORD>" %[[Bar2Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %output
 
@@ -59,7 +59,6 @@ void bar2(DispatchNodeInputRecord<RECORD> input, out DispatchNodeInputRecord<REC
 
 // DBG: call void @llvm.dbg.declare(metadata %"struct.DispatchNodeInputRecord<RECORD>"* %output, metadata ![[BAR2OUTPUT:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"output" !DIExpression() func:"bar2"
 // DBG: call void @llvm.dbg.declare(metadata %"struct.DispatchNodeInputRecord<RECORD>"* %input, metadata ![[BAR2INPUT:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"input" !DIExpression() func:"bar2"
-// DBG: call void @llvm.dbg.declare(metadata %"struct.DispatchNodeInputRecord<RECORD>"* %input, metadata ![[FOO2INPUT]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"input" !DIExpression() func:"foo2"
 
   output = foo2(input);
 }
@@ -76,12 +75,13 @@ void bar2(DispatchNodeInputRecord<RECORD> input, out DispatchNodeInputRecord<REC
 // DBG: ![[RecordElts]] = !{![[RecordElt:[0-9]+]]}
 // DBG: ![[RecordElt]] = !DIDerivedType(tag: DW_TAG_member, name: "X", scope: ![[RECORD]], file: !1, line: {{[0-9]+}}, baseType: ![[INT:[0-9]+]], size: 32, align: 32)
 // DBG: ![[INT]] = !DIBasicType(name: "int", size: 32, align: 32, encoding: DW_ATE_signed)
-// DBG: ![[Bar:[0-9]+]] = !DISubprogram(name: "bar", linkageName: "\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z", scope: !1, file: !1, line: {{[0-9]+}}, type: ![[BarTy:[0-9]+]], isLocal: false, isDefinition: true, scopeLine: {{[0-9]+}}, flags: DIFlagPrototyped, isOptimized: false, function: void (%"struct.DispatchNodeInputRecord<RECORD>"*, %"struct.DispatchNodeInputRecord<RECORD>"*)* @"\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z")
+// DBG: ![[Bar:[0-9]+]] = !DISubprogram(name: "bar", linkageName: "\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z", scope: !1, file: !1, line: {{[0-9]+}}, type: ![[BarTy:[0-9]+]], isLocal: false, isDefinition: true, scopeLine: {{[0-9]+}}, flags: DIFlagPrototyped, isOptimized: false, function: void (%"struct.DispatchNodeInputRecord<RECORD>"*, %"struct.DispatchNodeInputRecord<RECORD>"*)* @"\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z")
 // DBG: ![[BarTy]] = !DISubroutineType(types: ![[BarTys:[0-9]+]])
 // DBG: ![[BarTys]] = !{null, ![[ObjTy]], ![[OutObjTy:[0-9]+]]}
-// DBG: ![[OutObjTy]] = !DIDerivedType(tag: DW_TAG_restrict_type, baseType: ![[ObjTy]])
+// DBG: ![[OutObjTy]] = !DIDerivedType(tag: DW_TAG_restrict_type, baseType: !{{[0-9]+}})
+// DBG: ![[RefObjTy:[0-9]+]] = !DIDerivedType(tag: DW_TAG_reference_type, baseType: ![[ObjTy]])
 // DBG: ![[Foo2:[0-9]+]] = !DISubprogram(name: "foo2", linkageName: "\01?foo2@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z", scope: !1, file: !1, line: {{[0-9]+}}, type: ![[FooTy]], isLocal: false, isDefinition: true, scopeLine: {{[0-9]+}}, flags: DIFlagPrototyped, isOptimized: false, function: void (%"struct.DispatchNodeInputRecord<RECORD>"*, %"struct.DispatchNodeInputRecord<RECORD>"*)* @"\01?foo2@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z")
-// DBG: ![[Bar2:[0-9]+]] = !DISubprogram(name: "bar2", linkageName: "\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z", scope: !1, file: !1, line: {{[0-9]+}}, type: ![[BarTy]], isLocal: false, isDefinition: true, scopeLine: {{[0-9]+}}, flags: DIFlagPrototyped, isOptimized: false, function: void (%"struct.DispatchNodeInputRecord<RECORD>"*, %"struct.DispatchNodeInputRecord<RECORD>"*)* @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z")
+// DBG: ![[Bar2:[0-9]+]] = !DISubprogram(name: "bar2", linkageName: "\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z", scope: !1, file: !1, line: {{[0-9]+}}, type: ![[BarTy]], isLocal: false, isDefinition: true, scopeLine: {{[0-9]+}}, flags: DIFlagPrototyped, isOptimized: false, function: void (%"struct.DispatchNodeInputRecord<RECORD>"*, %"struct.DispatchNodeInputRecord<RECORD>"*)* @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z")
 // DBG: ![[FOOINPUT]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "input", arg: 1, scope: ![[Foo]], file: !1, line: {{[0-9]+}}, type: ![[ObjTy]])
 // DBG: ![[BAROUTPUT]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "output", arg: 2, scope: ![[Bar]], file: !1, line: {{[0-9]+}}, type: ![[ObjTy]])
 // DBG: ![[BARINPUT]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "input", arg: 1, scope: ![[Bar]], file: !1, line: {{[0-9]+}}, type: ![[ObjTy]])

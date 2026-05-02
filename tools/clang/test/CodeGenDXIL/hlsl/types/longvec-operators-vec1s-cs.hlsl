@@ -128,6 +128,19 @@ void main(uint3 GID : SV_GroupThreadID) {
 // Test assignment operators.
 void assignments(inout VTYPE things[11], TYPE scales[10]) {
 
+  // CHECK: [[ScIx:%.*]] = add i32 [[InIx2]], 1
+  // CHECK: [[ScHdl:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[Scales]]
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF0]], i8 1, i32 [[ALN]])
+  // CHECK: [[scl0:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF1]], i8 1, i32 [[ALN]])
+  // CHECK: [[scl1:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF2]], i8 1, i32 [[ALN]])
+  // CHECK: [[scl2:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF3]], i8 1, i32 [[ALN]])
+  // CHECK: [[scl3:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF4]], i8 1, i32 [[ALN]])
+  // CHECK: [[scl4:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
+
   // CHECK: [[InIx:%.*]] = add i32 [[InIx1]], 1
 
   // CHECK: [[InHdl:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[Input]]
@@ -152,24 +165,9 @@ void assignments(inout VTYPE things[11], TYPE scales[10]) {
   // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[InHdl]], i32 [[InIx]], i32 [[OFF10]], i8 1, i32 [[ALN]])
   // CHECK: [[val10:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
 
-
-  // CHECK: [[ScIx:%.*]] = add i32 [[InIx2]], 1
-  // CHECK: [[ScHdl:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[Scales]]
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF0]], i8 1, i32 [[ALN]])
-  // CHECK: [[scl0:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
-  // Nothing to check. Just a copy over.
-  things[0] = scales[0];
-
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF1]], i8 1, i32 [[ALN]])
-  // CHECK: [[scl1:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF2]], i8 1, i32 [[ALN]])
-  // CHECK: [[scl2:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF3]], i8 1, i32 [[ALN]])
-  // CHECK: [[scl3:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ScHdl]], i32 [[ScIx]], i32 [[OFF4]], i8 1, i32 [[ALN]])
-  // CHECK: [[scl4:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
-
   // CHECK: [[res1:%.*]] = [[ADD:f?add( fast)?]]{{( nsw)?}} [[TYPE]] [[val5]], [[val1]]
+  // Nothing to check for things[0]. Just a copy over.
+  things[0] = scales[0];
   things[1] += things[5];
 
   // CHECK: [[res2:%.*]] = [[SUB:f?sub( fast)?]]{{( nsw)?}} [[TYPE]] [[val2]], [[val6]]
@@ -188,13 +186,13 @@ void assignments(inout VTYPE things[11], TYPE scales[10]) {
   things[5] %= things[9];
 #endif
 
-  // CHECK: [[res6:%[0-9]*]] = [[ADD]]{{( nsw)?}} [[TYPE]] [[scl1]], [[val6]]
+  // CHECK: [[res6:%[0-9]*]] = [[ADD]]{{( nsw)?}} [[TYPE]] [[val6]], [[scl1]]
   things[6] += scales[1];
 
   // CHECK: [[res7:%[0-9]*]] = [[SUB]]{{( nsw)?}} [[TYPE]] [[val7]], [[scl2]]
   things[7] -= scales[2];
 
-  // CHECK: [[res8:%[0-9]*]] = [[MUL]]{{( nsw)?}} [[TYPE]] [[scl3]], [[val8]]
+  // CHECK: [[res8:%[0-9]*]] = [[MUL]]{{( nsw)?}} [[TYPE]] [[val8]], [[scl3]]
   things[8] *= scales[3];
 
   // CHECK: [[res9:%[0-9]*]] = [[DIV]]{{( nsw)?}} [[TYPE]] [[val9]], [[scl4]]

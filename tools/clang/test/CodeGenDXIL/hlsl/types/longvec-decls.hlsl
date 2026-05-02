@@ -105,21 +105,21 @@ export void lv_param_in_out(in vector<TYPE, NUM> vec1, out vector<TYPE, NUM> vec
   vec2 = vec1;
 }
 
-// CHECK-LABEL: define void @"\01?lv_param_in_out_rec@@YAXULongVec@@U1@@Z"(%struct.LongVec* %vec1, %struct.LongVec* noalias %vec2)
+// CHECK-LABEL: define void @"\01?lv_param_in_out_rec@@YAXULongVec@@AIAU1@@Z"(%struct.LongVec* %vec1, %struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec2)
 // CHECK: memcpy
 // CHECK:   ret void
 export void lv_param_in_out_rec(in LongVec vec1, out LongVec vec2) {
   vec2 = vec1;
 }
 
-// CHECK-LABEL: define void @"\01?lv_param_in_out_sub@@YAXULongVec@@U1@@Z"(%struct.LongVec* %vec1, %struct.LongVec* noalias %vec2)
+// CHECK-LABEL: define void @"\01?lv_param_in_out_sub@@YAXULongVec@@AIAU1@@Z"(%struct.LongVec* %vec1, %struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec2)
 // CHECK: memcpy
 // CHECK:   ret void
 export void lv_param_in_out_sub(in LongVec vec1, out LongVec vec2) {
   vec2 = vec1;
 }
 
-// CHECK-LABEL: define void @"\01?lv_param_in_out_tpl@@YAXULongVec@@U1@@Z"(%struct.LongVec* %vec1, %struct.LongVec* noalias %vec2)
+// CHECK-LABEL: define void @"\01?lv_param_in_out_tpl@@YAXULongVec@@AIAU1@@Z"(%struct.LongVec* %vec1, %struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec2)
 // CHECK: memcpy
 // CHECK:   ret void
 export void lv_param_in_out_tpl(in LongVec vec1, out LongVec vec2) {
@@ -140,7 +140,7 @@ export void lv_param_inout(inout vector<TYPE, NUM> vec1, inout vector<TYPE, NUM>
   vec2 = tmp;
 }
 
-// CHECK-LABEL: define void @"\01?lv_param_inout_rec@@YAXULongVec@@0@Z"(%struct.LongVec* noalias %vec1, %struct.LongVec* noalias %vec2)
+// CHECK-LABEL: define void @"\01?lv_param_inout_rec@@YAXAIAULongVec@@0@Z"(%struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec1, %struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec2)
 // CHECK: memcpy
 // CHECK:   ret void
 export void lv_param_inout_rec(inout LongVec vec1, inout LongVec vec2) {
@@ -149,7 +149,7 @@ export void lv_param_inout_rec(inout LongVec vec1, inout LongVec vec2) {
   vec2 = tmp;
 }
 
-// CHECK-LABEL: define void @"\01?lv_param_inout_sub@@YAXULongVec@@0@Z"(%struct.LongVec* noalias %vec1, %struct.LongVec* noalias %vec2)
+// CHECK-LABEL: define void @"\01?lv_param_inout_sub@@YAXAIAULongVec@@0@Z"(%struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec1, %struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec2)
 // CHECK: memcpy
 // CHECK:   ret void
 export void lv_param_inout_sub(inout LongVec vec1, inout LongVec vec2) {
@@ -158,7 +158,7 @@ export void lv_param_inout_sub(inout LongVec vec1, inout LongVec vec2) {
   vec2 = tmp;
 }
 
-// CHECK-LABEL: define void @"\01?lv_param_inout_tpl@@YAXULongVec@@0@Z"(%struct.LongVec* noalias %vec1, %struct.LongVec* noalias %vec2)
+// CHECK-LABEL: define void @"\01?lv_param_inout_tpl@@YAXAIAULongVec@@0@Z"(%struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec1, %struct.LongVec* noalias dereferenceable({{[0-9]+}}) %vec2)
 // CHECK: memcpy
 // CHECK:   ret void
 export void lv_param_inout_tpl(inout LongVec vec1, inout LongVec vec2) {
