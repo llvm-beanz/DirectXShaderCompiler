@@ -184,6 +184,11 @@ clang::QualType GetElementTypeOrType(clang::QualType type) {
 }
 
 bool HasHLSLMatOrientation(clang::QualType type, bool *pIsRowMajor) {
+  // Strip references so that callers handing us reference-typed
+  // out/inout parameters can still find the row_major / column_major
+  // attribute on the underlying matrix type.
+  if (type->isReferenceType())
+    type = type.getNonReferenceType();
   const AttributedType *AT = type->getAs<AttributedType>();
   while (AT) {
     AttributedType::Kind kind = AT->getAttrKind();
