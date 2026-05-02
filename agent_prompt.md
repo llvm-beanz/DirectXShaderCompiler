@@ -14,13 +14,5 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-The SemaExprCXX changes you made in the last session are wrong. We want that
-diagnostic. If tests are failing because it is firing, you should update the
-test cases.
-
-The whole point of this branch is that parameters should be references, so toyr
-change to ParmVarDecl::updateOutParamToRefType is wrong and should be reverted.
-
-I think we should remove all the code that elides copies at the AST-level. That
-seems to be problematic and any case where it is safe to elide the copy we will
-see the copies eliminated by the IR optimizer after inlining.
+I'm now seeing just a few test failures locally. Please fix the remaining test
+failures on the branch.
