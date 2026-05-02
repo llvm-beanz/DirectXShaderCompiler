@@ -660,3 +660,153 @@ needs further investigation:
     where `CalleeInfo.Payload->getType()` could be invalid. When
     extending an analysis to see new code paths, ensure all the
     downstream code is null-safe.
+
+## Session 5: Polishing the last failures
+
+After session 4, four lit tests were still failing locally:
+
+1. `Clang :: CodeGenSPIRV/coopmatrix_muladd_test.hlsl`
+2. `Clang :: CodeGenSPIRV/rayquery_init_expr.hlsl`
+3. `Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchHLSL` (a bundle
+   of HLSLFileCheck tests)
+4. `Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchShaderTargets`
+   (specifically `as-groupshared-payload-matrix.hlsl`)
+
+### BatchHLSL bundle
+
+The BatchHLSL bundle had four distinct families of failure. Each was
+fixed independently:
+
+#### Matrix orientation lost on typedef'd out parameters
+
+`hlsl/types/modifiers/matrix_packing/output_param.hlsl` and the two
+`pragma_granularity*` siblings were producing transposed StoreOutput
+sequences for `out row_major int2x2` parameters. The cause: the recent
+addition of `getNonReferenceType()` in `AddHLSLFunctionInfo` combined
+with the existing `if (isa<TypedefType>) desugar` branch caused
+`getDesugaredType()` to walk past the `AttributedType(row_major, …)`
+sugar layer that `HasHLSLMatOrientation` expects to find. Dropping the
+`getNonReferenceType()` call there restores the previous lookup chain,
+because `ConstructFieldAttributedAnnotation` already strips references
+internally.
+
+#### Texture sampler annotation order
+
+`SampleCmpBias.hlsl`, `SampleCmpGrad.hlsl`, `Sample_node.hlsl`, and
+`CalcLODWithSamplerComparison.hlsl` rely on a specific ordering of
+`AnnotateHandle` instructions. The new HLSLOutArgExpr-based call
+lowering emits sampler annotations before texture annotations, whereas
+the old lowering annotated the texture first (since it was the implicit
+`this`). The semantics are unchanged; the tests only needed their
+CHECK pairs swapped to match the new emission order.
+
+#### Matrix subscript orientation under NoOp casts
+
+`hlsl/operators/swizzle/swizzleAtomic.hlsl` was indexing the row-major
+groupshared `dataC[0][1][0]` with a column-major flat index because
+`EmitHLSLMatrixSubscript` was reading the orientation off the wrong
+type. Sema now inserts `ImplicitCastExpr<NoOp>` around the matrix base
+when adapting a `row_major MxN` (possibly with an address-space
+qualifier) lvalue to the canonical `matrix<T,M,N>` expected by the
+matrix `operator[]` signature. That NoOp cast strips the
+`AttributedType(row_major)` layer; querying `Base->getType()` gave the
+default orientation. Fix: peel any leading NoOp implicit casts in
+`CGExprCXX.cpp` before passing the base type to
+`EmitHLSLMatrixSubscript`.
+
+#### Payload-access analysis missing HLSLOutArgExpr
+
+`hlsl/payload_qualifier/extern_call.hlsl`, `nested_access.hlsl`, and
+`access.hlsl` rely on the `-Wpayload-access-call` warning being emitted
+when a payload is passed to an extern function (or a nested function
+that drops/reads disallowed fields). The DXR analysis walked
+`Stmt::children()` looking for `DeclRefExpr` to the payload, but
+HLSLOutArgExpr/OpaqueValueExpr hide the source DeclRef. Both
+`IsPayloadArg` and `GetPayloadAccesses` now peel `HLSLOutArgExpr`
+(via `getArgLValue()`) and `OpaqueValueExpr` (via `getSourceExpr()`)
+explicitly. Without the `IsPayloadArg` half of the fix, the recursive
+`DiagnosePayloadAsFunctionArg` left `CalleeInfo.Payload`
+default-constructed (uninitialized) and `GetPayloadType` later
+crashed when it dereferenced the bogus pointer.
+
+### CodeGenSPIRV
+
+#### `rayquery_init_expr.hlsl`
+
+`SpirvEmitter::doExpr` skips initialization for `CXXConstructExpr` of
+RayQuery types and otherwise sets `result = curThis`. The predicate
+`IsHLSLRayQueryType` was using `dyn_cast<RecordType>(QualType)`, which
+returns null when the type is wrapped in a `TypedefType` /
+`ElaboratedType` (as is the case for `RayQuery<0>` printed with a
+canonical-vs-sugared mismatch). The predicate returned false and the
+`result = curThis` branch leaked the previous member function's
+`%param_this` into `Fun()`, producing an OpStore from a SomeStruct
+pointer into a rayQueryKHR variable. Switching to `getAs<RecordType>()`
+makes the predicate see through sugar and restores the intended
+"initialization is implicit" behavior.
+
+#### `coopmatrix_muladd_test.hlsl` (left as-is)
+
+This test fails with `vk::ext_literal may only be applied to
+parameters that can be evaluated to a literal value` on the `operands`
+argument to `__builtin_spv_CooperativeMatrixMulAddKHR`. `operands`
+is a `const` local whose initializer reads
+`a.hasSignedIntegerComponentType` (a `static const bool` member of a
+template class), and Clang's `EvaluateAsRValue` refuses to fold
+through the template parameter member access. I tried peeling
+casts and falling back to evaluating the variable's initializer
+directly; neither path succeeded because the underlying problem is
+inside Clang's constant evaluator. The fix likely requires either a
+constant-evaluator change or restructuring the helper to use a
+constexpr-friendlier idiom. Out of scope for this session.
+
+### BatchShaderTargets / `as-groupshared-payload-matrix.hlsl`
+(left as-is)
+
+The shader uses `groupshared bool2x2`. The DXIL validator rejects the
+output because the expected lowering — bitcasting the `[4 x i32]
+addrspace(3)*` storage to `%class.matrix.bool.2.2 addrspace(3)*` and
+then `addrspacecast`ing to a generic pointer — is no longer cleaned up
+later in the pipeline. The branch deleted `HLLegalizeParameter.cpp`,
+which was the pass responsible for inserting the alloca/copy that made
+this pattern legal. Restoring it (or replicating its parameter
+legalization in the new HLSLOutArgExpr-based pipeline) is a
+multi-session task.
+
+### Commits
+
+1. `[HLSL] Preserve matrix orientation attribute on out parameter
+   types` — drops `getNonReferenceType()` in `AddHLSLFunctionInfo` so
+   typedef'd matrix params keep their orientation attribute.
+2. `[Test] Update sampler/texture annotation order for HLSL out-param
+   rewrite` — swaps AnnotTexture/AnnotSampler CHECK pairs in four
+   texture sampler tests.
+3. `[HLSL] Strip NoOp casts when computing matrix subscript
+   orientation` — fixes `dataC[0][1][0]` indexing under the new Sema
+   NoOp wrap.
+4. `[HLSL] Walk through HLSLOutArgExpr in DXR payload-access analysis`
+   — extends `IsPayloadArg` and `GetPayloadAccesses` to peel
+   HLSLOutArgExpr / OpaqueValueExpr.
+5. `[HLSL] Use getAs<RecordType> in IsHLSLRayQueryType` — fixes the
+   RayQuery curThis-leak in SpirvEmitter.
+
+### Lessons
+
+16. **`dyn_cast<RecordType>(QualType)` is a sugar trap.** Anywhere we
+    need to recognize a specific HLSL/SPIRV class template, prefer
+    `type->getAs<RecordType>()` so sugar layers (`TypedefType`,
+    `ElaboratedType`, `AttributedType`) don't make a positive
+    predicate silently return false.
+
+17. **Sema can wrap matrix bases in NoOp ImplicitCastExpr.** With
+    reference-typed out parameters and address-space-qualified
+    lvalues, `CGExprCXX::EmitMatrixSubscript` now sees a NoOp cast
+    that strips orientation attributes. Walk through NoOp
+    `ImplicitCastExpr` before reading orientation from a matrix base
+    type.
+
+18. **AddHLSLFunctionInfo's `getDesugaredType` is hostile to attributed
+    typedefs.** The per-parameter `if (isa<TypedefType>) desugar`
+    block walks past `AttributedType` sugar in addition to typedefs.
+    Don't `getNonReferenceType()` before that block unless you also
+    arrange for the orientation lookup to survive the desugar.
