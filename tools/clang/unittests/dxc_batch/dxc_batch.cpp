@@ -715,18 +715,16 @@ void DxcContext::WriteHeader(IDxcBlobEncoding *pDisassembly, IDxcBlob *pCode,
   {
     std::string s;
     llvm::raw_string_ostream OS(s);
-    // Note: with \r\n line endings, writing the disassembly could be a simple
-    // WriteBlobToHandle with a prior and following WriteString for #ifs
-    OS << "#if 0\r\n";
+    // Disassembly is written verbatim with `\n` line endings; the embedding
+    // file consumer can pick it up portably on any platform.
+    OS << "#if 0\n";
     const uint8_t *pBytes = (const uint8_t *)pDisassembly->GetBufferPointer();
     size_t len = pDisassembly->GetBufferSize();
     s.reserve(len + len * 0.1f); // rough estimate
     for (size_t i = 0; i < len; ++i) {
-      if (pBytes[i] == '\n')
-        OS << '\r';
       OS << pBytes[i];
     }
-    OS << "\r\n#endif\r\n";
+    OS << "\n#endif\n";
     OS.flush();
     WriteString(file, s.c_str(), pFileName);
   }
@@ -734,7 +732,7 @@ void DxcContext::WriteHeader(IDxcBlobEncoding *pDisassembly, IDxcBlob *pCode,
   {
     std::string s;
     llvm::raw_string_ostream OS(s);
-    OS << "\r\nconst unsigned char " << pVariableName << "[] = {";
+    OS << "\nconst unsigned char " << pVariableName << "[] = {";
     const uint8_t *pBytes = (const uint8_t *)pCode->GetBufferPointer();
     size_t len = pCode->GetBufferSize();
     s.reserve(100 + len * 6 + (len / 12) * 3); // rough estimate
@@ -742,13 +740,13 @@ void DxcContext::WriteHeader(IDxcBlobEncoding *pDisassembly, IDxcBlob *pCode,
       if (i != 0)
         OS << ',';
       if ((i % 12) == 0)
-        OS << "\r\n ";
+        OS << "\n ";
       OS << " 0x";
       if (pBytes[i] < 0x10)
         OS << '0';
       OS.write_hex(pBytes[i]);
     }
-    OS << "\r\n};\r\n";
+    OS << "\n};\n";
     OS.flush();
     WriteString(file, s.c_str(), pFileName);
   }
