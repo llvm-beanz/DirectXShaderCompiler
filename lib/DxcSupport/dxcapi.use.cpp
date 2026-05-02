@@ -109,21 +109,75 @@ void WriteOperationResultToConsole(IDxcOperationResult *pRewriteResult,
   WriteBlobToConsole(pBlob, STD_OUTPUT_HANDLE);
 }
 
-static void WriteWideNullTermToConsole(const wchar_t *pText, DWORD streamType) {
-  if (pText == nullptr) {
+// Writes UTF-8-encoded bytes to a standard handle, preserving Unicode where
+// possible.  Internally DXC operates on UTF-8 throughout, and the only
+// boundary that requires wide characters is the Windows console.  On Windows,
+// when the destination handle refers to a console, the bytes are converted to
+// UTF-16 once and written via WriteConsoleW so that no character is lost to
+// the (possibly non-UTF-8) console code page.  When the handle is redirected
+// to a file or pipe -- or when running on platforms with native UTF-8 streams
+// -- the UTF-8 bytes are written directly without any encoding conversion.
+static void WriteUtf8BytesToStream(const char *pText, size_t charCount,
+                                   DWORD streamType) {
+  if (charCount == 0 || pText == nullptr)
+    return;
+  if (streamType != STD_OUTPUT_HANDLE && streamType != STD_ERROR_HANDLE)
+    throw hlsl::Exception(E_INVALIDARG);
+
+#ifdef _WIN32
+  HANDLE hStream = GetStdHandle(streamType);
+  if (hStream != INVALID_HANDLE_VALUE && hStream != nullptr) {
+    DWORD mode = 0;
+    if (GetConsoleMode(hStream, &mode)) {
+      // Console destination: convert UTF-8 -> UTF-16 once and emit via
+      // WriteConsoleW so that the active console code page does not cause
+      // Unicode loss.
+      std::wstring wide;
+      if (Unicode::UTF8ToWideString(pText, charCount, &wide) && !wide.empty()) {
+        DWORD written = 0;
+        WriteConsoleW(hStream, wide.data(), (DWORD)wide.size(), &written,
+                      nullptr);
+      }
+      return;
+    }
+    // Redirected handle: write the original UTF-8 bytes verbatim.
+    DWORD written = 0;
+    WriteFile(hStream, pText, (DWORD)charCount, &written, nullptr);
     return;
   }
+#endif
 
-  bool lossy; // Note: even if there was loss,  print anyway
-  std::string consoleMessage;
-  Unicode::WideToConsoleString(pText, &consoleMessage, &lossy);
-  if (streamType == STD_OUTPUT_HANDLE) {
-    fprintf(stdout, "%s\n", consoleMessage.c_str());
-  } else if (streamType == STD_ERROR_HANDLE) {
-    fprintf(stderr, "%s\n", consoleMessage.c_str());
-  } else {
-    throw hlsl::Exception(E_INVALIDARG);
+  FILE *stream = (streamType == STD_ERROR_HANDLE) ? stderr : stdout;
+  fwrite(pText, 1, charCount, stream);
+}
+
+static void WriteWideNullTermToConsole(const wchar_t *pText, DWORD streamType) {
+  if (pText == nullptr)
+    return;
+
+#ifdef _WIN32
+  // On Windows, if the destination is a console we can write the wide buffer
+  // directly without going through any narrowing code page.
+  HANDLE hStream = GetStdHandle(streamType);
+  DWORD mode = 0;
+  if (hStream != INVALID_HANDLE_VALUE && hStream != nullptr &&
+      GetConsoleMode(hStream, &mode)) {
+    size_t len = wcslen(pText);
+    DWORD written = 0;
+    if (len > 0)
+      WriteConsoleW(hStream, pText, (DWORD)len, &written, nullptr);
+    static const wchar_t newline = L'\n';
+    WriteConsoleW(hStream, &newline, 1, &written, nullptr);
+    return;
   }
+#endif
+
+  // Non-console / non-Windows path: convert to UTF-8 once and write the bytes
+  // directly to the stream, then append a newline (matching prior behavior).
+  std::string utf8;
+  Unicode::WideToUTF8String(pText, &utf8);
+  utf8.push_back('\n');
+  WriteUtf8BytesToStream(utf8.data(), utf8.size(), streamType);
 }
 
 static HRESULT BlobToUtf8IfText(IDxcBlob *pBlob, IDxcBlobUtf8 **ppBlobUtf8) {
@@ -236,30 +290,27 @@ void WriteBlobToHandle(IDxcBlob *pBlob, HANDLE hFile, LPCWSTR pFileName,
 }
 
 void WriteUtf8ToConsole(const char *pText, int charCount, DWORD streamType) {
-  if (charCount == 0 || pText == nullptr) {
+  if (charCount <= 0 || pText == nullptr) {
     return;
   }
 
-  std::string resultToPrint;
-  wchar_t *wideMessage = nullptr;
-  size_t wideMessageLen;
-  Unicode::UTF8BufferToWideBuffer(pText, charCount, &wideMessage,
-                                  &wideMessageLen);
-
-  WriteWideNullTermToConsole(wideMessage, streamType);
-
-  delete[] wideMessage;
+  // The internal compiler representation is UTF-8.  Stream the bytes straight
+  // through, performing a UTF-16 conversion only when the destination is a
+  // Windows console (handled inside WriteUtf8BytesToStream).  This avoids the
+  // historical UTF-8 -> UTF-16 -> narrow-codepage round trip that could
+  // silently lose characters.
+  WriteUtf8BytesToStream(pText, static_cast<size_t>(charCount), streamType);
+  WriteUtf8BytesToStream("\n", 1, streamType);
 }
 
 void WriteUtf8ToConsoleSizeT(const char *pText, size_t charCount,
                              DWORD streamType) {
-  if (charCount == 0) {
+  if (charCount == 0 || pText == nullptr) {
     return;
   }
 
-  int charCountInt = 0;
-  IFT(SizeTToInt(charCount, &charCountInt));
-  WriteUtf8ToConsole(pText, charCountInt, streamType);
+  WriteUtf8BytesToStream(pText, charCount, streamType);
+  WriteUtf8BytesToStream("\n", 1, streamType);
 }
 
 } // namespace dxc
