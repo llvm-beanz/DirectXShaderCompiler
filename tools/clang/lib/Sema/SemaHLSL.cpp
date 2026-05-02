@@ -16871,8 +16871,28 @@ ExprResult Sema::ActOnOutParamExpr(ParmVarDecl *Param, Expr *Arg) {
 
   // HLSL allows implicit conversions from scalars to vectors, but not the
   // inverse, so we need to disallow `inout` with scalar->vector or
-  // scalar->matrix conversions.
-  if (Arg->getType()->isScalarType() != Ty->isScalarType()) {
+  // scalar->matrix conversions. However, single-element vectors and 1x1
+  // matrices are functionally equivalent to scalars in HLSL (e.g. `float`
+  // and `float1`), so treat those as scalar-equivalent for this check.
+  // Vector/matrix arguments passed to a scalar parameter are a truncation,
+  // which HLSL also disallows; emit the existing truncation diagnostic for
+  // that case rather than the scalar-extension one.
+  auto IsScalarLike = [](QualType T) {
+    if (T->isScalarType())
+      return true;
+    if (hlsl::IsHLSLVecMatType(T) && hlsl::GetElementCount(T) == 1)
+      return true;
+    return false;
+  };
+  bool ArgScalarLike = IsScalarLike(Arg->getType());
+  bool ParamScalarLike = IsScalarLike(Ty);
+  if (ArgScalarLike != ParamScalarLike) {
+    if (!ArgScalarLike && ParamScalarLike) {
+      // vector/matrix -> scalar truncation on an out/inout argument.
+      Diag(Arg->getLocStart(), diag::err_hlsl_unsupported_lvalue_cast_op);
+      return ExprError();
+    }
+    // scalar -> vector/matrix extension on an out/inout argument.
     Diag(Arg->getLocStart(), diag::error_hlsl_inout_scalar_extension)
         << Arg << (IsInOut ? 1 : 0);
     return ExprError();
