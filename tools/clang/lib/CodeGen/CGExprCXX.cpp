@@ -152,11 +152,26 @@ RValue CodeGenFunction::EmitCXXMemberOrOperatorMemberCallExpr(
         CGM.getHLSLRuntime().EmitHLSLMatrixStore(*this, Val, This, Base->getType());
       }
 
+      // Peel off any NoOp implicit casts when determining matrix orientation
+      // for the subscript. The Sema-inserted NoOp cast that adapts a
+      // 'row_major MxN' lvalue (or address-space-qualified lvalue) to the
+      // canonical 'matrix<T,M,N>' expected by operator[] otherwise strips the
+      // row_major / column_major attribute and causes orientation to default
+      // to column_major.
+      QualType MatTy = Base->getType();
+      const Expr *MatExpr = Base->IgnoreParens();
+      while (const ImplicitCastExpr *ICE = dyn_cast<ImplicitCastExpr>(MatExpr)) {
+        if (ICE->getCastKind() != CK_NoOp)
+          break;
+        MatExpr = ICE->getSubExpr()->IgnoreParens();
+        MatTy = MatExpr->getType();
+      }
+
       llvm::Value *Idx = EmitScalarExpr(CE->getArg(1));
       llvm::Type *RetTy =
           ConvertType(getContext().getLValueReferenceType(CE->getType()));
       llvm::Value *matSub = CGM.getHLSLRuntime().EmitHLSLMatrixSubscript(
-          *this, RetTy, This, Idx, Base->getType());
+          *this, RetTy, This, Idx, MatTy);
       return RValue::get(matSub);
     }
   }
