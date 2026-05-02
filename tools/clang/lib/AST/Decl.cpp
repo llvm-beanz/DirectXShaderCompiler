@@ -2371,7 +2371,12 @@ unsigned ParmVarDecl::getParameterIndexLarge() const {
 // HLSL Change Begins
 void ParmVarDecl::updateOutParamToRefType(ASTContext &C) {
   // Aggregate type will be indirect param convert to pointer type.
-  // So don't update to ReferenceType.
+  // So don't update to ReferenceType (and don't add restrict, because doing so
+  // would create a qualified type that doesn't match the source value type
+  // during codegen of HLSLOutArgExpr).
+  if ((getType()->isArrayType() || getType()->isRecordType()) &&
+      !hlsl::IsHLSLVecMatType(getType()))
+    return;
   setType(C.getLValueReferenceType(getType(), false));
   // Add restrict to out param.
   QualType QT = getType();
