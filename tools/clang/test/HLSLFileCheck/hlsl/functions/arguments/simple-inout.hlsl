@@ -1,5 +1,5 @@
-// RUN: %dxc -T vs_6_0 -fcgl %s | FileCheck %s --check-prefix=FCGL
-// RUN: %dxc -T vs_6_0 -ast-dump %s | FileCheck %s --check-prefix=AST
+// RUN: %dxc -T vs_6_0 -fcgl %s | FileCheck %s -check-prefix=FCGL
+// RUN: %dxc -T vs_6_0 -ast-dump %s | FileCheck %s -check-prefix=AST
 
 // Test basic inout parameter with implicit type conversion.
 // When val is passed for both the float and int inout parameters, the compiler

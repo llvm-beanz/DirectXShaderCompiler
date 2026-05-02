@@ -1,5 +1,5 @@
-// RUN: %dxc -T lib_6_x -fcgl %s | FileCheck %s --check-prefix=FCGL
-// RUN: %dxc -T lib_6_x -ast-dump %s | FileCheck %s --check-prefix=AST
+// RUN: %dxc -T lib_6_x -fcgl %s | FileCheck %s -check-prefix=FCGL
+// RUN: %dxc -T lib_6_x -ast-dump %s | FileCheck %s -check-prefix=AST
 
 // Test that inout parameters are represented as reference types in the AST
 // and that lvalue operations (+=) work correctly on them.
