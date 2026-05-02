@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#include "dxc/Support/Unicode.h"
 #include "dxc/Support/WinFunctions.h"
 #include "dxc/WinAdapter.h"
 #include "gtest/gtest.h"
@@ -171,19 +172,36 @@ HRESULT TryGetValue(const wchar_t *param, Common::String &retStr);
 } // namespace TestExecution
 namespace Logging {
 namespace Log {
+// On Linux the standard streams expect UTF-8 byte sequences.  Wide-character
+// output through fputws/wprintf is governed by the active C locale, which is
+// "C" (ASCII-only) by default in test processes.  In that mode wide
+// characters whose high byte is non-zero are dropped or interpreted as null
+// terminators, causing log messages to not appear at all.  Convert the wide
+// string to UTF-8 once and emit narrow bytes so that the terminal sees the
+// content the test intended to log regardless of the inherited locale.
+inline void WriteWideAsUtf8(const wchar_t *msg, FILE *stream) {
+  if (msg == nullptr)
+    return;
+  std::string utf8;
+  if (Unicode::WideToUTF8String(msg, &utf8))
+    fputs(utf8.c_str(), stream);
+  else
+    fputs("<encoding error>", stream);
+  fputc('\n', stream);
+}
 inline void StartGroup(const wchar_t *name) {
-  wprintf(L"BEGIN TEST(S): <%ls>\n", name);
+  fputs("BEGIN TEST(S): <", stdout);
+  WriteWideAsUtf8(name, stdout);
+  fputs(">\n", stdout);
 }
 inline void EndGroup(const wchar_t *name) {
-  wprintf(L"END TEST(S): <%ls>\n", name);
+  fputs("END TEST(S): <", stdout);
+  WriteWideAsUtf8(name, stdout);
+  fputs(">\n", stdout);
 }
-inline void Comment(const wchar_t *msg) {
-  fputws(msg, stdout);
-  fputwc(L'\n', stdout);
-}
+inline void Comment(const wchar_t *msg) { WriteWideAsUtf8(msg, stdout); }
 inline void Error(const wchar_t *msg) {
-  fputws(msg, stderr);
-  fputwc(L'\n', stderr);
+  WriteWideAsUtf8(msg, stderr);
   ADD_FAILURE();
 }
 } // namespace Log
