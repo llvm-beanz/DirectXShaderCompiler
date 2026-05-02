@@ -720,7 +720,10 @@ bool IsPatchConstantFunctionDecl(const clang::FunctionDecl *FD) {
   // Try to find TessFactor in out param.
   for (const ParmVarDecl *param : FD->params()) {
     if (param->hasAttr<HLSLOutAttr>()) {
-      if (HasTessFactorSemanticRecurse(param, param->getType()))
+      // Out params may be reference types in the AST; strip the reference
+      // before checking for tess factor semantics.
+      QualType ParamTy = param->getType().getNonReferenceType();
+      if (HasTessFactorSemanticRecurse(param, ParamTy))
         return true;
     }
   }

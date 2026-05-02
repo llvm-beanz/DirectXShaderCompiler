@@ -43,7 +43,24 @@ float4 main(): SV_Target
     RWStructuredBuffer<float4>      x7;
     AppendStructuredBuffer<float4>  x8;
 
+// For 'out' resource parameters, the compiler passes the original resource
+// variable directly without creating a temporary copy.  This avoids
+// counter-variable assignment issues for Append/ConsumeStructuredBuffers and
+// eliminates unnecessary load-store pairs.
+
+// CHECK: %x0 = OpVariable %_ptr_Function_type_2d_image Function
+// CHECK: %x1 = OpVariable %_ptr_Function_type_3d_image Function
+// CHECK: %x2 = OpVariable %_ptr_Function_type_sampler Function
+// CHECK: %x3 = OpVariable %_ptr_Function_accelerationStructureNV Function
+// CHECK: %x4 = OpVariable %_ptr_Function_type_buffer_image Function
+// CHECK: %x5 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_ByteAddressBuffer Function
+// CHECK: %x6 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_RWByteAddressBuffer Function
+// CHECK: %x7 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_RWStructuredBuffer_v4float Function
+// CHECK: %x8 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_AppendStructuredBuffer_v4float Function
+
+// The resources are passed directly to the callee (no hlsl.out temporaries).
 // CHECK: OpFunctionCall %void %getResource %x0 %x1 %x2 %x3 %x4 %x5 %x6 %x7 %x8
+
     getResource(x0, x1, x2, x3, x4, x5, x6, x7, x8);
 
     float4 pos = x4.Load(0);

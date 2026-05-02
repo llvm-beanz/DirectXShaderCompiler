@@ -1073,9 +1073,11 @@ bool isOrContainsAKindOfStructuredOrByteBuffer(QualType type) {
     }
 
     if (const auto *cxxDecl = type->getAsCXXRecordDecl()) {
-      for (const auto &base : cxxDecl->bases()) {
-        if (isOrContainsAKindOfStructuredOrByteBuffer(base.getType())) {
-          return true;
+      if (cxxDecl->hasDefinition()) {
+        for (const auto &base : cxxDecl->bases()) {
+          if (isOrContainsAKindOfStructuredOrByteBuffer(base.getType())) {
+            return true;
+          }
         }
       }
     }

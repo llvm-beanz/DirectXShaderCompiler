@@ -3116,8 +3116,20 @@ SpirvEmitter::doArraySubscriptExpr(const ArraySubscriptExpr *expr,
 
   llvm::SmallVector<SpirvInstruction *, 4> indices = {thisIndex};
 
+  // When the base of an array subscript has undergone array-to-pointer decay
+  // (e.g. CK_ArrayToPointerDecay), base->getType() is the decayed pointer type
+  // (e.g. T*). For rvalue temporaries, derefOrCreatePointerToValue uses the
+  // base type to allocate a temporary variable; using the pointer type would
+  // produce a variable of the wrong (element) type instead of the array type.
+  // Recover the original array type by stripping the ArrayToPointerDecay cast.
+  QualType baseType = base->getType();
+  if (const auto *castExpr = dyn_cast<ImplicitCastExpr>(base)) {
+    if (castExpr->getCastKind() == CK_ArrayToPointerDecay)
+      baseType = castExpr->getSubExpr()->getType();
+  }
+
   SpirvInstruction *loadVal =
-      derefOrCreatePointerToValue(base->getType(), info, expr->getType(),
+      derefOrCreatePointerToValue(baseType, info, expr->getType(),
                                   indices, base->getExprLoc(), range);
 
   // TODO(#6259): This maintains the same incorrect behaviour as before.
@@ -3519,6 +3531,43 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
     QualType tmpType = outParamExpr->getType();
     const Expr *argLValueExpr = outParamExpr->getArgLValue();
     QualType argType = argLValueExpr->getType();
+
+    // For struct-based buffer resources (ByteAddressBuffer, StructuredBuffer,
+    // etc.) the temporary holds a StorageBuffer pointer alias.  When the
+    // original argument is a global (external) resource variable the binding
+    // is immutable – the OpStore back to it would produce a SPIRV type
+    // mismatch because the global variable lives in StorageBuffer, not
+    // Function, storage class.  Skip the writeback; the alias is a no-op.
+    if (isAKindOfStructuredOrByteBuffer(tmpType)) {
+      if (const auto *declRef = dyn_cast<DeclRefExpr>(argLValueExpr)) {
+        if (const auto *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
+          if (isExternalVar(varDecl))
+            continue;
+        }
+      }
+    }
+
+    // For 'out' (non-inout) resource/opaque params, doHLSLOutArgExpr bypasses
+    // the temp and returns the original resource lvalue directly. The "tmpVar"
+    // IS the original resource variable, so any writeback would be a no-op.
+    // Skip it to avoid redundant load-store pairs and counter-var errors.
+    if (!outParamExpr->isInOut() &&
+        (isResourceType(tmpType) || isAKindOfStructuredOrByteBuffer(tmpType)))
+      continue;
+
+    // Global resource variables (textures, samplers, acceleration structures,
+    // buffers) live in read-only or descriptor-set storage classes.  Writing
+    // back to them after an inout call is both semantically a no-op and
+    // produces invalid SPIRV.  Skip the writeback for any inout argument
+    // whose lvalue resolves to an external resource variable.
+    if (isResourceType(tmpType)) {
+      if (const auto *declRef = dyn_cast<DeclRefExpr>(argLValueExpr)) {
+        if (const auto *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
+          if (isExternalVar(varDecl))
+            continue;
+        }
+      }
+    }
 
     // Load the out value from the temporary variable.
     SpirvInstruction *val = spvBuilder.createLoad(tmpType, tmpVar, loc);
@@ -4453,7 +4502,13 @@ SpirvEmitter::processBufferTextureGetDimensions(const CXXMemberCallExpr *expr) {
   const auto storeToOutputArg = [range, this](const Expr *outputArg,
                                               SpirvInstruction *id,
                                               QualType type) {
-    id = castToType(id, type, outputArg->getType(), outputArg->getExprLoc(),
+    // When outputArg is wrapped in HLSLOutArgExpr, getType() returns the param
+    // type. Use the actual lvalue type for casting to avoid type mismatches
+    // (e.g., when int/float variables are passed to uint out params).
+    const Expr *targetExpr = outputArg;
+    if (const auto *outExpr = dyn_cast<HLSLOutArgExpr>(outputArg))
+      targetExpr = outExpr->getArgLValue();
+    id = castToType(id, type, targetExpr->getType(), outputArg->getExprLoc(),
                     range);
     processAssignment(outputArg, id, false, nullptr, range);
   };
@@ -4963,6 +5018,12 @@ SpirvInstruction *SpirvEmitter::processByteAddressBufferLoadStore(
 
     if (doStore) {
       auto *values = doExpr(expr->getArg(1));
+      // processTemplatedStoreToBuffer expects a composite rvalue to serialize.
+      // If doExpr returned a pointer (lvalue, e.g. from HLSLArrayTemporaryExpr
+      // or a local array variable), load the value before serializing.
+      if (!values->isRValue())
+        values = spvBuilder.createLoad(expr->getArg(1)->getType(), values,
+                                       expr->getArg(1)->getExprLoc(), range);
       RawBufferHandler(*this).processTemplatedStoreToBuffer(
           values, objectInfo, byteAddress, expr->getArg(1)->getType(), range);
       result = nullptr;
@@ -5201,6 +5262,16 @@ bool SpirvEmitter::tryToAssignCounterVar(const Expr *dstExpr,
   auto *srcCounter = getFinalACSBufferCounterInstruction(srcExpr);
 
   if ((dstCounter == nullptr) != (srcCounter == nullptr)) {
+    // For non-ACS buffer resources (e.g. RWStructuredBuffer) counter tracking
+    // is optional: a counter mismatch can legitimately occur when one side is a
+    // function parameter without a counter alias while the other is a global
+    // with a lazily-created deferred counter.  Only error for Append/Consume
+    // StructuredBuffers which always require counter tracking.
+    if (!isAppendStructuredBuffer(dstExpr->getType()) &&
+        !isConsumeStructuredBuffer(dstExpr->getType()) &&
+        !isAppendStructuredBuffer(srcExpr->getType()) &&
+        !isConsumeStructuredBuffer(srcExpr->getType()))
+      return false;
     emitFatalError("cannot handle associated counter variable assignment",
                    srcExpr->getExprLoc());
     return false;
@@ -6524,7 +6595,8 @@ SpirvEmitter::processTextureSampleCmpLevel(const CXXMemberCallExpr *expr) {
   const auto numArgs = expr->getNumArgs();
   const bool hasStatusArg =
       expr->getArg(numArgs - 1)->getType()->isUnsignedIntegerType();
-  auto *status = hasStatusArg ? doExpr(expr->getArg(numArgs - 1)) : nullptr;
+  const Expr *statusArgExpr = hasStatusArg ? expr->getArg(numArgs - 1) : nullptr;
+  auto *status = statusArgExpr ? doExpr(statusArgExpr) : nullptr;
 
   const auto *imageExpr = expr->getImplicitObjectArgument();
   const auto imageType = imageExpr->getType();
@@ -6560,12 +6632,14 @@ SpirvEmitter::processTextureSampleCmpLevel(const CXXMemberCallExpr *expr) {
 
   const auto retType = expr->getDirectCallee()->getReturnType();
 
-  return createImageSample(
+  auto *retVal = createImageSample(
       retType, imageType, image, sampler, coordinate, compareVal,
       /*bias*/ nullptr, /*lod*/ lod, std::make_pair(nullptr, nullptr),
       constOffset, varOffset, /*constOffsets*/ nullptr,
       /*sampleNumber*/ nullptr, /*clamp*/ nullptr, status,
       expr->getCallee()->getLocStart(), expr->getSourceRange());
+  processHLSLOutArgWriteback(statusArgExpr, status, expr->getExprLoc());
+  return retVal;
 }
 
 SpirvInstruction *
@@ -14211,19 +14285,33 @@ void SpirvEmitter::processDispatchMesh(const CallExpr *callExpr) {
       featureManager.isExtensionEnabled(Extension::EXT_mesh_shader)
           ? spv::StorageClass::TaskPayloadWorkgroupEXT
           : spv::StorageClass::Output;
-  auto *payloadArg = doExpr(args[3]);
   bool isValid = false;
   SpirvInstruction *param = nullptr;
-  if (const auto *implCastExpr = dyn_cast<CastExpr>(args[3])) {
-    if (const auto *arg = dyn_cast<DeclRefExpr>(implCastExpr->getSubExpr())) {
-      if (const auto *paramDecl = dyn_cast<VarDecl>(arg->getDecl())) {
-        if (paramDecl->hasAttr<HLSLGroupSharedAttr>()) {
-          isValid = declIdMapper.createPayloadStageVars(
-              sigPoint, sc, paramDecl, /*asInput=*/false, paramDecl->getType(),
-              "out.var", &payloadArg);
-          param =
-              declIdMapper.getDeclEvalInfo(paramDecl, paramDecl->getLocation());
-        }
+  // Peel off HLSLOutArgExpr wrapper introduced by the new out-param pass.
+  // We evaluate the underlying lvalue directly to get the payload value,
+  // bypassing the temp-variable mechanism used for regular out/inout params.
+  const Expr *payloadExpr = args[3];
+  if (const auto *outArgExpr = dyn_cast<HLSLOutArgExpr>(payloadExpr))
+    payloadExpr = outArgExpr->getArgLValue();
+  // The payload may be a DeclRefExpr directly or wrapped in an implicit cast.
+  const DeclRefExpr *payloadDeclRef = dyn_cast<DeclRefExpr>(payloadExpr);
+  if (!payloadDeclRef) {
+    if (const auto *implCastExpr = dyn_cast<CastExpr>(payloadExpr))
+      payloadDeclRef = dyn_cast<DeclRefExpr>(implCastExpr->getSubExpr());
+  }
+  if (payloadDeclRef) {
+    if (const auto *paramDecl = dyn_cast<VarDecl>(payloadDeclRef->getDecl())) {
+      if (paramDecl->hasAttr<HLSLGroupSharedAttr>()) {
+        // Load the payload value from the groupshared variable to pass to
+        // createPayloadStageVars (which stores it to the stage output var).
+        auto *payloadVar =
+            declIdMapper.getDeclEvalInfo(paramDecl, paramDecl->getLocation());
+        auto *payloadArg = spvBuilder.createLoad(paramDecl->getType(), payloadVar,
+                                                 paramDecl->getLocation());
+        isValid = declIdMapper.createPayloadStageVars(
+            sigPoint, sc, paramDecl, /*asInput=*/false, paramDecl->getType(),
+            "out.var", &payloadArg);
+        param = payloadVar;
       }
     }
   }
@@ -17185,13 +17273,62 @@ bool SpirvEmitter::UpgradeToVulkanMemoryModelIfNeeded(
 SpirvInstruction *
 SpirvEmitter::doHLSLOutArgExpr(const HLSLOutArgExpr *Expr) {
   SpirvVariable *TmpVar = nullptr;
+  QualType paramType = Expr->getType();
+
+  // For opaque resource types (textures, samplers, buffers, etc.) used as
+  // 'out' (not inout) parameters: SPIRV represents resources as pointer
+  // aliases.  Copy-out through a Function-storage temp variable is not
+  // meaningful and causes counter-variable assignment failures for
+  // Append/ConsumeStructuredBuffers.  Instead, pass the original resource
+  // lvalue directly, bypassing the temp.
+  // Note: 'inout' resource params still need temp variables to hold the
+  // copy-in value (see global resource test expectations below).
+  if (!Expr->isInOut() &&
+      (isOpaqueType(paramType) || isAKindOfStructuredOrByteBuffer(paramType) ||
+       hlsl::IsHLSLRayQueryType(paramType))) {
+    auto *argLValInstr = doExpr(Expr->getArgLValue());
+    // Only bypass the temp if the lvalue is a plain variable (the common
+    // case for global/local resources).  For complex lvalues (access chains,
+    // etc.) fall through to the normal temp-variable path below.
+    if (auto *argLVar = dyn_cast<SpirvVariable>(argLValInstr)) {
+      // Bind the castedTemporary opaque value to the original resource lvalue
+      // so that uses of the parameter inside the function resolve to it.
+      bindOpaqueValue(argLVar, Expr->getCastedTemporary());
+      return argLVar;
+    }
+  }
+
   if (Expr->isInOut()) {
     SpirvInstruction *InitVal = doExpr(Expr->getArgLValue());
-    if (!InitVal->isRValue())
-      InitVal =
-          spvBuilder.createLoad(Expr->getType(), InitVal, Expr->getLocStart());
+    QualType argType = Expr->getArgLValue()->getType();
 
-    TmpVar = createTemporaryVar(Expr->getType(), "hlsl.inout", InitVal,
+    // For struct-based buffer resources (ByteAddressBuffer, StructuredBuffer,
+    // etc.) the SPIRV Function variable that holds the resource is a
+    // pointer-to-pointer.  The "value" to store into that holder is the
+    // StorageBuffer pointer itself (%rN), NOT a loaded struct value.  Skip the
+    // load so that InitVal stays as the pointer, letting storeValue produce a
+    // valid OpStore.
+    if (!InitVal->isRValue() && !isAKindOfStructuredOrByteBuffer(argType))
+      InitVal = spvBuilder.createLoad(argType, InitVal, Expr->getLocStart());
+
+    // Cast from argument type to parameter type when they differ (e.g., when
+    // a float2 swizzle is passed as inout bool2, or when structurally identical
+    // types with different SPIRV IDs are used due to storage class differences).
+    // Skip the cast for struct-based buffer types since InitVal is a pointer,
+    // not a loaded value.
+    if (!isAKindOfStructuredOrByteBuffer(argType) &&
+        argType.getCanonicalType().getUnqualifiedType() !=
+            paramType.getCanonicalType().getUnqualifiedType()) {
+      QualType elementType;
+      if (isVectorType(argType, &elementType) && isScalarType(paramType)) {
+        InitVal = spvBuilder.createCompositeExtract(elementType, InitVal, {0},
+                                                    Expr->getLocStart());
+        argType = elementType;
+      }
+      InitVal = castToType(InitVal, argType, paramType, Expr->getLocStart());
+    }
+
+    TmpVar = createTemporaryVar(paramType, "hlsl.inout", InitVal,
                                 Expr->getLocStart());
   } else {
     TmpVar =
@@ -17209,8 +17346,19 @@ SpirvInstruction *
 SpirvEmitter::doHLSLArrayTemporaryExpr(const HLSLArrayTemporaryExpr *expr) {
   auto *InitVal = doExpr(expr->getBase());
   auto *TmpVar = spvBuilder.addFnVar(expr->getType(), expr->getLocStart(), "tmp.hlsl.array");
-  (void)spvBuilder.createCopyMemory(TmpVar->getAstResultType(), InitVal,
-                                     TmpVar, expr->getLocStart());
+  const QualType type = expr->getType();
+  const SourceLocation loc = expr->getLocStart();
+  // Use load+storeValue instead of createCopyMemory to properly handle
+  // layout-rule differences (e.g. Uniform/std140 source vs. Function/void
+  // destination). If the initializer is already an rvalue composite (e.g. a
+  // templated ByteAddressBuffer load), store it directly; otherwise load from
+  // the pointer first.
+  if (InitVal->isRValue()) {
+    storeValue(TmpVar, InitVal, type, loc);
+  } else {
+    SpirvInstruction *loaded = spvBuilder.createLoad(type, InitVal, loc);
+    storeValue(TmpVar, loaded, type, loc);
+  }
   return TmpVar;
 }
 
@@ -17228,6 +17376,14 @@ void SpirvEmitter::processHLSLOutArgWriteback(const Expr *argExpr,
     return;
 
   QualType tmpType = outParamExpr->getType();
+
+  // 'out' opaque/resource params were passed by direct alias (no temp was
+  // created in doHLSLOutArgExpr), so there is nothing to write back.
+  if (!outParamExpr->isInOut() &&
+      (isOpaqueType(tmpType) || isAKindOfStructuredOrByteBuffer(tmpType) ||
+       hlsl::IsHLSLRayQueryType(tmpType)))
+    return;
+
   const Expr *argLVExpr = outParamExpr->getArgLValue();
   QualType argType = argLVExpr->getType();
 
