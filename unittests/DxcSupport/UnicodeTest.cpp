@@ -20,9 +20,12 @@
 #include "gtest/gtest.h"
 
 #include <cstdio>
-#include <fcntl.h>
 #include <string>
+
+#ifndef _WIN32
+#include <fcntl.h>
 #include <unistd.h>
+#endif
 
 namespace {
 
