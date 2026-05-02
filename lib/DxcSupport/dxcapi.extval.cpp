@@ -64,7 +64,7 @@ public:
     IFR(TempValidationResult->GetStatus(&HR));
     if (FAILED(HR)) {
       // prefix the stderr output
-      fprintf(stderr, "error: validation errors\r\n");
+      fprintf(stderr, "error: validation errors\n");
       return TempValidationResult->QueryInterface(Riid, ValResult);
     }
 

@@ -198,7 +198,7 @@ HRESULT ValidateAndAssembleToContainer(AssembleInputs &inputs) {
       StringRef errRef(pErrorsUtf8->GetStringPointer(),
                        pErrorsUtf8->GetStringLength());
       unsigned DiagID = inputs.pDiag->getCustomDiagID(
-          clang::DiagnosticsEngine::Error, "validation errors\r\n%0");
+          clang::DiagnosticsEngine::Error, "validation errors\n%0");
       inputs.pDiag->Report(DiagID) << errRef;
     }
   }
@@ -235,7 +235,7 @@ HRESULT ValidateRootSignatureInContainer(IDxcBlob *pRootSigContainer,
                        pErrorsUtf8->GetStringLength());
       unsigned DiagID =
           pDiag->getCustomDiagID(clang::DiagnosticsEngine::Error,
-                                 "root signature validation errors\r\n%0");
+                                 "root signature validation errors\n%0");
       pDiag->Report(DiagID) << errRef;
     }
   }
