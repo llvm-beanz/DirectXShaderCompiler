@@ -179,6 +179,27 @@ void GetPayloadAccesses(const Stmt *S, const DxrShaderDiagnoseInfo &Info,
       }
     }
 
+    // HLSLOutArgExpr wraps the source l-value behind OpaqueValueExpr nodes.
+    // OpaqueValueExpr does not expose its source expression as a child, so
+    // walk through it explicitly to keep the payload-access analysis in
+    // sync with the new out/inout argument representation.
+    if (const HLSLOutArgExpr *OutArg = dyn_cast<HLSLOutArgExpr>(C)) {
+      const Expr *ArgLV = OutArg->getArgLValue();
+      if (!ArgLV)
+        continue;
+      // The source l-value may itself be the payload DeclRef; check it
+      // directly before recursing into its children.
+      if (const DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(ArgLV)) {
+        if (Ref->getDecl() == Info.Payload) {
+          Accesses.push_back(PayloadAccessInfo{Member, Call, IsLValue});
+        }
+      }
+      GetPayloadAccesses(ArgLV, Info, Accesses, IsLValue,
+                         Member ? Member : dyn_cast<MemberExpr>(ArgLV),
+                         Call);
+      continue;
+    }
+
     GetPayloadAccesses(C, Info, Accesses, IsLValue,
                        Member ? Member : dyn_cast<MemberExpr>(C),
                        Call ? Call : dyn_cast<CallExpr>(C));
@@ -587,6 +608,20 @@ bool IsPayloadArg(const Stmt *S, const Decl *Payload) {
     const Decl *Decl = Ref->getDecl();
     if (Decl == Payload)
       return true;
+  }
+
+  // HLSLOutArgExpr / OpaqueValueExpr hide the payload DeclRef from the
+  // default child iterator. Walk through them explicitly so that callers
+  // taking out/inout payload arguments are still recognized.
+  if (const HLSLOutArgExpr *OutArg = dyn_cast<HLSLOutArgExpr>(S)) {
+    if (const Expr *ArgLV = OutArg->getArgLValue())
+      return IsPayloadArg(ArgLV, Payload);
+    return false;
+  }
+  if (const OpaqueValueExpr *OVE = dyn_cast<OpaqueValueExpr>(S)) {
+    if (const Expr *Src = OVE->getSourceExpr())
+      return IsPayloadArg(Src, Payload);
+    return false;
   }
 
   for (auto C : S->children()) {
