@@ -1667,6 +1667,38 @@ void HLMatrixLowerPass::lowerHLMatSubscript(
   while (GEPOperator *GEP = dyn_cast<GEPOperator>(RootPtr))
     RootPtr = GEP->getPointerOperand();
 
+  // Handle the case where the matrix pointer is an addrspacecast of an
+  // lvalue rooted at a global variable or alloca (e.g., a matrix field of a
+  // groupshared struct). CodeGen emits this addrspacecast whenever the
+  // matrix subscript intrinsic — which uses generic-address-space matrix
+  // pointers in its signature — is invoked on an lvalue in a non-zero
+  // address space. By the time this pass runs, the addrspacecast source may
+  // already be the lowered storage type (array of scalars), or still be a
+  // matrix-typed pointer that we need to bitcast to its lowered equivalent.
+  // In either case, tryGetLoweredPtrOperand bails on this pattern because
+  // the root is a global variable rather than an Argument or Alloca, so the
+  // HL subscript call would otherwise leak past matrix lowering.
+  if (LoweredPtr == nullptr) {
+    if (auto *ASC = dyn_cast<AddrSpaceCastInst>(MatPtr)) {
+      Value *SrcPtr = ASC->getOperand(0);
+      Value *SrcRoot = SrcPtr;
+      while (auto *GEP = dyn_cast<GEPOperator>(SrcRoot))
+        SrcRoot = GEP->getPointerOperand();
+      if (isa<GlobalVariable>(SrcRoot) || isa<AllocaInst>(SrcRoot)) {
+        Type *SrcElemTy = SrcPtr->getType()->getPointerElementType();
+        if (HLMatrixType::isa(SrcElemTy)) {
+          LoweredPtr = CallBuilder.CreateBitCast(
+              SrcPtr, HLMatrixType::getLoweredType(SrcPtr->getType()));
+        } else if (SrcElemTy->isArrayTy() || SrcElemTy->isVectorTy()) {
+          // Already lowered storage; use it directly.
+          LoweredPtr = SrcPtr;
+        }
+        if (LoweredPtr != nullptr)
+          RootPtr = SrcRoot;
+      }
+    }
+  }
+
   if (LoweredPtr == nullptr) {
     if (!isa<Argument>(RootPtr))
       return;
