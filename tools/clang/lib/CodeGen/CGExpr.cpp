@@ -2968,23 +2968,6 @@ void CodeGenFunction::EmitHLSLOutArgExpr(const HLSLOutArgExpr *E,
   LValue BaseLV = EmitLValue(E->getArgLValue());
   OpaqueValueMappingData::bind(*this, E->getOpaqueArgLValue(), BaseLV);
 
-  // If the pre-pass decided this argument's lvalue is unique among the
-  // call's out-parameters, we can skip the copy-in/copy-out temporary
-  // and pass the original lvalue's address directly. This preserves
-  // the long-standing copy-elision optimization that was previously
-  // implemented in CGMSHLSLRuntime::EmitHLSLOutParamConversionInit.
-  if (Args.shouldSkipOutArgCopy(E)) {
-    // Bind the casted-temporary opaque value to the same lvalue so that
-    // any uses (e.g. in the writeback cast expression) remain coherent
-    // even though no writeback will be emitted.
-    OpaqueValueMappingData::bind(*this, E->getCastedTemporary(), BaseLV);
-    llvm::Value *Addr = BaseLV.getAddress();
-    RValue RV = hasAggregateEvaluationKind(Ty) ? RValue::getAggregate(Addr)
-                                               : RValue::get(Addr);
-    Args.add(RV, Ty);
-    return;
-  }
-
   QualType ExprTy = E->getType();
   llvm::AllocaInst *Address = CreateIRTemp(ExprTy);
   LValue TempLV = MakeAddrLValue(Address, ExprTy);

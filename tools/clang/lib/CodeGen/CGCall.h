@@ -20,7 +20,6 @@
 #include "clang/AST/CanonicalType.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Value.h"
 
 // FIXME: Restructure so we don't have to expose so much stuff.
@@ -135,23 +134,10 @@ namespace CodeGen {
     void reverseWritebacks() {
       std::reverse(Writebacks.begin(), Writebacks.end());
     }
-    // Records HLSLOutArgExpr instances whose copy-in/copy-out can be
-    // safely elided because the underlying lvalue is unique among the
-    // out-parameters of this call.
-    void markOutArgSkipCopy(const class HLSLOutArgExpr *E) {
-      SkipCopyOutArgs.insert(E);
-    }
-    bool shouldSkipOutArgCopy(const class HLSLOutArgExpr *E) const {
-      return SkipCopyOutArgs.count(E) != 0;
-    }
     // HLSL Change End
 
   private:
     SmallVector<Writeback, 1> Writebacks;
-
-    /// HLSL Change: Set of HLSLOutArgExpr nodes whose inout/out copy
-    /// can be elided because the lvalue is unique among args.
-    llvm::SmallPtrSet<const class HLSLOutArgExpr *, 4> SkipCopyOutArgs;
 
     /// Deactivate these cleanups immediately before making the call.  This
     /// is used to cleanup objects that are owned by the callee once the call

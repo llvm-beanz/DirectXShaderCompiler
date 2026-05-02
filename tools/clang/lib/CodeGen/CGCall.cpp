@@ -2882,68 +2882,6 @@ void CodeGenFunction::EmitCallArgs(CallArgList &Args,
                                    CallExpr::const_arg_iterator ArgEnd,
                                    const FunctionDecl *CalleeDecl,
                                    unsigned ParamsToSkip) {
-  // HLSL Change Begin
-  // Walk arguments left-to-right and identify HLSLOutArgExpr arguments
-  // whose underlying lvalue's root VarDecl is unique among the out-args
-  // of this call. The first occurrence of a given root may safely skip
-  // the copy-in/copy-out temporary; subsequent occurrences must keep
-  // their own temp to preserve correct semantics when arguments alias.
-  if (getLangOpts().HLSL) {
-    llvm::SmallPtrSet<const VarDecl *, 4> Seen;
-    auto stripToRootDecl = [](const Expr *E) -> const VarDecl * {
-      while (E) {
-        E = E->IgnoreParenImpCasts();
-        if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-          return dyn_cast<VarDecl>(DRE->getDecl());
-        if (auto *ME = dyn_cast<MemberExpr>(E)) {
-          E = ME->getBase();
-          continue;
-        }
-        if (auto *ASE = dyn_cast<ArraySubscriptExpr>(E)) {
-          E = ASE->getBase();
-          continue;
-        }
-        if (auto *VEE = dyn_cast<HLSLVectorElementExpr>(E)) {
-          E = VEE->getBase();
-          continue;
-        }
-        if (auto *EVE = dyn_cast<ExtVectorElementExpr>(E)) {
-          E = EVE->getBase();
-          continue;
-        }
-        if (auto *UO = dyn_cast<UnaryOperator>(E)) {
-          E = UO->getSubExpr();
-          continue;
-        }
-        return nullptr;
-      }
-      return nullptr;
-    };
-    for (unsigned I = 0, E = ArgTypes.size(); I != E; ++I) {
-      const Expr *Arg = *(ArgBeg + I);
-      const auto *OAE = dyn_cast<HLSLOutArgExpr>(Arg);
-      if (!OAE)
-        continue;
-      const VarDecl *VD = stripToRootDecl(OAE->getArgLValue());
-      // Only elide when the root resolves to a local automatic-storage
-      // variable. Locals back to a unique alloca which is what the
-      // legacy optimization keyed on. Globals and other storage
-      // classes may alias in ways the alias check does not capture.
-      if (!VD || !VD->hasLocalStorage())
-        continue;
-      // Only elide when no real type conversion is needed between the
-      // argument's lvalue type and the parameter's temporary type. If
-      // there is a conversion (e.g. float<->double, struct truncation),
-      // we must materialize a temporary so the cast can be evaluated.
-      if (OAE->getArgLValue()->getType().getCanonicalType().getUnqualifiedType() !=
-          OAE->getType().getCanonicalType().getUnqualifiedType())
-        continue;
-      if (Seen.insert(VD).second)
-        Args.markOutArgSkipCopy(OAE);
-    }
-  }
-  // HLSL Change End
-
   // We *have* to evaluate arguments from right to left in the MS C++ ABI,
   // because arguments are destroyed left to right in the callee.
   if (CGM.getTarget().getCXXABI().areArgsDestroyedLeftToRightInCallee()) {
