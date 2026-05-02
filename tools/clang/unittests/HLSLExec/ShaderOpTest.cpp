@@ -457,7 +457,7 @@ void ShaderOpTest::CreatePipelineState() {
   CreateShaders();
   // Root signature may come from XML, or from shader.
   if (!m_pRootSignature) {
-    ShaderOpLogFmt(L"No root signature found\r\n");
+    ShaderOpLogFmt(L"No root signature found\n");
     CHECK_HR(E_FAIL);
   }
   if (m_pShaderOp->IsCompute()) {
@@ -788,7 +788,7 @@ void ShaderOpTest::CreateRootSignature() {
   if (FAILED(resultCode)) {
     CComPtr<IDxcBlobEncoding> errors;
     CHECK_HR(pResult->GetErrorBuffer(&errors));
-    ShaderOpLogFmt(L"Failed to compile root signature: %*S\r\n",
+    ShaderOpLogFmt(L"Failed to compile root signature: %*S\n",
                    (int)errors->GetBufferSize(),
                    (LPCSTR)errors->GetBufferPointer());
   }
@@ -826,7 +826,7 @@ void ShaderOpTest::CreateShaders() {
     if (S.Callback) {
       if (!m_ShaderCallbackFn) {
         ShaderOpLogFmt(
-            L"Callback required for shader, but not provided: %S\r\n", S.Name);
+            L"Callback required for shader, but not provided: %S\n", S.Name);
         CHECK_HR(E_FAIL);
       }
       m_ShaderCallbackFn(S.Name, pText, (IDxcBlob **)&pCode, m_pShaderOp);
@@ -837,7 +837,7 @@ void ShaderOpTest::CreateShaders() {
       std::vector<BYTE> decoded;
       decoded.resize(decodedLen);
       if (!Base64Decode(pText, textLen, decoded.data(), &decodedLen)) {
-        ShaderOpLogFmt(L"Failed to decode compiled shader: %S\r\n", S.Name);
+        ShaderOpLogFmt(L"Failed to decode compiled shader: %S\n", S.Name);
         CHECK_HR(E_FAIL);
       }
       // decodedLen should have the correct size now.
@@ -874,7 +874,7 @@ void ShaderOpTest::CreateShaders() {
       if (FAILED(resultCode)) {
         CComPtr<IDxcBlobEncoding> errors;
         CHECK_HR(pResult->GetErrorBuffer(&errors));
-        ShaderOpLogFmt(L"Failed to compile shader: %*S\r\n",
+        ShaderOpLogFmt(L"Failed to compile shader: %*S\n",
                        (int)errors->GetBufferSize(),
                        errors->GetBufferPointer());
       }
@@ -894,7 +894,7 @@ void ShaderOpTest::CreateShaders() {
       hr = D3DCompile(pText, strlen(pText), S.Name, nullptr, nullptr,
                       S.EntryPoint, S.Target, 0, 0, &pCode, &pError);
       if (FAILED(hr) && pError != nullptr) {
-        ShaderOpLogFmt(L"%*S\r\n", (int)pError->GetBufferSize(),
+        ShaderOpLogFmt(L"%*S\n", (int)pError->GetBufferSize(),
                        ((LPCSTR)pError->GetBufferPointer()));
       }
     }
@@ -907,7 +907,7 @@ void ShaderOpTest::CreateShaders() {
           0, pCode->GetBufferPointer(), pCode->GetBufferSize(),
           IID_PPV_ARGS(&m_pRootSignature));
       if (SUCCEEDED(hr)) {
-        ShaderOpLogFmt(L"Root signature created from shader %S\r\n", S.Name);
+        ShaderOpLogFmt(L"Root signature created from shader %S\n", S.Name);
       }
     }
   }

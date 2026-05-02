@@ -116,10 +116,10 @@ static void WriteInfoQueueMessages(void *pStrCtx,
     }
     CA2W msgW(pMessage->pDescription);
     pOutputStrFn(pStrCtx, msgW.m_psz);
-    pOutputStrFn(pStrCtx, L"\r\n");
+    pOutputStrFn(pStrCtx, L"\n");
   }
   if (!allMessagesOK) {
-    pOutputStrFn(pStrCtx, L"Failed to retrieve some messages.\r\n");
+    pOutputStrFn(pStrCtx, L"Failed to retrieve some messages.\n");
   }
 }
 

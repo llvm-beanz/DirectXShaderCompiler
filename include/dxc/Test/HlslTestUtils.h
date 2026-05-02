@@ -211,7 +211,7 @@ inline void strreplace(const std::vector<std::string> &lookFors,
     if (!bOptional) {
       if (!found) {
         WEX::Logging::Log::Comment(WEX::Common::String().Format(
-            L"String not found: '%S' in text:\r\n%.*S", pLookFor,
+            L"String not found: '%S' in text:\n%.*S", pLookFor,
             (unsigned)str.size(), str.data()));
       }
       VERIFY_IS_TRUE(found);
