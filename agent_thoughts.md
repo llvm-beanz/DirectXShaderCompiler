@@ -352,3 +352,122 @@ This session produced six small commits to make review easier:
    alloca/store/load. Reintroducing the optimization at AST level
    (mark in `EmitCallArgs`, consume in `EmitHLSLOutArgExpr`) is
    simpler than trying to retrofit it into CGCall.
+
+---
+
+## Session 3: Reverting AST-level copy elision and aggregate ref-skip
+
+The user instructed reverting three changes from session 2 and updating
+test expectations accordingly:
+
+1. **Restore the duplicate vector-truncation diagnostic**
+   (revert of `[HLSL] Remove duplicate vector truncation diag in
+   PerformImplicitConversion`). The diagnostic at `ICK_HLSLVector_Truncation`
+   in `Sema::PerformImplicitConversion` is wanted; rather than silencing
+   it for a few tests, the tests are updated to expect the now-duplicate
+   warning. Affected verifier-mode tests: `cpp-errors.hlsl`,
+   `cpp-errors-hv2015.hlsl`, `swizzleBitfieldNotAllowed.hlsl`.
+
+2. **Revert the aggregate skip in `ParmVarDecl::updateOutParamToRefType`**.
+   The whole point of the `cbieneman/out-param-draft` branch is that
+   inout/out parameters become reference-typed. Skipping aggregates
+   broke that invariant and special-cased records/arrays. Restoring
+   the wrap means aggregate parameters mangle with the
+   `LValueReferenceType` + `__restrict` prefix (`AIA<Type>`). Updated
+   `tools/clang/unittests/HLSL/ValidationTest.cpp` find/replace/diag
+   strings for the eight ray-tracing validation tests (RayPayloadIsStruct,
+   RayAttrIsStruct, CallableParamIsStruct, RayShaderExtraArg,
+   RayShaderWithSignaturesFail, WhenPayloadSizeTooSmallThenFail,
+   WhenMissingPayloadThenFail, ShaderFunctionReturnTypeVoid) to expect
+   `AIAU<Struct>@@` for `inout` struct payloads. The substitution was
+   made by a one-shot Python script keyed on `Y[AM][XM]U(Payload|Param|...)@@`.
+
+3. **Drop the AST-level copy-elision pre-pass for `HLSLOutArgExpr`**.
+   The pre-pass that walked `EmitCallArgs` and marked unique-root out
+   args as skip-copy (and the corresponding `SkipCopyOutArgs` machinery
+   and `EmitHLSLOutArgExpr` short-circuit) is removed. The unrelated
+   correctness fix from the same commit — choosing
+   `RValue::getAggregate` for aggregate evaluation kinds in
+   `EmitHLSLOutArgExpr` — is preserved. The user's reasoning: any
+   case where the copy is safe to elide will have it eliminated by
+   the IR optimizer after inlining, so doing it at the AST level is
+   redundant and problematic.
+
+   This is observable at `-fcgl` / `-Od` where the optimizer doesn't
+   run. Updated the FileCheck expectations of the affected tests:
+
+   - `copyin-copyout.hlsl`, `copyin-copyout-operators.hlsl`: expect
+     one temp per argument (right-to-left store, then call, then
+     left-to-right writeback).
+   - `inout_from_arg.hlsl`, `local_inout.hlsl`: expect the extra
+     `[5 x i32]` allocas for the inout array temporaries.
+   - `dxil/debug/out_args.hlsl`, `dxil/debug/scoped_fragments.hlsl`:
+     the explicit copies change the shape of debug-info pieces;
+     CHECK/CHECK-NOT lines were relaxed to match the new IR.
+   - `shader_targets/library/inout_struct_mismatch-strictudt.hlsl`:
+     the inout cast now allocates a fresh `ParamStruct` temp and
+     copies fields in/out instead of bitcasting the `CallStruct` local.
+
+### WEXAdapter Comment/Error logging on POSIX
+
+While iterating, it became clear that the BatchHLSL/BatchDxil/BatchShaderTargets
+gtest harnesses still didn't surface failure context: gtest just printed
+a generic `Failure / Failed` line for each underlying `.hlsl` mismatch.
+The WEXAdapter shim's `Comment()`/`Error()` were using `fputws/fputwc`,
+which silently drop on Linux without a UTF-8 wide locale. Switching to
+`fprintf("%ls\n", msg)` mirrors the StartGroup/EndGroup change from
+session 2 and makes the per-file error text appear between the
+`BEGIN TEST(S)` / `END TEST(S)` markers. This is essential for narrowing
+down which underlying `.hlsl` file in a batch caused a failure.
+
+### Outcome
+
+Before this session: 14 unexpected `check-all` failures.
+After this session: 4 unexpected `check-all` failures, and all four are
+pre-existing on `cbieneman/out-param-draft` (independently confirmed by
+running `check-all` against `48c7f53a3` source files):
+
+- `Clang :: CodeGenSPIRV/coopmatrix_muladd_test.hlsl`
+- `Clang :: CodeGenSPIRV/rayquery_init_expr.hlsl`
+- `Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchHLSL` (27 sub-failures)
+- `Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchShaderTargets` (2 sub-failures)
+
+Net change vs. the session-2 baseline: 0 regressions, 7 sub-failures
+fixed across the Batch* harnesses, and the 8 ValidationTest cases that
+session 2 fixed via the aggregate-skip have been re-fixed via test
+expectations rather than source workaround.
+
+### Commit layout
+
+1. Revert "Remove duplicate vector truncation diag in PerformImplicitConversion".
+2. Update cpp-errors / cpp-errors-hv2015 verifier expectations.
+3. Revert "Skip reference+restrict rewrite for aggregate out parameters".
+4. Remove AST-level copy elision in CGCall/CGExpr (preserve aggregate
+   `RValue::getAggregate` correctness fix).
+5. Update ValidationTest expectations for `AIA` mangling on inout structs.
+6. Update swizzleBitfieldNotAllowed verifier expectations.
+7. Print WEXAdapter Comment/Error messages on POSIX.
+8. Update FileCheck expectations after removing AST-level copy elision.
+
+### Lessons
+
+9. **Aggregate ref-wrap couples mangling, codegen attributes, AST type,
+    and validator diagnostics.** Special-casing aggregates to skip the
+    wrap looks small but flips test expectations across all four layers
+    in unison. If the branch-level invariant is "out/inout params are
+    references," it should be uniform; the alternative is to keep the
+    invariant but adjust test expectations.
+
+10. **Copy elision at -O0 is observable and not free to remove.** Tests
+    that ran at `-fcgl`, `-Od`, or `-O0` and looked at debug info,
+    lifetimes, or alloca counts encoded the legacy elision behavior.
+    Removing the AST-level optimization makes those tests fail until
+    each is updated; the IR-after-inlining argument is correct only at
+    higher optimization levels.
+
+11. **gtest + WEXAdapter logging on POSIX is fragile.** Wide-string
+    output via `fputws`/`fputwc`/`wprintf` silently drops without a
+    UTF-8 wide locale. Always prefer `fprintf("%ls", ...)` for log
+    plumbing in the test framework, and verify after every change to
+    the framework that failure context still reaches the gtest
+    output.
