@@ -485,7 +485,7 @@ my_label: local_i = 1; // expected-error {{label is unsupported in HLSL}}
   int2 red_i_then_int = 0; // expected-note {{previous definition is here}}
   for (int red_i_then_int = 0;;) break; //expected-warning {{redefinition of 'red_i_then_int' with a different type: 'int' vs 'int2' shadows declaration in the outer scope; most recent declaration will be used}}
   fn_int_arg(red_i_then_int);
-  fn_int_arg(int2(0,0)); // int2 to int conversion is allowed // expected-warning {{implicit truncation of vector type}}
+  fn_int_arg(int2(0,0)); // int2 to int conversion is allowed // expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}}
 
   // for without declaration
   for (local_i = 0; ;) {
