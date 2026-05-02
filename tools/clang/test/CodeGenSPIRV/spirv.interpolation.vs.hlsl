@@ -38,7 +38,7 @@ struct VSOutput {
 };
 
 // CHECK: OpDecorate %out_var_TEXCOORD NoPerspective
-VSOutput main(out noperspective int a : TEXCOORD) {
+VSOutput main(out noperspective float a : TEXCOORD) {
   VSOutput myOutput;
   return myOutput;
 }

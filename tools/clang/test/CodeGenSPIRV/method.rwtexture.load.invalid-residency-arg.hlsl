@@ -7,6 +7,6 @@ RWTexture2D<uint> g_rwtexture2d : register(u1, space3);
   // The second argument for Load must be a variable where the function can
   // write the operation result Status.
   //
-  // CHECK: 11:24: error: an lvalue argument should be used for returning the operation status
+  // CHECK: 11:38: error: no matching member function for call to 'Load'
   g_output[threadId] = g_rwtexture2d.Load(0, 0);
 }

@@ -19,14 +19,13 @@ int getArray()[2] {
 [numthreads(1, 1, 1)]
 void main() {
   InterlockedCompareExchange(value, 1, 2, 3);
-// CHECK: error: InterlockedCompareExchange requires a reference as output parameter
+// CHECK: error: cannot bind non-lvalue argument 3 to out param{{emter|eter}}
 
   InterlockedAdd(value, 1, getValue());
-// CHECK: error: InterlockedCompareExchange requires a reference as output parameter
+// CHECK: error: cannot bind non-lvalue argument getValue() to out param{{emter|eter}}
 
   InterlockedAdd(value, 1, getVector().x);
-// CHECK: error: InterlockedCompareExchange requires a reference as output parameter
+// CHECK: error: cannot bind non-lvalue argument getVector().x to out param{{emter|eter}}
 
   InterlockedAdd(value, 1, getArray()[0]);
-// CHECK: error: InterlockedCompareExchange requires a reference as output parameter
 }

@@ -26,9 +26,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex3_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image_array]] %tex2dArrayf4
 // CHECK:      [[val3:%[a-zA-Z0-9_]+]] = OpImageSparseGather %SparseResidencyStruct [[tex3_load]] [[v2fc]] %int_0 ConstOffset [[v2ic]]
 // CHECK:  [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[val3]] 0
-// CHECK:                                OpStore %status [[status_0]]
+// CHECK:                                OpStore %hlsl_out [[status_0]]
     uint status;
     float4 val3 = tex2dArrayf4.Gather(float3(0.5, 0.25, 0.1), int2(2, 3), status);
 
     return 1.0;
 }
+
+// CHECK:                                [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK:                                OpStore %status [[status_0_ld_0]]

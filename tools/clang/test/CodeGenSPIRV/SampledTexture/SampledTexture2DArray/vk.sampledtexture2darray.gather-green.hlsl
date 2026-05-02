@@ -32,16 +32,20 @@ float4 main() : SV_Target {
 // CHECK: [[tex1_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image_array]] %tex2darray
 // CHECK: [[val_green_s:%[a-zA-Z0-9_]+]] = OpImageSparseGather %SparseResidencyStruct [[tex1_load]] [[v2fc]] %int_1 ConstOffset [[v2ic]]
 // CHECK: [[status_green_s:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[val_green_s]] 0
-// CHECK: OpStore %status [[status_green_s]]
+// CHECK: OpStore %hlsl_out [[status_green_s]]
 // CHECK: [[res_green_s:%[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float [[val_green_s]] 1
+// CHECK: [[status_green_s_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status_green_s_ld_0]]
 // CHECK: OpStore %val [[res_green_s]]
     val = tex2darray.GatherGreen(float3(0.5, 0.25, 0.1), int2(2, 3), status);
 
 // CHECK: [[tex1_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image_array]] %tex2darray
 // CHECK: [[val_green_o4_s:%[a-zA-Z0-9_]+]] = OpImageSparseGather %SparseResidencyStruct [[tex1_load]] [[v2fc]] %int_1 ConstOffsets [[const_offsets]]
 // CHECK: [[status_green_o4_s:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[val_green_o4_s]] 0
-// CHECK: OpStore %status [[status_green_o4_s]]
+// CHECK: OpStore %hlsl_out_0 [[status_green_o4_s]]
 // CHECK: [[res_green_o4_s:%[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float [[val_green_o4_s]] 1
+// CHECK: [[status_green_o4_s_ld_1:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out_0
+// CHECK: OpStore %status [[status_green_o4_s_ld_1]]
 // CHECK: OpStore %val [[res_green_o4_s]]
     val = tex2darray.GatherGreen(float3(0.5, 0.25, 0.1), int2(1, 2), int2(3, 4), int2(5, 6), int2(7, 8), status);
 

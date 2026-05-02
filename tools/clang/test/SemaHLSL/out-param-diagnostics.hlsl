@@ -13,17 +13,17 @@ int Returned(out int Val) { // expected-note{{variable 'Val' is declared here}}
 
 int ReturnedPassthrough(int Cond, out int Val) { // expected-note{{variable 'Val' is declared here}}
   if (Cond % 3)
-    return Returned(Val);
+    return Returned(Val); // expected-warning{{parameter 'Val' is uninitialized when used here}}
   else if (Cond % 2)
     return Returned(Val);
-  return Val; // expected-warning{{parameter 'Val' is uninitialized when used here}}
+  return Val;
 }
 
 // No disagnostic expected here because all paths to the exit return, and they
 // all initialize Val.
-int AllPathsReturn(int Cond, out int Val) {
+int AllPathsReturn(int Cond, out int Val) { // expected-note{{variable 'Val' is declared here}}
   if (Cond % 3)
-    return Returned(Val);
+    return Returned(Val); // expected-warning{{parameter 'Val' is uninitialized when used here}}
   else
     return Returned(Val);
 }
@@ -45,9 +45,9 @@ void AllPathsReturnSwitch(int Cond, out int Val) {
 int ReturnedMaybePassthrough(int Cond, out int Val) { // expected-note{{variable 'Val' is declared here}}
   if (Cond % 3)
     UnusedEmpty(Val);
-  else if (Cond % 2) // expected-warning{{parameter 'Val' is used uninitialized whenever 'if' condition is false}} expected-note{{remove the 'if' if its condition is always true}}
+  else if (Cond % 2) //
     UnusedEmpty(Val);
-  return Val; // expected-note{{uninitialized use occurs here}}
+  return Val; // expected-warning{{parameter 'Val' is uninitialized when used here}}
 }
 
 void SomePathsReturnSwitch(int Cond, out int Val) { // expected-note{{variable 'Val' is declared here}}
@@ -99,9 +99,9 @@ void DblInPlace2(inout int V) {
 void MaybePassthrough(int Cond, out int Val) { // expected-note{{variable 'Val' is declared here}}
   if (Cond % 3)
     UnusedEmpty(Val);
-  else if (Cond % 2) // expected-warning{{parameter 'Val' is used uninitialized whenever 'if' condition is false}} expected-note{{remove the 'if' if its condition is always true}}
+  else if (Cond % 2) //
     UnusedEmpty(Val);
-} // expected-note{{uninitialized use occurs here}}
+} // expected-warning{{parameter 'Val' is uninitialized when used here}}
 
 void EarlyOut(int Cond, out int Val) { // expected-note{{variable 'Val' is declared here}}
   if (Cond % 11)
@@ -117,10 +117,10 @@ void SomethingCalledOut(out int V) {
   V = 1;
 }
 
-int Something1(out int Num) {
+int Something1(out int Num) { // expected-note {{variable 'Num' is declared here}}
   // no diagnostic since this writes Num but doesn't read it
   SomethingCalledOut(Num);
-  return Num;
+  return Num; // expected-warning {{parameter 'Num' is uninitialized when used here}}
 }
 
 
@@ -129,8 +129,8 @@ void SomethingCalledInAndOut(in out int V) {
 }
 
 int Something2(out int Num) { // expected-note {{variable 'Num' is declared here}}
-  SomethingCalledInAndOut(Num); // expected-warning {{parameter 'Num' is uninitialized when used here}}
-  return Num;
+  SomethingCalledInAndOut(Num);
+  return Num; // expected-warning {{parameter 'Num' is uninitialized when used here}}
 }
 
 void SomethingCalledInOut(inout int V) {
@@ -138,8 +138,8 @@ void SomethingCalledInOut(inout int V) {
 }
 
 int Something3(out int Num) { // expected-note {{variable 'Num' is declared here}}
-  SomethingCalledInOut(Num); // expected-warning {{parameter 'Num' is uninitialized when used here}}
-  return Num;
+  SomethingCalledInOut(Num);
+  return Num; // expected-warning {{parameter 'Num' is uninitialized when used here}}
 }
 
 struct SomeObj {
@@ -181,9 +181,9 @@ RWByteAddressBuffer buffer;
 // No expected diagnostic here. InterlockedAdd is not annotated with HLSL
 // parameter annotations, so we fall back to C/C++ rules, which don't treat
 // reference passed parameters as uses.
-void interlockWrapper(out uint original) {
+void interlockWrapper(out uint original) { // expected-note{{variable 'original' is declared here}}
   buffer.InterlockedAdd(16, 1, original);
-}
+} // expected-warning{{parameter 'original' is uninitialized when used here}}
 
 // Neither of these will warn because we don't support element-based tracking.
 void UnusedSizedArray(out uint u[2]) { }

@@ -63,124 +63,123 @@ void main() {
 // CHECK-NEXT: [[v2f:%[0-9]+]] = OpFOrdNotEqual %v2bool
 // CHECK-NEXT:     {{%[0-9]+}} = OpAll %bool [[v2f]]
   if (all(v2f))
-// CHECK:                      OpLine [[file]] 72 5
+// CHECK:                      OpLine [[file]] 71 5
 // CHECK:       [[sin:%[0-9]+]] = OpExtInst %float {{%[0-9]+}} Sin {{%[0-9]+}}
-// CHECK-NEXT:                 OpLine [[file]] 72 19
+// CHECK-NEXT:                 OpLine [[file]] 71 19
 // CHECK-NEXT: [[v2fx:%[0-9]+]] = OpAccessChain %_ptr_Function_float %v2f %int_1
-// CHECK-NEXT:                 OpLine [[file]] 72 5
 // CHECK-NEXT:                 OpStore [[v2fx]] [[sin]]
     sincos(v2f.x, v2f.y, v2f.x);
 
-// CHECK:                 OpLine [[file]] 76 9
+// CHECK:                 OpLine [[file]] 75 9
 // CHECK-NEXT: {{%[0-9]+}} = OpExtInst %v2float {{%[0-9]+}} FClamp
   v2f = saturate(v2f);
 
-// CHECK: OpLine [[file]] 80 26
+// CHECK: OpLine [[file]] 79 26
 // CHECK: OpAny
   /* comment */ dest_i = any(v4i);
 
-// CHECK:                     OpLine [[file]] 87 41
+// CHECK:                     OpLine [[file]] 86 41
 // CHECK-NEXT: [[idx:%[0-9]+]] = OpIAdd %uint
-// CHECK:                     OpLine [[file]] 87 3
+// CHECK:                     OpLine [[file]] 86 3
 // CHECK-NEXT: [[v4i_1:%[0-9]+]] = OpAccessChain %_ptr_Function_uint %v4i %int_0
 // CHECK-NEXT:                OpStore [[v4i_1]] {{%[0-9]+}}
   v4i.x = NonUniformResourceIndex(v4i.y + v4i.z);
 
-// CHECK:      OpLine [[file]] 93 11
+// CHECK:      OpLine [[file]] 92 11
 // CHECK-NEXT: OpImageSparseTexelsResident %bool
-// CHECK:      OpLine [[file]] 93 3
+// CHECK:      OpLine [[file]] 92 3
 // CHECK-NEXT: OpAccessChain %_ptr_Function_uint %v4i %int_2
   v4i.z = CheckAccessFullyMapped(v4i.w);
 
-// CHECK:                     OpLine [[file]] 101 34
+// CHECK:                     OpLine [[file]] 100 34
 // CHECK-NEXT: [[add:%[0-9]+]] = OpFAdd %v2float
-// CHECK-NEXT:                OpLine [[file]] 101 12
+// CHECK-NEXT:                OpLine [[file]] 100 12
 // CHECK-NEXT:                OpBitcast %v2uint [[add]]
-// CHECK-NEXT:                OpLine [[file]] 101 3
+// CHECK-NEXT:                OpLine [[file]] 100 3
 // CHECK-NEXT:                OpLoad %v4uint %v4i
   v4i.xy = asuint(m2x2f._m00_m11 + v2f);
 
-// CHECK:      OpLine [[file]] 107 15
+// CHECK:      OpLine [[file]] 106 15
 // CHECK-NEXT: OpFMul %v2float
-// CHECK-NEXT: OpLine [[file]] 107 3
+// CHECK-NEXT: OpLine [[file]] 106 3
 // CHECK-NEXT: OpFOrdLessThan %v2bool
   clip(v4i.yz * m2x2f._m00_m11);
 
   float4 v4f;
 
-// CHECK:      OpLine [[file]] 115 37
+// CHECK:      OpLine [[file]] 114 37
 // CHECK-NEXT: OpFMul %float
-// CHECK:      OpLine [[file]] 115 9
+// CHECK:      OpLine [[file]] 114 9
 // CHECK-NEXT: OpConvertFToU %v4uint
   v4i = dst(v4f + 3 * v4f, v4f - v4f);
 
-// CHECK:      OpLine [[file]] 121 17
+// CHECK:      OpLine [[file]] 120 17
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} Exp2
-// CHECK:      OpLine [[file]] 121 11
+// CHECK:      OpLine [[file]] 120 11
 // CHECK-NEXT: OpBitcast %int
   v4i.x = asint(ldexp(v4f.x + v4f.y, v4f.w));
 
-// CHECK:      OpLine [[file]] 129 25
+// CHECK:      OpLine [[file]] 128 25
 // CHECK-NEXT: OpFAdd %float
-// CHECK-NEXT: OpLine [[file]] 129 34
-// CHECK-NEXT: OpAccessChain %_ptr_Function_float %v4f %int_3
-// CHECK-NEXT: OpLine [[file]] 129 13
+// CHECK-NEXT: OpLine [[file]] 128 13
 // CHECK-NEXT: OpExtInst %FrexpStructType {{%[0-9]+}} FrexpStruct
+// CHECK:      OpLine [[file]] 128 34
+// CHECK-NEXT: OpAccessChain %_ptr_Function_float %v4f %int_3
   v4f = lit(frexp(v4f.x + v4f.y, v4f.w),
-// CHECK:                     OpLine [[file]] 133 13
+// CHECK:                     OpLine [[file]] 132 13
 // CHECK-NEXT: [[v4f:%[0-9]+]] = OpAccessChain %_ptr_Function_float %v4f %int_2
 // CHECK-NEXT:                OpLoad %float [[v4f]]
             v4f.z,
-// CHECK:                       OpLine [[file]] 140 13
+// CHECK:                       OpLine [[file]] 139 13
 // CHECK-NEXT: [[clamp:%[0-9]+]] = OpExtInst %uint {{%[0-9]+}} UClamp
 // CHECK-NEXT:                  OpConvertUToF %float [[clamp]]
-// CHECK-NEXT:                  OpLine [[file]] 129 9
+// CHECK-NEXT:                  OpLine [[file]] 128 9
 // CHECK-NEXT:                  OpExtInst %float {{%[0-9]+}} FMax %float_0
 // CHECK-NEXT:                  OpExtInst %float {{%[0-9]+}} FMin
             clamp(v4i.x + v4i.y, 2 * v4i.z, v4i.w - v4i.z));
 
-// CHECK:                      OpLine [[file]] 146 33
+// CHECK:                      OpLine [[file]] 145 33
 // CHECK-NEXT: [[sign:%[0-9]+]] = OpExtInst %v3float {{%[0-9]+}} FSign
-// CHECK-NEXT:                 OpLine [[file]] 146 38
+// CHECK-NEXT:                 OpLine [[file]] 145 38
 // CHECK-NEXT:                 OpConvertFToS %v3int [[sign]]
   v4i = D3DCOLORtoUBYTE4(float4(sign(v4f.xyz - 2 * v4f.xyz),
-// CHECK:      OpLine [[file]] 149 33
+// CHECK:      OpLine [[file]] 148 33
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} FSign
                                 sign(v4f.w)));
-// CHECK:                     OpLine [[file]] 146 9
+// CHECK:                     OpLine [[file]] 145 9
 // CHECK-NEXT: [[arg:%[0-9]+]] = OpVectorShuffle %v4float {{%[0-9]+}} {{%[0-9]+}} 2 1 0 3
 // CHECK-NEXT:                OpVectorTimesScalar %v4float [[arg]]
 
-// CHECK:      OpLine [[file]] 156 7
+// CHECK:      OpLine [[file]] 155 7
 // CHECK-NEXT: OpIsNan %v4bool
   if (isfinite(v4f).x)
-// CHECK:                     OpLine [[file]] 161 15
+// CHECK:                     OpLine [[file]] 160 15
 // CHECK-NEXT: [[rcp:%[0-9]+]] = OpFDiv %v4float
-// CHECK-NEXT:                OpLine [[file]] 161 11
+// CHECK-NEXT:                OpLine [[file]] 160 11
 // CHECK-NEXT:                OpExtInst %v4float {{%[0-9]+}} Sin [[rcp]]
     v4f = sin(rcp(v4f / v4i.x));
 
-// CHECK:                     OpLine [[file]] 168 20
+// CHECK:                     OpLine [[file]] 167 20
 // CHECK-NEXT:                OpExtInst %float {{%[0-9]+}} Log2
-// CHECK:                     OpLine [[file]] 168 11
+// CHECK:                     OpLine [[file]] 167 11
 // CHECK-NEXT: [[arg_0:%[0-9]+]] = OpCompositeConstruct %v2float
 // CHECK-NEXT:                OpExtInst %uint {{%[0-9]+}} PackHalf2x16 [[arg_0]]
   v4i.x = f32tof16(log10(v2f.x * v2f.y + v4f.x));
 
-// CHECK:      OpLine [[file]] 172 3
+// CHECK:      OpLine [[file]] 171 3
 // CHECK-NEXT: OpTranspose %mat2v2float
   transpose(m2x2f + m2x2f);
 
-// CHECK:                     OpLine [[file]] 180 25
+// CHECK:                     OpLine [[file]] 179 25
 // CHECK-NEXT: [[abs:%[0-9]+]] = OpExtInst %float {{%[0-9]+}} FAbs
-// CHECK-NEXT:                OpLine [[file]] 180 20
+// CHECK-NEXT:                OpLine [[file]] 179 20
 // CHECK-NEXT:                OpExtInst %float {{%[0-9]+}} Sqrt [[abs]]
-// CHECK:      OpLine [[file]] 180 7
+// CHECK:      OpLine [[file]] 179 7
 // CHECK-NEXT: OpExtInst %uint {{%[0-9]+}} FindSMsb
   max(firstbithigh(sqrt(abs(v2f.x * v4f.w)) + v4i.x),
-// CHECK:      OpLine [[file]] 183 7
+// CHECK:      OpLine [[file]] 182 7
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} Cos
       cos(v4f.x));
-// CHECK:      OpLine [[file]] 180 3
+// CHECK:      OpLine [[file]] 179 3
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} NMax
 }

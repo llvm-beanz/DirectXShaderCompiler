@@ -30,7 +30,7 @@ void main() {
   // Assigning using out param of builtin function
   double d = 1.0;
   asuint(d, local[0], local[1]);                          /* expected-error {{no matching function for call to 'asuint'}} expected-note {{candidate function not viable: 2nd argument ('const uint') would lose const qualifier}} */
-  asuint(d, gs_val[0], gs_val[1]);                        /* expected-error {{no matching function for call to 'asuint'}} expected-note {{candidate function not viable: 2nd argument ('const uint') would lose const qualifier}} */
+  asuint(d, gs_val[0], gs_val[1]);                        /* expected-error {{no matching function for call to 'asuint'}} expected-note {{candidate function not viable: 2nd argument ('const __attribute__((address_space(3))) uint') is in address space 3, but parameter must be in address space 0}} */
   asuint(d, g_cbuf[0], g_cbuf[1]);                        /* expected-error {{no matching function for call to 'asuint'}} expected-note {{candidate function not viable: 2nd argument ('const uint') would lose const qualifier}} */
   asuint(d, g_robuf[0], g_robuf[1]);                      /* expected-error {{no matching function for call to 'asuint'}} expected-note {{candidate function not viable: 2nd argument ('const unsigned int') would lose const qualifier}} */
 
@@ -45,7 +45,7 @@ void main() {
   // Assigning using dest param of atomics
   // Distinct because of special handling of atomics dest param
   InterlockedAdd(local[0], 1);                              /* expected-error {{no matching function for call to 'InterlockedAdd'}} expected-note {{candidate function not viable: 1st argument ('const uint') would lose const qualifier}} expected-note {{candidate function not viable: no known conversion from 'const uint' to 'unsigned long long &' for 1st argument}} */
-  InterlockedAdd(gs_val[0], 1);                             /* expected-error {{no matching function for call to 'InterlockedAdd'}} expected-note {{candidate function not viable: 1st argument ('const uint') would lose const qualifier}} expected-note {{candidate function not viable: no known conversion from 'const uint' to 'unsigned long long &' for 1st argument}} */
+  InterlockedAdd(gs_val[0], 1);                             /* expected-error {{no matching function for call to 'InterlockedAdd'}} expected-note {{candidate function not viable: 1st argument ('const __attribute__((address_space(3))) uint') is in address space 3, but parameter must be in address space 0}} expected-note {{candidate function not viable: no known conversion from 'const __attribute__((address_space(3))) uint' to 'unsigned long long &' for 1st argument}} */
   InterlockedAdd(g_cbuf[0], 1);                             /* expected-error {{no matching function for call to 'InterlockedAdd'}} expected-note {{candidate function not viable: 1st argument ('const uint') would lose const qualifier}} expected-note {{candidate function not viable: no known conversion from 'const uint' to 'unsigned long long &' for 1st argument}} */
   InterlockedAdd(g_robuf[0], 1);                            /* expected-error {{no matching function for call to 'InterlockedAdd'}} expected-note {{candidate function not viable: 1st argument ('const unsigned int') would lose const qualifier}} expected-note {{candidate function not viable: no known conversion from 'const unsigned int' to 'unsigned long long &' for 1st argument}} */
 

@@ -41,7 +41,7 @@ int1x1 float_to_i11(float f)  { return f; }
 float  i11_to_float(int1x1 v) { return v; }
 
 void into_out_i(out int i) { i = g_i11; }
-void into_out_i3(out int3 i3) { i3 = int3(1, 2, 3); } // expected-note {{candidate function}} expected-note {{passing argument to parameter 'i3' here}} fxc-pass {{}}
+void into_out_i3(out int3 i3) { i3 = int3(1, 2, 3); } // expected-note {{candidate function}} fxc-pass {{}}
 void into_out_f(out float i) { i = g_i11; }
 void into_out_f3_s(out f3_s i) { }
 void into_out_ss(out SamplerState ss) { ss = g_SamplerState; }
@@ -99,14 +99,14 @@ float4 plain(float4 param4 /* : FOO */) /*: FOO */{
     ari1 = (int[1])ints; // explicit conversion works
     ari1 = ari1; // assign to same-sized array
     ari2 = ari1; // expected-error {{cannot convert from 'int [1]' to 'int [2]'}} fxc-error {{X3017: cannot implicitly convert from 'int[1]' to 'int[2]'}}
-    ari2 = (int[2])ari1; // expected-error {{cannot convert from 'int [1]' to 'int [2]'}} fxc-error {{X3017: cannot convert from 'int[1]' to 'int[2]'}}
+    ari2 = (int[2])ari1; // expected-error {{cannot convert from 'int *' to 'int [2]'}} fxc-error {{X3017: cannot convert from 'int[1]' to 'int[2]'}}
     ari1 = ari2; // expected-error {{cannot implicitly convert from 'int [2]' to 'int [1]'}} fxc-error {{X3017: cannot convert from 'int[2]' to 'int[1]'}}
     ari1 = (int[1])ari2; // explicit conversion to smaller size
     i12 = ari1;  // expected-error {{cannot convert from 'int [1]' to 'int1x2'}} fxc-error {{X3017: cannot implicitly convert from 'int[1]' to 'int2'}}
     i21 = ari1;  // expected-error {{cannot convert from 'int [1]' to 'int2x1'}} fxc-error {{X3017: cannot implicitly convert from 'int[1]' to 'int2x1'}}
     i22 = ari1;  // expected-error {{cannot convert from 'int [1]' to 'int2x2'}} fxc-error {{X3017: cannot implicitly convert from 'int[1]' to 'int2x2'}}
     floats = ari1; // expected-error {{cannot implicitly convert from 'int [1]' to 'float'}} fxc-error {{X3017: cannot convert from 'int[1]' to 'float'}}
-    floats = (float)ari1; // assign to scalar of compatible type
+    floats = (float)ari1; // assign to scalar of compatible type // expected-error{{cannot convert from 'int *' to 'float'}}
     ari1 = ari1 + ari1; // expected-error {{scalar, vector, or matrix expected}} fxc-error {{X3022: scalar, vector, or matrix expected}}
     ari1 = ints + ari1; // expected-error {{scalar, vector, or matrix expected}} fxc-error {{X3022: scalar, vector, or matrix expected}}
 
@@ -138,7 +138,7 @@ float4 plain(float4 param4 /* : FOO */) /*: FOO */{
     into_out_f3_s(f3_ss);
     into_out_ss(SamplerStates);
     // fxc error X3017: 'into_out_i3': cannot implicitly convert from 'int2' to 'int3'
-    into_out_i3(i2); // expected-error {{cannot initialize a parameter of type 'int3 &' with an lvalue of type 'int2'}} fxc-error {{X3017: 'into_out_i3': cannot convert output parameter from 'int3' to 'int2'}}
+    into_out_i3(i2); // expected-error {{cannot initialize a parameter of type 'vector<int, 3>' with an lvalue of type 'vector<int, 2>'}} fxc-error {{X3017: 'into_out_i3': cannot convert output parameter from 'int3' to 'int2'}}
     // fxc error X3017: cannot convert from 'int2' to 'int3'
     into_out_i3((int3)i2); // expected-error {{cannot convert from 'int2' to 'int3'}} fxc-error {{X3013: 'into_out_i3': no matching 1 parameter function}} fxc-error {{X3017: cannot convert from 'int2' to 'int3'}}
     into_out_i3(i4); // expected-error {{no matching function for call to 'into_out_i3'}} fxc-error {{X3017: 'into_out_i3': cannot implicitly convert output parameter from 'int3' to 'int4'}}

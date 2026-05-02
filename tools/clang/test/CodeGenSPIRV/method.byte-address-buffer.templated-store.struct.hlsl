@@ -121,8 +121,10 @@ void main(uint3 tid : SV_DispatchThreadId) {
 // CHECK:          [[tidx_ptr:%[0-9]+]] = OpAccessChain %_ptr_Function_uint %tid %int_0
 // CHECK:         [[base_addr:%[0-9]+]] = OpLoad %uint [[tidx_ptr]]
 // CHECK:              [[sArr:%[0-9]+]] = OpLoad %_arr_S_uint_2 %sArr
-// CHECK:                [[s0:%[0-9]+]] = OpCompositeExtract %S [[sArr]] 0
-// CHECK:                [[s1:%[0-9]+]] = OpCompositeExtract %S [[sArr]] 1
+// CHECK:                                 OpStore %tmp_hlsl_array [[sArr]]
+// CHECK:          [[sArr_ld:%[0-9]+]] = OpLoad %_arr_S_uint_2 %tmp_hlsl_array
+// CHECK:                [[s0:%[0-9]+]] = OpCompositeExtract %S [[sArr_ld]] 0
+// CHECK:                [[s1:%[0-9]+]] = OpCompositeExtract %S [[sArr_ld]] 1
 // CHECK:                 [[a:%[0-9]+]] = OpCompositeExtract %_arr_v3half_uint_3 [[s0]] 0
 // CHECK:                [[a0:%[0-9]+]] = OpCompositeExtract %v3half [[a]] 0
 // CHECK:                [[a1:%[0-9]+]] = OpCompositeExtract %v3half [[a]] 1

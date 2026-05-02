@@ -2088,7 +2088,13 @@ void CastOperation::CheckHLSLCStyleCast(bool FunctionalStyle,
 
   QualType SrcType = SrcExpr.get()->getType();
   if (SrcType.getCanonicalType() == DestType.getCanonicalType()) {
-    ValueKind = VK_LValue;
+    // Preserve the source value category: a cast from an rvalue must remain
+    // an rvalue. Only treat the no-op cast as an lvalue when the source is an
+    // lvalue, which keeps lvalue array/struct conversions working without
+    // wrongly classifying rvalue conditional/parenthesized expressions as
+    // lvalues.
+    if (SrcExpr.get()->isLValue())
+      ValueKind = VK_LValue;
     Kind = CK_NoOp;
     ResultType = DestType;
     return;

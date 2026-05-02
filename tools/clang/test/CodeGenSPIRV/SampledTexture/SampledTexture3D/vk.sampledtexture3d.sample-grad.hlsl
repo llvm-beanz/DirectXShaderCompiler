@@ -29,8 +29,10 @@ float4 main() : SV_Target {
 // CHECK: [[tex4_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_3d_sampled_image]] %tex3d
 // CHECK: [[sampled_result4:%[a-zA-Z0-9_]+]] = OpImageSparseSampleExplicitLod %SparseResidencyStruct [[tex4_load]] [[v3fc]] Grad|ConstOffset|MinLod [[v3f_1]] [[v3f_2]] [[v3ic]] %float_0_5
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result4]] 0
-// CHECK: OpStore %status [[status_0]]
+// CHECK: OpStore %hlsl_out [[status_0]]
 // CHECK: [[sampled_texel:%[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float [[sampled_result4]] 1
+// CHECK: [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status_0_ld_0]]
 // CHECK: OpStore %val4 [[sampled_texel]]
     uint status;
     float4 val4 = tex3d.SampleGrad(float3(0.5, 0.25, 0), float3(1, 1, 1), float3(2, 2, 2), int3(2, 3, 1), 0.5, status);

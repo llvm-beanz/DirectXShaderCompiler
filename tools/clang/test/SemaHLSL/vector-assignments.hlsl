@@ -70,8 +70,8 @@ float3 f3c_f2_f = float3(f2c_f_f, 1);
 
 // *assignments* don't mind if they are narrowing, but warn.
 // fxc error: warning X3206: implicit truncation of vector type
-float2 f2a_f2_f = f3c_f2_f; // expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}}
-float2 f2c_f2_f = float3(f2c_f_f, 1); // expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}}
+float2 f2a_f2_f = f3c_f2_f; // expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}}
+float2 f2c_f2_f = float3(f2c_f_f, 1); // expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}}
 
 // *assignments* do mind if they are widening.
 // fxc error: error X3017: cannot implicitly convert from 'float3' to 'float4'

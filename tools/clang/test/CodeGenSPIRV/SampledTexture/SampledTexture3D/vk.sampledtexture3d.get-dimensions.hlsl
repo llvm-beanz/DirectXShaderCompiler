@@ -104,10 +104,10 @@ void main() {
   tex3d.GetDimensions(mipLevel, i_width, i_height, i_depth, i_numLevels);
 
 #ifdef ERROR
-// ERROR: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 
   tex3d.GetDimensions(mipLevel, 0, height, depth, numLevels);
 
-// ERROR: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 
   tex3d.GetDimensions(width, 20, depth);
 #endif
 }

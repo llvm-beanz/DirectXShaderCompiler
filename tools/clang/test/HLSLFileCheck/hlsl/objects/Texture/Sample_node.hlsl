@@ -6,11 +6,11 @@
 // CHECK:  %[[Sampler:.+]] = load %dx.types.Handle, %dx.types.Handle* @"\01?s@@3USamplerComparisonState@@A", align 4
 // CHECK:  %[[T2D:.+]] = load %dx.types.Handle, %dx.types.Handle* @"\01?tex2d@@3V?$Texture2D@V?$vector@M$03@@@@A", align 4
 
-// CHECK: %[[T2DH:.+]] = call %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32 160, %dx.types.Handle %[[T2D]])  ; CreateHandleForLib(Resource)
-// CHECK: %[[T2DAnnot:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[T2DH]], %dx.types.ResourceProperties { i32 2, i32 1033 })  ; AnnotateHandle(res,props)  resource: Texture2D<4xF32>
-
 // CHECK: %[[SamplerH:.+]] = call %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32 160, %dx.types.Handle %[[Sampler]])  ; CreateHandleForLib(Resource)
 // CHECK: %[[SamplerAnnot:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[SamplerH]], %dx.types.ResourceProperties { i32 32782, i32 0 })  ; AnnotateHandle(res,props)  resource: SamplerComparisonState
+
+// CHECK: %[[T2DH:.+]] = call %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32 160, %dx.types.Handle %[[T2D]])  ; CreateHandleForLib(Resource)
+// CHECK: %[[T2DAnnot:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[T2DH]], %dx.types.ResourceProperties { i32 2, i32 1033 })  ; AnnotateHandle(res,props)  resource: Texture2D<4xF32>
 
 // CHECK: call %dx.types.ResRet.f32 @dx.op.sampleCmpBias.f32(i32 255, %dx.types.Handle %[[T2DAnnot]], %dx.types.Handle %[[SamplerAnnot]], float %{{.*}}, float %{{.*}}, float undef, float undef, i32 -5, i32 7, i32 undef, float %{{.*}}, float %{{.*}}, float %{{.*}})  ; SampleCmpBias(srv,sampler,coord0,coord1,coord2,coord3,offset0,offset1,offset2,compareValue,bias,clamp)
 

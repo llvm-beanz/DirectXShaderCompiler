@@ -1,0 +1,396 @@
+[1/28] Touch GetCommitInfo.py to trigger rebuild
+[2/28] cd /Users/cbieneman/dev/DirectXShaderCompiler/build-rel/utils/version && /Users/cbieneman/dev/open-source/cmake-bins/bin/cmake -E copy_if_different /Users/cbieneman/dev/DirectXShaderCompiler/build-rel/utils/version/dxcversion.inc.gen /Users/cbieneman/dev/DirectXShaderCompiler/build-rel/utils/version/dxcversion.inc
+[2/3] Running all regression tests
+-- Testing: 4645 tests, 16 threads --
+Testing: 0 .. 10.. 20.. 30.. 40..
+FAIL: Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchShaderTargets (2298 of 4645)
+******************** TEST 'Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchShaderTargets' FAILED ********************
+Note: Google Test filter = CompilerTest.BatchShaderTargets
+[==========] Running 1 test from 1 test case.
+[----------] Global test environment set-up.
+[----------] 1 test from CompilerTest
+// RUN: %dxc -E main -T as_6_5 %s | FileCheck %s
+Prior (-2147467259): %dxc -E main -T as_6_5 %s 
+Error (1): FileCheck %s
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:3:11: error: expected string not found in input
+// CHECK: define void @main
+          ^
+<stdin>:1:1: note: scanning from here
+error: validation errors
+^
+<stdin>:3:108: note: possible intended match here
+note: at '%13 = bitcast [4 x i32] addrspace(3)* %12 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+                                                                                                           ^
+
+<full input to FileCheck>
+error: validation errors
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:28:3: error: Bitcast on struct types is not allowed.
+note: at '%13 = bitcast [4 x i32] addrspace(3)* %12 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:28:3: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%14 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %13 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:35:3: error: Bitcast on struct types is not allowed.
+note: at '%78 = bitcast [4 x i32] addrspace(3)* %77 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:35:3: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%79 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %78 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:36:14: error: Bitcast on struct types is not allowed.
+note: at '%88 = bitcast [4 x i32] addrspace(3)* %87 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:36:14: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%89 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %88 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+error: Vector type '<2 x i32>' is not allowed.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:39:3: error: Bitcast on struct types is not allowed.
+note: at '%107 = bitcast [4 x i32] addrspace(3)* %106 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:39:3: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%108 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %107 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:40:21: error: Bitcast on struct types is not allowed.
+note: at '%118 = bitcast [4 x i32] addrspace(3)* %117 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:40:21: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%119 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %118 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+error: Vector type '<2 x i32>' is not allowed.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:43:3: error: Bitcast on struct types is not allowed.
+note: at '%145 = bitcast [4 x i32] addrspace(3)* %144 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:43:3: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%146 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %145 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+error: Vector type '<2 x i32>' is not allowed.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:44:21: error: Bitcast on struct types is not allowed.
+note: at '%155 = bitcast [4 x i32] addrspace(3)* %154 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:44:21: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%156 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %155 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+error: Vector type '<2 x i32>' is not allowed.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:56:3: error: Bitcast on struct types is not allowed.
+note: at '%205 = bitcast [4 x i32] addrspace(3)* %204 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:56:3: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%206 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %205 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:57:14: error: Bitcast on struct types is not allowed.
+note: at '%215 = bitcast [4 x i32] addrspace(3)* %214 to %class.matrix.bool.2.2 addrspace(3)*' in block '#0' of function 'main'.
+/Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl:57:14: error: Address space cast between pointer types must have one part to be generic address space.
+note: at '%216 = addrspacecast %class.matrix.bool.2.2 addrspace(3)* %215 to %class.matrix.bool.2.2*' in block '#0' of function 'main'.
+Function: dx.hl.subscript.colMajor[].rn.<2 x i32>* (i32, %class.matrix.bool.2.2*, i32, i32): error: External function 'dx.hl.subscript.colMajor[].rn.<2 x i32>* (i32, %class.matrix.bool.2.2*, i32, i32)' is not a DXIL function.
+Validation failed.
+
+
+/Users/cbieneman/dev/DirectXShaderCompiler/include/dxc/Test/WEXAdapter.h:189: Failure
+Failed
+[  FAILED  ] CompilerTest.BatchShaderTargets (383 ms)
+[----------] 1 test from CompilerTest (383 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test case ran. (383 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CompilerTest.BatchShaderTargets
+
+ 1 FAILED TEST
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh-shadingrate.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh-shadingrate.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notArrayOutIndices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notArrayOutIndices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh-rootsig.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh-rootsig.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/amplification.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/amplification.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/vertices_sig_bigger_than_primitives_sig_regression.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/vertices_sig_bigger_than_primitives_sig_regression.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl>
+Run result is not zero
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-matrix.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-method.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload-method.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh-payload-matrix.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh-payload-matrix.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/tooManyOutPrimitives.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/tooManyOutPrimitives.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleInPayload.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleInPayload.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/semantic_on_parameter.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/semantic_on_parameter.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-nested-payload.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-nested-payload.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/matVertexStOutput_colmajor.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/matVertexStOutput_colmajor.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notUint2OutIndicesForLines.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notUint2OutIndicesForLines.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleOutVertices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleOutVertices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/tooManyOutIndices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/tooManyOutIndices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleOutPrimitives.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleOutPrimitives.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/matVertexStOutput_rowmajor.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/matVertexStOutput_rowmajor.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/illegalOutIndicesAssignment.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/illegalOutIndicesAssignment.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notArrayOutVertices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notArrayOutVertices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/as-groupshared-payload.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/readFromOutIndices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/readFromOutIndices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notVectorOutIndices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notVectorOutIndices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/tooManyOutVertices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/tooManyOutVertices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notArrayOutPrimitives.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notArrayOutPrimitives.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notUint3OutIndicesForTriangles.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notUint3OutIndicesForTriangles.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh_invalid_interpolation_modes.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/mesh_invalid_interpolation_modes.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleOutIndices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/multipleOutIndices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notUintOutIndices.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/mesh/notUintOutIndices.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/nodes/NodeOutput.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/nodes/NodeOutput.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/nodes/max_output_records_shared_with.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/nodes/max_output_records_shared_with.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/FloatMaxtessfactorHs.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/FloatMaxtessfactorHs.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/static_res_in_patch_constant_func2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/static_res_in_patch_constant_func2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/static_res_in_patch_constant_func.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/static_res_in_patch_constant_func.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/NoInputPatchHs.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/NoInputPatchHs.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/pcfunc-uses-class.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/hull/pcfunc-uses-class.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_cs_entry2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_cs_entry2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/link_mismatch_target.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/link_mismatch_target.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry6.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry6.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_append_buf.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_append_buf.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_unresolved_func1.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_unresolved_func1.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_select_res.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_select_res.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry7.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry7.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_cs_entry3.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_cs_entry3.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_out_undef.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_out_undef.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten4.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten4.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten3.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten3.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_arg_flatten.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_ret_struct.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_ret_struct.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_empty_struct_arg.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_arg_flatten/lib_empty_struct_arg.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/inout_struct_mismatch-strictudt.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/inout_struct_mismatch-strictudt.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_res_param_x.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_res_param_x.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_out_param_res_imp.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_out_param_res_imp.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_resource.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_resource.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_res_sel.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_res_sel.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_array.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_array.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/inout_struct_mismatch.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/inout_struct_mismatch.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib-copy-vec.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib-copy-vec.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_shaders_only.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_shaders_only.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/vec_array_param.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/vec_array_param.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_cast.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_cast.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage_internal.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage_internal.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_no_alias.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_no_alias.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage_external.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage_external.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_hs_shaders_only.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_hs_shaders_only.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_cs_entry.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_cs_entry.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_cast2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_cast2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_no_flat_extern_func.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_no_flat_extern_func.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_select_res_x2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_select_res_x2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_exports_collision1.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_exports_collision1.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry8.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry8.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_global_ctor_with_export.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_global_ctor_with_export.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_ret_res.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_ret_res.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_param8.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_param8.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry4.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry4.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/link_multi_traceray.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/link_multi_traceray.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage_6_x.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_default_linkage_6_x.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_entries.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_entries.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry5.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_mat_entry5.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_unresolved_func2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_unresolved_func2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_select_res_x.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_select_res_x.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_remove_res.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_remove_res.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_out_param_res.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_out_param_res.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_no_vanilla_fn_attributes.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_no_vanilla_fn_attributes.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_res_param.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_res_param.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_entries2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_entries2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_unused_func.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/library/lib_unused_func.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/effect_skip.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/effect_skip.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/empty.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/empty.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/earlydepthstencil/earlyDepthStencil.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/earlydepthstencil/earlyDepthStencil.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/passthrough2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/pixel/passthrough2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_output_before_input_same_struct.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_output_before_input_same_struct.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_matrix_all_orientations.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_matrix_all_orientations.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/structured_buffer_getdim_stride.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/structured_buffer_getdim_stride.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_input_before_output_same_struct.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_input_before_output_same_struct.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_input_before_output_different_structs.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_input_before_output_different_structs.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_multiple_aggregates.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_multiple_aggregates.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_output_before_input_different_structs.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_output_before_input_different_structs.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_output_before_input_different_structs-strictudt.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_output_before_input_different_structs-strictudt.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_input_before_output_different_structs-strictudt.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/streamoutputs/streamout_input_before_output_different_structs-strictudt.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/multiStreamGS2.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/multiStreamGS2.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/gs_precise_output.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/gs_precise_output.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/multiStreamGS.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/multiStreamGS.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/semantic_on_parameter.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/geometry/semantic_on_parameter.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/vertex/passthrough1.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/vertex/passthrough1.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_accept_ignore_hit.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_accept_ignore_hit.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_attr_struct.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_attr_struct.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_wave.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_wave.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_geometryIndex.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_geometryIndex.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_ignore_hit.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_ignore_hit.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_builtin.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_builtin.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_callable_wave.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_callable_wave.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_raydesc_from_cbuffer.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_raydesc_from_cbuffer.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/subobjects_raytracingPipelineConfig1.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/subobjects_raytracingPipelineConfig1.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_reporthit.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_reporthit.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_derived_payload.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_derived_payload.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_intersection.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_intersection.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_callshader.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_callshader.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit_numeric.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit_numeric.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_traceray.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_traceray.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_transforms4x3.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_transforms4x3.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_intrin.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_intrin.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/subobjects.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/subobjects.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_raygeneration_wave.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_raygeneration_wave.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_miss_wave.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_miss_wave.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_intersection_geometryIndex.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_intersection_geometryIndex.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/precise_payload.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/precise_payload.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_payload_struct.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_payload_struct.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit_wave.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit_wave.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_callable.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_callable.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_intersection_wave.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_intersection_wave.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_accept_ignore_hit_fail_lib.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_accept_ignore_hit_fail_lib.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/no-phi-on-res.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/no-phi-on-res.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_transforms3x4.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_transforms3x4.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_transforms.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_sgv_transforms.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_miss_ret.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_miss_ret.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_udt_sizes.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_udt_sizes.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_traceray_readback.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_traceray_readback.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_accept_hit.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_anyhit_accept_hit.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_miss.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_miss.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_raygeneration.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_raygeneration.hlsl>
+BEGIN TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit_geometryIndex.hlsl>
+END TEST(S): </Users/cbieneman/dev/DirectXShaderCompiler/tools/clang/test/HLSL/../HLSLFileCheck/shader_targets/raytracing/raytracing_closesthit_geometryIndex.hlsl>
+
+********************
+Testing: 0 .. 10.. 20.. 30.. 40.. 50.. 60.. 70.. 80.. 90.. 
+Testing Time: 11.17s
+********************
+Failing Tests (1):
+    Clang-Unit :: HLSL/ClangHLSLTests/CompilerTest.BatchShaderTargets
+
+  Expected Passes    : 4603
+  Expected Failures  : 9
+  Unsupported Tests  : 32
+  Unexpected Failures: 1
+FAILED: CMakeFiles/check-all /Users/cbieneman/dev/DirectXShaderCompiler/build-rel/CMakeFiles/check-all 
+cd /Users/cbieneman/dev/DirectXShaderCompiler/build-rel && /Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9 /Users/cbieneman/dev/DirectXShaderCompiler/utils/lit/lit.py -sv --param clang_site_config=/Users/cbieneman/dev/DirectXShaderCompiler/build-rel/tools/clang/test/lit.site.cfg --param skip_taef_exec=False --param llvm_site_config=/Users/cbieneman/dev/DirectXShaderCompiler/build-rel/test/lit.site.cfg --param llvm_unit_site_config=/Users/cbieneman/dev/DirectXShaderCompiler/build-rel/test/Unit/lit.site.cfg /Users/cbieneman/dev/DirectXShaderCompiler/build-rel/tools/clang/test /Users/cbieneman/dev/DirectXShaderCompiler/build-rel/test
+ninja: build stopped: subcommand failed.

@@ -57,8 +57,10 @@ void main() {
 // CHECK-NEXT:    [[sampledImg:%[0-9]+]] = OpSampledImage %type_sampled_image_2 [[tcube]] [[sampler]]
 // CHECK-NEXT: [[structResult:%[0-9]+]]  = OpImageSparseSampleDrefImplicitLod %SparseResidencyStruct [[sampledImg]] [[v3fc]] [[cmpVal]] Bias|MinLod [[bias]] [[clamp]]
 // CHECK-NEXT:        [[status:%[0-9]+]] = OpCompositeExtract %uint [[structResult]] 0
-// CHECK-NEXT:                             OpStore %status [[status]]
+// CHECK-NEXT:                             OpStore %hlsl_out [[status]]
 // CHECK-NEXT:        [[result:%[0-9]+]] = OpCompositeExtract %float [[structResult]] 1
+// CHECK-NEXT:                             [[status_ld_0:%[0-9]+]] = OpLoad %uint %hlsl_out
+// CHECK-NEXT:                             OpStore %status [[status_ld_0]]
 // CHECK-NEXT:                             OpStore %val4 [[result]]
     float val4 = tcube.SampleCmpBias(s, float3(1, 2, 3), cmpVal, bias, clamp, status);
 }

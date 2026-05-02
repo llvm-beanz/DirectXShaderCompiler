@@ -17,6 +17,6 @@ void main() {
   // CHECK: OpStore [[fragStencilVar]] %int_10
   gl_FragStencilRefARB = 10;
 
-  // CHECK: OpFunctionCall %void %assign [[fragStencilVar]]
+  // CHECK: OpFunctionCall %void %assign %hlsl_out
   assign(gl_FragStencilRefARB);
 }

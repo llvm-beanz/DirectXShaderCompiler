@@ -88,10 +88,10 @@ void main() {
   tex1dArray.GetDimensions(mipLevel, i_width, i_elements, i_numLevels);
 
 #ifdef ERROR
-// ERROR: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 
   tex1dArray.GetDimensions(mipLevel, 0, elements, numLevels);
 
-// ERROR: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 
   tex1dArray.GetDimensions(width, 20);
 #endif
 }

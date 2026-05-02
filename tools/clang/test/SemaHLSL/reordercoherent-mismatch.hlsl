@@ -65,16 +65,16 @@ void GCStore(reordercoherent RWByteAddressBuffer Buf) {
   Buf.Store(0, 0);
 }
 
-void getNonRCBufPAram(inout reordercoherent RWByteAddressBuffer PRCBuf) {
-  PRCBuf = NonRCBuf; // expected-warning{{implicit conversion from 'RWByteAddressBuffer' to 'reordercoherent RWByteAddressBuffer __restrict' adds reordercoherent annotation}}
+void getNonRCBufPAram(inout reordercoherent RWByteAddressBuffer PRCBuf) { // expected-error{{'reordercoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer &'}} expected-note{{'reordercoherent' can only be applied to UAV objects}}
+  PRCBuf = NonRCBuf; // expected-warning{{implicit conversion from 'RWByteAddressBuffer' to 'reordercoherent RWByteAddressBuffer' adds reordercoherent annotation}}
 }
 
 static reordercoherent RWByteAddressBuffer SRCBufArr[2] = NonRCBufArr;               // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'reordercoherent RWByteAddressBuffer [2]' adds reordercoherent annotation}}
 static reordercoherent RWByteAddressBuffer SRCBufMultiArr0[2] = NonRCBufMultiArr[0]; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'reordercoherent RWByteAddressBuffer [2]' adds reordercoherent annotation}}
 static reordercoherent RWByteAddressBuffer SRCBufMultiArr1[2][2] = NonRCBufMultiArr; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2][2]' to 'reordercoherent RWByteAddressBuffer [2][2]' adds reordercoherent annotation}}
 
-void getNonRCBufArrParam(inout reordercoherent RWByteAddressBuffer PRCBufArr[2]) {
-  PRCBufArr = NonRCBufArr; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'reordercoherent RWByteAddressBuffer __restrict[2]' adds reordercoherent annotation}}
+void getNonRCBufArrParam(inout reordercoherent RWByteAddressBuffer PRCBufArr[2]) { // expected-error{{'reordercoherent' is not a valid modifier for a declaration of type 'RWByteAddressBuffer (&)[2]'}} expected-note{{'reordercoherent' can only be applied to UAV objects}}
+  PRCBufArr = NonRCBufArr; // expected-warning{{implicit conversion from 'RWByteAddressBuffer [2]' to 'reordercoherent RWByteAddressBuffer [2]' adds reordercoherent annotation}}
 }
 
 [shader("raygeneration")] void main() {

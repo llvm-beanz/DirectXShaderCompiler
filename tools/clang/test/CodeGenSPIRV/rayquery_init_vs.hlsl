@@ -39,6 +39,6 @@ void main()
 // CHECK:  OpRayQueryInitializeKHR [[rayquery]] [[accel]] %uint_517 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
 
     q.TraceRayInline(AccelerationStructure,RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, 0xFF, ray);
-// CHECK: OpRayQueryInitializeKHR [[rayquery]] [[accel]] %uint_5 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
+// CHECK: OpRayQueryInitializeKHR {{%[0-9]+}} [[accel]] %uint_5 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
     doInitialize(q, ray);
 }

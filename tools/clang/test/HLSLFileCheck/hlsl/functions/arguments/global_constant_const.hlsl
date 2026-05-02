@@ -23,7 +23,7 @@ float4 main() : SV_Target {
 // bar should be called with a copy of st.a.
 // CHECK: define <4 x float> @main()
 // CHECK-DAG: [[tmp:%[0-9A-Za-z.]+]] = alloca [32 x <4 x float>], align 4
-// CHECK-DAG: [[global:%[0-9]+]] = getelementptr inbounds %"$Globals", %"$Globals"* %2, i32 0, i32 0, i32 0
+// CHECK-DAG: [[global:%[0-9]+]] = getelementptr inbounds %"$Globals", %"$Globals"* %{{[0-9]+}}, i32 0, i32 0, i32 0
 // CHECK-DAG: [[dstPtr:%[0-9]+]] = bitcast [32 x <4 x float>]* [[tmp]] to i8*
 // CHECK-DAG: [[srcPtr:%[0-9]+]] = bitcast [32 x <4 x float>]* [[global]] to i8*
 // CHECK-DAG: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[dstPtr]], i8* [[srcPtr]], i64 512, i32 1, i1 false)

@@ -2969,7 +2969,11 @@ void CodeGenFunction::EmitHLSLOutArgExpr(const HLSLOutArgExpr *E,
   OpaqueValueMappingData::bind(*this, E->getOpaqueArgLValue(), BaseLV);
 
   QualType ExprTy = E->getType();
-  llvm::AllocaInst *Address = CreateIRTemp(ExprTy);
+  // Use the memory representation for the temporary so that types like
+  // `bool` (i1 scalar / i32 memory) match the pointee type of the
+  // reference-typed parameter. CreateIRTemp would use the scalar rep
+  // (e.g. i1*) which causes a load/store-vs-pointee type mismatch.
+  llvm::AllocaInst *Address = CreateMemTemp(ExprTy);
   LValue TempLV = MakeAddrLValue(Address, ExprTy);
 
   if (E->isInOut())
@@ -2982,7 +2986,14 @@ void CodeGenFunction::EmitHLSLOutArgExpr(const HLSLOutArgExpr *E,
   llvm::Type *ElTy = ConvertTypeForMem(TempLV.getType());
 
   Args.addWriteback(BaseLV, Addr, nullptr, E->getWritebackCast());
-  Args.add(RValue::get(Addr), Ty);
+  // For aggregate parameter types the ABI passes them indirectly as
+  // aggregates; using a scalar RValue here causes CGCall to allocate
+  // a second temporary and emit a `store T*, T*` with mismatched
+  // pointee type. Pick the right RValue kind based on the parameter
+  // type's evaluation kind.
+  RValue RV = hasAggregateEvaluationKind(Ty) ? RValue::getAggregate(Addr)
+                                             : RValue::get(Addr);
+  Args.add(RV, Ty);
 }
 
 LValue

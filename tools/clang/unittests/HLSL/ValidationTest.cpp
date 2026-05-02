@@ -3233,18 +3233,18 @@ TEST_F(ValidationTest, RayShaderWithSignaturesFail) {
        "!{void \\(\\)\\* @\"\\\\01\\?IntersectionProto@@YAXXZ\", "
        "!\"\\\\01\\?IntersectionProto@@YAXXZ\", null, null,",
        "!{void \\(%struct.Payload\\*, %struct.Attributes\\*\\)\\* "
-       "@\"\\\\01\\?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\\\01\\?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", null, null,",
+       "@\"\\\\01\\?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\\\01\\?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", null, null,",
        "!{void \\(%struct.Payload\\*, %struct.Attributes\\*\\)\\* "
-       "@\"\\\\01\\?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\\\01\\?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", null, "
+       "@\"\\\\01\\?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\\\01\\?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", null, "
        "null,",
        "!{void \\(%struct.Payload\\*\\)\\* "
-       "@\"\\\\01\\?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\\\01\\?MissProto@@YAXUPayload@@@Z\", null, null,",
+       "@\"\\\\01\\?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\\\01\\?MissProto@@YAXAIAUPayload@@@Z\", null, null,",
        "!{void \\(%struct.Param\\*\\)\\* "
-       "@\"\\\\01\\?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\\\01\\?CallableProto@@YAXUParam@@@Z\", null, null,"},
+       "@\"\\\\01\\?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\\\01\\?CallableProto@@YAXAIAUParam@@@Z\", null, null,"},
       {"!{void ()* @VSInOnly, !\"VSInOnly\", !1001, null,\\2!1001 = ",
        "!{void ()* @VSOutOnly, !\"VSOutOnly\", !1002, null,\\2!1002 = ",
        "!{void ()* @VSInOut, !\"VSInOut\", !1003, null,\\2!1003 = ",
@@ -3253,29 +3253,29 @@ TEST_F(ValidationTest, RayShaderWithSignaturesFail) {
        "!{void ()* @\"\\\\01?IntersectionProto@@YAXXZ\", "
        "!\"\\\\01?IntersectionProto@@YAXXZ\", !1002, null,",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", !1003, null,",
+       "@\"\\\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", !1003, null,",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", !1001, "
+       "@\"\\\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", !1001, "
        "null,",
-       "!{void (%struct.Payload*)* @\"\\\\01?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\\\01?MissProto@@YAXUPayload@@@Z\", !1002, null,",
-       "!{void (%struct.Param*)* @\"\\\\01?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\\\01?CallableProto@@YAXUParam@@@Z\", !1003, null,"},
+       "!{void (%struct.Payload*)* @\"\\\\01?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\\\01?MissProto@@YAXAIAUPayload@@@Z\", !1002, null,",
+       "!{void (%struct.Param*)* @\"\\\\01?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\\\01?CallableProto@@YAXAIAUParam@@@Z\", !1003, null,"},
       {"Ray tracing shader '\\\\01\\?RayGenProto@@YAXXZ' should not have any "
        "shader signatures",
        "Ray tracing shader '\\\\01\\?IntersectionProto@@YAXXZ' should not have "
        "any shader signatures",
        "Ray tracing shader "
-       "'\\\\01\\?AnyHitProto@@YAXUPayload@@UAttributes@@@Z' should not have "
+       "'\\\\01\\?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z' should not have "
        "any shader signatures",
        "Ray tracing shader "
-       "'\\\\01\\?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z' should not "
+       "'\\\\01\\?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z' should not "
        "have any shader signatures",
-       "Ray tracing shader '\\\\01\\?MissProto@@YAXUPayload@@@Z' should not "
+       "Ray tracing shader '\\\\01\\?MissProto@@YAXAIAUPayload@@@Z' should not "
        "have any shader signatures",
-       "Ray tracing shader '\\\\01\\?CallableProto@@YAXUParam@@@Z' should not "
+       "Ray tracing shader '\\\\01\\?CallableProto@@YAXAIAUParam@@@Z' should not "
        "have any shader signatures"},
       /*bRegex*/ true);
 }
@@ -3550,13 +3550,13 @@ TEST_F(ValidationTest, RayPayloadIsStruct) {
       "export void BadMiss(inout float f) { f += 1.0; }\n",
       "lib_6_3",
       {"!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\",",
+       "@\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\",",
-       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\01?MissProto@@YAXUPayload@@@Z\","},
+       "@\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
+       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\01?MissProto@@YAXAIAUPayload@@@Z\","},
       {"!{void (float*, %struct.Attributes*)* "
        "@\"\\01?BadAnyHit@@YAXAIAMUAttributes@@@Z\", "
        "!\"\\01?BadAnyHit@@YAXAIAMUAttributes@@@Z\",",
@@ -3587,21 +3587,21 @@ TEST_F(ValidationTest, RayAttrIsStruct) {
       "export void BadClosestHit(inout Payload p, in float a) { p.f += a; }\n",
       "lib_6_3",
       {"!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\",",
+       "@\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\","},
+       "@\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\","},
       {"!{void (%struct.Payload*, float)* "
-       "@\"\\01?BadAnyHit@@YAXUPayload@@M@Z\", "
-       "!\"\\01?BadAnyHit@@YAXUPayload@@M@Z\",",
+       "@\"\\01?BadAnyHit@@YAXAIAUPayload@@M@Z\", "
+       "!\"\\01?BadAnyHit@@YAXAIAUPayload@@M@Z\",",
        "!{void (%struct.Payload*, float)* "
-       "@\"\\01?BadClosestHit@@YAXUPayload@@M@Z\", "
-       "!\"\\01?BadClosestHit@@YAXUPayload@@M@Z\","},
+       "@\"\\01?BadClosestHit@@YAXAIAUPayload@@M@Z\", "
+       "!\"\\01?BadClosestHit@@YAXAIAUPayload@@M@Z\","},
       {"Argument 'a' must be a struct type for attributes in shader function "
-       "'\\01?BadAnyHit@@YAXUPayload@@M@Z'",
+       "'\\01?BadAnyHit@@YAXAIAUPayload@@M@Z'",
        "Argument 'a' must be a struct type for attributes in shader function "
-       "'\\01?BadClosestHit@@YAXUPayload@@M@Z'"},
+       "'\\01?BadClosestHit@@YAXAIAUPayload@@M@Z'"},
       false);
 }
 
@@ -3614,8 +3614,8 @@ TEST_F(ValidationTest, CallableParamIsStruct) {
       "}\n"
       "export void BadCallable(inout float f) { f += 1.0; }\n",
       "lib_6_3",
-      {"!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\01?CallableProto@@YAXUParam@@@Z\","},
+      {"!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\01?CallableProto@@YAXAIAUParam@@@Z\","},
       {"!{void (float*)* @\"\\01?BadCallable@@YAXAIAM@Z\", "
        "!\"\\01?BadCallable@@YAXAIAM@Z\","},
       {"Argument 'f' must be a struct type for callable shader function "
@@ -3644,33 +3644,33 @@ TEST_F(ValidationTest, RayShaderExtraArg) {
       "export void BadCallable(inout Param p, float f) { p.f += f; }\n",
       "lib_6_3",
       {"!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\"",
+       "@\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\"",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\"",
-       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\01?MissProto@@YAXUPayload@@@Z\"",
-       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\01?CallableProto@@YAXUParam@@@Z\""},
+       "@\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\"",
+       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\01?MissProto@@YAXAIAUPayload@@@Z\"",
+       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\01?CallableProto@@YAXAIAUParam@@@Z\""},
       {"!{void (%struct.Payload*, %struct.Attributes*, float)* "
-       "@\"\\01?BadAnyHit@@YAXUPayload@@UAttributes@@M@Z\", "
-       "!\"\\01?BadAnyHit@@YAXUPayload@@UAttributes@@M@Z\"",
+       "@\"\\01?BadAnyHit@@YAXAIAUPayload@@UAttributes@@M@Z\", "
+       "!\"\\01?BadAnyHit@@YAXAIAUPayload@@UAttributes@@M@Z\"",
        "!{void (%struct.Payload*, %struct.Attributes*, float)* "
-       "@\"\\01?BadClosestHit@@YAXUPayload@@UAttributes@@M@Z\", "
-       "!\"\\01?BadClosestHit@@YAXUPayload@@UAttributes@@M@Z\"",
-       "!{void (%struct.Payload*, float)* @\"\\01?BadMiss@@YAXUPayload@@M@Z\", "
-       "!\"\\01?BadMiss@@YAXUPayload@@M@Z\"",
-       "!{void (%struct.Param*, float)* @\"\\01?BadCallable@@YAXUParam@@M@Z\", "
-       "!\"\\01?BadCallable@@YAXUParam@@M@Z\""},
+       "@\"\\01?BadClosestHit@@YAXAIAUPayload@@UAttributes@@M@Z\", "
+       "!\"\\01?BadClosestHit@@YAXAIAUPayload@@UAttributes@@M@Z\"",
+       "!{void (%struct.Payload*, float)* @\"\\01?BadMiss@@YAXAIAUPayload@@M@Z\", "
+       "!\"\\01?BadMiss@@YAXAIAUPayload@@M@Z\"",
+       "!{void (%struct.Param*, float)* @\"\\01?BadCallable@@YAXAIAUParam@@M@Z\", "
+       "!\"\\01?BadCallable@@YAXAIAUParam@@M@Z\""},
       {"Extra argument 'f' not allowed for shader function "
-       "'\\01?BadAnyHit@@YAXUPayload@@UAttributes@@M@Z'",
+       "'\\01?BadAnyHit@@YAXAIAUPayload@@UAttributes@@M@Z'",
        "Extra argument 'f' not allowed for shader function "
-       "'\\01?BadClosestHit@@YAXUPayload@@UAttributes@@M@Z'",
+       "'\\01?BadClosestHit@@YAXAIAUPayload@@UAttributes@@M@Z'",
        "Extra argument 'f' not allowed for shader function "
-       "'\\01?BadMiss@@YAXUPayload@@M@Z'",
+       "'\\01?BadMiss@@YAXAIAUPayload@@M@Z'",
        "Extra argument 'f' not allowed for shader function "
-       "'\\01?BadCallable@@YAXUParam@@M@Z'"},
+       "'\\01?BadCallable@@YAXAIAUParam@@M@Z'"},
       false);
 }
 
@@ -3700,17 +3700,17 @@ TEST_F(ValidationTest, ResInShaderStruct) {
       {"!{!\"lib\", i32 6, i32 15}", "!dx.valver = !{!([0-9]+)}",
        "= !{i32 20, !([0-9]+), !([0-9]+), !([0-9]+)}",
        "!{void \\(%struct\\.Payload\\*, %struct\\.Attributes\\*\\)\\* "
-       "@\"\\\\01\\?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\\\01\\?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\",",
+       "@\"\\\\01\\?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\\\01\\?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
        "!{void \\(%struct\\.Payload\\*, %struct\\.Attributes\\*\\)\\* "
-       "@\"\\\\01\\?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\\\01\\?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\",",
+       "@\"\\\\01\\?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\\\01\\?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
        "!{void \\(%struct\\.Payload\\*\\)\\* "
-       "@\"\\\\01\\?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\\\01\\?MissProto@@YAXUPayload@@@Z\",",
+       "@\"\\\\01\\?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\\\01\\?MissProto@@YAXAIAUPayload@@@Z\",",
        "!{void \\(%struct\\.Param\\*\\)\\* "
-       "@\"\\\\01\\?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\\\01\\?CallableProto@@YAXUParam@@@Z\","},
+       "@\"\\\\01\\?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\\\01\\?CallableProto@@YAXAIAUParam@@@Z\","},
       {
           "!{!\"lib\", i32 6, i32 3}",
           "!dx.valver = !{!100\\1}\n!1002 = !{i32 1, i32 3}",
@@ -3771,39 +3771,39 @@ TEST_F(ValidationTest, WhenPayloadSizeTooSmallThenFail) {
        "!{void ()* @\"\\01?IntersectionProto@@YAXXZ\", "
        "!\"\\01?IntersectionProto@@YAXXZ\",",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\",",
+       "@\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\",",
-       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\01?MissProto@@YAXUPayload@@@Z\",",
-       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\01?CallableProto@@YAXUParam@@@Z\","},
+       "@\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
+       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\01?MissProto@@YAXAIAUPayload@@@Z\",",
+       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\01?CallableProto@@YAXAIAUParam@@@Z\","},
       {"!{void ()* @\"\\01?BadRayGen@@YAXXZ\", !\"\\01?BadRayGen@@YAXXZ\",",
        "!{void ()* @\"\\01?BadIntersection@@YAXXZ\", "
        "!\"\\01?BadIntersection@@YAXXZ\",",
        "!{void (%struct.BadPayload*, %struct.BadAttributes*)* "
-       "@\"\\01?BadAnyHit@@YAXUBadPayload@@UBadAttributes@@@Z\", "
-       "!\"\\01?BadAnyHit@@YAXUBadPayload@@UBadAttributes@@@Z\",",
+       "@\"\\01?BadAnyHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z\", "
+       "!\"\\01?BadAnyHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z\",",
        "!{void (%struct.BadPayload*, %struct.BadAttributes*)* "
-       "@\"\\01?BadClosestHit@@YAXUBadPayload@@UBadAttributes@@@Z\", "
-       "!\"\\01?BadClosestHit@@YAXUBadPayload@@UBadAttributes@@@Z\",",
-       "!{void (%struct.BadPayload*)* @\"\\01?BadMiss@@YAXUBadPayload@@@Z\", "
-       "!\"\\01?BadMiss@@YAXUBadPayload@@@Z\",",
-       "!{void (%struct.BadParam*)* @\"\\01?BadCallable@@YAXUBadParam@@@Z\", "
-       "!\"\\01?BadCallable@@YAXUBadParam@@@Z\","},
-      {"For shader '\\01?BadAnyHit@@YAXUBadPayload@@UBadAttributes@@@Z', "
+       "@\"\\01?BadClosestHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z\", "
+       "!\"\\01?BadClosestHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z\",",
+       "!{void (%struct.BadPayload*)* @\"\\01?BadMiss@@YAXAIAUBadPayload@@@Z\", "
+       "!\"\\01?BadMiss@@YAXAIAUBadPayload@@@Z\",",
+       "!{void (%struct.BadParam*)* @\"\\01?BadCallable@@YAXAIAUBadParam@@@Z\", "
+       "!\"\\01?BadCallable@@YAXAIAUBadParam@@@Z\","},
+      {"For shader '\\01?BadAnyHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z', "
        "payload size is smaller than argument's allocation size",
-       "For shader '\\01?BadAnyHit@@YAXUBadPayload@@UBadAttributes@@@Z', "
+       "For shader '\\01?BadAnyHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z', "
        "attribute size is smaller than argument's allocation size",
-       "For shader '\\01?BadClosestHit@@YAXUBadPayload@@UBadAttributes@@@Z', "
+       "For shader '\\01?BadClosestHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z', "
        "payload size is smaller than argument's allocation size",
-       "For shader '\\01?BadClosestHit@@YAXUBadPayload@@UBadAttributes@@@Z', "
+       "For shader '\\01?BadClosestHit@@YAXAIAUBadPayload@@UBadAttributes@@@Z', "
        "attribute size is smaller than argument's allocation size",
-       "For shader '\\01?BadMiss@@YAXUBadPayload@@@Z', payload size is smaller "
+       "For shader '\\01?BadMiss@@YAXAIAUBadPayload@@@Z', payload size is smaller "
        "than argument's allocation size",
-       "For shader '\\01?BadCallable@@YAXUBadParam@@@Z', params size is "
+       "For shader '\\01?BadCallable@@YAXAIAUBadParam@@@Z', params size is "
        "smaller than argument's allocation size"},
       false);
 }
@@ -3827,23 +3827,23 @@ TEST_F(ValidationTest, WhenMissingPayloadThenFail) {
       "export void BadCallable() {}\n",
       "lib_6_3",
       {"!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\",",
+       "@\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\",",
-       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\01?MissProto@@YAXUPayload@@@Z\",",
-       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\01?CallableProto@@YAXUParam@@@Z\","},
-      {"!{void (%struct.Payload*)* @\"\\01?BadAnyHit@@YAXUPayload@@@Z\", "
-       "!\"\\01?BadAnyHit@@YAXUPayload@@@Z\",",
+       "@\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
+       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\01?MissProto@@YAXAIAUPayload@@@Z\",",
+       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\01?CallableProto@@YAXAIAUParam@@@Z\","},
+      {"!{void (%struct.Payload*)* @\"\\01?BadAnyHit@@YAXAIAUPayload@@@Z\", "
+       "!\"\\01?BadAnyHit@@YAXAIAUPayload@@@Z\",",
        "!{void ()* @\"\\01?BadClosestHit@@YAXXZ\", "
        "!\"\\01?BadClosestHit@@YAXXZ\",",
        "!{void ()* @\"\\01?BadMiss@@YAXXZ\", !\"\\01?BadMiss@@YAXXZ\",",
        "!{void ()* @\"\\01?BadCallable@@YAXXZ\", "
        "!\"\\01?BadCallable@@YAXXZ\","},
-      {"anyhit shader '\\01?BadAnyHit@@YAXUPayload@@@Z' missing required "
+      {"anyhit shader '\\01?BadAnyHit@@YAXAIAUPayload@@@Z' missing required "
        "attributes parameter",
        "closesthit shader '\\01?BadClosestHit@@YAXXZ' missing required payload "
        "parameter",
@@ -3881,35 +3881,35 @@ TEST_F(ValidationTest, ShaderFunctionReturnTypeVoid) {
       {"!{void ()* @\"\\01?RayGenProto@@YAXXZ\", "
        "!\"\\01?RayGenProto@@YAXXZ\",",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?AnyHitProto@@YAXUPayload@@UAttributes@@@Z\",",
+       "@\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?AnyHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
        "!{void (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?ClosestHitProto@@YAXUPayload@@UAttributes@@@Z\",",
-       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXUPayload@@@Z\", "
-       "!\"\\01?MissProto@@YAXUPayload@@@Z\",",
-       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXUParam@@@Z\", "
-       "!\"\\01?CallableProto@@YAXUParam@@@Z\","},
+       "@\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?ClosestHitProto@@YAXAIAUPayload@@UAttributes@@@Z\",",
+       "!{void (%struct.Payload*)* @\"\\01?MissProto@@YAXAIAUPayload@@@Z\", "
+       "!\"\\01?MissProto@@YAXAIAUPayload@@@Z\",",
+       "!{void (%struct.Param*)* @\"\\01?CallableProto@@YAXAIAUParam@@@Z\", "
+       "!\"\\01?CallableProto@@YAXAIAUParam@@@Z\","},
       {"!{float ()* @\"\\01?BadRayGen@@YAMXZ\", "
        "!\"\\01?BadRayGen@@YAMXZ\",",
        "!{float (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?BadAnyHit@@YAMUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?BadAnyHit@@YAMUPayload@@UAttributes@@@Z\",",
+       "@\"\\01?BadAnyHit@@YAMAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?BadAnyHit@@YAMAIAUPayload@@UAttributes@@@Z\",",
        "!{float (%struct.Payload*, %struct.Attributes*)* "
-       "@\"\\01?BadClosestHit@@YAMUPayload@@UAttributes@@@Z\", "
-       "!\"\\01?BadClosestHit@@YAMUPayload@@UAttributes@@@Z\",",
-       "!{float (%struct.Payload*)* @\"\\01?BadMiss@@YAMUPayload@@@Z\", "
-       "!\"\\01?BadMiss@@YAMUPayload@@@Z\",",
-       "!{float (%struct.Param*)* @\"\\01?BadCallable@@YAMUParam@@@Z\", "
-       "!\"\\01?BadCallable@@YAMUParam@@@Z\","},
+       "@\"\\01?BadClosestHit@@YAMAIAUPayload@@UAttributes@@@Z\", "
+       "!\"\\01?BadClosestHit@@YAMAIAUPayload@@UAttributes@@@Z\",",
+       "!{float (%struct.Payload*)* @\"\\01?BadMiss@@YAMAIAUPayload@@@Z\", "
+       "!\"\\01?BadMiss@@YAMAIAUPayload@@@Z\",",
+       "!{float (%struct.Param*)* @\"\\01?BadCallable@@YAMAIAUParam@@@Z\", "
+       "!\"\\01?BadCallable@@YAMAIAUParam@@@Z\","},
       {"Shader function '\\01?BadRayGen@@YAMXZ' must have void return type",
-       "Shader function '\\01?BadAnyHit@@YAMUPayload@@UAttributes@@@Z' must "
+       "Shader function '\\01?BadAnyHit@@YAMAIAUPayload@@UAttributes@@@Z' must "
        "have void return type",
-       "Shader function '\\01?BadClosestHit@@YAMUPayload@@UAttributes@@@Z' "
+       "Shader function '\\01?BadClosestHit@@YAMAIAUPayload@@UAttributes@@@Z' "
        "must have void return type",
-       "Shader function '\\01?BadMiss@@YAMUPayload@@@Z' must have void return "
+       "Shader function '\\01?BadMiss@@YAMAIAUPayload@@@Z' must have void return "
        "type",
-       "Shader function '\\01?BadCallable@@YAMUParam@@@Z' must have void "
+       "Shader function '\\01?BadCallable@@YAMAIAUParam@@@Z' must have void "
        "return type"},
       false);
 }
@@ -4616,12 +4616,12 @@ TEST_F(ValidationTest, AtomicsInvalidDests) {
   RewriteAssemblyCheckMsg(
       L"..\\DXILValidation\\atomics.hlsl", "lib_6_3", pArguments.data(), 2,
       nullptr, 0, {"atomicrmw add i32 addrspace(3)* @\"\\01?gs_var@@3IA\""},
-      {"atomicrmw add i32* %res"},
+      {"atomicrmw add i32* %11"},
       "Non-groupshared or node record destination to atomic operation.", false);
   RewriteAssemblyCheckMsg(
       L"..\\DXILValidation\\atomics.hlsl", "lib_6_3", pArguments.data(), 2,
       nullptr, 0, {"cmpxchg i32 addrspace(3)* @\"\\01?gs_var@@3IA\""},
-      {"cmpxchg i32* %res"},
+      {"cmpxchg i32* %11"},
       "Non-groupshared or node record destination to atomic operation.", false);
 }
 

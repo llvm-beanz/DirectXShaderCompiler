@@ -27,10 +27,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex4_load:%[a-zA-Z0-9_]+]] = OpLoad %type_sampled_image %tex1dArray
 // CHECK: [[sampled_result_4:%[a-zA-Z0-9_]+]] = OpImageSparseSampleDrefExplicitLod %SparseResidencyStruct [[tex4_load]] [[sample_coord_4:%[a-zA-Z0-9_]+]] %float_1 Grad|ConstOffset|MinLod %float_1 %float_2 %int_2 %float_0_5
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result_4]] 0
-// CHECK: OpStore %status [[status_0]]
+// CHECK: OpStore %hlsl_out [[status_0]]
 
     uint status;
 // CHECK: [[sampled_value:%[a-zA-Z0-9_]+]] = OpCompositeExtract %float [[sampled_result_4]] 1
+// CHECK: [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status_0_ld_0]]
 // CHECK: OpStore %val4 [[sampled_value]]
 
     float val4 = tex1dArray.SampleCmpGrad(float2(0.5, 0.25), 1.0f, 1.0, 2.0, 2, 0.5, status);

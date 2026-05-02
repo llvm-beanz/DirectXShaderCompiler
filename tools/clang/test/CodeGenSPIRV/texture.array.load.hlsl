@@ -32,8 +32,10 @@ float4 main(int4 location: A) : SV_Target {
 // CHECK-NEXT:          [[t1_0:%[0-9]+]] = OpLoad %type_1d_image_array %t1
 // CHECK-NEXT:[[structResult:%[0-9]+]] = OpImageSparseFetch %SparseResidencyStruct [[t1_0]] [[coord_1]] Lod|ConstOffset [[lod_1]] %int_10
 // CHECK-NEXT:      [[status:%[0-9]+]] = OpCompositeExtract %uint [[structResult]] 0
-// CHECK-NEXT:                        OpStore %status [[status]]
+// CHECK-NEXT:                        OpStore %hlsl_out [[status]]
 // CHECK-NEXT:      [[result:%[0-9]+]] = OpCompositeExtract %v4float [[structResult]] 1
+// CHECK-NEXT:                        [[status_ld_0:%[0-9]+]] = OpLoad %uint %hlsl_out
+// CHECK-NEXT:                        OpStore %status [[status_ld_0]]
 // CHECK-NEXT:                        OpStore %val3 [[result]]
     float4 val3 = t1.Load(int3(1, 2, 3), 10, status);
 
@@ -43,8 +45,10 @@ float4 main(int4 location: A) : SV_Target {
 // CHECK-NEXT:          [[t2_0:%[0-9]+]] = OpLoad %type_2d_image_array %t2
 // CHECK-NEXT:[[structResult_0:%[0-9]+]] = OpImageSparseFetch %SparseResidencyStruct [[t2_0]] [[coord_2]] Lod|ConstOffset [[lod_2]] [[v2ic]]
 // CHECK-NEXT:      [[status_0:%[0-9]+]] = OpCompositeExtract %uint [[structResult_0]] 0
-// CHECK-NEXT:                        OpStore %status [[status_0]]
+// CHECK-NEXT:                        OpStore %hlsl_out_0 [[status_0]]
 // CHECK-NEXT:      [[result_0:%[0-9]+]] = OpCompositeExtract %v4float [[structResult_0]] 1
+// CHECK-NEXT:                        [[status_0_ld_1:%[0-9]+]] = OpLoad %uint %hlsl_out_0
+// CHECK-NEXT:                        OpStore %status [[status_0_ld_1]]
 // CHECK-NEXT:                        OpStore %val4 [[result_0]]
     float4 val4 = t2.Load(location, int2(1, 2), status);
 

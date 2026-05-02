@@ -21,10 +21,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex3_load:%[a-zA-Z0-9_]+]] = OpLoad %type_sampled_image %tex1dArray
 // CHECK: [[sampled_result_3:%[a-zA-Z0-9_]+]] = OpImageSparseSampleExplicitLod %SparseResidencyStruct [[tex3_load]] [[sample_coord_3:%[a-zA-Z0-9_]+]] Lod|ConstOffset %float_0_5 %int_2
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result_3]] 0
-// CHECK: OpStore %status [[status_0]]
+// CHECK: OpStore %hlsl_out [[status_0]]
 
     uint status;
 // CHECK: [[sampled_texel:%[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float [[sampled_result_3]] 1
+// CHECK: [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status_0_ld_0]]
 // CHECK: OpStore %val3 [[sampled_texel]]
 
     float4 val3 = tex1dArray.SampleLevel(float2(0.5, 0.25), 0.5f, 2, status);

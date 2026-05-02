@@ -34,6 +34,6 @@ void main(inout Payload MyPayload) {
 // CHECK:  [[accel:%[0-9]+]] = OpLoad %accelerationStructureNV %AccelerationStructure
 // CHECK:  OpRayQueryInitializeKHR [[rayquery]] [[accel]] %uint_1 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
   q.TraceRayInline(AccelerationStructure,RAY_FLAG_FORCE_OPAQUE, 0xFF, ray);
-// CHECK: OpRayQueryInitializeKHR [[rayquery]] [[accel]] %uint_3 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
+// CHECK: OpRayQueryInitializeKHR {{%[0-9]+}} [[accel]] %uint_3 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
   doInitialize(q, ray);
 }

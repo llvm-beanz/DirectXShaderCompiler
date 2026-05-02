@@ -4488,6 +4488,50 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   return FirstLd;
 }
 
+// For pointer-returning buffer loads with an HLSLOutArgExpr status argument,
+// the writeback sequence (load from temp alloca + store to actual dest) is
+// emitted immediately after the HL call. After SROA expands the result pointer
+// into GEP+load accesses and may optimize away the intermediate store,
+// UpdateStatus writes to the temp alloca AFTER the existing load of that alloca.
+// Fix this by moving the existing load instruction to after all UpdateStatus
+// stores so that mem2reg correctly propagates the checkAccessFullyMapped result.
+static void FixStatusLoadOrdering(Value *statusAlloca) {
+  AllocaInst *AI = dyn_cast<AllocaInst>(statusAlloca);
+  if (!AI)
+    return;
+  // Find the pre-existing load from the alloca (from the HLSLOutArgExpr writeback).
+  LoadInst *statusLoad = nullptr;
+  for (User *U : AI->users()) {
+    if (LoadInst *LI = dyn_cast<LoadInst>(U)) {
+      statusLoad = LI;
+      break;
+    }
+  }
+  if (!statusLoad)
+    return;
+  // Find the last store to the alloca inserted by UpdateStatus.
+  BasicBlock *BB = statusLoad->getParent();
+  StoreInst *lastStore = nullptr;
+  for (Instruction &I : *BB) {
+    if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+      if (SI->getPointerOperand() == AI)
+        lastStore = SI;
+    }
+  }
+  if (!lastStore)
+    return;
+  // Move the load to just after the last UpdateStatus store so that
+  // mem2reg propagates the correct checkAccessFullyMapped result.
+  // Check IR ordering: iterate the block to see if statusLoad comes before lastStore.
+  bool loadBeforeStore = false;
+  for (Instruction &I : *BB) {
+    if (&I == statusLoad) { loadBeforeStore = true; break; }
+    if (&I == lastStore) break;
+  }
+  if (loadBeforeStore)
+    statusLoad->moveBefore(lastStore->getNextNode());
+}
+
 Value *TranslateResourceLoad(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
                              HLOperationLowerHelper &helper,
                              HLObjectOperationLowerHelper *pObjHelper,
@@ -4509,6 +4553,11 @@ Value *TranslateResourceLoad(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
              "Textures should not be treated as structured buffers.");
     TranslateStructBufSubscript(cast<CallInst>(ldHelper.retVal), handle,
                                 ldHelper.status, hlslOP, RK, DL);
+    // After TranslateStructBufSubscript inserts UpdateStatus stores, move the
+    // pre-existing status load to after those stores so mem2reg propagates the
+    // checkAccessFullyMapped result rather than an uninitialized value.
+    if (ldHelper.status)
+      FixStatusLoadOrdering(ldHelper.status);
   } else {
     Ld = TranslateBufLoad(ldHelper, RK, Builder, hlslOP, DL);
     dxilutil::MigrateDebugValue(CI, Ld);

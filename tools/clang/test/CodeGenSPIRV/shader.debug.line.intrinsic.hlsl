@@ -63,124 +63,120 @@ void main() {
 // CHECK-NEXT: [[v2f:%[0-9]+]] = OpFOrdNotEqual %v2bool
 // CHECK:          {{%[0-9]+}} = OpAll %bool [[v2f]]
   if (all(v2f))
-// CHECK:                      DebugLine [[src]] %uint_72 %uint_72 %uint_5 %uint_31
+// CHECK:                      DebugLine [[src]] %uint_70 %uint_70 %uint_5 %uint_31
 // CHECK:       [[sin:%[0-9]+]] = OpExtInst %float {{%[0-9]+}} Sin {{%[0-9]+}}
-// CHECK-NEXT:                 DebugLine [[src]] %uint_72 %uint_72 %uint_19 %uint_23
 // CHECK-NEXT: [[v2fx:%[0-9]+]] = OpAccessChain %_ptr_Function_float %v2f %int_1
-// CHECK-NEXT:                 DebugLine [[src]] %uint_72 %uint_72 %uint_5 %uint_31
 // CHECK-NEXT:                 OpStore [[v2fx]] [[sin]]
     sincos(v2f.x, v2f.y, v2f.x);
 
-// CHECK:                 DebugLine [[src]] %uint_76 %uint_76 %uint_9 %uint_21
+// CHECK:                 DebugLine [[src]] %uint_74 %uint_74 %uint_9 %uint_21
 // CHECK-NEXT: {{%[0-9]+}} = OpExtInst %v2float {{%[0-9]+}} FClamp
   v2f = saturate(v2f);
 
-// CHECK: DebugLine [[src]] %uint_80 %uint_80 %uint_26 %uint_33
+// CHECK: DebugLine [[src]] %uint_78 %uint_78 %uint_26 %uint_33
 // CHECK: OpAny
   /* comment */ dest_i = any(v4i);
 
-// CHECK:                     DebugLine [[src]] %uint_87 %uint_87 %uint_35 %uint_47
+// CHECK:                     DebugLine [[src]] %uint_85 %uint_85 %uint_35 %uint_47
 // CHECK-NEXT: [[idx:%[0-9]+]] = OpIAdd %uint
-// CHECK:                     DebugLine [[src]] %uint_87 %uint_87 %uint_3 %uint_48
+// CHECK:                     DebugLine [[src]] %uint_85 %uint_85 %uint_3 %uint_48
 // CHECK-NEXT: [[v4i_1:%[0-9]+]] = OpAccessChain %_ptr_Function_uint %v4i %int_0
 // CHECK-NEXT:                OpStore [[v4i_1]] {{%[0-9]+}}
   v4i.x = NonUniformResourceIndex(v4i.y + v4i.z);
 
-// CHECK:      DebugLine [[src]] %uint_93 %uint_93 %uint_11 %uint_39
+// CHECK:      DebugLine [[src]] %uint_91 %uint_91 %uint_11 %uint_39
 // CHECK-NEXT: OpImageSparseTexelsResident %bool
-// CHECK:      DebugLine [[src]] %uint_93 %uint_93 %uint_3 %uint_39
+// CHECK:      DebugLine [[src]] %uint_91 %uint_91 %uint_3 %uint_39
 // CHECK-NEXT: OpAccessChain %_ptr_Function_uint %v4i %int_2
   v4i.z = CheckAccessFullyMapped(v4i.w);
 
-// CHECK:                     DebugLine [[src]] %uint_101 %uint_101 %uint_19 %uint_36
+// CHECK:                     DebugLine [[src]] %uint_99 %uint_99 %uint_19 %uint_36
 // CHECK-NEXT: [[add:%[0-9]+]] = OpFAdd %v2float
-// CHECK-NEXT:                DebugLine [[src]] %uint_101 %uint_101 %uint_12 %uint_39
+// CHECK-NEXT:                DebugLine [[src]] %uint_99 %uint_99 %uint_12 %uint_39
 // CHECK-NEXT:                OpBitcast %v2uint [[add]]
-// CHECK-NEXT:                DebugLine [[src]] %uint_101 %uint_101 %uint_3 %uint_39
+// CHECK-NEXT:                DebugLine [[src]] %uint_99 %uint_99 %uint_3 %uint_39
 // CHECK-NEXT:                OpLoad %v4uint %v4i
   v4i.xy = asuint(m2x2f._m00_m11 + v2f);
 
-// CHECK:      DebugLine [[src]] %uint_107 %uint_107 %uint_8 %uint_23
+// CHECK:      DebugLine [[src]] %uint_105 %uint_105 %uint_8 %uint_23
 // CHECK-NEXT: OpFMul %v2float
-// CHECK-NEXT: DebugLine [[src]] %uint_107 %uint_107 %uint_3 %uint_31
+// CHECK-NEXT: DebugLine [[src]] %uint_105 %uint_105 %uint_3 %uint_31
 // CHECK-NEXT: OpFOrdLessThan %v2bool
   clip(v4i.yz * m2x2f._m00_m11);
 
   float4 v4f;
 
-// CHECK:      DebugLine [[src]] %uint_115 %uint_115 %uint_9 %uint_37
+// CHECK:      DebugLine [[src]] %uint_113 %uint_113 %uint_9 %uint_37
 // CHECK:      OpFMul %float
 // CHECK-NEXT: OpCompositeConstruct %v4float
 // CHECK-NEXT: OpConvertFToU %v4uint
   v4i = dst(v4f + 3 * v4f, v4f - v4f);
 
-// CHECK:      DebugLine [[src]] %uint_121 %uint_121 %uint_17 %uint_43
+// CHECK:      DebugLine [[src]] %uint_119 %uint_119 %uint_17 %uint_43
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} Exp2
-// CHECK:      DebugLine [[src]] %uint_121 %uint_121 %uint_11 %uint_44
+// CHECK:      DebugLine [[src]] %uint_119 %uint_119 %uint_11 %uint_44
 // CHECK-NEXT: OpBitcast %int
   v4i.x = asint(ldexp(v4f.x + v4f.y, v4f.w));
 
-// CHECK:      DebugLine [[src]] %uint_129 %uint_129 %uint_19 %uint_31
+// CHECK:      DebugLine [[src]] %uint_125 %uint_125 %uint_19 %uint_31
 // CHECK-NEXT: OpFAdd %float
-// CHECK-NEXT: DebugLine [[src]] %uint_129 %uint_129 %uint_34 %uint_38
-// CHECK-NEXT: OpAccessChain %_ptr_Function_float %v4f %int_3
-// CHECK-NEXT: DebugLine [[src]] %uint_129 %uint_129 %uint_13 %uint_39
+// CHECK:      DebugLine [[src]] %uint_125 %uint_125 %uint_13 %uint_39
 // CHECK-NEXT: OpExtInst %FrexpStructType {{%[0-9]+}} FrexpStruct
   v4f = lit(frexp(v4f.x + v4f.y, v4f.w),
-// CHECK:                     DebugLine [[src]] %uint_133 %uint_133 %uint_13 %uint_17
+// CHECK:                     DebugLine [[src]] %uint_129 %uint_129 %uint_13 %uint_17
 // CHECK-NEXT: [[v4f:%[0-9]+]] = OpAccessChain %_ptr_Function_float %v4f %int_2
 // CHECK-NEXT:                OpLoad %float [[v4f]]
             v4f.z,
-// CHECK:                       DebugLine [[src]] %uint_140 %uint_140 %uint_13 %uint_58
+// CHECK:                       DebugLine [[src]] %uint_136 %uint_136 %uint_13 %uint_58
 // CHECK-NEXT: [[clamp:%[0-9]+]] = OpExtInst %uint {{%[0-9]+}} UClamp
 // CHECK-NEXT:                  OpConvertUToF %float [[clamp]]
-// CHECK-NEXT:                  DebugLine [[src]] %uint_129 %uint_140 %uint_9 %uint_59
+// CHECK-NEXT:                  DebugLine [[src]] %uint_125 %uint_136 %uint_9 %uint_59
 // CHECK-NEXT:                  OpExtInst %float {{%[0-9]+}} FMax %float_0
 // CHECK-NEXT:                  OpExtInst %float {{%[0-9]+}} FMin
             clamp(v4i.x + v4i.y, 2 * v4i.z, v4i.w - v4i.z));
 
-// CHECK:                      DebugLine [[src]] %uint_146 %uint_146 %uint_33 %uint_59
+// CHECK:                      DebugLine [[src]] %uint_142 %uint_142 %uint_33 %uint_59
 // CHECK-NEXT: [[sign:%[0-9]+]] = OpExtInst %v3float {{%[0-9]+}} FSign
-// CHECK-NEXT:                 DebugLine [[src]] %uint_146 %uint_146 %uint_38 %uint_38
+// CHECK-NEXT:                 DebugLine [[src]] %uint_142 %uint_142 %uint_38 %uint_38
 // CHECK-NEXT:                 OpConvertFToS %v3int [[sign]]
   v4i = D3DCOLORtoUBYTE4(float4(sign(v4f.xyz - 2 * v4f.xyz),
-// CHECK:      DebugLine [[src]] %uint_149 %uint_149 %uint_33 %uint_43
+// CHECK:      DebugLine [[src]] %uint_145 %uint_145 %uint_33 %uint_43
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} FSign
                                 sign(v4f.w)));
-// CHECK:                     DebugLine [[src]] %uint_146 %uint_149 %uint_9 %uint_45
+// CHECK:                     DebugLine [[src]] %uint_142 %uint_145 %uint_9 %uint_45
 // CHECK-NEXT: [[arg:%[0-9]+]] = OpVectorShuffle %v4float {{%[0-9]+}} {{%[0-9]+}} 2 1 0 3
 // CHECK-NEXT:                OpVectorTimesScalar %v4float [[arg]]
 
-// CHECK:      DebugLine [[src]] %uint_156 %uint_156 %uint_7 %uint_19
+// CHECK:      DebugLine [[src]] %uint_152 %uint_152 %uint_7 %uint_19
 // CHECK-NEXT: OpIsNan %v4bool
   if (isfinite(v4f).x)
-// CHECK:                     DebugLine [[src]] %uint_161 %uint_161 %uint_15 %uint_30
+// CHECK:                     DebugLine [[src]] %uint_157 %uint_157 %uint_15 %uint_30
 // CHECK-NEXT: [[rcp:%[0-9]+]] = OpFDiv %v4float
-// CHECK-NEXT:                DebugLine [[src]] %uint_161 %uint_161 %uint_11 %uint_31
+// CHECK-NEXT:                DebugLine [[src]] %uint_157 %uint_157 %uint_11 %uint_31
 // CHECK-NEXT:                OpExtInst %v4float {{%[0-9]+}} Sin [[rcp]]
     v4f = sin(rcp(v4f / v4i.x));
 
-// CHECK:                     DebugLine [[src]] %uint_168 %uint_168 %uint_20 %uint_47
+// CHECK:                     DebugLine [[src]] %uint_164 %uint_164 %uint_20 %uint_47
 // CHECK-NEXT:                OpExtInst %float {{%[0-9]+}} Log2
-// CHECK:                     DebugLine [[src]] %uint_168 %uint_168 %uint_11 %uint_48
+// CHECK:                     DebugLine [[src]] %uint_164 %uint_164 %uint_11 %uint_48
 // CHECK-NEXT: [[arg_0:%[0-9]+]] = OpCompositeConstruct %v2float
 // CHECK-NEXT:                OpExtInst %uint {{%[0-9]+}} PackHalf2x16 [[arg_0]]
   v4i.x = f32tof16(log10(v2f.x * v2f.y + v4f.x));
 
-// CHECK:      DebugLine [[src]] %uint_172 %uint_172 %uint_3 %uint_26
+// CHECK:      DebugLine [[src]] %uint_168 %uint_168 %uint_3 %uint_26
 // CHECK-NEXT: OpTranspose %mat2v2float
   transpose(m2x2f + m2x2f);
 
-// CHECK:                     DebugLine [[src]] %uint_180 %uint_180 %uint_25 %uint_42
+// CHECK:                     DebugLine [[src]] %uint_176 %uint_176 %uint_25 %uint_42
 // CHECK-NEXT: [[abs:%[0-9]+]] = OpExtInst %float {{%[0-9]+}} FAbs
-// CHECK-NEXT:                DebugLine [[src]] %uint_180 %uint_180 %uint_20 %uint_43
+// CHECK-NEXT:                DebugLine [[src]] %uint_176 %uint_176 %uint_20 %uint_43
 // CHECK-NEXT:                OpExtInst %float {{%[0-9]+}} Sqrt [[abs]]
-// CHECK:      DebugLine [[src]] %uint_180 %uint_180 %uint_7 %uint_52
+// CHECK:      DebugLine [[src]] %uint_176 %uint_176 %uint_7 %uint_52
 // CHECK-NEXT: OpExtInst %uint {{%[0-9]+}} FindSMsb
   max(firstbithigh(sqrt(abs(v2f.x * v4f.w)) + v4i.x),
-// CHECK:      DebugLine [[src]] %uint_183 %uint_183 %uint_7 %uint_16
+// CHECK:      DebugLine [[src]] %uint_179 %uint_179 %uint_7 %uint_16
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} Cos
       cos(v4f.x));
-// CHECK:      DebugLine [[src]] %uint_180 %uint_183 %uint_3 %uint_17
+// CHECK:      DebugLine [[src]] %uint_176 %uint_179 %uint_3 %uint_17
 // CHECK-NEXT: OpExtInst %float {{%[0-9]+}} NMax
 }

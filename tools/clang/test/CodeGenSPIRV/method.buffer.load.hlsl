@@ -90,18 +90,22 @@ void main() {
 // CHECK:              [[img3_0:%[0-9]+]] = OpLoad %type_buffer_image_1 %floatbuf
 // CHECK-NEXT: [[structResult:%[0-9]+]] = OpImageSparseFetch %SparseResidencyStruct [[img3_0]] {{%[0-9]+}} None
 // CHECK-NEXT:       [[status:%[0-9]+]] = OpCompositeExtract %uint [[structResult]] 0
-// CHECK-NEXT:                         OpStore %status [[status]]
+// CHECK-NEXT:                         OpStore %hlsl_out [[status]]
 // CHECK-NEXT:     [[v4result:%[0-9]+]] = OpCompositeExtract %v4float [[structResult]] 1
 // CHECK-NEXT:       [[result:%[0-9]+]] = OpCompositeExtract %float [[v4result]] 0
+// CHECK-NEXT:                         [[status_ld_0:%[0-9]+]] = OpLoad %uint %hlsl_out
+// CHECK-NEXT:                         OpStore %status [[status_ld_0]]
 // CHECK-NEXT:                         OpStore %r1 [[result]]
   float  r1 = floatbuf.Load(address, status);  // Test for Buffer
 
 // CHECK:              [[img6_0:%[0-9]+]] = OpLoad %type_buffer_image_4 %float2buf
 // CHECK-NEXT: [[structResult_0:%[0-9]+]] = OpImageSparseRead %SparseResidencyStruct [[img6_0]] {{%[0-9]+}} None
 // CHECK-NEXT:       [[status_0:%[0-9]+]] = OpCompositeExtract %uint [[structResult_0]] 0
-// CHECK-NEXT:                         OpStore %status [[status_0]]
+// CHECK-NEXT:                         OpStore %hlsl_out_0 [[status_0]]
 // CHECK-NEXT:     [[v4result_0:%[0-9]+]] = OpCompositeExtract %v4float [[structResult_0]] 1
 // CHECK-NEXT:       [[result_0:%[0-9]+]] = OpVectorShuffle %v2float [[v4result_0]] [[v4result_0]] 0 1
+// CHECK-NEXT:                         [[status_0_ld_1:%[0-9]+]] = OpLoad %uint %hlsl_out_0
+// CHECK-NEXT:                         OpStore %status [[status_0_ld_1]]
 // CHECK-NEXT:                         OpStore %r2 [[result_0]]
   float2 r2 = float2buf.Load(address, status);  // Test for RWBuffer
 }

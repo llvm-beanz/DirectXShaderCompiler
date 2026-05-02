@@ -1963,7 +1963,7 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
 
     const ParmVarDecl *parmDecl = FD->getParamDecl(ParmIdx);
 
-    QualType fieldTy = parmDecl->getType().getNonReferenceType();
+    QualType fieldTy = parmDecl->getType();
     // Save object properties for parameters.
     AddValToPropertyMap(ArgIt, fieldTy);
 
@@ -2000,7 +2000,8 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
         continue;
       }
       const ConstantArrayType *CAT =
-          dyn_cast<ConstantArrayType>(fieldTy.getCanonicalType());
+          dyn_cast<ConstantArrayType>(
+              fieldTy.getNonReferenceType().getCanonicalType());
       if (CAT == nullptr) {
         unsigned DiagID = Diags.getCustomDiagID(
             DiagnosticsEngine::Error,
@@ -2082,7 +2083,8 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
         continue;
       }
       const ConstantArrayType *CAT =
-          dyn_cast<ConstantArrayType>(fieldTy.getCanonicalType());
+          dyn_cast<ConstantArrayType>(
+              fieldTy.getNonReferenceType().getCanonicalType());
       if (CAT == nullptr) {
         unsigned DiagID = Diags.getCustomDiagID(
             DiagnosticsEngine::Error,
@@ -2113,7 +2115,8 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
         continue;
       }
       const ConstantArrayType *CAT =
-          dyn_cast<ConstantArrayType>(fieldTy.getCanonicalType());
+          dyn_cast<ConstantArrayType>(
+              fieldTy.getNonReferenceType().getCanonicalType());
       if (CAT == nullptr) {
         unsigned DiagID = Diags.getCustomDiagID(
             DiagnosticsEngine::Error,
@@ -2277,7 +2280,7 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
     }
 
     if (GsInputArrayDim != 0) {
-      QualType Ty = parmDecl->getType();
+      QualType Ty = parmDecl->getType().getNonReferenceType();
       if (!Ty->isConstantArrayType()) {
         unsigned DiagID = Diags.getCustomDiagID(
             DiagnosticsEngine::Error,

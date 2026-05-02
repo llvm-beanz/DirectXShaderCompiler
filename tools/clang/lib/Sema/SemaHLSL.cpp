@@ -12687,6 +12687,10 @@ DiagnoseElementTypes(Sema &S, SourceLocation Loc, QualType Ty, bool &Empty,
   if (Ty.isNull() || Ty->isDependentType())
     return false;
 
+  // Parameters to inout/out functions are stored as reference types in the
+  // AST. Strip the reference before checking element types.
+  Ty = Ty.getNonReferenceType();
+
   const bool CheckLongVec = LongVecDiagContext != TypeDiagContext::Valid;
   const bool CheckObjects = ObjDiagContext != TypeDiagContext::Valid;
 
@@ -16853,7 +16857,8 @@ void Sema::CheckHLSLArrayAccess(const Expr *expr) {
 }
 
 ExprResult Sema::ActOnOutParamExpr(ParmVarDecl *Param, Expr *Arg) {
-  bool IsInOut = Param->hasAttr<HLSLInOutAttr>();
+  bool IsInOut = Param->hasAttr<HLSLInOutAttr>() ||
+                 Param->getParamModifiers().isInOut();
   if (!Arg->isLValue()) {
     Diag(Arg->getLocStart(), diag::error_hlsl_inout_lvalue)
         << Arg << (IsInOut ? 1 : 0);
@@ -16866,8 +16871,28 @@ ExprResult Sema::ActOnOutParamExpr(ParmVarDecl *Param, Expr *Arg) {
 
   // HLSL allows implicit conversions from scalars to vectors, but not the
   // inverse, so we need to disallow `inout` with scalar->vector or
-  // scalar->matrix conversions.
-  if (Arg->getType()->isScalarType() != Ty->isScalarType()) {
+  // scalar->matrix conversions. However, single-element vectors and 1x1
+  // matrices are functionally equivalent to scalars in HLSL (e.g. `float`
+  // and `float1`), so treat those as scalar-equivalent for this check.
+  // Vector/matrix arguments passed to a scalar parameter are a truncation,
+  // which HLSL also disallows; emit the existing truncation diagnostic for
+  // that case rather than the scalar-extension one.
+  auto IsScalarLike = [](QualType T) {
+    if (T->isScalarType())
+      return true;
+    if (hlsl::IsHLSLVecMatType(T) && hlsl::GetElementCount(T) == 1)
+      return true;
+    return false;
+  };
+  bool ArgScalarLike = IsScalarLike(Arg->getType());
+  bool ParamScalarLike = IsScalarLike(Ty);
+  if (ArgScalarLike != ParamScalarLike) {
+    if (!ArgScalarLike && ParamScalarLike) {
+      // vector/matrix -> scalar truncation on an out/inout argument.
+      Diag(Arg->getLocStart(), diag::err_hlsl_unsupported_lvalue_cast_op);
+      return ExprError();
+    }
+    // scalar -> vector/matrix extension on an out/inout argument.
     Diag(Arg->getLocStart(), diag::error_hlsl_inout_scalar_extension)
         << Arg << (IsInOut ? 1 : 0);
     return ExprError();

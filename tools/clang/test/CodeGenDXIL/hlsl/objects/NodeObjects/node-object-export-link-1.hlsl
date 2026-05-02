@@ -17,27 +17,27 @@
 // FOO2-NEXT:   store %"struct.DispatchNodeInputRecord<RECORD>" %[[Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}, align 4
 
 // Confirm that external function "bar" is correctly included here since it is called by bar3
-// BAR: define void @"\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* nocapture readonly, %"struct.DispatchNodeInputRecord<RECORD>"* noalias nocapture) #{{[0-9]+}} {
+// BAR: define void @"\01?bar@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* nocapture readonly, %"struct.DispatchNodeInputRecord<RECORD>"* noalias nocapture dereferenceable(4)) #{{[0-9]+}} {
 // BAR-NEXT:   %[[Alloca:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>", align 8
-// BAR-NEXT:   call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* nonnull sret %[[Alloca]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}})
+// BAR:   call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* nonnull sret %[[Alloca]], %"struct.DispatchNodeInputRecord<RECORD>"* {{.+}})
 // BAR-NEXT:   %[[Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[Alloca]], align 8
 // BAR-NEXT:   store %"struct.DispatchNodeInputRecord<RECORD>" %[[Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}, align 4
 
 // Confirm that external function "bar2" is correctly included here since it is called by bar4
-// BAR2: define void @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* nocapture readonly, %"struct.DispatchNodeInputRecord<RECORD>"* noalias nocapture) #{{[0-9]+}} {
+// BAR2: define void @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* nocapture readonly, %"struct.DispatchNodeInputRecord<RECORD>"* noalias nocapture dereferenceable(4)) #{{[0-9]+}} {
 // BAR2-NEXT:   %[[Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}, align 4
 // BAR2-NEXT:   store %"struct.DispatchNodeInputRecord<RECORD>" %[[Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}, align 4
 
 // Confirm that internal function "bar3" is correctly included here and calls external function "foo"
-// BAR3: define void @"\01?bar3@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"*, %"struct.DispatchNodeInputRecord<RECORD>"* noalias) #{{[0-9]+}} {
-// BAR3-NEXT:   %[[Alloca:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>", align 8
-// BAR3-NEXT:   call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* nonnull sret %[[Alloca]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}) #{{[0-9]+}}
-// BAR3-NEXT:   %[[Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[Alloca]], align 8
-// BAR3-NEXT:   store %"struct.DispatchNodeInputRecord<RECORD>" %[[Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}, align 4
+// BAR3: define void @"\01?bar3@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z"({{.*}}) #{{[0-9]+}} {
+// BAR3-NEXT:   %[[Alloca:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>", align {{[0-9]+}}
+// BAR3:   call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nonnull |noalias )?}}sret %[[Alloca]], %"struct.DispatchNodeInputRecord<RECORD>"* {{.+}}) #{{[0-9]+}}
+// BAR3-NEXT:   %[[Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[Alloca]], align {{[0-9]+}}
+// BAR3-NEXT:   store %"struct.DispatchNodeInputRecord<RECORD>" %[[Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}, align {{[0-9]+}}
 
 // Confirm that internal function "bar4" is correctly included here and calls outside function "bar2"
-// BAR4: define void @"\01?bar4@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"*, %"struct.DispatchNodeInputRecord<RECORD>"* noalias) #{{[0-9]+}} {
-// BAR4-NEXT:   call void @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* %{{.+}}, %"struct.DispatchNodeInputRecord<RECORD>"* %1) #{{[0-9]+}}
+// BAR4: define void @"\01?bar4@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z"({{.*}}) #{{[0-9]+}} {
+// BAR4:   call void @"\01?bar2@@YAXU?$DispatchNodeInputRecord@URECORD@@@@AIAU1@@Z"({{.*}}) #{{[0-9]+}}
 
 // Confirm that external function "foo" is correctly included here even though it is called only by external functions
 // FOO: define void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* noalias nocapture sret, %"struct.DispatchNodeInputRecord<RECORD>"* nocapture readonly) #{{[0-9]+}} {

@@ -49,8 +49,10 @@ float4 main(float3 location: A, float comparator: B, int2 offset: C) : SV_Target
 // CHECK-NEXT:   [[sampledImg_2:%[0-9]+]] = OpSampledImage %type_sampled_image [[t3_0]] [[gSampler_2]]
 // CHECK-NEXT: [[structResult:%[0-9]+]] = OpImageSparseDrefGather %SparseResidencyStruct [[sampledImg_2]] [[loc_1]] [[comparator_2]] Offset [[offset_0]]
 // CHECK-NEXT:       [[status:%[0-9]+]] = OpCompositeExtract %uint [[structResult]] 0
-// CHECK-NEXT:                         OpStore %status [[status]]
+// CHECK-NEXT:                         OpStore %hlsl_out [[status]]
 // CHECK-NEXT:       [[result:%[0-9]+]] = OpCompositeExtract %v4float [[structResult]] 1
+// CHECK-NEXT:                         [[status_ld_0:%[0-9]+]] = OpLoad %uint %hlsl_out
+// CHECK-NEXT:                         OpStore %status [[status_ld_0]]
 // CHECK-NEXT:                         OpStore %val4 [[result]]
     float4 val4 = t3.GatherCmp(gSampler, location, comparator, offset, status);
 
@@ -60,8 +62,10 @@ float4 main(float3 location: A, float comparator: B, int2 offset: C) : SV_Target
 // CHECK-NEXT:   [[sampledImg_3:%[0-9]+]] = OpSampledImage %type_sampled_image_0 [[t4]] [[gSampler_3]]
 // CHECK-NEXT: [[structResult_0:%[0-9]+]] = OpImageSparseDrefGather %SparseResidencyStruct [[sampledImg_3]] [[v4fc]] [[comparator_3]] None
 // CHECK-NEXT:       [[status_0:%[0-9]+]] = OpCompositeExtract %uint [[structResult_0]] 0
-// CHECK-NEXT:                         OpStore %status [[status_0]]
+// CHECK-NEXT:                         OpStore %hlsl_out_0 [[status_0]]
 // CHECK-NEXT:       [[result_0:%[0-9]+]] = OpCompositeExtract %v4float [[structResult_0]] 1
+// CHECK-NEXT:                         [[status_0_ld_1:%[0-9]+]] = OpLoad %uint %hlsl_out_0
+// CHECK-NEXT:                         OpStore %status [[status_0_ld_1]]
 // CHECK-NEXT:                         OpStore %val5 [[result_0]]
     float4 val5 = t4.GatherCmp(gSampler, /*location*/float4(1.5, 1.5, 1.5, 1.5), comparator, status);
 

@@ -152,10 +152,10 @@ namespace ns_std_conversions {
     fn_f4(i);  // vector splat
     fn_u4(f4); // vector element
     fn_f4(u4); // vector element
-    f3 = f4;   // expected-warning {{implicit truncation of vector type}}
+    f3 = f4;   // expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}}
     // f4 = f3; // fxc-error {{error X3017: cannot implicitly convert from 'float3' to 'float4'}}
-    fn_iof(f1); // inout case (float1->float - vector single element conversion; float->float1 vector splat)
-    fn_iof1(u); // inout case (uint->float1 - vector splat; float1->uint vector single element conversion)
+    fn_iof(f1); // inout case (float1->float - vector single element conversion; float->float1 vector splat). float and float1 are scalar-equivalent in HLSL, so no diagnostic.
+    fn_iof1(u); // inout case (uint->float1 - vector splat; float1->uint vector single element conversion). uint and float1 are both single-element scalar-like, so no diagnostic.
   }
 
   struct struct_f44 { float4x4 f44; };
@@ -195,7 +195,7 @@ namespace ns_std_conversions {
     fn_f14(1);
 
     u = f11; // matrix single element conversion
-    // expected-warning@+1 {{implicit truncation of vector type}}
+    // expected-warning@+1 {{implicit truncation of vector type}} expected-warning@+1 {{implicit truncation of vector type}}
     u = f14; // matrix scalar truncation conversion
 
     u2 = f11; // matrix single element vector conversion
@@ -204,11 +204,11 @@ namespace ns_std_conversions {
     //u3 = f12; // cannot convert if target has more
 
     u44 = f44; // matrix element-type conversion
-    // expected-warning@+1 {{implicit truncation of vector type}}
+    // expected-warning@+1 {{implicit truncation of vector type}} expected-warning@+1 {{implicit truncation of vector type}}
     u22 = f44; // can convert to smaller
-    // expected-warning@+1 {{implicit truncation of vector type}}
+    // expected-warning@+1 {{implicit truncation of vector type}} expected-warning@+1 {{implicit truncation of vector type}}
     u22 = f33; // can convert to smaller
-    // expected-warning@+1 {{implicit truncation of vector type}}
+    // expected-warning@+1 {{implicit truncation of vector type}} expected-warning@+1 {{implicit truncation of vector type}}
     f32 = f33; // can convert as long as each dimension is smaller
     //u44 = f22; // cannot convert to bigger
   }

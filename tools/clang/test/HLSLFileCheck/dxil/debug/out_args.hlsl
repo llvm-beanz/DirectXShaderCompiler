@@ -1,9 +1,12 @@
 // RUN: %dxc -E main -T ps_6_0 %s -Zi -O0 | FileCheck %s
 
 // CHECK-NOT: DW_OP_deref
-// CHECK-DAG: dbg.value(metadata float {{.+}}, i64 0, metadata !{{[0-9]+}}, metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"arg0" !DIExpression(DW_OP_bit_piece, 0, 32)
-// CHECK-DAG: dbg.value(metadata float {{.+}}, i64 0, metadata !{{[0-9]+}}, metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"arg0" !DIExpression(DW_OP_bit_piece, 32, 32)
-// CHECK-DAG: dbg.value(metadata float {{.+}}, i64 0, metadata !{{[0-9]+}}, metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"arg0" !DIExpression(DW_OP_bit_piece, 64, 32)
+// With copy-in/copy-out copies materialized at the AST level, the writeback
+// for an 'out' parameter is a separate vector store rather than a fused
+// per-element write, so the debug info for arg0 is emitted as a single
+// dbg.value rather than as three bit-piece pieces. Only arg1 (inout) and
+// the local 'output' get split into bit-piece pieces.
+// CHECK-DAG: dbg.value(metadata <3 x float> {{.+}}, i64 0, metadata !{{[0-9]+}}, metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"arg0"
 // CHECK-DAG: dbg.value(metadata float {{.+}}, i64 0, metadata !{{[0-9]+}}, metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"arg1" !DIExpression(DW_OP_bit_piece, 0, 32)
 // CHECK-DAG: dbg.value(metadata float {{.+}}, i64 0, metadata !{{[0-9]+}}, metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"arg1" !DIExpression(DW_OP_bit_piece, 32, 32)
 // CHECK-DAG: dbg.value(metadata float {{.+}}, i64 0, metadata !{{[0-9]+}}, metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"arg1" !DIExpression(DW_OP_bit_piece, 64, 32)

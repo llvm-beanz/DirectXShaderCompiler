@@ -29,9 +29,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex4_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image]] %tex2d
 // CHECK: [[sampled_result4:%[a-zA-Z0-9_]+]] = OpImageSparseSampleExplicitLod %SparseResidencyStruct [[tex4_load]] [[v2fc]] Grad|ConstOffset|MinLod [[v2f_1]] [[v2f_2]] [[v2ic]] %float_0_5
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result4]] 0
-// CHECK:                        OpStore %status [[status_0]]
+// CHECK:                        OpStore %hlsl_out [[status_0]]
     uint status;
     float4 val4 = tex2d.SampleGrad(float2(0.5, 0.25), float2(1, 1), float2(2, 2), int2(2,3), 0.5, status);
 
     return 1.0;
 }
+
+// CHECK:                        [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK:                        OpStore %status [[status_0_ld_0]]

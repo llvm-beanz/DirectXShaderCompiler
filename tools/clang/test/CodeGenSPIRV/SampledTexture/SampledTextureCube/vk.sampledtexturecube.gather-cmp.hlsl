@@ -17,8 +17,11 @@ float4 main() : SV_Target {
 // CHECK: [[tex5:%[a-zA-Z0-9_]+]] = OpLoad [[type_cube_sampled]] %tex
 // CHECK: [[f_sparse:%[a-zA-Z0-9_]+]] = OpImageSparseDrefGather %SparseResidencyStruct [[tex5]] [[v3fc]] %float_0_25 None
 // CHECK: [[status0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[f_sparse]] 0
-// CHECK: OpStore %status [[status0]]
+// CHECK: OpStore %hlsl_out [[status0]]
   float4 f = tex.GatherCmp(float3(0.5, 0.25, 0.75), 0.25f, status);
 
   return a + f;
 }
+
+// CHECK: [[status0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status0_ld_0]]

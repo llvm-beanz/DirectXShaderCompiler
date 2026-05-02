@@ -172,18 +172,20 @@ HRESULT TryGetValue(const wchar_t *param, Common::String &retStr);
 namespace Logging {
 namespace Log {
 inline void StartGroup(const wchar_t *name) {
-  wprintf(L"BEGIN TEST(S): <%ls>\n", name);
+  fprintf(stderr, "BEGIN TEST(S): <%ls>\n", name);
+  fflush(stderr);
 }
 inline void EndGroup(const wchar_t *name) {
-  wprintf(L"END TEST(S): <%ls>\n", name);
+  fprintf(stderr, "END TEST(S): <%ls>\n", name);
+  fflush(stderr);
 }
 inline void Comment(const wchar_t *msg) {
-  fputws(msg, stdout);
-  fputwc(L'\n', stdout);
+  fprintf(stdout, "%ls\n", msg);
+  fflush(stdout);
 }
 inline void Error(const wchar_t *msg) {
-  fputws(msg, stderr);
-  fputwc(L'\n', stderr);
+  fprintf(stderr, "%ls\n", msg);
+  fflush(stderr);
   ADD_FAILURE();
 }
 } // namespace Log

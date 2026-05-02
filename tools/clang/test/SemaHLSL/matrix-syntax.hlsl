@@ -114,7 +114,7 @@ void main() {
     //fxc error X3017: cannot implicitly convert from 'float2' to 'float3'
     f3 = mymatrix._m00_m01; // expected-error {{cannot convert from 'vector<float, 2>' to 'float3'}} fxc-error {{X3017: cannot implicitly convert from 'float2' to 'float3'}}
     //fxc warning X3206: implicit truncation of vector type
-    f2 = mymatrix._m00_m01_m00; // expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}}
+    f2 = mymatrix._m00_m01_m00; // expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}}
     mymatrix._m00 = mymatrix._m01;
     mymatrix._m00_m11_m02_m13 = mymatrix._m10_m21_m10_m21;
     /*verify-ast

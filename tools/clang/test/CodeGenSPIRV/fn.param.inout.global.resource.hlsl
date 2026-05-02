@@ -26,32 +26,41 @@ float4 run(inout    Texture2D<float4>               a0,
 
 float4 main(): SV_Target
 {
-// CHECK: %param_var_a0 = OpVariable %_ptr_Function_type_2d_image Function
-// CHECK: %param_var_a1 = OpVariable %_ptr_Function_type_3d_image Function
-// CHECK: %param_var_a2 = OpVariable %_ptr_Function_type_sampler Function
-// CHECK: %param_var_a3 = OpVariable %_ptr_Function_accelerationStructureNV Function
-// CHECK: %param_var_a4 = OpVariable %_ptr_Function_type_buffer_image Function
-// CHECK: %param_var_a5 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_ByteAddressBuffer Function
-// CHECK: %param_var_a6 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_RWByteAddressBuffer Function
-// CHECK: %param_var_a7 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_RWStructuredBuffer_v4float Function
-// CHECK: %param_var_a8 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_AppendStructuredBuffer_v4float Function
+// For each inout argument, a temporary variable (hlsl.inout) is created in the
+// caller.  Non-buffer resources (images, samplers, RTAS, buffer images) are
+// loaded into the temporary; struct-based buffer types (ByteAddressBuffer, etc.)
+// are stored as pointer aliases without a load (no OpStore type mismatch).
 
+// CHECK: %temp_var_hlsl_inout   = OpVariable %_ptr_Function_type_2d_image Function
+// CHECK: %temp_var_hlsl_inout_0 = OpVariable %_ptr_Function_type_3d_image Function
+// CHECK: %temp_var_hlsl_inout_1 = OpVariable %_ptr_Function_type_sampler Function
+// CHECK: %temp_var_hlsl_inout_2 = OpVariable %_ptr_Function_accelerationStructureNV Function
+// CHECK: %temp_var_hlsl_inout_3 = OpVariable %_ptr_Function_type_buffer_image Function
+// CHECK: %temp_var_hlsl_inout_4 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_ByteAddressBuffer Function
+// CHECK: %temp_var_hlsl_inout_5 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_RWByteAddressBuffer Function
+// CHECK: %temp_var_hlsl_inout_6 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_RWStructuredBuffer_v4float Function
+// CHECK: %temp_var_hlsl_inout_7 = OpVariable %_ptr_Function__ptr_StorageBuffer_type_AppendStructuredBuffer_v4float Function
+
+// Non-buffer resources: load the resource value then store into the temp var.
 // CHECK: [[r0:%[a-zA-Z0-9_]+]] = OpLoad %type_2d_image %r0
-// CHECK:               OpStore %param_var_a0 [[r0]]
+// CHECK:                         OpStore %temp_var_hlsl_inout [[r0]]
 // CHECK: [[r1:%[a-zA-Z0-9_]+]] = OpLoad %type_3d_image %r1
-// CHECK:               OpStore %param_var_a1 [[r1]]
+// CHECK:                         OpStore %temp_var_hlsl_inout_0 [[r1]]
 // CHECK: [[r2:%[a-zA-Z0-9_]+]] = OpLoad %type_sampler %r2
-// CHECK:               OpStore %param_var_a2 [[r2]]
+// CHECK:                         OpStore %temp_var_hlsl_inout_1 [[r2]]
 // CHECK: [[r3:%[a-zA-Z0-9_]+]] = OpLoad %accelerationStructureNV %r3
-// CHECK:               OpStore %param_var_a3 [[r3]]
+// CHECK:                         OpStore %temp_var_hlsl_inout_2 [[r3]]
 // CHECK: [[r4:%[a-zA-Z0-9_]+]] = OpLoad %type_buffer_image %r4
-// CHECK:               OpStore %param_var_a4 [[r4]]
-// CHECK:               OpStore %param_var_a5 %r5
-// CHECK:               OpStore %param_var_a6 %r6
-// CHECK:               OpStore %param_var_a7 %r7
-// CHECK:               OpStore %param_var_a8 %r8
+// CHECK:                         OpStore %temp_var_hlsl_inout_3 [[r4]]
 
-// CHECK: OpFunctionCall %v4float %run %param_var_a0 %param_var_a1 %param_var_a2 %param_var_a3 %param_var_a4 %param_var_a5 %param_var_a6 %param_var_a7 %param_var_a8
+// Struct-based buffer resources: store the StorageBuffer pointer directly into
+// the Function alias variable (no intermediate load to avoid type mismatch).
+// CHECK: OpStore %temp_var_hlsl_inout_4 %r5
+// CHECK: OpStore %temp_var_hlsl_inout_5 %r6
+// CHECK: OpStore %temp_var_hlsl_inout_6 %r7
+// CHECK: OpStore %temp_var_hlsl_inout_7 %r8
+
+// CHECK: OpFunctionCall %v4float %run %temp_var_hlsl_inout %temp_var_hlsl_inout_0 %temp_var_hlsl_inout_1 %temp_var_hlsl_inout_2 %temp_var_hlsl_inout_3 %temp_var_hlsl_inout_4 %temp_var_hlsl_inout_5 %temp_var_hlsl_inout_6 %temp_var_hlsl_inout_7
 
     return run(r0, r1, r2, r3, r4, r5, r6, r7, r8);
 }

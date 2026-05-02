@@ -26,7 +26,7 @@
 // AST-NEXT: ReturnStmt
 // AST-NEXT: ImplicitCastExpr {{.*}} 'float' <LValueToRValue>
 // AST-NEXT: ArraySubscriptExpr {{.*}} 'float' lvalue
-// AST-NEXT: ImplicitCastExpr {{.*}} 'float [4]' <LValueToRValue>
+// AST-NEXT: ImplicitCastExpr {{.*}} 'float *' <ArrayToPointerDecay>
 // AST-NEXT: MemberExpr {{.*}} 'float [4]' lvalue .mArr
 // AST-NEXT: ImplicitCastExpr {{.*}} 'array' lvalue <UncheckedDerivedToBase (array)>
 // AST-NEXT: CXXThisExpr {{.*}} 'array_ext' lvalue this

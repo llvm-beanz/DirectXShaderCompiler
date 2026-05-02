@@ -44,8 +44,10 @@ float4 main(int2 offset: A, float comparator: B) : SV_Target {
 // CHECK-NEXT:   [[sampledImg_2:%[0-9]+]] = OpSampledImage %type_sampled_image_0 [[t2_0]] [[gSampler_2]]
 // CHECK-NEXT: [[structResult:%[0-9]+]] = OpImageSparseSampleDrefExplicitLod %SparseResidencyStruct [[sampledImg_2]] [[v2fc]] [[comparator_2]] Lod|ConstOffset %float_0 [[v2ic]]
 // CHECK-NEXT:       [[status:%[0-9]+]] = OpCompositeExtract %uint [[structResult]] 0
-// CHECK-NEXT:                         OpStore %status [[status]]
+// CHECK-NEXT:                         OpStore %hlsl_out [[status]]
 // CHECK-NEXT:       [[result:%[0-9]+]] = OpCompositeExtract %float [[structResult]] 1
+// CHECK-NEXT:                         [[status_ld_0:%[0-9]+]] = OpLoad %uint %hlsl_out
+// CHECK-NEXT:                         OpStore %status [[status_ld_0]]
 // CHECK-NEXT:                         OpStore %val5 [[result]]
     float val5 = t2.SampleCmpLevelZero(gSampler, float2(1, 2), comparator, 1, status);
 
@@ -55,8 +57,10 @@ float4 main(int2 offset: A, float comparator: B) : SV_Target {
 // CHECK-NEXT:   [[sampledImg_3:%[0-9]+]] = OpSampledImage %type_sampled_image_1 [[t4_0]] [[gSampler_3]]
 // CHECK-NEXT: [[structResult_0:%[0-9]+]] = OpImageSparseSampleDrefExplicitLod %SparseResidencyStruct [[sampledImg_3]] [[v3fc]] [[comparator_3]] Lod %float_0
 // CHECK-NEXT:       [[status_0:%[0-9]+]] = OpCompositeExtract %uint [[structResult_0]] 0
-// CHECK-NEXT:                         OpStore %status [[status_0]]
+// CHECK-NEXT:                         OpStore %hlsl_out_0 [[status_0]]
 // CHECK-NEXT:       [[result_0:%[0-9]+]] = OpCompositeExtract %float [[structResult_0]] 1
+// CHECK-NEXT:                         [[status_0_ld_1:%[0-9]+]] = OpLoad %uint %hlsl_out_0
+// CHECK-NEXT:                         OpStore %status [[status_0_ld_1]]
 // CHECK-NEXT:                         OpStore %val6 [[result_0]]
     float val6 = t4.SampleCmpLevelZero(gSampler, float3(1, 2, 3), comparator, status);
 

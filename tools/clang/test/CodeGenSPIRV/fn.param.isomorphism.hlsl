@@ -62,16 +62,30 @@ void main() {
   fn.incr();
 
 // CHECK:      [[rwsb_0:%[0-9]+]] = OpAccessChain %_ptr_Uniform_R %rwsb %int_0 %uint_0
-// CHECK-NEXT:      {{%[0-9]+}} = OpFunctionCall %void %decr [[rwsb_0]]
+// CHECK-NEXT:              {{%[0-9]+}} = OpLoad %R [[rwsb_0]]
+// CHECK:                               OpStore %temp_var_hlsl_inout {{%[0-9]+}}
+// CHECK-NEXT:              {{%[0-9]+}} = OpFunctionCall %void %decr %temp_var_hlsl_inout
   decr(rwsb[0]);
 
-// CHECK: OpFunctionCall %void %decr2 %gs
+// CHECK: [[gs_ld:%[0-9]+]] = OpLoad %S %gs
+// CHECK-NEXT:                OpStore %temp_var_hlsl_inout_0 [[gs_ld]]
+// CHECK-NEXT: {{%[0-9]+}} = OpFunctionCall %void %decr2 %temp_var_hlsl_inout_0
+// CHECK-NEXT: [[gs_wb:%[0-9]+]] = OpLoad %S %temp_var_hlsl_inout_0
+// CHECK-NEXT:                OpStore %gs [[gs_wb]]
   decr2(gs);
 
-// CHECK: OpFunctionCall %void %decr2 %st
+// CHECK: [[st_ld:%[0-9]+]] = OpLoad %S %st
+// CHECK-NEXT:                OpStore %temp_var_hlsl_inout_1 [[st_ld]]
+// CHECK-NEXT: {{%[0-9]+}} = OpFunctionCall %void %decr2 %temp_var_hlsl_inout_1
+// CHECK-NEXT: [[st_wb:%[0-9]+]] = OpLoad %S %temp_var_hlsl_inout_1
+// CHECK-NEXT:                OpStore %st [[st_wb]]
   decr2(st);
 
-// CHECK: OpFunctionCall %void %decr2 %fn
+// CHECK: [[fn_ld:%[0-9]+]] = OpLoad %S %fn
+// CHECK-NEXT:                OpStore %temp_var_hlsl_inout_2 [[fn_ld]]
+// CHECK-NEXT: {{%[0-9]+}} = OpFunctionCall %void %decr2 %temp_var_hlsl_inout_2
+// CHECK-NEXT: [[fn_wb:%[0-9]+]] = OpLoad %S %temp_var_hlsl_inout_2
+// CHECK-NEXT:                OpStore %fn [[fn_wb]]
   decr2(fn);
 
 // CHECK:      [[gsarr:%[0-9]+]] = OpAccessChain %_ptr_Workgroup_S %gsarr %int_0
@@ -87,21 +101,33 @@ void main() {
   fnarr[0].incr();
 
 // CHECK:      [[gsarr_0:%[0-9]+]] = OpAccessChain %_ptr_Workgroup_S %gsarr %int_0
-// CHECK-NEXT:       {{%[0-9]+}} = OpFunctionCall %void %decr2 [[gsarr_0]]
+// CHECK-NEXT: [[gs_arr_ld:%[0-9]+]] = OpLoad %S [[gsarr_0]]
+// CHECK-NEXT:                        OpStore %temp_var_hlsl_inout_3 [[gs_arr_ld]]
+// CHECK-NEXT:              {{%[0-9]+}} = OpFunctionCall %void %decr2 %temp_var_hlsl_inout_3
+// CHECK-NEXT: [[gs_arr_wb:%[0-9]+]] = OpLoad %S %temp_var_hlsl_inout_3
+// CHECK:                             OpStore {{%[0-9]+}} [[gs_arr_wb]]
   decr2(gsarr[0]);
 
 // CHECK:      [[starr_0:%[0-9]+]] = OpAccessChain %_ptr_Private_S %starr %int_0
-// CHECK-NEXT:       {{%[0-9]+}} = OpFunctionCall %void %decr2 [[starr_0]]
+// CHECK-NEXT: [[st_arr_ld:%[0-9]+]] = OpLoad %S [[starr_0]]
+// CHECK-NEXT:                        OpStore %temp_var_hlsl_inout_4 [[st_arr_ld]]
+// CHECK-NEXT:              {{%[0-9]+}} = OpFunctionCall %void %decr2 %temp_var_hlsl_inout_4
+// CHECK-NEXT: [[st_arr_wb:%[0-9]+]] = OpLoad %S %temp_var_hlsl_inout_4
+// CHECK:                             OpStore {{%[0-9]+}} [[st_arr_wb]]
   decr2(starr[0]);
 
 // CHECK:      [[fnarr_0:%[0-9]+]] = OpAccessChain %_ptr_Function_S %fnarr %int_0
-// CHECK-NEXT:       {{%[0-9]+}} = OpFunctionCall %void %decr2 [[fnarr_0]]
+// CHECK-NEXT: [[fn_arr_ld:%[0-9]+]] = OpLoad %S [[fnarr_0]]
+// CHECK-NEXT:                        OpStore %temp_var_hlsl_inout_5 [[fn_arr_ld]]
+// CHECK-NEXT:              {{%[0-9]+}} = OpFunctionCall %void %decr2 %temp_var_hlsl_inout_5
+// CHECK-NEXT: [[fn_arr_wb:%[0-9]+]] = OpLoad %S %temp_var_hlsl_inout_5
+// CHECK:                             OpStore {{%[0-9]+}} [[fn_arr_wb]]
   decr2(fnarr[0]);
 
-// CHECK:        [[arr:%[0-9]+]] = OpAccessChain %_ptr_Function_int %arr %int_0
-// CHECK-NEXT: [[arr_0:%[0-9]+]] = OpLoad %int [[arr]]
-// CHECK-NEXT: [[arr_1:%[0-9]+]] = OpIAdd %int [[arr_0]] %int_1
-// CHECK-NEXT:                  OpStore [[arr]] [[arr_1]]
-// CHECK-NEXT:       {{%[0-9]+}} = OpFunctionCall %void %int_decr [[arr]]
+// CHECK:       {{%[0-9]+}} = OpFunctionCall %void %int_decr %hlsl_out
+// CHECK-NEXT: [[hl_ld:%[0-9]+]] = OpLoad %int %hlsl_out
+// CHECK:      [[arr:%[0-9]+]] = OpAccessChain %_ptr_Function_int %arr %int_0
+// CHECK:                       OpStore [[arr]] {{%[0-9]+}}
+// CHECK-NEXT:                  OpStore [[arr]] [[hl_ld]]
   int_decr(++arr[0]);
 }

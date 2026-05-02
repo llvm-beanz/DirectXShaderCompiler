@@ -15,7 +15,7 @@ void main() {
   // CHECK-SAME: ; LinAlgMatVecMulAdd(matrix,isOutputSigned,inputVector,inputInterpretation,biasVector,biasInterpretation)
 
   // CHECK2: call void @"dx.hl.op..void (i32, <4 x float>*, %dx.types.LinAlgMatrixC5M3N4U0S0, i1, <4 x float>,
-  // CHECK2-SAME: i32, <4 x float>, i32)"(i32 419, <4 x float>* %result, %dx.types.LinAlgMatrixC5M3N4U0S0 %{{[0-9]+}},
+  // CHECK2-SAME: i32, <4 x float>, i32)"(i32 419, <4 x float>* %{{[^ ]+}}, %dx.types.LinAlgMatrixC5M3N4U0S0 %{{[0-9]+}},
   // CHECK2-SAME: i1 true, <4 x float> %{{[0-9]+}}, i32 1, <4 x float> %{{[0-9]+}}, i32 0)
 
   __builtin_LinAlg_MatrixVectorMultiplyAdd(result, mat1, true, vec, 1, result, 0);
@@ -30,7 +30,7 @@ void main() {
   // CHECK-SAME: ; LinAlgMatVecMulAdd(matrix,isOutputSigned,inputVector,inputInterpretation,biasVector,biasInterpretation)
 
   // CHECK2: call void @"dx.hl.op..void (i32, <4 x double>*, %dx.types.LinAlgMatrixC5M3N4U0S0, i1, <4 x double>,
-  // CHECK2-SAME: i32, <4 x double>, i32)"(i32 419, <4 x double>* %result2, %dx.types.LinAlgMatrixC5M3N4U0S0 %{{[0-9]+}},
+  // CHECK2-SAME: i32, <4 x double>, i32)"(i32 419, <4 x double>* %{{[^ ]+}}, %dx.types.LinAlgMatrixC5M3N4U0S0 %{{[0-9]+}},
   // CHECK2-SAME: i1 true, <4 x double> %{{[0-9]+}}, i32 1, <4 x double> %{{[0-9]+}}, i32 0)
 
   __builtin_LinAlg_MatrixVectorMultiplyAdd(result2, mat2, true, vec2, 1, result2, 0);
@@ -45,7 +45,7 @@ void main() {
   // CHECK-SAME: ; LinAlgMatVecMulAdd(matrix,isOutputSigned,inputVector,inputInterpretation,biasVector,biasInterpretation)
 
   // CHECK2: call void @"dx.hl.op..void (i32, <4 x i64>*, %dx.types.LinAlgMatrixC5M3N4U0S0, i1, <4 x i64>,
-  // CHECK2-SAME: i32, <4 x i64>, i32)"(i32 419, <4 x i64>* %result3, %dx.types.LinAlgMatrixC5M3N4U0S0 %{{[0-9]+}},
+  // CHECK2-SAME: i32, <4 x i64>, i32)"(i32 419, <4 x i64>* %{{[^ ]+}}, %dx.types.LinAlgMatrixC5M3N4U0S0 %{{[0-9]+}},
   // CHECK2-SAME: i1 true, <4 x i64> %{{[0-9]+}}, i32 1, <4 x i64> %{{[0-9]+}}, i32 0)
 
   __builtin_LinAlg_MatrixVectorMultiplyAdd(result3, mat3, true, vec3, 1, result3, 0);

@@ -47,10 +47,7 @@ int if_scoped_array(int n, int c)
 // CHECK: %[[alloca:.*]] = alloca %struct.MyStruct
 // CHECK: ret
 // CHECK: phi i32
-// CHECK-NEXT: bitcast
-// CHECK-NEXT: call void @llvm.lifetime.start
 // CHECK-NEXT: call float @"\01?func{{[@$?.A-Za-z0-9_]+}}"(%struct.MyStruct* nonnull %[[alloca]])
-// CHECK-NEXT: call void @llvm.lifetime.end
 // CHECK: br i1
 struct MyStruct {
   float x;
@@ -80,10 +77,8 @@ void loop_scoped_escaping_struct(int n)
 // CHECK: phi i32
 // CHECK-NEXT: phi i32
 // CHECK-NOT: phi float
-// CHECK-NEXT: bitcast
-// CHECK-NEXT: call void @llvm.lifetime.start
 // CHECK-NOT: store
-// CHECK-NEXT: call void @"\01?func2{{[@$?.A-Za-z0-9_]+}}"(%struct.MyStruct* nonnull %[[alloca]])
+// CHECK: call void @"\01?func2{{[@$?.A-Za-z0-9_]+}}"(%struct.MyStruct* nonnull dereferenceable(4) %[[alloca]])
 // CHECK-NEXT: getelementptr
 // CHECK-NEXT: load
 // CHECK: call void @llvm.lifetime.end

@@ -939,7 +939,7 @@ bool DeclResultIdMapper::createStageInputVar(const ParmVarDecl *paramDecl,
                                              SpirvInstruction **loadedValue,
                                              bool forPCF) {
   uint32_t arraySize = 0;
-  QualType type = paramDecl->getType();
+  QualType type = paramDecl->getType().getNonReferenceType();
 
   // Deprive the outermost arrayness for HS/DS/GS and use arraySize
   // to convey that information
@@ -1098,7 +1098,10 @@ DeclResultIdMapper::createFnParam(const ParmVarDecl *param,
 }
 
 void DeclResultIdMapper::createCounterVarForDecl(const DeclaratorDecl *decl) {
-  const QualType declType = getTypeOrFnRetType(decl);
+  // Strip reference qualifiers: out/inout parameters are reference types but
+  // their pointee type determines whether a counter variable is needed.
+  const QualType declType =
+      getTypeOrFnRetType(decl).getNonReferenceType();
 
   if (!counterVars.count(decl) && isRWAppendConsumeSBuffer(declType)) {
     createCounterVar(decl, /*declId=*/0, /*isAlias=*/true);
@@ -4846,9 +4849,14 @@ QualType DeclResultIdMapper::getTypeAndCreateCounterForPotentialAliasVar(
   // Whether we should generate this decl as an alias variable.
   bool genAlias = false;
 
+  // Strip reference qualifiers when probing the type: out/inout parameters are
+  // represented as reference types, but their pointee type determines whether
+  // an alias or counter variable is needed.
+  const QualType typeForProbe = type.getNonReferenceType();
+
   // For ConstantBuffers, TextureBuffers, StructuredBuffers, ByteAddressBuffers
-  if (isConstantTextureBuffer(type) ||
-      isOrContainsAKindOfStructuredOrByteBuffer(type)) {
+  if (isConstantTextureBuffer(typeForProbe) ||
+      isOrContainsAKindOfStructuredOrByteBuffer(typeForProbe)) {
     genAlias = true;
   }
 

@@ -305,8 +305,8 @@ float4 test(): SV_Target {
   min16float4x4 m16f4x4 = g_m16f4x4;
   // GENERATED_CODE:END
 
-  float3  f3 = f4;                                          /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
-  int3x1 i3x1 = i4x4;                                       /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  float3  f3 = f4;                                          /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  int3x1 i3x1 = i4x4;                                       /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
   /*verify-ast
     DeclStmt <col:3, col:21>
     `-VarDecl <col:3, col:17> col:10 used i3x1 'int3x1':'matrix<int, 3, 1>' cinit
@@ -321,7 +321,7 @@ float4 test(): SV_Target {
   VERIFY_TYPES(float4, i4 * f1);
   VERIFY_TYPES(float4x4, i4x4 * f);
   VERIFY_TYPES(float4x4, f * i4x4);
-  VERIFY_TYPES(bool, b = i4);                   /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  VERIFY_TYPES(bool, b = i4);                   /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
 
   VERIFY_TYPES(float4x4, overload1(i4x4 * f));
   VERIFY_TYPES(float4x4, overload1(i4x4 * 1.5F));
@@ -393,7 +393,7 @@ float4 test(): SV_Target {
       `-ImplicitCastExpr <col:10> 'int' <LValueToRValue>
         `-DeclRefExpr <col:10> 'int' lvalue Var 'i' 'int'
   */
-  i = i4x4;                                     /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  i = i4x4;                                     /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
   /*verify-ast
     BinaryOperator <col:3, col:7> 'int' '='
     |-DeclRefExpr <col:3> 'int' lvalue Var 'i' 'int'
@@ -492,7 +492,7 @@ float4 test(): SV_Target {
       `-ImplicitCastExpr <col:7> 'bool' <LValueToRValue>
         `-DeclRefExpr <col:7> 'bool' lvalue Var 'b' 'bool'
   */
-  f = b4;                                       /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  f = b4;                                       /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
   /*verify-ast
     BinaryOperator <col:3, col:7> 'float' '='
     |-DeclRefExpr <col:3> 'float' lvalue Var 'f' 'float'
@@ -607,7 +607,7 @@ float4 test(): SV_Target {
                 `-IntegerLiteral <col:30> 'literal int' 1
   */
 
-  b = i4;                                       /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  b = i4;                                       /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
   /*verify-ast
     BinaryOperator <col:3, col:7> 'bool' '='
     |-DeclRefExpr <col:3> 'bool' lvalue Var 'b' 'bool'
@@ -621,7 +621,7 @@ float4 test(): SV_Target {
   i.x = f4 + f1x4 * f4x1 / i1;                  /* expected-error {{cannot convert from 'float4x1' to 'float1x4'}} fxc-error {{X3020: type mismatch}} */
 
   // TODO: fxc passes the following (i4x1 should implicitly cast to float4 for mul op)
-  f4x4._m02_m11_m20 = i4x1 * f4;                /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  f4x4._m02_m11_m20 = i4x1 * f4;                /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
   /*verify-ast
     BinaryOperator <col:3, col:30> 'vector<float, 3>':'vector<float, 3>' '='
     |-ExtMatrixElementExpr <col:3, col:8> 'vector<float, 3>':'vector<float, 3>' lvalue vectorcomponent _m02_m11_m20
@@ -637,8 +637,8 @@ float4 test(): SV_Target {
               `-DeclRefExpr <col:30> 'float4':'vector<float, 4>' lvalue Var 'f4' 'float4':'vector<float, 4>'
   */
 
-  f4 = i3x1 * f4;                               /* expected-error {{cannot convert from 'matrix<float, 3, 1>' to 'float4'}} expected-warning {{implicit truncation of vector type}} fxc-error {{X3017: cannot implicitly convert from 'const float3x1' to 'float4'}} fxc-warning {{X3206: implicit truncation of vector type}} */
-  f3 = i3x1 * f4;                               /* expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  f4 = i3x1 * f4;                               /* expected-error {{cannot convert from 'matrix<float, 3, 1>' to 'float4'}} expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-error {{X3017: cannot implicitly convert from 'const float3x1' to 'float4'}} fxc-warning {{X3206: implicit truncation of vector type}} */
+  f3 = i3x1 * f4;                               /* expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}} fxc-warning {{X3206: implicit truncation of vector type}} */
   /*verify-ast
     BinaryOperator <col:3, col:15> 'float3':'vector<float, 3>' '='
     |-DeclRefExpr <col:3> 'float3':'vector<float, 3>' lvalue Var 'f3' 'float3':'vector<float, 3>'

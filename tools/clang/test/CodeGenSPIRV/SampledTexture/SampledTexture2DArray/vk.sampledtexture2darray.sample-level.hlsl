@@ -22,9 +22,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex3_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image_array]] %tex2darray
 // CHECK: [[sampled_result3:%[a-zA-Z0-9_]+]] = OpImageSparseSampleExplicitLod %SparseResidencyStruct [[tex3_load]] [[v2fc]] Lod|ConstOffset %float_0_5 [[v2ic]]
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result3]] 0
-// CHECK:                        OpStore %status [[status_0]]
+// CHECK:                        OpStore %hlsl_out [[status_0]]
     uint status;
     float4 val3 = tex2darray.SampleLevel(float3(0.5, 0.25, 0.1), 0.5f, int2(2, 3), status);
 
     return 1.0;
 }
+
+// CHECK:                        [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK:                        OpStore %status [[status_0_ld_0]]
