@@ -22,7 +22,10 @@ float4 main() : SV_Target {
 // CHECK: [[tex2:%[a-zA-Z0-9_]+]] = OpLoad [[type_cube_sampled]] %tex
 // CHECK: [[c_sparse:%[a-zA-Z0-9_]+]] = OpImageSparseSampleImplicitLod %SparseResidencyStruct [[tex2]] [[v3fc]] MinLod %float_0_5
 // CHECK: [[status0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[c_sparse]] 0
-// CHECK: OpStore %status [[status0]]
+// CHECK: OpStore %hlsl_out [[status0]]
   float4 c = tex.Sample(float3(0.5, 0.25, 0.75), 0.5f, status);
   return a + b + c;
 }
+
+// CHECK: [[status0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status0_ld_0]]

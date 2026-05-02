@@ -36,8 +36,10 @@ float4 main(int3 location3: A) : SV_Target {
 // CHECK-NEXT:[[tex_ms_img:%[0-9]+]] = OpImage [[type_2d_image_ms]] [[tex_ms]]
 // CHECK-NEXT:[[structResult:%[0-9]+]] = OpImageSparseFetch %SparseResidencyStruct [[tex_ms_img]] [[coord_ms]] ConstOffset|Sample [[v2ic]] [[sample_ms]]
 // CHECK-NEXT:      [[status:%[0-9]+]] = OpCompositeExtract %uint [[structResult]] 0
-// CHECK-NEXT:                        OpStore %status [[status]]
+// CHECK-NEXT:                        OpStore %hlsl_out [[status]]
 // CHECK-NEXT:    [[v4result:%[0-9]+]] = OpCompositeExtract %v4float [[structResult]] 1
+// CHECK-NEXT:                        [[status_ld_0:%[0-9]+]] = OpLoad %uint %hlsl_out
+// CHECK-NEXT:                        OpStore %status [[status_ld_0]]
 // CHECK-NEXT:                        OpStore %val3 [[v4result]]
     float4 val3 = tex2dMS.Load(location3.xy, location3.z, int2(1, 2), status);
 

@@ -28,9 +28,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex4_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image_array]] %tex2darray
 // CHECK: [[sampled_result4:%[a-zA-Z0-9_]+]] = OpImageSparseSampleImplicitLod %SparseResidencyStruct [[tex4_load]] [[v2fc]] Bias|ConstOffset|MinLod %float_0_5 [[v2ic]] %float_2_5
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result4]] 0
-// CHECK:                        OpStore %status [[status_0]]
+// CHECK:                        OpStore %hlsl_out [[status_0]]
     uint status;
     float4 val4 = tex2darray.SampleBias(float3(0.5, 0.25, 0.1), 0.5f, int2(2, 3), 2.5f, status);
 
     return 1.0;
 }
+
+// CHECK:                        [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK:                        OpStore %status [[status_0_ld_0]]

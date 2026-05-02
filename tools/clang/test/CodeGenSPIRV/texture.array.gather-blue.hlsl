@@ -58,8 +58,10 @@ float4 main(float3 location: A) : SV_Target {
 // CHECK-NEXT:   [[sampledImg_3:%[0-9]+]] = OpSampledImage %type_sampled_image_0 [[t2i3_1]] [[gSampler_3]]
 // CHECK-NEXT: [[structResult:%[0-9]+]] = OpImageSparseGather %SparseResidencyStruct [[sampledImg_3]] [[loc_3]] %int_2 ConstOffset [[c12]]
 // CHECK-NEXT:       [[status:%[0-9]+]] = OpCompositeExtract %uint [[structResult]] 0
-// CHECK-NEXT:                         OpStore %status [[status]]
+// CHECK-NEXT:                         OpStore %hlsl_out [[status]]
 // CHECK-NEXT:       [[result:%[0-9]+]] = OpCompositeExtract %v4int [[structResult]] 1
+// CHECK-NEXT:                         [[status_ld_0:%[0-9]+]] = OpLoad %uint %hlsl_out
+// CHECK-NEXT:                         OpStore %status [[status_ld_0]]
 // CHECK-NEXT:                         OpStore %e [[result]]
     int4 e = t2i3.GatherBlue(gSampler, location, int2(1, 2), status);
 
@@ -69,8 +71,10 @@ float4 main(float3 location: A) : SV_Target {
 // CHECK-NEXT:   [[sampledImg_4:%[0-9]+]] = OpSampledImage %type_sampled_image_0 [[t2i3_2]] [[gSampler_4]]
 // CHECK-NEXT: [[structResult_0:%[0-9]+]] = OpImageSparseGather %SparseResidencyStruct [[sampledImg_4]] [[loc_4]] %int_2 ConstOffsets [[c1to8]]
 // CHECK-NEXT:       [[status_0:%[0-9]+]] = OpCompositeExtract %uint [[structResult_0]] 0
-// CHECK-NEXT:                         OpStore %status [[status_0]]
+// CHECK-NEXT:                         OpStore %hlsl_out_0 [[status_0]]
 // CHECK-NEXT:       [[result_0:%[0-9]+]] = OpCompositeExtract %v4int [[structResult_0]] 1
+// CHECK-NEXT:                         [[status_0_ld_1:%[0-9]+]] = OpLoad %uint %hlsl_out_0
+// CHECK-NEXT:                         OpStore %status [[status_0_ld_1]]
 // CHECK-NEXT:                         OpStore %f [[result_0]]
     int4 f = t2i3.GatherBlue(gSampler, location, int2(1, 2), int2(3, 4), int2(5, 6), int2(7, 8), status);
 
@@ -79,8 +83,10 @@ float4 main(float3 location: A) : SV_Target {
 // CHECK-NEXT:   [[sampledImg_5:%[0-9]+]] = OpSampledImage %type_sampled_image_1 [[tCubeArray]] [[gSampler_5]]
 // CHECK-NEXT: [[structResult_1:%[0-9]+]] = OpImageSparseGather %SparseResidencyStruct_0 [[sampledImg_5]] [[cv4f_1_5]] %int_2 None
 // CHECK-NEXT:       [[status_1:%[0-9]+]] = OpCompositeExtract %uint [[structResult_1]] 0
-// CHECK-NEXT:                         OpStore %status [[status_1]]
+// CHECK-NEXT:                         OpStore %hlsl_out_1 [[status_1]]
 // CHECK-NEXT:       [[result_1:%[0-9]+]] = OpCompositeExtract %v4uint [[structResult_1]] 1
+// CHECK-NEXT:                         [[status_1_ld_2:%[0-9]+]] = OpLoad %uint %hlsl_out_1
+// CHECK-NEXT:                         OpStore %status [[status_1_ld_2]]
 // CHECK-NEXT:                         OpStore %g [[result_1]]
     uint4 g = tCubeArray.GatherBlue(gSampler, /*location*/ float4(1.5, 1.5, 1.5, 1.5), status);
 

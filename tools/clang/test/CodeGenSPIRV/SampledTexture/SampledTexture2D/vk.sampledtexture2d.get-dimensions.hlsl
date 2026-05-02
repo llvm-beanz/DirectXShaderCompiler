@@ -109,10 +109,10 @@ void main() {
   tex2d.GetDimensions(mipLevel, i_width, i_height, i_numLevels);
 
 #ifdef ERROR
-// ERROR: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 
   tex2d.GetDimensions(mipLevel, 0, height, numLevels);
 
-// ERROR: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 
   tex2d.GetDimensions(width, 20);
 #endif
 }

@@ -45,7 +45,7 @@ float4 main() : SV_Target {
 // CHECK-DAG:       [[offset:%[0-9]+]] = OpBitcast %int [[tmp]]
 // CHECK-NEXT:         [[tmp:%[0-9]+]] = OpImageSparseSampleDrefExplicitLod %SparseResidencyStruct [[sampledImage]] %float_1 %float_2 Lod|Offset %float_0 [[offset]]
 // CHECK-NEXT:          [[res:%[0-9]+]] = OpCompositeExtract %uint [[tmp]] 0
-// CHECK-NEXT:                            OpStore %status_0 [[res]]
+// CHECK-NEXT:                            OpStore %hlsl_out [[res]]
   uint status_0;
   float4 d = tex1d.SampleCmpLevelZero(samplerComparisonState, 1, 2, data[0], status_0);
 
@@ -66,7 +66,7 @@ float4 main() : SV_Target {
 // CHECK-DAG:  [[sampledImage:%[0-9]+]] = OpSampledImage [[t_cube_sampled_image]] [[texture]] [[sampler]]
 // CHECK-NEXT:          [[tmp:%[0-9]+]] = OpImageSparseSampleDrefExplicitLod %SparseResidencyStruct [[sampledImage]] [[v3f_0_0_0]] %float_1 Lod %float_2
 // CHECK-NEXT:          [[res:%[0-9]+]] = OpCompositeExtract %uint [[tmp]] 0
-// CHECK-NEXT:                            OpStore %status_1 [[res]]
+// CHECK-NEXT:                            OpStore %hlsl_out_0 [[res]]
   uint status_1;
   float4 g = texCube.SampleCmpLevel(samplerComparisonState, float3(0, 0, 0), 1, 2, status_1);
 
@@ -81,7 +81,7 @@ float4 main() : SV_Target {
 // CHECK-DAG:  [[sampledImage:%[0-9]+]] = OpSampledImage [[t_cube_array_sampled_image]] [[texture]] [[sampler]]
 // CHECK-NEXT:          [[tmp:%[0-9]+]] = OpImageSparseSampleDrefExplicitLod %SparseResidencyStruct [[sampledImage]] [[v4f_0_0_0_0]] %float_1 Lod %float_2
 // CHECK-NEXT:          [[res:%[0-9]+]] = OpCompositeExtract %uint [[tmp]] 0
-// CHECK-NEXT:                            OpStore %status_2 [[res]]
+// CHECK-NEXT:                            OpStore %hlsl_out_1 [[res]]
   uint status_2;
   float4 i = texCubeArray.SampleCmpLevel(samplerComparisonState, float4(0, 0, 0, 0), 1, 2, status_2);
 

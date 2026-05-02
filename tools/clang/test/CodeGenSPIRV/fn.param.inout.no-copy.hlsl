@@ -30,8 +30,13 @@ void main() {
 // CHECK: %c = OpVariable %_ptr_Function_mat2v3float Function
 // CHECK: %d = OpVariable %_ptr_Function_S Function
 // CHECK: %e = OpVariable %_ptr_Function__arr_float_uint_4 Function
+// CHECK: %hlsl_out = OpVariable %_ptr_Function_int Function
+// CHECK: %temp_var_hlsl_inout = OpVariable %_ptr_Function_v2uint Function
+// CHECK: %hlsl_out_0 = OpVariable %_ptr_Function_mat2v3float Function
+// CHECK: %temp_var_hlsl_inout_0 = OpVariable %_ptr_Function_S Function
+// CHECK: %hlsl_out_1 = OpVariable %_ptr_Function__arr_float_uint_4 Function
 
-// CHECK:      OpFunctionCall %void %foo %a %b %c %d %e
+// CHECK:      OpFunctionCall %void %foo %hlsl_out %temp_var_hlsl_inout %hlsl_out_0 %temp_var_hlsl_inout_0 %hlsl_out_1
 
     foo(a, b, c, d, e);
 }

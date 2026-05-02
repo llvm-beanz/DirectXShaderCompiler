@@ -29,11 +29,13 @@ float4 main(int3 location3: A, int4 location4: B) : SV_Target {
 // CHECK: [[tex_image_3:%[a-zA-Z0-9_]+]] = OpImage %type_1d_image_array [[tex3_load]]
 // CHECK: [[sparse_fetch_result:%[a-zA-Z0-9_]+]] = OpImageSparseFetch %SparseResidencyStruct [[tex_image_3]] [[coords_3]] Lod|ConstOffset [[mip_level_3]] %int_1
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sparse_fetch_result]] 0
-// CHECK: OpStore %status [[status_0]]
+// CHECK: OpStore %hlsl_out [[status_0]]
 
     uint status;
 
 // CHECK: [[sampled_texel:%[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float [[sparse_fetch_result]] 1
+// CHECK: [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status_0_ld_0]]
 // CHECK: OpStore %val3 [[sampled_texel]]
 
     float4 val1 = tex1dArray.Load(location3);

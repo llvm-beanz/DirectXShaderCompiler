@@ -27,8 +27,10 @@ float4 main() : SV_Target {
 // CHECK: [[tex1_load_3:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image]] %tex2d
 // CHECK: [[val_struct:%[a-zA-Z0-9_]+]] = OpImageSparseDrefGather %SparseResidencyStruct [[tex1_load_3]] [[v2fc]] %float_0_5 ConstOffset [[v2ic]]
 // CHECK: [[status_1:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[val_struct]] 0
-// CHECK: OpStore %status [[status_1]]
+// CHECK: OpStore %hlsl_out [[status_1]]
 // CHECK: [[res_1:%[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float [[val_struct]] 1
+// CHECK: [[status_1_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status_1_ld_0]]
 // CHECK: OpStore %val [[res_1]]
     val = tex2d.GatherCmp(float2(0.5, 0.25), 0.5, int2(1, 2), status);
 

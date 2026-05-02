@@ -363,10 +363,10 @@ void main() {
   t3.GetDimensions(signedMipLevel, signedWidth, signedHeight, signedNumLevels);
 
 #ifdef ERROR
-// ERROR: 367:30: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 'GetDimensions'
   t9.GetDimensions(mipLevel, 0, height, elements, numLevels);
 
-// ERROR: 370:35: error: Output argument must be an l-value
+// ERROR: error: no matching member function for call to 'GetDimensions'
   t9.GetDimensions(width, height, 20);
 #endif
 }

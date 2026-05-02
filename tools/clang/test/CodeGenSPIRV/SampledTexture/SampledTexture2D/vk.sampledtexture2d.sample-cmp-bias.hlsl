@@ -33,10 +33,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex4_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_2d_sampled_image]] %tex2d
 // CHECK: [[sampled_result4:%[a-zA-Z0-9_]+]] = OpImageSparseSampleDrefImplicitLod %SparseResidencyStruct [[tex4_load]] [[v2fc]] %float_1 Bias|ConstOffset|MinLod %float_0_5 [[v2ic]] %float_2_5
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result4]] 0
-// CHECK:                        OpStore %status [[status_0]]
+// CHECK:                        OpStore %hlsl_out [[status_0]]
     uint status;
     float val4 = tex2d.SampleCmpBias(float2(0.5, 0.25), 1.0f, 0.5f, int2(2, 3), 2.5f, status);
 
+// CHECK:                        [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK:                        OpStore %status [[status_0_ld_0]]
 // CHECK: [[tex1d_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_1d_sampled_image]] %tex1d
 // CHECK: [[sampled_1d:%[a-zA-Z0-9_]+]] = OpImageSampleDrefImplicitLod %float [[tex1d_load]] %float_0_5 %float_1 Bias %float_0_5
     float val5 = tex1d.SampleCmpBias(0.5, 1.0f, 0.5f);

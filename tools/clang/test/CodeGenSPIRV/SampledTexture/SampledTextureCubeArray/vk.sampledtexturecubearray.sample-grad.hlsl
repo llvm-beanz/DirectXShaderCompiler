@@ -31,7 +31,10 @@ float4 main() : SV_Target {
 // CHECK: [[ddy_load_2:%[a-zA-Z0-9_]+]] = OpLoad %v3float %ddy
 // CHECK: [[c_sparse:%[a-zA-Z0-9_]+]] = OpImageSparseSampleExplicitLod %SparseResidencyStruct [[tex2]] [[v4fc]] Grad|MinLod [[ddx_load_2]] [[ddy_load_2]] %float_0_5
 // CHECK: [[status0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[c_sparse]] 0
-// CHECK: OpStore %status [[status0]]
+// CHECK: OpStore %hlsl_out [[status0]]
   float4 c = tex.SampleGrad(float4(0.5, 0.25, 0.75, 1.0), ddx, ddy, 0.5f, status);
   return a + b + c;
 }
+
+// CHECK: [[status0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status0_ld_0]]

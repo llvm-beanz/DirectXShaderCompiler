@@ -17,8 +17,11 @@ float4 main() : SV_Target {
 // CHECK: [[tex1:%[a-zA-Z0-9_]+]] = OpLoad [[type_cube_array_sampled]] %texf4
 // CHECK: [[b_sparse:%[a-zA-Z0-9_]+]] = OpImageSparseGather %SparseResidencyStruct [[tex1]] [[v4fc]] %int_1 None
 // CHECK: [[status0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[b_sparse]] 0
-// CHECK: OpStore %status [[status0]]
+// CHECK: OpStore %hlsl_out [[status0]]
   float4 b = texf4.GatherGreen(float4(0.5, 0.25, 0.75, 1.0), status);
 
   return a + b;
 }
+
+// CHECK: [[status0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK: OpStore %status [[status0_ld_0]]

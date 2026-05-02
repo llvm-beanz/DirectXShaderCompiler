@@ -31,10 +31,12 @@ float4 main() : SV_Target {
 // CHECK: [[tex4_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_3d_sampled_image]] %tex3df4
 // CHECK: [[sampled_result4:%[a-zA-Z0-9_]+]] = OpImageSparseSampleImplicitLod %SparseResidencyStruct [[tex4_load]] [[v3fc]] ConstOffset|MinLod [[v3ic]] %float_1
 // CHECK: [[status_0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result4]] 0
-// CHECK:                        OpStore %status [[status_0]]
+// CHECK:                        OpStore %hlsl_out [[status_0]]
     uint status;
     float4 val4 = tex3df4.Sample(float3(0.5, 0.25, 0), int3(2, 3, 1), 1.0f, status);
 
+// CHECK:                        [[status_0_ld_0:%[a-zA-Z0-9_]+]] = OpLoad %uint %hlsl_out
+// CHECK:                        OpStore %status [[status_0_ld_0]]
 // CHECK: [[tex5_load:%[a-zA-Z0-9_]+]] = OpLoad [[type_3d_sampled_image_uint]] %tex3duint
 // CHECK: [[sampled_result5:%[a-zA-Z0-9_]+]] = OpImageSampleImplicitLod %v4uint [[tex5_load]] [[v3fc]] None
 // CHECK: [[val5:%[a-zA-Z0-9_]+]] = OpCompositeExtract %uint [[sampled_result5]] 0

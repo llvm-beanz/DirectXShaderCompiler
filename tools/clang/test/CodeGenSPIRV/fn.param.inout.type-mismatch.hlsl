@@ -12,26 +12,28 @@ void bar( inout float3 p)
 float4 main() : SV_Target0 {
   float3 output;
 // CHECK:       %param_var_input = OpVariable %_ptr_Function_v3half Function
-// CHECK-NEXT: %param_var_output = OpVariable %_ptr_Function_v3half Function
+// CHECK-NEXT:      %hlsl_out = OpVariable %_ptr_Function_v3half Function
 
-// CHECK:      [[outputFloat3:%[0-9]+]] = OpLoad %v3float %output
-// CHECK-NEXT:  [[outputHalf3:%[0-9]+]] = OpFConvert %v3half [[outputFloat3]]
-// CHECK-NEXT:                         OpStore %param_var_output [[outputHalf3]]
-// CHECK-NEXT:              {{%[0-9]+}} = OpFunctionCall %void %foo %param_var_input %param_var_output
+// CHECK:                              OpStore %param_var_input {{%[0-9]+}}
+// CHECK-NEXT:              {{%[0-9]+}} = OpFunctionCall %void %foo %param_var_input %hlsl_out
   foo(float3(1, 0, 0), output);
-// CHECK-NEXT:  [[outputHalf3_0:%[0-9]+]] = OpLoad %v3half %param_var_output
+// CHECK-NEXT:  [[outputHalf3_0:%[0-9]+]] = OpLoad %v3half %hlsl_out
 // CHECK-NEXT: [[outputFloat3_0:%[0-9]+]] = OpFConvert %v3float [[outputHalf3_0]]
 // CHECK-NEXT:                         OpStore %output [[outputFloat3_0]]
 
-// CHECK:      [[f:%[0-9]+]] = OpLoad %float %f
-// CHECK-NEXT: [[splat:%[0-9]+]] = OpCompositeConstruct %v3float [[f]] [[f]] [[f]]
-// CHECK-NEXT:      OpStore %param_var_p [[splat]]
-// CHECK-NEXT: OpFunctionCall %void %bar %param_var_p
-// CHECK-NEXT: [[ret:%[0-9]+]] = OpLoad %v3float %param_var_p
-// CHECK-NEXT: [[ext:%[0-9]+]] = OpCompositeExtract %float [[ret]] 0
-// CHECK-NEXT:      OpStore %f [[ext]]
+// CHECK:      [[f1:%[0-9]+]] = OpLoad %float %f
+// CHECK-NEXT: [[f2:%[0-9]+]] = OpLoad %float %f
+// CHECK-NEXT: [[f3:%[0-9]+]] = OpLoad %float %f
+// CHECK-NEXT: [[splat:%[0-9]+]] = OpCompositeConstruct %v3float [[f1]] [[f2]] [[f3]]
+// CHECK-NEXT:               OpStore %p3 [[splat]]
+// CHECK-NEXT: [[p3_ld:%[0-9]+]] = OpLoad %v3float %p3
+// CHECK-NEXT:               OpStore %temp_var_hlsl_inout [[p3_ld]]
+// CHECK-NEXT: OpFunctionCall %void %bar %temp_var_hlsl_inout
+// CHECK-NEXT: [[ret:%[0-9]+]] = OpLoad %v3float %temp_var_hlsl_inout
+// CHECK-NEXT:               OpStore %p3 [[ret]]
    float f = 0;
-   bar(f);
+   float3 p3 = float3(f, f, f);
+   bar(p3);
 
 // CHECK: [[outputFloat3_1:%[0-9]+]] = OpLoad %v3float %output
 // CHECK-NEXT: OpCompositeExtract %float [[outputFloat3_2:%[0-9]+]] 0
