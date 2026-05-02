@@ -17,22 +17,48 @@ void fn() {
   D(X, Y, X);
 }
 
+// Each out/inout argument materializes its own copy-in/copy-out temporary.
+// Aliasing is not exploited at the AST level; the IR optimizer is expected
+// to elide redundant copies after inlining.
+
 // CHECK: define internal void @"\01?fn{{[@$?.A-Za-z0-9_]+}}"()
 // CHECK: [[X:%[0-9A-Z]+]] = alloca float, align 4
 // CHECK: [[Z:%[0-9A-Z]+]] = alloca float, align 4
 // CHECK: [[Y:%[0-9A-Z]+]] = alloca i32, align 4
 // CHECK: [[D:%[0-9A-Z]+]] = alloca %struct.Doggo
-// CHECK: [[Tmp1:%[0-9a-z.]+]] = alloca float
+// CHECK: [[T1A:%[0-9a-z.]+]] = alloca float
+// CHECK: [[T1B:%[0-9a-z.]+]] = alloca i32
+// CHECK: [[T1C:%[0-9a-z.]+]] = alloca float
+// CHECK: [[T2A:%[0-9a-z.]+]] = alloca float
+// CHECK: [[T2B:%[0-9a-z.]+]] = alloca i32
+// CHECK: [[T2C:%[0-9a-z.]+]] = alloca float
 
-// First call has no copy-in/copy out parameters since all parameters are unique.
-// CHECK: call void @"\01??RDoggo{{[@$?.A-Za-z0-9_]+}}"(%struct.Doggo* [[D]], float* dereferenceable(4) [[X]], i32* dereferenceable(4) [[Y]], float* dereferenceable(4) [[Z]])
+// First call D(X, Y, Z) - all three args copied right-to-left.
+// CHECK: load float, float* [[Z]]
+// CHECK: store float {{.*}}, float* [[T1A]]
+// CHECK: load i32, i32* [[Y]]
+// CHECK: store i32 {{.*}}, i32* [[T1B]]
+// CHECK: load float, float* [[X]]
+// CHECK: store float {{.*}}, float* [[T1C]]
+// CHECK: call void @"\01??RDoggo{{[@$?.A-Za-z0-9_]+}}"(%struct.Doggo* [[D]], float* dereferenceable(4) [[T1C]], i32* dereferenceable(4) [[T1B]], float* dereferenceable(4) [[T1A]])
+// CHECK: load float, float* [[T1C]]
+// CHECK: store float {{.*}}, float* [[X]]
+// CHECK: load i32, i32* [[T1B]]
+// CHECK: store i32 {{.*}}, i32* [[Y]]
+// CHECK: load float, float* [[T1A]]
+// CHECK: store float {{.*}}, float* [[Z]]
 
-// The second call copies X for the third parameter.
-// CHECK: [[TmpX:%[0-9A-Z]+]] = load float, float* [[X]], align 4
-// CHECK: store float [[TmpX]], float* [[Tmp1]]
-
-// CHECK: call void @"\01??RDoggo{{[@$?.A-Za-z0-9_]+}}"(%struct.Doggo* [[D]], float* dereferenceable(4) [[X]], i32* dereferenceable(4) [[Y]], float* dereferenceable(4) [[Tmp1]])
-
-// The third call stores parameter 3 to X after the call.
-// CHECK: [[TmpX:%[0-9A-Z]+]] = load float, float* [[Tmp1]]
-// CHECK: store float [[TmpX]], float* [[X]]
+// Second call D(X, Y, X).
+// CHECK: load float, float* [[X]]
+// CHECK: store float {{.*}}, float* [[T2A]]
+// CHECK: load i32, i32* [[Y]]
+// CHECK: store i32 {{.*}}, i32* [[T2B]]
+// CHECK: load float, float* [[X]]
+// CHECK: store float {{.*}}, float* [[T2C]]
+// CHECK: call void @"\01??RDoggo{{[@$?.A-Za-z0-9_]+}}"(%struct.Doggo* [[D]], float* dereferenceable(4) [[T2C]], i32* dereferenceable(4) [[T2B]], float* dereferenceable(4) [[T2A]])
+// CHECK: load float, float* [[T2C]]
+// CHECK: store float {{.*}}, float* [[X]]
+// CHECK: load i32, i32* [[T2B]]
+// CHECK: store i32 {{.*}}, i32* [[Y]]
+// CHECK: load float, float* [[T2A]]
+// CHECK: store float {{.*}}, float* [[X]]

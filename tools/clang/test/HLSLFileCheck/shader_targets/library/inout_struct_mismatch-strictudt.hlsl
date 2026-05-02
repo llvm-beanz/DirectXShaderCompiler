@@ -1,10 +1,12 @@
 // RUN: %dxc -T lib_6_x -default-linkage external -HV 2021 %s | FileCheck %s
 
+// With explicit copy-in/copy-out for inout aggregates, the cast from
+// CallStruct to ParamStruct materializes a ParamStruct temporary and the
+// fields are copied one by one before/after the call.
 // CHECK: define <4 x float>
 // CHECK-SAME: main
-// CHECK: [[local:%(local)|([0-9]+)]] = alloca %struct.CallStruct
-// CHECK: [[param:%[0-9]+]] = bitcast %struct.CallStruct* [[local]] to %struct.ParamStruct*
-// CHEKC: call void @"\01?modify_ext{{.*}}(%struct.ParamStruct* dereferenceable(8) [[param]])
+// CHECK: alloca %struct.ParamStruct
+// CHECK: call void @"\01?modify_ext{{.*}}(%struct.ParamStruct* {{.*}}dereferenceable(8) %{{[0-9]+}})
 
 struct ParamStruct {
   int i;

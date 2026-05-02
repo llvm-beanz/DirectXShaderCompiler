@@ -1,11 +1,15 @@
 // RUN: %dxc -E main -Tps_6_0 -fcgl %s | FileCheck %s
 
 
-// Make sure only one alloca [5 x i32] in main.
-// CHECK:define float @main(
-// CHECK:alloca [5 x i32]
-// CHECK-NOT:alloca [5 x i32]
-// CHECK:ret float
+// Each inout array argument materializes a copy-in/copy-out temporary at the
+// AST level: main allocates the original array plus one temp for foo and one
+// for bar. The IR optimizer is expected to elide these copies after inlining.
+// CHECK: define float @main(
+// CHECK: alloca [5 x i32]
+// CHECK: alloca [5 x i32]
+// CHECK: alloca [5 x i32]
+// CHECK-NOT: alloca [5 x i32]
+// CHECK: ret float
 
 void foo(inout uint a[5], uint b) {
     a[0] = b;
