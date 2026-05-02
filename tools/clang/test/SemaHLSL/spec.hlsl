@@ -154,8 +154,8 @@ namespace ns_std_conversions {
     fn_f4(u4); // vector element
     f3 = f4;   // expected-warning {{implicit truncation of vector type}} expected-warning {{implicit truncation of vector type}}
     // f4 = f3; // fxc-error {{error X3017: cannot implicitly convert from 'float3' to 'float4'}}
-    fn_iof(f1); // inout case (float1->float - vector single element conversion; float->float1 vector splat) // expected-error{{illegal scalar extension cast on argument f1 to inout paramemter}}
-    fn_iof1(u); // inout case (uint->float1 - vector splat; float1->uint vector single element conversion) // expected-error{{illegal scalar extension cast on argument u to inout paramemter}}
+    fn_iof(f1); // inout case (float1->float - vector single element conversion; float->float1 vector splat). float and float1 are scalar-equivalent in HLSL, so no diagnostic.
+    fn_iof1(u); // inout case (uint->float1 - vector splat; float1->uint vector single element conversion). uint and float1 are both single-element scalar-like, so no diagnostic.
   }
 
   struct struct_f44 { float4x4 f44; };
