@@ -28,10 +28,9 @@ float main(float4 a
   uint status;
   float r = 0;
 
-// CHECK: %[[AnnotT1D:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[T1D]], %dx.types.ResourceProperties { i32 1, i32 1033 })  ; AnnotateHandle(res,props)  resource: Texture1D<4xF32>
 // CHECK: %[[AnnotSampler:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[Sampler]], %dx.types.ResourceProperties { i32 32782, i32 0 })  ; AnnotateHandle(res,props)  resource: SamplerComparisonState
+// CHECK: %[[AnnotT1D:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[T1D]], %dx.types.ResourceProperties { i32 1, i32 1033 })  ; AnnotateHandle(res,props)  resource: Texture1D<4xF32>
 // CHECK: call %dx.types.ResRet.f32 @dx.op.sampleCmpBias.f32(i32 255, %dx.types.Handle %[[AnnotT1D]], %dx.types.Handle %[[AnnotSampler]], float %{{.*}}, float undef, float undef, float undef, i32 0, i32 undef, i32 undef, float %{{.*}}, float %{{.*}}, float undef)
-
   r += tex1d.SampleCmpBias(samp1, a.x, cmpVal, bias);
 
 // CHECK: %[[AnnotT1DArray:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[T1DArray]], %dx.types.ResourceProperties { i32 6, i32 1033 })  ; AnnotateHandle(res,props)  resource: Texture1DArray<4xF32>

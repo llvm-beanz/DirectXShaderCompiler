@@ -30,8 +30,8 @@ float main(float4 a
   uint status;
   float r = 0;
 
-// CHECK: %[[AnnotCube:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[Cube]], %dx.types.ResourceProperties { i32 5, i32 1033 })  ; AnnotateHandle(res,props)  resource: TextureCube<4xF32>
 // CHECK: %[[AnnotSampler:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[Sampler]], %dx.types.ResourceProperties { i32 32782, i32 0 })  ; AnnotateHandle(res,props)  resource: SamplerComparisonState
+// CHECK: %[[AnnotCube:.+]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %[[Cube]], %dx.types.ResourceProperties { i32 5, i32 1033 })  ; AnnotateHandle(res,props)  resource: TextureCube<4xF32>
 // CHECK: call %dx.types.ResRet.f32 @dx.op.sampleCmpGrad.f32(i32 254, %dx.types.Handle %[[AnnotCube]], %dx.types.Handle %[[AnnotSampler]], float %{{.*}}, float %{{.*}}, float %{{.*}}, float undef, i32 undef, i32 undef, i32 undef, float %{{.*}}, float %{{.*}}, float %{{.*}}, float %{{.*}}, float %{{.*}}, float %{{.*}}, float %{{.*}}, float undef)  ; SampleCmpGrad(srv,sampler,coord0,coord1,coord2,coord3,offset0,offset1,offset2,compareValue,ddx0,ddx1,ddx2,ddy0,ddy1,ddy2,clamp)
 
   r += texcube.SampleCmpGrad(samp1, a.xyz, cmpVal, ddx.xxy, ddy.yyx);
