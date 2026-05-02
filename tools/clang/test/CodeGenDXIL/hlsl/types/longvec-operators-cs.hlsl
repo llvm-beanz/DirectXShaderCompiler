@@ -426,20 +426,6 @@ vector<bool, NUM> logic(vector<bool, NUM> truth[10], vector<TYPE, NUM> consequen
   vector<bool, NUM> res[10];
   // CHECK: [[ResIx:%.*]] = add i32 [[OutIx]], 4
   // CHECK: [[TruHdl:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[Truths]]
-  // CHECK: [[TruIx:%.*]] = add i32 [[InIx2]], 4
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF0]], i32 [[IALN]])
-  // CHECK: [[ivec0:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF1]], i32 [[IALN]])
-  // CHECK: [[ivec1:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF2]], i32 [[IALN]])
-  // CHECK: [[ivec2:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF3]], i32 [[IALN]])
-  // CHECK: [[ivec3:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF4]], i32 [[IALN]])
-  // CHECK: [[ivec4:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
-  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF5]], i32 [[IALN]])
-  // CHECK: [[ivec5:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
-
   // CHECK: [[VecIx:%.*]] = add i32 [[InIx1]], 4
   // CHECK: [[InHdl:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[Input]]
   // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferVectorLoad.[[TY]](i32 303, %dx.types.Handle [[InHdl]], i32 [[VecIx]], i32 [[OFF0]], i32 [[ALN]])
@@ -456,6 +442,20 @@ vector<bool, NUM> logic(vector<bool, NUM> truth[10], vector<TYPE, NUM> consequen
   // CHECK: [[vec5:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
   // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferVectorLoad.[[TY]](i32 303, %dx.types.Handle [[InHdl]], i32 [[VecIx]], i32 [[OFF6]], i32 [[ALN]])
   // CHECK: [[vec6:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
+
+  // CHECK: [[TruIx:%.*]] = add i32 [[InIx2]], 4
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF0]], i32 [[IALN]])
+  // CHECK: [[ivec0:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF1]], i32 [[IALN]])
+  // CHECK: [[ivec1:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF2]], i32 [[IALN]])
+  // CHECK: [[ivec2:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF3]], i32 [[IALN]])
+  // CHECK: [[ivec3:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF4]], i32 [[IALN]])
+  // CHECK: [[ivec4:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
+  // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[ITY]] @dx.op.rawBufferVectorLoad.[[ITY]](i32 303, %dx.types.Handle [[TruHdl]], i32 [[TruIx]], i32 [[BOFF5]], i32 [[IALN]])
+  // CHECK: [[ivec5:%.*]] = extractvalue %dx.types.ResRet.[[ITY]] [[ld]], 0
 
 
   // CHECK: [[cmp:%[0-9]*]] = icmp ne <[[NUM]] x i32> [[ivec0]], zeroinitializer
@@ -526,6 +526,7 @@ vector<TYPE, NUM> index(vector<TYPE, NUM> things[11], int i)[11] {
 
   // CHECK: [[ResIx:%.*]] = add i32 [[OutIx]], 5
   // CHECK: [[ResHdl:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[Output]]
+  // CHECK: [[Ix:%.*]] = add i32 [[InIx2]], 5
   // CHECK: [[VecIx:%.*]] = add i32 [[InIx1]], 5
   // CHECK: [[InHdl:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[Input]]
 
@@ -573,8 +574,6 @@ vector<TYPE, NUM> index(vector<TYPE, NUM> things[11], int i)[11] {
   // CHECK: [[ld:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferVectorLoad.[[TY]](i32 303, %dx.types.Handle [[InHdl]], i32 [[VecIx]], i32 [[OFF10]], i32 [[ALN]])
   // CHECK: [[vec10:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[ld]], 0
   // CHECK: store <[[NUM]] x [[TYPE]]> [[vec10]], <[[NUM]] x [[TYPE]]>* [[adr]], align [[ALN]]
-
-  // CHECK: [[Ix:%.*]] = add i32 [[InIx2]], 5
 
   // CHECK: [[adr0:%.*]] = getelementptr inbounds [11 x <[[NUM]] x [[TYPE]]>], [11 x <[[NUM]] x [[TYPE]]>]* [[scratch1]], i32 0, i32 0
   // CHECK: store <[[NUM]] x [[TYPE]]> zeroinitializer, <[[NUM]] x [[TYPE]]>* [[adr0]], align [[ALN]]

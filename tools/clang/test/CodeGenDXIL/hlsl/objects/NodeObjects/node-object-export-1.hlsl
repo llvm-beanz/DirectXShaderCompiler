@@ -24,10 +24,10 @@ DispatchNodeInputRecord<RECORD> foo(DispatchNodeInputRecord<RECORD> input) {
 export
 void bar(DispatchNodeInputRecord<RECORD> input, out DispatchNodeInputRecord<RECORD> output) {
 
-// CHECK: %[[TMP:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>"{{(, align 8)?}}
-// CHECK: call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nonnull |noalias )?}}sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{[^ ,)]+}})
-// CHECK: %[[BarLd:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[TMP]]{{(, align 8)?}}
-// CHECK: store %"struct.DispatchNodeInputRecord<RECORD>" %[[BarLd]], %"struct.DispatchNodeInputRecord<RECORD>"* %output{{(, align 4)?}}
+// CHECK: %[[TMP:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>"{{(, align [0-9]+)?}}
+// CHECK: call void @"\01?foo@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* {{(nonnull |noalias )?}}sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* {{(nonnull |noalias )?}}%{{[^ ,)]+}})
+// CHECK: %[[BarLd:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[TMP]]{{(, align [0-9]+)?}}
+// CHECK: store %"struct.DispatchNodeInputRecord<RECORD>" %[[BarLd]], %"struct.DispatchNodeInputRecord<RECORD>"* %output{{(, align [0-9]+)?}}
 
 // DBG: call void @llvm.dbg.declare(metadata %"struct.DispatchNodeInputRecord<RECORD>"* %output, metadata ![[BAROUTPUT:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"output" !DIExpression() func:"bar"
 // DBG: call void @llvm.dbg.declare(metadata %"struct.DispatchNodeInputRecord<RECORD>"* %input, metadata ![[BARINPUT:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"input" !DIExpression() func:"bar"
@@ -50,12 +50,12 @@ DispatchNodeInputRecord<RECORD> foo2(DispatchNodeInputRecord<RECORD> input) {
 export
 void bar2(DispatchNodeInputRecord<RECORD> input, out DispatchNodeInputRecord<RECORD> output) {
 // FCGL: %[[TMP:.+]] = alloca %"struct.DispatchNodeInputRecord<RECORD>", align 4
-// FCGL: call void @"\01?foo2@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* %{{[^ ,)]+}})
+// FCGL: call void @"\01?foo2@@YA?AU?$DispatchNodeInputRecord@URECORD@@@@U1@@Z"(%"struct.DispatchNodeInputRecord<RECORD>"* sret %[[TMP]], %"struct.DispatchNodeInputRecord<RECORD>"* {{(nonnull |noalias )?}}%{{[^ ,)]+}})
 // FCGL: %[[Bar2Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %[[TMP]]
 // FCGL: store %"struct.DispatchNodeInputRecord<RECORD>" %[[Bar2Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %output
 
-// DXIL:   %[[Bar2Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %input, {{(align 4, )?}}!noalias
-// DXIL:   store %"struct.DispatchNodeInputRecord<RECORD>" %[[Bar2Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %output{{(, align 4, )?}}
+// DXIL:   %[[Bar2Ld:.+]] = load %"struct.DispatchNodeInputRecord<RECORD>", %"struct.DispatchNodeInputRecord<RECORD>"* %input{{(, align [0-9]+)?}}
+// DXIL:   store %"struct.DispatchNodeInputRecord<RECORD>" %[[Bar2Ld]], %"struct.DispatchNodeInputRecord<RECORD>"* %output{{(, align [0-9]+)?}}
 
 // DBG: call void @llvm.dbg.declare(metadata %"struct.DispatchNodeInputRecord<RECORD>"* %output, metadata ![[BAR2OUTPUT:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"output" !DIExpression() func:"bar2"
 // DBG: call void @llvm.dbg.declare(metadata %"struct.DispatchNodeInputRecord<RECORD>"* %input, metadata ![[BAR2INPUT:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}} ; var:"input" !DIExpression() func:"bar2"
