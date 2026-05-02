@@ -4616,12 +4616,12 @@ TEST_F(ValidationTest, AtomicsInvalidDests) {
   RewriteAssemblyCheckMsg(
       L"..\\DXILValidation\\atomics.hlsl", "lib_6_3", pArguments.data(), 2,
       nullptr, 0, {"atomicrmw add i32 addrspace(3)* @\"\\01?gs_var@@3IA\""},
-      {"atomicrmw add i32* %res"},
+      {"atomicrmw add i32* %11"},
       "Non-groupshared or node record destination to atomic operation.", false);
   RewriteAssemblyCheckMsg(
       L"..\\DXILValidation\\atomics.hlsl", "lib_6_3", pArguments.data(), 2,
       nullptr, 0, {"cmpxchg i32 addrspace(3)* @\"\\01?gs_var@@3IA\""},
-      {"cmpxchg i32* %res"},
+      {"cmpxchg i32* %11"},
       "Non-groupshared or node record destination to atomic operation.", false);
 }
 
