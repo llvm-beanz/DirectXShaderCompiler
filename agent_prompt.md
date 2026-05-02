@@ -16,3 +16,5 @@ the root of the repository and commit it in its own commit when you're done.
 
 I'm now seeing just a few test failures locally. Please fix the remaining test
 failures on the branch.
+
+See test_output.txt for details of my local failures.
