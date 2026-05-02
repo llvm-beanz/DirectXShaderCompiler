@@ -20,33 +20,27 @@
 // CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[OutThisCpyPtr]], i8* [[OutArgCpyPtr]], i64 8, i32 1, i1 false)
 
 // `bar` calls `lib_func_3` with `this` as an `inout` parameter, so it needs to
-// be initialized first, then copied back after the call.
+// be initialized first, then copied back after the call. With the inout
+// rewrite this is now done as a struct memcpy through the Child->Parent
+// bitcast rather than a field-by-field copy.
 
 // CHECK-LABEL: define linkonce_odr void @"\01?bar@
 // CHEKC-SAME: (%class.Child* [[this:%.+]])
 // CHECK: [[InOutArg:%.+]] = alloca %class.Parent
+// CHECK: [[ThisAsParent:%.+]] = bitcast %class.Child* [[this]] to %class.Parent*
 
-// Initialize the temporary from `this`.
-// CHECK-DAG: [[ThisIPtr:%.+]] = getelementptr inbounds %class.Child, %class.Child* [[this]], i32 0, i32 0, i32 0
-// CHECK-DAG: [[ThisFPtr:%.+]] = getelementptr inbounds %class.Child, %class.Child* [[this]], i32 0, i32 0, i32 1
-// CHECK-DAG: [[ThisI:%.+]] = load i32, i32* [[ThisIPtr]]
-// CHECK-DAG: [[ThisF:%.+]] = load float, float* [[ThisFPtr]]
-// CHECK-DAG: [[TmpIPtr:%.+]] = getelementptr inbounds %class.Parent, %class.Parent* [[InOutArg]], i32 0, i32 0
-// CHECK-DAG: [[TmpFPtr:%.+]] = getelementptr inbounds %class.Parent, %class.Parent* [[InOutArg]], i32 0, i32 1
-// CHECK-DAG: store i32 [[ThisI]], i32* [[TmpIPtr]]
-// CHECK-DAG: store float [[ThisF]], float* [[TmpFPtr]]
+// Copy this into the temporary.
+// CHECK-DAG: [[TmpInI8:%.+]] = bitcast %class.Parent* [[InOutArg]] to i8*
+// CHECK-DAG: [[ThisInI8:%.+]] = bitcast %class.Parent* [[ThisAsParent]] to i8*
+// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[TmpInI8]], i8* [[ThisInI8]], i64 8, i32 1, i1 false)
 
 // Call lib_func3 with the temporary.
-// CHECK-DAG: call void @"\01?lib_func3@{{[@$?.A-Za-z0-9_]+}}"(%class.Parent* dereferenceable(8) [[InOutArg]])
+// CHECK: call void @"\01?lib_func3@{{[@$?.A-Za-z0-9_]+}}"(%class.Parent* dereferenceable(8) [[InOutArg]])
 
-// Copy back the temporary to `this`. There is a redundant bitcast here due to
-// the aggregate copy trying to match the target type before the memcpy is
-// generated. This could be removed in the future.
-
-// CHECK-DAG: [[ThisCastParent:%.+]] = bitcast %class.Child* [[this]] to %class.Parent*
-// CHECK-DAG: [[ThisCastI8:%.+]] = bitcast %class.Parent* [[ThisCastParent]] to i8*
-// CHECK-DAG: [[TmpCastI8:%.+]] = bitcast %class.Parent* [[InOutArg]] to i8*
-// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[ThisCastI8]], i8* [[TmpCastI8]], i64 8, i32 1, i1 false)
+// Copy the temporary back to this.
+// CHECK-DAG: [[ThisOutI8:%.+]] = bitcast %class.Parent* [[ThisAsParent]] to i8*
+// CHECK-DAG: [[TmpOutI8:%.+]] = bitcast %class.Parent* [[InOutArg]] to i8*
+// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[ThisOutI8]], i8* [[TmpOutI8]], i64 8, i32 1, i1 false)
 
 
 // CHECK-LABEL: define linkonce_odr i32 @"\01?foo@
@@ -58,8 +52,8 @@
 // CHECK-DAG: [[ThisFPtr:%.+]] = getelementptr inbounds %class.Child, %class.Child* [[this]], i32 0, i32 0, i32 1
 // CHECK-DAG: [[ThisI:%.+]] = load i32, i32* [[ThisIPtr]]
 // CHECK-DAG: [[ThisF:%.+]] = load float, float* [[ThisFPtr]]
-// CHECK-DAG: [[TmpIPtr:%.+]] = getelementptr inbounds %class.Parent, %class.Parent* [[InOutArg]], i32 0, i32 0
-// CHECK-DAG: [[TmpFPtr:%.+]] = getelementptr inbounds %class.Parent, %class.Parent* [[InOutArg]], i32 0, i32 1
+// CHECK-DAG: [[TmpIPtr:%.+]] = getelementptr inbounds %class.Parent, %class.Parent* %[[Arg]], i32 0, i32 0
+// CHECK-DAG: [[TmpFPtr:%.+]] = getelementptr inbounds %class.Parent, %class.Parent* %[[Arg]], i32 0, i32 1
 // CHECK-DAG: store i32 [[ThisI]], i32* [[TmpIPtr]]
 // CHECK-DAG: store float [[ThisF]], float* [[TmpFPtr]]
 

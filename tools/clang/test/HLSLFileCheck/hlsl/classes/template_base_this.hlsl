@@ -29,7 +29,7 @@
 // around the casts. The casts themselves might be removed or changed in a
 // future change.
 
-// AST-NEXT: ImplicitCastExpr {{.*}} 'float [3]' <LValueToRValue>
+// AST-NEXT: ImplicitCastExpr {{.*}} 'float *' <ArrayToPointerDecay>
 // AST-NEXT: MemberExpr {{.*}} 'float [3]' lvalue .mArr
 // AST-NEXT: ImplicitCastExpr {{.*}} 'array<float, 3U>':'array<float, 3>' lvalue <UncheckedDerivedToBase (array)>
 // AST-NEXT: CXXThisExpr {{.* }}'array_ext<float, 3>' lvalue this
