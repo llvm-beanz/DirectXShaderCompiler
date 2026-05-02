@@ -180,12 +180,12 @@ inline void EndGroup(const wchar_t *name) {
   fflush(stderr);
 }
 inline void Comment(const wchar_t *msg) {
-  fputws(msg, stdout);
-  fputwc(L'\n', stdout);
+  fprintf(stdout, "%ls\n", msg);
+  fflush(stdout);
 }
 inline void Error(const wchar_t *msg) {
-  fputws(msg, stderr);
-  fputwc(L'\n', stderr);
+  fprintf(stderr, "%ls\n", msg);
+  fflush(stderr);
   ADD_FAILURE();
 }
 } // namespace Log
