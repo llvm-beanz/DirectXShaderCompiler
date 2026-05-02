@@ -14,7 +14,6 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Some of DXC's output (particularly in tests) contains carriage returns (`\r`)
-even on unix platforms that only use line feed (`\n`) newlines. Can you do a
-search of DXC's code and identify places where carriage returns are explicitly
-added and replace them with an appropriate portable implementation?
+A previous change added DxcSupport\UnicodeTest.cpp, which includes unistd.h.
+Unfortunately unistd.h isn't available on Windows. Can you update this test to
+build and work on Windows?
