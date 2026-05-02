@@ -16857,7 +16857,8 @@ void Sema::CheckHLSLArrayAccess(const Expr *expr) {
 }
 
 ExprResult Sema::ActOnOutParamExpr(ParmVarDecl *Param, Expr *Arg) {
-  bool IsInOut = Param->hasAttr<HLSLInOutAttr>();
+  bool IsInOut = Param->hasAttr<HLSLInOutAttr>() ||
+                 Param->getParamModifiers().isInOut();
   if (!Arg->isLValue()) {
     Diag(Arg->getLocStart(), diag::error_hlsl_inout_lvalue)
         << Arg << (IsInOut ? 1 : 0);
