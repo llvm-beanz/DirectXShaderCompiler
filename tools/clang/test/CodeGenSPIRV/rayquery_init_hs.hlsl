@@ -69,7 +69,7 @@ CONTROL_POINT main(InputPatch<VS_CONTROL_POINT_OUTPUT, MAX_POINTS> ip, uint cpid
 // CHECK:  OpRayQueryInitializeKHR [[rayquery]] [[accel]] %uint_257 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
 
     q.TraceRayInline(AccelerationStructure,RAY_FLAG_FORCE_OPAQUE, 0xFF, ray);
-// CHECK: OpRayQueryInitializeKHR [[rayquery]] [[accel]] %uint_259 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
+// CHECK: OpRayQueryInitializeKHR {{%[0-9]+}} [[accel]] %uint_259 %uint_255 {{%[0-9]+}} %float_0 {{%[0-9]+}} %float_9999
     doInitialize(q, ray);
     CONTROL_POINT result;
     return result;

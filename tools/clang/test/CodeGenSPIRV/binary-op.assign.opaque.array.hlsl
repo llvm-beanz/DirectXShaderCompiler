@@ -59,9 +59,11 @@ float4 main() : SV_Target {
     samplers = r.samplers.samplers;
 
 // Copy to function parameter
-// CHECK:      OpAccessChain %_ptr_Function_type_sampler %samplers %int_0
+// CHECK:      OpLoad %_arr_type_sampler_uint_2 %samplers
+// CHECK-NEXT: OpStore %tmp_hlsl_array
+// CHECK-NEXT: OpAccessChain %_ptr_Function_type_sampler %tmp_hlsl_array %int_0
 // CHECK-NEXT: OpLoad
-// CHECK-NEXT: OpAccessChain %_ptr_Function_type_sampler %samplers %int_1
+// CHECK-NEXT: OpAccessChain %_ptr_Function_type_sampler %tmp_hlsl_array %int_1
 // CHECK-NEXT: OpLoad
 // CHECK-NEXT: OpCompositeConstruct %_arr_type_sampler_uint_2
     return doSample(textures[0], samplers);

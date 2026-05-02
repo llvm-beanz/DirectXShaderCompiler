@@ -1444,13 +1444,24 @@ bool SpirvEmitter::loadIfAliasVarRef(const Expr *varExpr,
   const auto range = (rangeOverride != SourceRange())
                          ? rangeOverride
                          : varExpr->getSourceRange();
+
+  // Strip CK_ArrayToPointerDecay so that local alias arrays of struct-based
+  // buffer types (e.g. ByteAddressBuffer arr[2]) are recognized. The decay
+  // cast turns the array type into a pointer, which would otherwise not pass
+  // the isAKindOfStructuredOrByteBuffer check.
+  const Expr *exprForType = varExpr;
+  if (const auto *castExpr = dyn_cast<ImplicitCastExpr>(varExpr)) {
+    if (castExpr->getCastKind() == CK_ArrayToPointerDecay)
+      exprForType = castExpr->getSubExpr();
+  }
+
   if ((*instr) && (*instr)->containsAliasComponent() &&
-      isAKindOfStructuredOrByteBuffer(varExpr->getType())) {
+      isAKindOfStructuredOrByteBuffer(exprForType->getType())) {
     // Load the pointer of the aliased-to-variable if the expression has a
     // pointer to pointer type.
-    if (varExpr->isGLValue()) {
-      *instr = spvBuilder.createLoad(varExpr->getType(), *instr,
-                                     varExpr->getExprLoc(), range);
+    if (exprForType->isGLValue()) {
+      *instr = spvBuilder.createLoad(exprForType->getType(), *instr,
+                                     exprForType->getExprLoc(), range);
     }
     return true;
   }

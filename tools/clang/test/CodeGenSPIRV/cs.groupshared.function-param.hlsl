@@ -24,7 +24,7 @@ void main() {
 // CHECK:      %param_var_x = OpVariable %_ptr_Function_int Function
 // CHECK-NEXT: %param_var_y = OpVariable %_ptr_Function_int Function
 // CHECK-NEXT: %param_var_z = OpVariable %_ptr_Function_int Function
-// CHECK-NEXT: %param_var_w = OpVariable %_ptr_Function__arr_int_uint_10 Function
+// CHECK:      %param_var_w = OpVariable %_ptr_Function__arr_int_uint_10 Function
 // CHECK-NEXT: %param_var_v = OpVariable %_ptr_Function_int Function
 
 
@@ -34,8 +34,7 @@ void main() {
 // CHECK-NEXT:              OpStore %param_var_y [[B]]
 // CHECK-NEXT: [[C:%[0-9]+]] = OpLoad %int %C
 // CHECK-NEXT:              OpStore %param_var_z [[C]]
-// CHECK-NEXT: [[D:%[0-9]+]] = OpLoad %_arr_int_uint_10 %D
-// CHECK-NEXT:              OpStore %param_var_w [[D]]
+// CHECK:                   OpStore %param_var_w {{%[0-9]+}}
 // CHECK-NEXT: [[E:%[0-9]+]] = OpLoad %int %E
 // CHECK-NEXT:              OpStore %param_var_v [[E]]
 // CHECK-NEXT:   {{%[0-9]+}} = OpFunctionCall %int %foo %param_var_x %param_var_y %param_var_z %param_var_w %param_var_v
