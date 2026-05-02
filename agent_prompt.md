@@ -31,3 +31,4 @@ Can you inspec the DXC codebases' code that converts between UTF-8 and wide
 character formats and clean up the abstraction so that strings always remain
 UTF-8 until they are used in a way where they must be wide character (such as
 writing them to a console, file, or output buffer)?
+
