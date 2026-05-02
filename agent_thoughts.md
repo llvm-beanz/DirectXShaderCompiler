@@ -259,3 +259,26 @@ For every place I changed, the destination is one of:
   `tools/clang/test/CodeGenDXIL/`, which still pass — FileCheck strips
   trailing `\r` from input, so they were tolerant of either form, but the
   underlying compiler now emits the same bytes on every platform.
+
+## Follow-up: fix UnicodeTest.cpp Windows build
+
+The previously added `unittests/DxcSupport/UnicodeTest.cpp` unconditionally
+included `<unistd.h>` and `<fcntl.h>`. Those headers are POSIX-only and not
+present in the Windows SDK, so the test failed to build on Windows.
+
+The only consumer of those headers is the `StdStreamRedirect` helper that uses
+`pipe`/`dup`/`fcntl` to capture stdout/stderr for the
+`WriteUtf8ToConsolePreservesBytes` and `WriteUtf8ToConsoleErrorPath` tests.
+That helper and both tests are already wrapped in `#ifndef _WIN32` (the
+console-bytes regression they guard is a non-Windows-only issue, since the
+Windows path goes through `WriteConsoleW`).
+
+The minimal, surgical fix is therefore to move the two POSIX includes inside
+the same `#ifndef _WIN32` guard. The Windows-relevant tests
+(`Utf8WideRoundTrip`, `Utf8WideRoundTripWithLength`,
+`Utf8BufferToWideBufferRoundTrip`) only depend on `<cstdio>`, `<string>`, and
+the DxcSupport / gtest headers, all of which are portable.
+
+Verified locally on Linux by rebuilding `DxcSupportTests` and running it; all
+six tests still pass. The change is purely a compile-time guard, so no
+behaviour changes on either platform.
