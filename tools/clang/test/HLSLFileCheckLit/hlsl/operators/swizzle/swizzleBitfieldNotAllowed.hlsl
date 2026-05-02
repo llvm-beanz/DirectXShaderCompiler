@@ -19,5 +19,5 @@ float4 main(uint addr: TEXCOORD): SV_Target
 {      
     myConstBuff.v2.x = 4; /* expected-error{{expression is not assignable}} */
     myStructBuff[0].v2.x = 4; /* expected-error{{expression is not assignable}} */
-    uint z = myConstBuff.v2.xy; /* expected-error{{vector swizzle 'xy' is out of bounds}} */ /* expected-warning{{implicit truncation of vector type}} */
+    uint z = myConstBuff.v2.xy; /* expected-error{{vector swizzle 'xy' is out of bounds}} */ /* expected-warning{{implicit truncation of vector type}} */ /* expected-warning{{implicit truncation of vector type}} */
 }
