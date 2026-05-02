@@ -2969,7 +2969,11 @@ void CodeGenFunction::EmitHLSLOutArgExpr(const HLSLOutArgExpr *E,
   OpaqueValueMappingData::bind(*this, E->getOpaqueArgLValue(), BaseLV);
 
   QualType ExprTy = E->getType();
-  llvm::AllocaInst *Address = CreateIRTemp(ExprTy);
+  // Use the memory representation for the temporary so that types like
+  // `bool` (i1 scalar / i32 memory) match the pointee type of the
+  // reference-typed parameter. CreateIRTemp would use the scalar rep
+  // (e.g. i1*) which causes a load/store-vs-pointee type mismatch.
+  llvm::AllocaInst *Address = CreateMemTemp(ExprTy);
   LValue TempLV = MakeAddrLValue(Address, ExprTy);
 
   if (E->isInOut())
