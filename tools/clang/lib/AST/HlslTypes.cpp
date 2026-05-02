@@ -799,7 +799,7 @@ clang::RecordDecl *GetRecordDeclFromNodeObjectType(clang::QualType ObjectTy) {
 
 bool IsHLSLRayQueryType(clang::QualType type) {
   type = type.getNonReferenceType();
-  if (const RecordType *RT = dyn_cast<RecordType>(type)) {
+  if (const RecordType *RT = type->getAs<RecordType>()) {
     if (const ClassTemplateSpecializationDecl *templateDecl =
             dyn_cast<ClassTemplateSpecializationDecl>(
                 RT->getAsCXXRecordDecl())) {
