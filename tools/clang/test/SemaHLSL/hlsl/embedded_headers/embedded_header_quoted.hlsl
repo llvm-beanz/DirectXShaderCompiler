@@ -1,15 +1,11 @@
-// RUN: not %dxc -T ps_6_0 -E main %s 2>&1 | FileCheck %s
+// RUN: %dxc -T ps_6_0 -E main -verify %s
 
 // Quoted #includes should still go through the normal filesystem search
 // path; the embedded-headers mechanism only kicks in for angle-bracket
 // includes.  Without a -I pointing at the hlsl/ directory, this quoted
 // include must fail.
 
-// COPILOT_TODO: This test should use the -verify flag rather than FileCheck.
-// That allows for more flexible matching of error messages to lines.
-
-#include "enable_if.h"
+#include "enable_if.h" // expected-error{{'enable_if.h' file not found}}
 
 float4 main() : SV_Target { return 0; }
 
-// CHECK: 'enable_if.h' file not found
