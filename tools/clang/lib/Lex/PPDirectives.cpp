@@ -18,6 +18,7 @@
 #include "clang/Lex/CodeCompletionHandler.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
+#include "clang/Lex/HLSLEmbeddedHeaders.h"
 #include "clang/Lex/LexDiagnostic.h"
 #include "clang/Lex/LiteralSupport.h"
 #include "clang/Lex/MacroInfo.h"
@@ -25,6 +26,7 @@
 #include "clang/Lex/Pragma.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "clang/Lex/PreprocessorOptions.h" // HLSL Change - ignore line directives.
@@ -723,6 +725,47 @@ const FileEntry *Preprocessor::LookupFile(
       }
     }
   }
+
+  // HLSL Change Begin - fall back to compiled-in HLSL header data when the
+  // angled #include's filename matches the relative path of one of the
+  // headers shipped under tools/clang/lib/Headers/hlsl.  This lets the
+  // compiler resolve those headers without consulting the filesystem,
+  // while still allowing user-provided -I paths (or the source tree
+  // itself) to take precedence when present.
+  if (isAngled && !FromDir && !FromFile) {
+    const llvm::StringMap<llvm::StringRef> &EmbeddedHeaders =
+        hlsl::getEmbeddedHeaders();
+    auto It = EmbeddedHeaders.find(Filename);
+    if (It != EmbeddedHeaders.end()) {
+      llvm::StringRef Data = It->second;
+      // Use a recognisable virtual filename so the bundled header is
+      // easy to identify in diagnostics and source listings.
+      SmallString<128> VirtualName("<built-in:hlsl>/");
+      VirtualName.append(Filename.begin(), Filename.end());
+      const FileEntry *EmbeddedFE =
+          FileMgr.getVirtualFile(VirtualName, Data.size(), /*ModTime=*/0);
+      if (EmbeddedFE) {
+        if (!SourceMgr.isFileOverridden(EmbeddedFE)) {
+          SourceMgr.overrideFileContents(
+              EmbeddedFE,
+              llvm::MemoryBuffer::getMemBuffer(Data, VirtualName,
+                                               /*RequiresNullTerminator=*/
+                                               false));
+        }
+        if (SearchPath)
+          SearchPath->clear();
+        if (RelativePath) {
+          RelativePath->clear();
+          RelativePath->append(Filename.begin(), Filename.end());
+        }
+        CurDir = nullptr;
+        if (SuggestedModule)
+          *SuggestedModule = ModuleMap::KnownHeader();
+        return EmbeddedFE;
+      }
+    }
+  }
+  // HLSL Change End
 
   // Otherwise, we really couldn't find the file.
   return nullptr;
