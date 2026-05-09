@@ -5,6 +5,11 @@
 // search path points at the hlsl/ directory.
 
 #include <enable_if.h>
+// COPILOT_TODO: This test's execution and check can be simplified by using the
+// -M flag to just check the include paths that the preprocessor searches,
+// rather than having to preprocess the file and check the output for evidence
+// of the included file being found. It is also probably worth adding a -verify
+// RUN line to check that no errors are produced.
 
 float4 main() : SV_Target { return 0; }
 

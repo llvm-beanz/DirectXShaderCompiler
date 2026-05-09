@@ -5,6 +5,9 @@
 // includes.  Without a -I pointing at the hlsl/ directory, this quoted
 // include must fail.
 
+// COPILOT_TODO: This test should use the -verify flag rather than FileCheck.
+// That allows for more flexible matching of error messages to lines.
+
 #include "enable_if.h"
 
 float4 main() : SV_Target { return 0; }

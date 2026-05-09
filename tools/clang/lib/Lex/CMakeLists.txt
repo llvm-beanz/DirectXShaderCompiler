@@ -30,6 +30,9 @@ file(GLOB_RECURSE hlsl_embedded_inputs
      RELATIVE "${hlsl_headers_src_dir}"
      "${hlsl_headers_src_dir}/*.h"
      "${hlsl_headers_src_dir}/*.impl")
+# COPILOT_TODO: Please use an explicit list of files here instead of a GLOB.
+# GLOBs are run at configuration-time rather than runtime, which causes them to
+# be fragile to new files being added.
 
 set(hlsl_embedded_inc_files)
 set(hlsl_embedded_entries)
@@ -46,6 +49,13 @@ foreach(rel_path ${hlsl_embedded_inputs})
 endforeach()
 
 set(hlsl_embedded_source "${hlsl_embedded_dir}/HLSLEmbeddedHeaders.cpp")
+# COPILOT_TODO: We should make the HLSLEmbeddedHeaders.cpp file a file that
+# exists in the repo but includes a generated file, so that we don't have to
+# generate the entire source file at build time. This simplifies the build and
+# makes it more robust to changes in the list of embedded headers.
+# Additionally we should only include the headers in the `vk` directory if the
+# SPIRV codegen is enabled, to avoid unnecessarily including Vulkan-specific
+# headers in the DXC build.
 add_custom_command(
   OUTPUT "${hlsl_embedded_source}"
   DEPENDS ${hlsl_embedded_inc_files} "${generate_embedded_headers_script}"
