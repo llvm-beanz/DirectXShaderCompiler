@@ -14,10 +14,6 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-I'd like to make sure that if the -I flag points to a folder containing a header
-included with the angled bracket #include (<>), the preprocessor will grab the
-file from disk even if it is built into the binary. This will allow tools to
-find the file on disk when possible which will allow users to inspect the header
-on their system and modify it if they really want.
-
-Can you ensure that this workflow is covered in our test cases?
+Can you add test coverage to ensure that if a user specifies the path to a
+built-in header using Windows path separators it still correctly finds the
+built-in header?
