@@ -5,13 +5,29 @@ set(LLVM_LINK_COMPONENTS support)
 # ----------------------------------------------------------------------------
 # Embedded HLSL headers.
 #
-# Every file under tools/clang/lib/Headers/hlsl/ is converted at build time
-# to a small C++ snippet (an llvm::StringRef "Data" definition) by
-# utils/embed_header.py.  A second script then generates a single C++ source
-# file that wraps each snippet in a uniquely-named namespace and exposes the
-# whole collection through clang::hlsl::getEmbeddedHeaders() as a
-# StringMap.  This compiled-in data lets the preprocessor satisfy angled
-# #includes of the bundled headers without consulting the filesystem.
+# Each file under tools/clang/lib/Headers/hlsl/ that we want to ship as
+# compiled-in data is converted at build time to a small C++ snippet (an
+# llvm::StringRef "Data" definition) by utils/embed_header.py.  A second
+# script (utils/generate_hlsl_embedded_headers.py) then aggregates those
+# snippets into two ``.inc`` files:
+#
+#   * HLSLEmbeddedHeadersDecls.inc -- one ``namespace <ns> { #include ... }``
+#     per header so each ``Data`` lives in its own namespace.
+#   * HLSLEmbeddedHeadersEntries.inc -- an X-macro list of (rel_path, ns)
+#     pairs.
+#
+# Those ``.inc`` files are textually included by the hand-written
+# HLSLEmbeddedHeaders.cpp in this directory, which exposes the whole
+# collection through clang::hlsl::getEmbeddedHeaders() as a
+# StringMap<StringRef>.  This compiled-in data lets the preprocessor
+# satisfy #includes of the bundled headers without consulting the
+# filesystem.
+#
+# The list of embedded inputs is intentionally enumerated explicitly
+# below: file(GLOB ...) is evaluated at configuration time, so a glob
+# would silently miss files added between configure and build.
+# Vulkan-specific headers under hlsl/vk/ are only embedded when SPIR-V
+# codegen is enabled, to keep the DXC-only build free of unused data.
 # ----------------------------------------------------------------------------
 
 set(hlsl_headers_src_dir
@@ -23,16 +39,20 @@ set(embed_header_script
 set(generate_embedded_headers_script
     "${LLVM_MAIN_SRC_DIR}/utils/generate_hlsl_embedded_headers.py")
 
-# Recursively find every regular file under hlsl/.  Restrict to extensions
-# that are actually used as headers; this avoids embedding LICENSE.txt,
-# README.txt, and editor configuration files like .clang-format.
-file(GLOB_RECURSE hlsl_embedded_inputs
-     RELATIVE "${hlsl_headers_src_dir}"
-     "${hlsl_headers_src_dir}/*.h"
-     "${hlsl_headers_src_dir}/*.impl")
-# COPILOT_TODO: Please use an explicit list of files here instead of a GLOB.
-# GLOBs are run at configuration-time rather than runtime, which causes them to
-# be fragile to new files being added.
+set(hlsl_embedded_inputs
+    enable_if.h
+    vector_utils.h
+    dx/linalg.h
+    )
+
+if (ENABLE_SPIRV_CODEGEN)
+  list(APPEND hlsl_embedded_inputs
+       vk/khr/cooperative_matrix.h
+       vk/khr/cooperative_matrix.impl
+       vk/opcode_selector.h
+       vk/spirv.h
+       )
+endif()
 
 set(hlsl_embedded_inc_files)
 set(hlsl_embedded_entries)
@@ -48,28 +68,36 @@ foreach(rel_path ${hlsl_embedded_inputs})
   list(APPEND hlsl_embedded_entries "--entry" "${rel_path}=${inc}")
 endforeach()
 
-set(hlsl_embedded_source "${hlsl_embedded_dir}/HLSLEmbeddedHeaders.cpp")
-# COPILOT_TODO: We should make the HLSLEmbeddedHeaders.cpp file a file that
-# exists in the repo but includes a generated file, so that we don't have to
-# generate the entire source file at build time. This simplifies the build and
-# makes it more robust to changes in the list of embedded headers.
-# Additionally we should only include the headers in the `vk` directory if the
-# SPIRV codegen is enabled, to avoid unnecessarily including Vulkan-specific
-# headers in the DXC build.
+set(hlsl_embedded_decls "${hlsl_embedded_dir}/HLSLEmbeddedHeadersDecls.inc")
+set(hlsl_embedded_entries_inc
+    "${hlsl_embedded_dir}/HLSLEmbeddedHeadersEntries.inc")
 add_custom_command(
-  OUTPUT "${hlsl_embedded_source}"
+  OUTPUT "${hlsl_embedded_decls}" "${hlsl_embedded_entries_inc}"
   DEPENDS ${hlsl_embedded_inc_files} "${generate_embedded_headers_script}"
   COMMAND "${Python3_EXECUTABLE}" "${generate_embedded_headers_script}"
-          --output "${hlsl_embedded_source}"
+          --decls-output "${hlsl_embedded_decls}"
+          --entries-output "${hlsl_embedded_entries_inc}"
           ${hlsl_embedded_entries}
-  COMMENT "Generating HLSL embedded headers source")
+  COMMENT "Generating HLSL embedded headers includes")
 
-set_source_files_properties("${hlsl_embedded_source}"
+set_source_files_properties("${hlsl_embedded_decls}"
+                            "${hlsl_embedded_entries_inc}"
                             PROPERTIES GENERATED TRUE)
+
+# Make the generated .inc files visible to HLSLEmbeddedHeaders.cpp.
+include_directories("${hlsl_embedded_dir}")
+
+# Carry the generated .inc files as an explicit dependency of the
+# library target so they're produced before HLSLEmbeddedHeaders.cpp is
+# compiled.
+set(hlsl_embedded_generated_files
+    "${hlsl_embedded_decls}"
+    "${hlsl_embedded_entries_inc}")
 
 add_clang_library(clangLex
   HeaderMap.cpp
   HeaderSearch.cpp
+  HLSLEmbeddedHeaders.cpp
   HLSLMacroExpander.cpp
   Lexer.cpp
   LiteralSupport.cpp
@@ -91,7 +119,7 @@ add_clang_library(clangLex
   ScratchBuffer.cpp
   TokenConcatenation.cpp
   TokenLexer.cpp
-  ${hlsl_embedded_source}
+  ${hlsl_embedded_generated_files}
 
   LINK_LIBS
   clangBasic

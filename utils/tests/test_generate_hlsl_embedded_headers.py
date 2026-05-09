@@ -62,57 +62,60 @@ class GeneratorTests(unittest.TestCase):
         subprocess.check_call([sys.executable, EMBED, src_path, inc_path])
         return inc_path
 
-    def test_generates_namespaces_and_map(self):
+    def test_generates_decls_and_entries(self):
         inc1 = self._embed("enable_if.h", b"// enable_if header\n")
         inc2 = self._embed("dx/linalg.h", b"// linalg header\n")
-        out = os.path.join(self.tmp, "Embedded.cpp")
+        decls = os.path.join(self.tmp, "Decls.inc")
+        entries = os.path.join(self.tmp, "Entries.inc")
         subprocess.check_call([
             sys.executable, GEN,
-            "--output", out,
+            "--decls-output", decls,
+            "--entries-output", entries,
             "--entry", "enable_if.h=" + inc1,
             "--entry", "dx/linalg.h=" + inc2,
         ])
-        with open(out) as f:
-            text = f.read()
+        with open(decls) as f:
+            decls_text = f.read()
+        with open(entries) as f:
+            entries_text = f.read()
 
-        # Each header gets its own namespace.
-        self.assertIn("namespace enable_if_h {", text)
-        self.assertIn("namespace dx_linalg_h {", text)
+        # Each header gets its own namespace in the decls file.
+        self.assertIn("namespace enable_if_h {", decls_text)
+        self.assertIn("namespace dx_linalg_h {", decls_text)
 
         # Each embedded .inc is included inside its namespace.
-        self.assertIn(inc1.replace("\\", "/"), text)
-        self.assertIn(inc2.replace("\\", "/"), text)
+        self.assertIn(inc1.replace("\\", "/"), decls_text)
+        self.assertIn(inc2.replace("\\", "/"), decls_text)
 
-        # The map function is defined in clang::hlsl with proper keys.
+        # The entries file uses the X-macro form with rel_path and namespace.
         self.assertIn(
-            "const llvm::StringMap<llvm::StringRef> &getEmbeddedHeaders()",
-            text)
-        self.assertIn("\"enable_if.h\"", text)
-        self.assertIn("enable_if_h::Data", text)
-        self.assertIn("\"dx/linalg.h\"", text)
-        self.assertIn("dx_linalg_h::Data", text)
-        self.assertIn("namespace clang", text)
-        self.assertIn("namespace hlsl", text)
+            "HLSL_EMBEDDED_HEADER(\"enable_if.h\", enable_if_h)",
+            entries_text)
+        self.assertIn(
+            "HLSL_EMBEDDED_HEADER(\"dx/linalg.h\", dx_linalg_h)",
+            entries_text)
 
     def test_entries_are_sorted_and_normalized(self):
         inc1 = self._embed("a.h", b"a")
         inc2 = self._embed("z/y.h", b"z")
-        out = os.path.join(self.tmp, "Embedded.cpp")
+        decls = os.path.join(self.tmp, "Decls.inc")
+        entries = os.path.join(self.tmp, "Entries.inc")
         # Pass them out of order and with a leading "./".
         subprocess.check_call([
             sys.executable, GEN,
-            "--output", out,
+            "--decls-output", decls,
+            "--entries-output", entries,
             "--entry", "z/y.h=" + inc2,
             "--entry", "./a.h=" + inc1,
         ])
-        with open(out) as f:
-            text = f.read()
-        # "a.h" entry should appear before "z/y.h" in the map literal.
-        a_pos = text.index("\"a.h\"")
-        z_pos = text.index("\"z/y.h\"")
+        with open(entries) as f:
+            entries_text = f.read()
+        # "a.h" entry should appear before "z/y.h" in the entries list.
+        a_pos = entries_text.index("\"a.h\"")
+        z_pos = entries_text.index("\"z/y.h\"")
         self.assertLess(a_pos, z_pos)
         # Leading "./" must be stripped.
-        self.assertNotIn("\"./a.h\"", text)
+        self.assertNotIn("\"./a.h\"", entries_text)
 
 
 if __name__ == "__main__":
