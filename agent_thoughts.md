@@ -131,21 +131,77 @@ in diagnostics and source listings. The contents are wired up via
   * negative case proving that quoted includes still go through the
     filesystem and fail when the header is unavailable.
 
+## Follow-up: addressing the COPILOT_TODOs
+
+After the initial change above, a second round of feedback (left in
+`COPILOT_TODO` comments) was addressed:
+
+### Explicit input list and gating Vulkan headers
+
+`tools/clang/lib/Lex/CMakeLists.txt` no longer uses
+`file(GLOB_RECURSE ...)` for the embedded inputs.  Globs are evaluated
+at configure time, so a new file would silently be missed until the
+next reconfigure.  The list is now spelled out, and the
+`vk/` subtree is only embedded when `ENABLE_SPIRV_CODEGEN` is on, so
+the DXC-only build doesn't drag in the SPIR-V headers.
+
+### Hand-written cpp + minimal generated includes
+
+The aggregator script no longer emits the entire C++ source file at
+build time.  `tools/clang/lib/Lex/HLSLEmbeddedHeaders.cpp` lives in
+source control and textually includes two small build-time-generated
+`.inc` files:
+
+* `HLSLEmbeddedHeadersDecls.inc` — one
+  `namespace <ns> { #include "<path>.inc" }` block per header.
+* `HLSLEmbeddedHeadersEntries.inc` — an X-macro list of
+  `HLSL_EMBEDDED_HEADER(rel_path, ns)` lines.
+
+`HLSLEmbeddedHeaders.cpp` defines `HLSL_EMBEDDED_HEADER` to insert into
+the StringMap before including the entries file, and `#undef`s it
+afterwards.  This puts the C++ skeleton (function signature, lambda,
+StringMap construction) under code review and limits the generated
+content to data that actually depends on the on-disk header set.
+
+### Simplified embedded-header lit tests
+
+The three lit tests under
+`tools/clang/test/SemaHLSL/hlsl/embedded_headers/` were rewritten:
+
+* The two positive tests now run `dxc -M %s | FileCheck %s` to check
+  that the bundled header appears in the include dependency dump as
+  `<built-in:hlsl>/<rel>`, and a second RUN line with `-verify` plus
+  `expected-no-diagnostics` confirms the same input compiles cleanly.
+  This replaces the previous "preprocess to a temp file and grep"
+  approach.
+* The negative quoted-include test uses `-verify` with an inline
+  `expected-error` comment instead of `not %dxc ... | FileCheck`.
+
+### Retiring `%hlsl_headers`
+
+The lit substitution that pointed at the source `hlsl/` directory is
+gone, along with `config.hlsl_headers_dir` and
+`HLSL_HEADERS_DIR`.  Every test that depended on it was updated to
+rely on the embedded headers instead — most just needed `-I
+%hlsl_headers` removed.  Two collateral fixes were necessary:
+
+* `tools/clang/lib/Headers/hlsl/vk/khr/cooperative_matrix.h` and
+  `cooperative_matrix.impl` used quoted `#include "..."` for sibling
+  bundled headers.  Quoted lookups skip the embedded fallback by
+  design (so the negative `embedded_header_quoted.hlsl` test still
+  holds), so these intra-bundle includes were switched to angled
+  form.  The same conversion was applied in
+  `tools/clang/test/CodeGenSPIRV/convert.selector.hlsl`, which
+  textually included `vk/opcode_selector.h` in quoted form.
+* `VerifyDiagnosticConsumer`'s `expected-note@<file>:line` directives
+  resolve `<file>` through `Preprocessor::LookupFile` with
+  `isAngled=false`.  When that quoted lookup fails (which is now the
+  common case for bundled headers), it retries with `isAngled=true`,
+  letting the embedded fallback satisfy the directive's file lookup
+  with the same virtual `<built-in:hlsl>/<rel>` `FileEntry` that the
+  actual `#include` resolved to.
+
 ### Verification
 
-Configured the build using `-C cmake/caches/PredefinedParams.cmake`
-(via the existing `build-rel` directory) and ran `ninja check-all`. All
-4599 expected-pass lit tests pass; no new failures were introduced.
-
-## Commit layout
-
-The change is split into small commits:
-
-1. `Add embed_header.py utility for embedding files as StringRef` —
-   just the per-file script and its unit tests; reviewable in
-   isolation.
-2. `Embed HLSL headers into clangLex via generated source` — the
-   aggregator script, the public header, and the CMake build rules.
-3. `Resolve angled HLSL header includes from compiled-in data` — the
-   preprocessor change and lit tests.
-4. (this file) — agent thoughts.
+Reconfigured with `-C cmake/caches/PredefinedParams.cmake` and ran
+`ninja check-all`.  4599 expected passes; no new failures.
