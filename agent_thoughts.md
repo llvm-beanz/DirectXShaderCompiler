@@ -239,3 +239,49 @@ up as a test of its own.
 Verified by running the embedded-headers lit suite (4/4 PASS) and the
 broader `SemaHLSL/` lit suite (259 PASS + 1 expected failure, no
 regressions).
+
+## Follow-up: Windows path separators in embedded-header includes
+
+A reviewer asked for test coverage to ensure that an angle-bracket
+`#include` written with Windows-style separators (backslashes) still
+resolves to the compiled-in HLSL header.
+
+The embedded-header map is keyed on POSIX-style relative paths (e.g.
+`dx/linalg.h`) generated from the `tools/clang/lib/Headers/hlsl/`
+source tree at build time.  The original lookup in
+`Preprocessor::LookupFile` looked up the raw `Filename` string from the
+`#include` directive directly in that map, so an include such as
+`#include <dx\linalg.h>` missed the entry and reported the header as
+not found, even though `<dx/linalg.h>` resolved correctly.
+
+### Fix
+
+In `tools/clang/lib/Lex/PPDirectives.cpp`, before consulting the
+embedded-header map, copy `Filename` into a `SmallString` and replace
+any `\\` with `/`.  Use the normalised string both for the `StringMap`
+lookup and for the synthesised virtual `<built-in:hlsl>/...` filename
+plus the `RelativePath` output, so dependency dumps and diagnostics
+show a single canonical (forward-slash) path regardless of how the
+include was spelled.  This intentionally only affects the embedded
+fallback; the existing on-disk `HeaderSearch::LookupFile` path is
+unchanged, since on the POSIX builds DXC supports it would already
+treat backslashes as part of the literal filename.
+
+### Test
+
+Added `tools/clang/test/SemaHLSL/hlsl/embedded_headers/embedded_header_windows_path.hlsl`
+mirroring `embedded_header_nested.hlsl` but spelling the include as
+`#include <dx\linalg.h>`.  The test runs `dxc` twice:
+
+1. `-verify` (with `expected-no-diagnostics`) confirms Sema accepts
+   the program, i.e. the include resolved through the embedded
+   fallback.
+2. `-M ... | FileCheck` asserts that the dependency dump records the
+   canonical `<built-in:hlsl>/dx/linalg.h` path — proof that the
+   normalisation is reflected in the virtual filename emitted by the
+   preprocessor, not just in the lookup key.
+
+Verified: the embedded-headers lit suite is now 5/5 PASS, the broader
+`SemaHLSL/` suite is unchanged, and `ninja check-clang` reports
+2973 expected passes / 7 expected failures / 0 regressions on the
+existing `build-assert` configuration.
