@@ -205,3 +205,37 @@ rely on the embedded headers instead — most just needed `-I
 
 Reconfigured with `-C cmake/caches/PredefinedParams.cmake` and ran
 `ninja check-all`.  4599 expected passes; no new failures.
+
+## Follow-up: explicit `-I`-overrides-embedded test
+
+A later request asked for explicit test coverage of the workflow where
+`-I` points at a directory containing a header that shadows one of the
+compiled-in HLSL headers, and an angle-bracket `#include` resolves to
+the on-disk file (so users can inspect or modify the bundled headers).
+The fallback-after-`HeaderSearch` ordering in
+`Preprocessor::LookupFile` already guarantees this behaviour, but no
+test was exercising it.
+
+Added:
+
+* `tools/clang/test/SemaHLSL/hlsl/embedded_headers/Inputs/enable_if.h`
+  — an overlay copy of the bundled header that defines a unique
+  `HLSL_OVERLAY_ENABLE_IF` macro so the test can prove which version
+  was actually included.
+* `tools/clang/test/SemaHLSL/hlsl/embedded_headers/embedded_header_include_path.hlsl`
+  — runs `dxc` twice with `-I %S/Inputs`:
+  1. `-M ... | FileCheck` confirms the dependency dump references the
+     on-disk overlay path and **does not** mention the
+     `<built-in:hlsl>/...` virtual filename used for embedded data.
+  2. `-verify` plus an `#error` guarded on `HLSL_OVERLAY_ENABLE_IF`
+     confirms the on-disk overlay was the version actually consumed by
+     the preprocessor.
+
+The `Inputs/` subdirectory is automatically excluded from lit
+discovery by `tools/clang/test/lit.cfg`'s standard `excludes` list,
+and `.h` is not in `config.suffixes`, so the overlay is never picked
+up as a test of its own.
+
+Verified by running the embedded-headers lit suite (4/4 PASS) and the
+broader `SemaHLSL/` lit suite (259 PASS + 1 expected failure, no
+regressions).
