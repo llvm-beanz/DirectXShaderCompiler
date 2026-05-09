@@ -30,6 +30,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "clang/Lex/PreprocessorOptions.h" // HLSL Change - ignore line directives.
+#include <algorithm> // HLSL Change - std::replace for path separator normalisation.
 using namespace clang;
 
 //===----------------------------------------------------------------------===//
@@ -735,13 +736,25 @@ const FileEntry *Preprocessor::LookupFile(
   if (isAngled && !FromDir && !FromFile) {
     const llvm::StringMap<llvm::StringRef> &EmbeddedHeaders =
         hlsl::getEmbeddedHeaders();
-    auto It = EmbeddedHeaders.find(Filename);
+    // The embedded-header map is keyed on POSIX-style relative paths
+    // (e.g. "dx/linalg.h"), but a user may write the include using
+    // Windows-style separators (e.g. <dx\linalg.h>).  Normalise any
+    // backslashes to forward slashes so either spelling resolves to
+    // the same compiled-in header.
+    SmallString<128> NormalizedFilename(Filename);
+    std::replace(NormalizedFilename.begin(), NormalizedFilename.end(),
+                 '\\', '/');
+    auto It = EmbeddedHeaders.find(NormalizedFilename);
     if (It != EmbeddedHeaders.end()) {
       llvm::StringRef Data = It->second;
       // Use a recognisable virtual filename so the bundled header is
-      // easy to identify in diagnostics and source listings.
+      // easy to identify in diagnostics and source listings.  The
+      // virtual name uses the normalised (POSIX-style) relative path
+      // so the displayed filename is canonical regardless of how the
+      // user spelled the include.
       SmallString<128> VirtualName("<built-in:hlsl>/");
-      VirtualName.append(Filename.begin(), Filename.end());
+      VirtualName.append(NormalizedFilename.begin(),
+                         NormalizedFilename.end());
       const FileEntry *EmbeddedFE =
           FileMgr.getVirtualFile(VirtualName, Data.size(), /*ModTime=*/0);
       if (EmbeddedFE) {
@@ -756,7 +769,8 @@ const FileEntry *Preprocessor::LookupFile(
           SearchPath->clear();
         if (RelativePath) {
           RelativePath->clear();
-          RelativePath->append(Filename.begin(), Filename.end());
+          RelativePath->append(NormalizedFilename.begin(),
+                               NormalizedFilename.end());
         }
         CurDir = nullptr;
         if (SuggestedModule)
