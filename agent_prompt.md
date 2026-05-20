@@ -17,6 +17,6 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Can you write a bunch of test cases that verify different types of operations
-working with constexpr functions and variables inside `_Static_assert`
-expressions to ensure that the compiler is evaluating them early?
+Can you generate tests for cases where constexprs fail due to non-constant
+evaluations of expressions or variables? Also tests that cover cases calling
+constexpr functions with non-constexpr arguments.
