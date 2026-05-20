@@ -205,3 +205,83 @@ $ python3 ./build-rel/bin/llvm-lit \
 ```
 
 All three new tests pass and no neighbouring tests regress.
+
+## Follow-up: negative tests for non-constant evaluation
+
+A follow-up request asked for two additional families of tests:
+
+1. Constexpr variables whose initializer is *not* a constant expression.
+2. Calls to constexpr functions with *non-constexpr* arguments.
+
+Both belong squarely in the Sema phase (the constant-expression
+evaluator runs there), so I added two `-verify` tests under
+`tools/clang/test/SemaHLSL/v202x/`.
+
+### `constexpr-non-const-init.hlsl`
+
+Exercises every realistic source of "not a constant expression" that an
+HLSL author can plausibly write:
+
+* cbuffer-backed runtime globals (`int`, `float`, `uint`) and arithmetic
+  on them.
+* Non-constexpr free-function calls.
+* Function parameters.
+* Non-const locals, including a mutable `static` local.
+* `_Static_assert` operands drawn from the same runtime values, to
+  confirm the path that flows through `Sema::VerifyIntegerConstantExpression`
+  rather than through `AddInitializerToDecl`.
+
+I deliberately pin both the `expected-error` (the diagnostic the user
+sees) and the cascading `expected-note` (the "read of non-const variable
+... is not allowed" hint) so a future regression that drops the note
+chain still fails the test.
+
+### `constexpr-non-const-args.hlsl`
+
+The interesting case here is the *runtime is fine* / *constant context
+isn't* distinction. Calling `square(p)` where `p` is a function
+parameter is perfectly legal C++/HLSL — the call simply isn't a constant
+expression and gets lowered like any other call. What is illegal is
+*requiring* that result to be constant.
+
+The test therefore has two halves:
+
+* Negative half: feeding non-const arguments (globals, params, locals,
+  and even nested `square(plain(x))`) into a `constexpr` variable
+  initializer, an array bound proxy, or `_Static_assert`, and pinning
+  the matching diagnostic.
+* Positive half (the `main` function): the same calls used in plain
+  runtime contexts must compile cleanly with no diagnostics.
+
+This pairing protects against two opposite regressions: either
+over-eager rejection of legitimate runtime calls, or silent acceptance
+of a constant-context use that should fail.
+
+### Quirks I hit
+
+* Globals (`g_runtime`, `g_runtime_f`) trigger the "must be initialized
+  by a constant expression" *error* but do **not** emit the "read of
+  non-const variable" *note*; that note path is only reached for
+  locals/params. Initially I added expected-notes for the globals and
+  the test failed with "expected diagnostic not seen". Removing those
+  notes (and only marking notes on the local/param cases) made the
+  expected/actual sets line up.
+* `_Static_assert` produces a *different* top-level diagnostic — "static
+  assert expression is not an integral constant expression" — than the
+  constexpr-init diagnostic, so the two error families have to be
+  matched separately even though they share the same underlying
+  non-constant cause.
+
+### Validation
+
+```
+$ python3 ./build-rel/bin/llvm-lit \
+    tools/clang/test/SemaHLSL/v202x/constexpr-non-const-init.hlsl \
+    tools/clang/test/SemaHLSL/v202x/constexpr-non-const-args.hlsl
+... Expected Passes : 2
+
+$ python3 ./build-rel/bin/llvm-lit tools/clang/test/SemaHLSL/
+... Expected Passes : 263 / Expected Failures : 1
+```
+
+Both new tests pass and the wider `SemaHLSL/` suite is unchanged.
