@@ -227,6 +227,13 @@ void IdentifierTable::AddKeywords(const LangOptions &LangOpts) {
   // has been rewritten in terms of something more generic, remove this code.
   if (LangOpts.CUDA)
     AddKeyword("__declspec", tok::kw___declspec, KEYALL, LangOpts, *this);
+
+  // HLSL Change Starts - Enable C++11-style 'static_assert' keyword in
+  // HLSL 202x. The token kw_static_assert is otherwise gated on C++11 via
+  // the KEYCXX11 flag in TokenKinds.def.
+  if (LangOpts.HLSL && LangOpts.HLSLVersion >= hlsl::LangStd::v202x)
+    AddKeyword("static_assert", tok::kw_static_assert, KEYALL, LangOpts, *this);
+  // HLSL Change Ends
 }
 
 /// \brief Checks if the specified token kind represents a keyword in the
