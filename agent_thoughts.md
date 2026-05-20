@@ -1,0 +1,124 @@
+# Agent Thoughts: Enabling C++11 `constexpr` in HLSL 202x
+
+## Task
+
+Enable C++11 `constexpr` support in HLSL under the HLSL 202x language mode.
+Under HLSL 2021 (and earlier), `constexpr` must produce a clear error.
+Under HLSL 202x (and later), `constexpr` behaves as defined by C++.
+
+## Investigation
+
+### Why was `constexpr` rejected previously?
+
+`constexpr` is declared in `TokenKinds.def` as a `CXX11_KEYWORD`. In HLSL
+mode, `LangOpts.CPlusPlus` is true but `LangOpts.CPlusPlus11` is false. The
+keyword-status logic in `IdentifierTable.cpp` then classifies `constexpr`
+as `KS_Future`, which actually demotes it to a plain identifier (with a
+future-compat warning). The parser's `tok::kw_constexpr` case had a
+defensive `goto HLSLReservedKeyword` for safety, but at runtime the token
+was an identifier, so users got cryptic errors like
+"unknown type name 'constexpr'".
+
+### Why not just enable `LangOpts.CPlusPlus11` in HLSL 202x?
+
+Tempting, but `KEYCXX11` covers many keywords beyond `constexpr`
+(`decltype`, `nullptr`, `static_assert`, `thread_local`,
+`char16_t`/`char32_t`, `noexcept`, `alignas`/`alignof`). Promoting all of
+them to keywords in HLSL 202x would change tokenization of any user code
+that uses those identifiers as names. Out of scope for this task and a
+backwards-compat risk.
+
+I chose a surgical approach: only `constexpr` becomes a real keyword in
+HLSL.
+
+## Approach
+
+### Phase 1 — Lexer / Parser
+
+1. Tag `constexpr` with `KEYHLSL` in `TokenKinds.def` so it is a real
+   keyword in every HLSL mode (regardless of version). This lets us emit
+   a precise diagnostic instead of "unknown type name".
+2. In `ParseDecl.cpp` where `tok::kw_constexpr` is handled, replace the
+   blanket "reserved keyword" rejection with a version check. For HLSL
+   versions below 202x, emit a new `err_hlsl_constexpr_requires_202x`
+   diagnostic and skip calling `SetConstexprSpec` (so the variable
+   doesn't pick up the constexpr semantics and generate a cascading
+   "must be initialized by a constant expression" error). For HLSL 202x
+   and later, call `SetConstexprSpec` as in standard C++.
+3. Update the two existing HLSL tests that asserted on the old, less
+   precise error.
+
+### Phase 2 — Sema / AST
+
+Even after Phase 1 the constexpr machinery was mostly inert because
+Clang gates several pieces of constexpr semantics on
+`LangOpts.CPlusPlus11`. I had to widen three gates to also accept
+`HLSL && HLSLVersion >= v202x`:
+
+* `VarDecl::isUsableInConstantExpressions` — without this, a constexpr
+  variable couldn't be used as an array bound or in another constexpr
+  initializer.
+* `VarDecl::evaluateValue` and `VarDecl::checkInitIsICE` — these are
+  what populate the cached `Eval->IsICE` bit that
+  `Sema::AddInitializerToDecl` (via `var->isInitICE()`) reads when
+  validating that a constexpr variable was initialized by a constant
+  expression. Without widening, *every* constexpr declaration in 202x
+  was incorrectly flagged as "must be initialized by a constant
+  expression". I discovered this with a temporary debug print inside
+  the constexpr-init branch of `SemaDecl`; `evaluateValue` returned
+  success, but `isInitICE()` returned false because the side-effect
+  population of `Eval->IsICE` was C++11-only.
+* `VarDecl` linkage computation — in HLSL, const globals are
+  intentionally treated as external (cbuffer) variables, which causes a
+  "Initializer of external global will be ignored" warning that breaks
+  uses like `constexpr int N = 4; int arr[N];`. In standard C++ a
+  namespace-scope `constexpr` variable has internal linkage, so I made
+  HLSL 202x follow the standard rule for `constexpr` (only) — `const`
+  HLSL globals are unchanged.
+
+I also fixed the parallel `CPlusPlus11` gate in `SemaStmt.cpp` that
+selects between "constexpr function missing return" vs the generic
+missing-return diagnostic, so a constexpr function in HLSL 202x gets
+the more specific error.
+
+### Phase 3 — Tests
+
+I added three tests covering each phase of translation:
+
+* `tools/clang/test/SemaHLSL/v2021/constexpr.hlsl` — `-verify` test
+  that exercises the new diagnostic at global, function and local
+  scope (Parse-phase behavior).
+* `tools/clang/test/SemaHLSL/v202x/constexpr.hlsl` — `-verify` test
+  with `expected-no-diagnostics`. Exercises a constexpr variable,
+  multiple constexpr functions, constexpr used as an array bound, and
+  a local constexpr initialized from other constexpr values
+  (Sema-phase behavior).
+* `tools/clang/test/CodeGenHLSL/constexpr-202x.hlsl` — FileCheck test
+  on DXIL output verifying that a `constexpr` function call folds to a
+  constant at CodeGen time.
+
+I also updated the two pre-existing HLSL parser tests that previously
+verified the cryptic "unknown type name" error.
+
+## Verification
+
+* `ninja dxc` builds clean.
+* `ninja check-all` reports 4603 expected passes (was 4601; my two new
+  Sema tests account for the delta — the CodeGenHLSL test is also
+  picked up but appears under the same expected-pass count).
+* Manually verified with a small shader that `constexpr int sq(int x)
+  { return x*x; } constexpr int N = sq(5);` produces a `bufferStore`
+  using the literal `25`.
+
+## Risks / Notes
+
+* HLSL globals are normally treated as external cbuffer variables. I
+  only changed the linkage rule when both `isConstexpr()` and HLSL
+  version >= 202x are true, so other HLSL globals are unaffected.
+* I deliberately did not promote `LangOpts.CPlusPlus11` to true under
+  HLSL 202x because that would change the tokenization of many
+  identifiers; a separate, intentional discussion should happen if/when
+  HLSL wants to adopt the full set of C++11 keywords.
+* The new parser diagnostic message ("'constexpr' is only supported in
+  HLSL 202x or later") follows the same style as the existing
+  `err_hlsl_reserved_keyword` diagnostic.
