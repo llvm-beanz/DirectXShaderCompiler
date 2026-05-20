@@ -17,6 +17,6 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Can you enable C++11 `constexpr` support in HLSL under the HLSL 202x language
-mode? Make it so that `constexpr` produces an error under HLSL 2021, but behaves
-as C++ defines for 202x and later.
+Can you write a bunch of test cases that verify different types of operations
+working with constexpr functions and variables inside `_Static_assert`
+expressions to ensure that the compiler is evaluating them early?
