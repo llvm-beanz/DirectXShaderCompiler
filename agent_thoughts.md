@@ -122,3 +122,86 @@ verified the cryptic "unknown type name" error.
 * The new parser diagnostic message ("'constexpr' is only supported in
   HLSL 202x or later") follows the same style as the existing
   `err_hlsl_reserved_keyword` diagnostic.
+
+---
+
+## Follow-up: _Static_assert + constexpr Test Coverage
+
+### Task
+
+Add a broad suite of test cases that drive constexpr functions and
+variables through `_Static_assert`, to pin down that the compiler
+evaluates them early (during Sema, not deferred to CodeGen).
+
+### Approach
+
+`_Static_assert` requires its condition to be an integral constant
+expression, so a successful `_Static_assert(<constexpr-expr>, "msg")`
+already proves that the constexpr machinery ran during semantic
+analysis. To get high signal I added three complementary test files,
+one per phase of translation:
+
+1. **Lex/Parse + Sema "happy path"**:
+   `tools/clang/test/SemaHLSL/v202x/static-assert-constexpr.hlsl` —
+   `-verify` with `expected-no-diagnostics`. Exercises every interesting
+   shape I could think of:
+   * constexpr variables of `int`, `uint`, `float`
+   * constexpr variables initialized from other constexpr variables
+   * arithmetic (`+ - * / %`), comparisons, logical (`&& || !`),
+     bitwise (`& | ^ ~`), shifts (`<< >>`), unary (`+ -`), ternary
+   * constexpr functions calling other constexpr functions
+   * constexpr functions taking constexpr-variable arguments
+   * nested calls (e.g. `square(square(x))`)
+   * numeric casts (`int <-> float`)
+   * `_Static_assert` at namespace scope, in a `struct`, and inside a
+     function body
+   * local constexpr inside a function used in a `_Static_assert`
+
+2. **Sema "negative path"**:
+   `tools/clang/test/SemaHLSL/v202x/static-assert-constexpr-fail.hlsl` —
+   every `_Static_assert` is intentionally false and tagged with a
+   matching `expected-error{{static_assert failed "..."}}`. This makes
+   sure that if the compiler ever stopped evaluating constexpr inside
+   `_Static_assert` (e.g., silently treating it as non-constant), the
+   missing diagnostics would fail the test — i.e., the test would not
+   pass vacuously.
+
+3. **CodeGen agreement**:
+   `tools/clang/test/CodeGenHLSL/static-assert-constexpr.hlsl` —
+   compiles the same constexpr entities that drive `_Static_assert`
+   into a real shader and FileChecks that the constant value reaches
+   DXIL. This guards against a regression where Sema-time evaluation
+   and CodeGen-time evaluation could disagree.
+
+### Gotchas hit while writing the tests
+
+* I initially used a constexpr helper named `mul` and got a "not an
+  integral constant expression" error. Cause: `mul` is also an HLSL
+  intrinsic (vector/matrix multiply), and the call resolution picks up
+  the intrinsic in ways that interfere with constant folding. I renamed
+  the helper to `imul` (and similarly `idiv`, `imod`, `iabs`, `imax`,
+  `imin`, `fmul`, `band`, `bor`, `bxor`, `shl`, `shr`) to avoid clashing
+  with intrinsic names. This is also good hygiene for the tests —
+  collisions with intrinsics would otherwise mask what we're trying to
+  measure.
+
+* HLSL forbids recursion, so I avoided classic constexpr examples like
+  `factorial` and `fib`. The constant evaluator does run for those, but
+  later semantic checks reject the recursion and the test would fail
+  for the wrong reason.
+
+* HLSL uses `uint` rather than `unsigned`. I caught this when an early
+  draft used `unsigned`, producing "HLSL requires a type specifier"
+  errors.
+
+### Validation
+
+```
+$ python3 ./build-rel/bin/llvm-lit \
+    tools/clang/test/SemaHLSL/v202x/ \
+    tools/clang/test/SemaHLSL/v2021/ \
+    tools/clang/test/CodeGenHLSL/constexpr-202x.hlsl
+... Expected Passes : 14
+```
+
+All three new tests pass and no neighbouring tests regress.
