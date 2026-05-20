@@ -3270,7 +3270,10 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
     FunctionDecl *FD = getCurFunctionDecl();
 
     unsigned DiagID;
-    if (getLangOpts().CPlusPlus11 && FD && FD->isConstexpr()) {
+    if ((getLangOpts().CPlusPlus11 ||
+         (getLangOpts().HLSL &&
+          getLangOpts().HLSLVersion >= hlsl::LangStd::v202x)) &&
+        FD && FD->isConstexpr()) {
       // C++11 [stmt.return]p2
       DiagID = diag::err_constexpr_return_missing_expr;
       FD->setInvalidDecl();
