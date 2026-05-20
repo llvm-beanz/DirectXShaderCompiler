@@ -1,18 +1,17 @@
 // RUN: %dxc -T lib_6_6 -HV 202x -ast-dump-implicit %s | FileCheck %s
 
-// Verify that under HLSL 202x the built-in 'hlsl' namespace exists and that
-// intrinsic functions used by the program are placed inside it.  An implicit
-// 'using namespace hlsl;' directive should also be added at translation-unit
-// scope so that unqualified references still resolve.
+// Verify that under HLSL 202x the implicit 'hlsl' namespace exists, that
+// intrinsic functions used by the program are placed inside it, and that
+// *no* implicit 'using namespace hlsl;' directive is injected.
 
 [shader("compute")]
 [numthreads(1,1,1)]
 void main() {
   float x;
   float3 v;
-  float a = sin(x);
-  float b = cos(x);
-  float c = dot(v, v);
+  float a = hlsl::sin(x);
+  float b = hlsl::cos(x);
+  float c = hlsl::dot(v, v);
 }
 
 // Translation unit should contain an implicit 'hlsl' namespace.
@@ -26,6 +25,5 @@ void main() {
 // CHECK: FunctionDecl {{.*}} implicit used cos 'float (float)'
 // CHECK: FunctionDecl {{.*}} implicit used dot
 
-// The translation unit should also contain an implicit using-directive
-// nominating the 'hlsl' namespace, so unqualified intrinsic names resolve.
-// CHECK: UsingDirectiveDecl {{.*}} implicit Namespace {{.*}} 'hlsl'
+// No implicit 'using namespace hlsl;' directive is injected under 202x.
+// CHECK-NOT: UsingDirectiveDecl {{.*}} Namespace {{.*}} 'hlsl'

@@ -1,29 +1,25 @@
-// RUN: %dxc -T lib_6_6 -HV 202x %s -verify
+// RUN: %dxc -T lib_6_3 -HV 202x %s -verify
 
-// Under HLSL 202x, qualifying an intrinsic name with the 'hlsl::' namespace
-// must compile cleanly once an unqualified call has materialized the
-// declaration inside the namespace.  This file is a -verify run so any
-// unexpected diagnostic will cause it to fail.
+// Under HLSL 202x, HLSL intrinsics live exclusively in the implicit
+// 'hlsl' namespace; unqualified references must fail to resolve while
+// fully-qualified 'hlsl::' references must succeed.  This file is a
+// -verify run, so any unexpected diagnostic causes a failure.
 
-// expected-no-diagnostics
-
-float UseSin(float x) {
-  // First an unqualified use to materialize the declaration in 'hlsl'.
-  float u = sin(x);
-  // Then a fully qualified call must also succeed.
-  float q = hlsl::sin(x);
-  return u + q;
+float UseQualifiedSin(float x) {
+  // Fully qualified call: must compile cleanly.
+  return hlsl::sin(x);
 }
 
-float UseDot(float3 a, float3 b) {
-  float u = dot(a, b);
-  float q = hlsl::dot(a, b);
-  return u + q;
+float UseQualifiedDot(float3 a, float3 b) {
+  // Fully qualified call to an overloaded intrinsic: must compile cleanly.
+  return hlsl::dot(a, b);
 }
 
-[shader("compute")]
-[numthreads(1,1,1)]
-void main() {
-  UseSin(0.5);
-  UseDot(float3(1, 0, 0), float3(0, 1, 0));
+float UseUnqualifiedSin(float x) {
+  // Unqualified intrinsic name must not resolve under HLSL 202x.
+  return sin(x); // expected-error{{use of undeclared identifier 'sin'}}
+}
+
+float UseUnqualifiedDot(float3 a, float3 b) {
+  return dot(a, b); // expected-error{{use of undeclared identifier 'dot'}}
 }
