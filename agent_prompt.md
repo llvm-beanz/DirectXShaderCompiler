@@ -17,7 +17,5 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-There is an `if` statement in SemaHLSL.cpp on line 5595 disabling the `hlsl`
-namespace. Can you enable that line under HLSL 202x, and write a bunch of tests
-to verify that hlsl's complex built-in data types and functions get properly put
-under the `hlsl` namespace under 202x and are resolved through the `hlsl` namespace?
+Can you remove the implicit `using namespace hlsl` under hlsl 202x, and ensure
+that unqualified lookups fail correctly and qualified lookups succeed?
