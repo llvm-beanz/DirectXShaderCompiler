@@ -984,6 +984,8 @@ def err_hlsl_expected_space : Error<
   "expected space definition with syntax 'spaceX', where X is an integral value">;
 def err_hlsl_reserved_keyword : Error<
   "'%0' is a reserved keyword in HLSL">;
+def err_hlsl_constexpr_requires_202x : Error<
+  "'constexpr' is only supported in HLSL 202x or later">;
 def err_hlsl_packoffset_requires_c_register : Error<
   "register type for packoffset must be 'c'">;
 def err_hlsl_unsupported_attributes : Error<

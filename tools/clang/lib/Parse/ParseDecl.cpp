@@ -4010,7 +4010,14 @@ HLSLReservedKeyword:
 
     // constexpr
     case tok::kw_constexpr:
-      if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - reserved for HLSL
+      // HLSL Change Begin: gate constexpr on HLSL 202x
+      if (getLangOpts().HLSL &&
+          getLangOpts().HLSLVersion < hlsl::LangStd::v202x) {
+        Diag(Loc, diag::err_hlsl_constexpr_requires_202x);
+        // Don't set the constexpr spec to avoid cascading errors.
+        break;
+      }
+      // HLSL Change End
       isInvalid = DS.SetConstexprSpec(Loc, PrevSpec, DiagID);
       break;
 
