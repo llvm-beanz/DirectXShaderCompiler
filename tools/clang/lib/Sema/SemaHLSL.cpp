@@ -4398,20 +4398,12 @@ public:
     }
 #endif // ENABLE_SPIRV_CODEGEN
 
-    // Under HLSL 202x, automatically inject `using namespace hlsl;` so that
-    // unqualified references to HLSL built-in functions and types continue to
-    // resolve transparently while still being formally declared in the `hlsl`
-    // namespace. See https://github.com/microsoft/hlsl-specs/issues/484.
-    if (m_hlslNSDecl) {
-      UsingDirectiveDecl *UDir = UsingDirectiveDecl::Create(
-          context, context.getTranslationUnitDecl(), SourceLocation(),
-          SourceLocation(), NestedNameSpecifierLoc(), SourceLocation(),
-          m_hlslNSDecl, context.getTranslationUnitDecl());
-      UDir->setImplicit();
-      context.getTranslationUnitDecl()->addDecl(UDir);
-      if (S.TUScope)
-        S.PushUsingDirective(S.TUScope, UDir);
-    }
+    // Note: Under HLSL 202x, HLSL built-in intrinsic functions live in the
+    // implicit `hlsl` namespace created above and *no* implicit
+    // `using namespace hlsl;` directive is injected. Unqualified references
+    // to HLSL intrinsics therefore fail to resolve under 202x; user code is
+    // expected to use the `hlsl::` qualifier. See
+    // https://github.com/microsoft/hlsl-specs/issues/484.
   }
 
   void ForgetSema() override { m_sema = nullptr; }
@@ -5473,12 +5465,13 @@ public:
         ULE->getQualifier()->getKind() == NestedNameSpecifier::Namespace &&
         ULE->getQualifier()->getAsNamespace()->getName() == "hlsl";
 
-    // Intrinsics live in the global namespace, so references to their names
-    // should be either unqualified or '::'-prefixed.
+    // HLSL intrinsics live in the global namespace, so references to their
+    // names should be either unqualified or '::'-prefixed.
     // Exceptions:
     // - Vulkan-specific intrinsics live in the 'vk::' namespace.
     // - DirectX-specific intrinsics live in the 'dx::' namespace.
-    // - Under HLSL 202x, HLSL intrinsics also live in the 'hlsl::' namespace.
+    // - Under HLSL 202x, HLSL intrinsics live exclusively in the 'hlsl::'
+    //   namespace and unqualified references must not resolve to them.
     // - Global namespaces could just mean we have a `using` declaration... so
     // it can be anywhere!
     if (isQualified && !isGlobalNamespace && !isVkNamespace && !isDxNamespace &&
@@ -5502,7 +5495,17 @@ public:
 
     bool SearchDX = isDxNamespace;
     bool SearchVK = isVkNamespace;
-    if (isGlobalNamespace || isHlslNamespace || !isQualified)
+
+    // Under HLSL 202x, HLSL intrinsics live exclusively in the implicit
+    // `hlsl` namespace and unqualified references must not resolve to them.
+    // Pre-202x, intrinsics are treated as residing at translation-unit scope
+    // and unqualified references continue to work.
+    const bool intrinsicsRequireHlslQualifier =
+        m_sema->getLangOpts().HLSLVersion >= hlsl::LangStd::v202x;
+    const bool searchHlslIntrinsics =
+        isGlobalNamespace || isHlslNamespace ||
+        (!isQualified && !intrinsicsRequireHlslQualifier);
+    if (searchHlslIntrinsics)
       SearchTables.push_back(
           IntrinsicTableEntry{IntrinsicArray(g_Intrinsics), m_hlslNSDecl});
 
@@ -5526,7 +5529,8 @@ public:
           IntrinsicTableEntry{IntrinsicArray(g_VkIntrinsics), m_vkNSDecl});
 #endif
 
-    assert(!SearchTables.empty() && "Must have at least one search table!");
+    if (SearchTables.empty())
+      return false;
 
     for (const auto &T : SearchTables) {
 
