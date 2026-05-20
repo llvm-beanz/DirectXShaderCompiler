@@ -5495,19 +5495,7 @@ public:
 
     bool SearchDX = isDxNamespace;
     bool SearchVK = isVkNamespace;
-
-    // Under HLSL 202x, HLSL intrinsics live exclusively in the implicit
-    // `hlsl` namespace and unqualified references must not resolve to them.
-    // Pre-202x, intrinsics are treated as residing at translation-unit scope
-    // and unqualified references continue to work.
-    const bool intrinsicsRequireHlslQualifier =
-        m_sema->getLangOpts().HLSLVersion >= hlsl::LangStd::v202x;
-    const bool searchHlslIntrinsics =
-        isGlobalNamespace || isHlslNamespace ||
-        (!isQualified && !intrinsicsRequireHlslQualifier);
-    if (searchHlslIntrinsics)
-      SearchTables.push_back(
-          IntrinsicTableEntry{IntrinsicArray(g_Intrinsics), m_hlslNSDecl});
+    bool SearchHlslViaUsing = false;
 
     if (S && !isQualified) {
       SmallVector<const DeclContext *, 4> NSContexts;
@@ -5517,8 +5505,26 @@ public:
           SearchDX = true;
         else if (static_cast<DeclContext *>(m_vkNSDecl) == UD)
           SearchVK = true;
+        else if (static_cast<DeclContext *>(m_hlslNSDecl) == UD)
+          SearchHlslViaUsing = true;
       }
     }
+
+    // Under HLSL 202x, HLSL intrinsics live exclusively in the implicit
+    // `hlsl` namespace and unqualified references must not resolve to them
+    // unless the program has nominated `hlsl` via an explicit
+    // `using namespace hlsl;` directive reachable from the current scope.
+    // Pre-202x, intrinsics are treated as residing at translation-unit scope
+    // and unqualified references continue to work without a using-directive.
+    const bool intrinsicsRequireHlslQualifier =
+        m_sema->getLangOpts().HLSLVersion >= hlsl::LangStd::v202x;
+    const bool searchHlslIntrinsics =
+        isGlobalNamespace || isHlslNamespace ||
+        (!isQualified &&
+         (!intrinsicsRequireHlslQualifier || SearchHlslViaUsing));
+    if (searchHlslIntrinsics)
+      SearchTables.push_back(
+          IntrinsicTableEntry{IntrinsicArray(g_Intrinsics), m_hlslNSDecl});
 
     if (SearchDX)
       SearchTables.push_back(
