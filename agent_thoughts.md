@@ -150,3 +150,99 @@ I split the work into focused commits:
    202x` — the namespace-specific tests rewritten/added.
 4. This `agent_thoughts.md` update (committed by itself, as
    instructed).
+
+---
+
+# Agent thoughts: explicit `using namespace hlsl;` at different scopes
+
+## Problem statement
+
+The prior change made HLSL 202x require the `hlsl::` qualifier for any
+HLSL built-in intrinsic.  The follow-up request was to allow programs
+that explicitly write `using namespace hlsl;` to call HLSL intrinsics
+unqualified — exactly the way `using namespace dx;` already lets users
+call DirectX intrinsics unqualified — and to add tests verifying this at
+several different scopes.
+
+## Investigation
+
+`HLSLExternalSource::AddOverloadedCallCandidates` already collected the
+set of namespace contexts reachable from the current `Scope*` via
+`Sema::CollectNamespaceContexts` and toggled `SearchDX`/`SearchVK` when
+it found the implicit `dx`/`vk` namespace among them.  No analogous
+toggle existed for the implicit `hlsl` namespace; when a program wrote
+`using namespace hlsl;` at any scope under 202x and then called `sin(x)`
+unqualified, the hook returned without ever searching `g_Intrinsics`,
+and Clang emitted `use of undeclared identifier 'sin'`.
+
+I verified this by hand-running `dxc -T lib_6_3 -HV 202x` against a tiny
+fixture that used `using namespace hlsl;` at translation-unit scope —
+that initial run reproduced the diagnostic.
+
+## Design
+
+The fix is symmetric with the existing dx/vk handling:
+
+* Add a `SearchHlslViaUsing` flag that becomes true when the
+  `CollectNamespaceContexts` walk discovers `m_hlslNSDecl` (i.e. an
+  in-scope `using namespace hlsl;`).
+* Reorder the local block in `AddOverloadedCallCandidates` so the
+  using-directive scan runs before the decision of whether to push
+  `g_Intrinsics` into `SearchTables`, since that decision now depends
+  on the scan result.
+* Adjust `searchHlslIntrinsics`: under 202x the HLSL intrinsic table
+  is searched for unqualified calls when either the program is
+  pre-202x (existing behavior) **or** an in-scope using-directive
+  nominates the implicit `hlsl` namespace.
+* The qualified path (`hlsl::name`, `::name`) is unchanged and
+  continues to work whether or not a using-directive is present.
+
+`Sema::UseArgumentDependentLookup` did not need further changes: for
+unqualified calls ADL is already enabled, so the call expression
+becomes an `UnresolvedLookupExpr` and the HLSL hook still gets to run.
+
+## Tests
+
+Sema (`-verify`) tests are organized by the scope at which the
+using-directive sits:
+
+* `SemaHLSL/hlsl-using-namespace-tu-scope-202x.hlsl` —
+  `using namespace hlsl;` at translation-unit scope; multiple
+  intrinsics (`sin`, `cos`, `dot`, `saturate`) all resolve unqualified
+  and the qualified form is also accepted.
+* `SemaHLSL/hlsl-using-namespace-function-scope-202x.hlsl` — the
+  using-directive is placed in a function body and in a nested compound
+  statement; sibling functions and code outside the inner block still
+  emit `use of undeclared identifier` so we know the directive is
+  scoped correctly.
+* `SemaHLSL/hlsl-using-namespace-namespace-scope-202x.hlsl` — the
+  directive is placed inside a user-defined namespace; intrinsic
+  references inside that namespace (including from out-of-line member
+  definitions) resolve, while an unrelated sibling namespace and TU
+  scope still require the qualifier.
+
+A CodeGen test covers the later phases of translation:
+
+* `CodeGenDXIL/hlsl/intrinsics/hlsl-using-namespace-call.hlsl` — a
+  translation-unit `using namespace hlsl;` followed by an unqualified
+  `sin` call; the test asserts that the resulting DXIL contains the
+  expected `dx.op.unary` `Sin` op (opcode 13).
+
+## Verification
+
+* `ninja check-clang` — 2986 expected passes, 7 expected failures
+  (pre-existing), 9 unsupported, 0 unexpected failures.
+* All three new SemaHLSL tests and the new CodeGenDXIL test pass.
+* The previously-added namespace tests
+  (`hlsl-namespace-no-implicit-using-202x.hlsl`,
+  `hlsl-namespace-qualified-intrinsics.hlsl`, etc.) still pass,
+  confirming that programs which do *not* nominate the namespace still
+  see the diagnostic.
+
+## Commits
+
+1. `[SemaHLSL] Honor explicit 'using namespace hlsl;' under HLSL 202x`
+   — the SemaHLSL.cpp change.
+2. `[Test][HLSL] Cover explicit 'using namespace hlsl;' at various
+   scopes` — the four new lit tests (three Sema, one CodeGen).
+3. This `agent_thoughts.md` update, committed by itself.
