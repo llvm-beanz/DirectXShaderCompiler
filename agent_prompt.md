@@ -17,5 +17,5 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Can you remove the implicit `using namespace hlsl` under hlsl 202x, and ensure
-that unqualified lookups fail correctly and qualified lookups succeed?
+Can you add tests to verify that explicit `using namespace hlsl` declarations
+work at different scopes to allow lookups to not require the fully qualified name?
