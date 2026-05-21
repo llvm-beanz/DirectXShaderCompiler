@@ -858,18 +858,72 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   return true;
 }
 
+// Walk every nested NamespaceDecl in \p DC whose name matches the next
+// element of \p Path; when the path is exhausted, record the name of every
+// FunctionDecl directly declared in that namespace into \p Names.
+//
+// Namespaces in C++ may be reopened, so the matching is done across all
+// declarations in \p DC, not just the first match. The walk descends into
+// nested NamespaceDecls only — it deliberately ignores other declaration
+// contexts (linkage specs, records, etc.) because the user::ad::{fwd,bwd}
+// names are required to be namespaces by the autodiff convention.
+void collectFunctionNamesInNamespace(const DeclContext *DC,
+                                     ArrayRef<StringRef> Path,
+                                     StringSet<> &Names) {
+  if (Path.empty()) {
+    for (const Decl *D : DC->decls()) {
+      if (const auto *FD = dyn_cast<FunctionDecl>(D)) {
+        if (FD->getIdentifier())
+          Names.insert(FD->getName());
+      }
+    }
+    return;
+  }
+  StringRef Head = Path.front();
+  ArrayRef<StringRef> Tail = Path.slice(1);
+  for (const Decl *D : DC->decls()) {
+    const auto *NS = dyn_cast<NamespaceDecl>(D);
+    if (!NS || !NS->getIdentifier() || NS->getName() != Head)
+      continue;
+    collectFunctionNamesInNamespace(NS, Tail, Names);
+  }
+}
+
+// Populate \p FwdNames and \p BwdNames with the unqualified names of every
+// function the user has already declared (or defined) inside
+// `user::ad::fwd` and `user::ad::bwd` respectively. These names are used to
+// suppress regeneration of the corresponding autodiff stubs, allowing users
+// to provide hand-written differentials or to incrementally check the
+// generated ones into source control.
+void collectUserAdFunctionNames(const TranslationUnitDecl *TU,
+                                StringSet<> &FwdNames,
+                                StringSet<> &BwdNames) {
+  static const StringRef FwdPath[] = {"user", "ad", "fwd"};
+  static const StringRef BwdPath[] = {"user", "ad", "bwd"};
+  collectFunctionNamesInNamespace(TU, FwdPath, FwdNames);
+  collectFunctionNamesInNamespace(TU, BwdPath, BwdNames);
+}
+
 // Emit forward and/or backward generated functions for a single annotated
 // function, wrapped in the user::ad::{fwd,bwd}:: namespaces.
+//
+// If a function with the same unqualified name already exists in the
+// corresponding user::ad::fwd / user::ad::bwd namespace (see
+// collectUserAdFunctionNames) the corresponding mode is skipped, leaving
+// the user's existing implementation untouched.
 void EmitAutoDiffForFunction(const FunctionDecl *FD,
                              const HLSLAutoDiffAttr *Attr,
+                             const StringSet<> &ExistingFwd,
+                             const StringSet<> &ExistingBwd,
                              const PrintingPolicy &Policy, raw_ostream &OS) {
-  if (Attr->hasForward()) {
+  StringRef Name = FD->getName();
+  if (Attr->hasForward() && !ExistingFwd.count(Name)) {
     OS << "\nnamespace user { namespace ad { namespace fwd {\n";
     OS << "using namespace ::ad::fwd;\n";
     emitAutoDiffFunction(FD, AutoDiffEmitter::Fwd, Policy, OS);
     OS << "} } } // namespace user::ad::fwd\n";
   }
-  if (Attr->hasBackward()) {
+  if (Attr->hasBackward() && !ExistingBwd.count(Name)) {
     OS << "\nnamespace user { namespace ad { namespace bwd {\n";
     OS << "using namespace ::ad::bwd;\n";
     emitAutoDiffFunction(FD, AutoDiffEmitter::Bwd, Policy, OS);
@@ -884,11 +938,22 @@ namespace hlsl {
 void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
                                            raw_ostream &OS,
                                            PrintingPolicy &Policy) {
+  // Collect the names of any user::ad::fwd / user::ad::bwd functions the
+  // input translation unit has already declared. We use these sets to skip
+  // regenerating differentials a user has either hand-written or previously
+  // checked in.
+  StringSet<> ExistingFwd;
+  StringSet<> ExistingBwd;
+  collectUserAdFunctionNames(tu, ExistingFwd, ExistingBwd);
+
   // Determine which auto-diff library headers the generated output needs
   // and emit the corresponding #include directives at the very top of the
   // file. The wrapped namespace blocks pull names in with a
   // `using namespace ::ad::{fwd,bwd};` directive each, so the rewritten
-  // bodies can stay free of fully-qualified names.
+  // bodies can stay free of fully-qualified names. We only include a
+  // header if we are actually about to emit at least one function for
+  // that mode; functions whose user-provided differentials are already
+  // present do not require us to drag the library in.
   bool NeedFwd = false;
   bool NeedBwd = false;
   for (Decl *D : tu->decls()) {
@@ -896,8 +961,9 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
     if (!FD)
       continue;
     if (const auto *AD = FD->getAttr<HLSLAutoDiffAttr>()) {
-      NeedFwd |= AD->hasForward();
-      NeedBwd |= AD->hasBackward();
+      StringRef Name = FD->getName();
+      NeedFwd |= AD->hasForward() && !ExistingFwd.count(Name);
+      NeedBwd |= AD->hasBackward() && !ExistingBwd.count(Name);
     }
   }
   if (NeedFwd)
@@ -919,7 +985,7 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
     if (!FD)
       continue;
     if (auto *AD = FD->getAttr<HLSLAutoDiffAttr>())
-      EmitAutoDiffForFunction(FD, AD, Policy, OS);
+      EmitAutoDiffForFunction(FD, AD, ExistingFwd, ExistingBwd, Policy, OS);
   }
 }
 
