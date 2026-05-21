@@ -558,3 +558,63 @@ After all five commits:
   and `dxc -I tools/clang/lib/Headers/hlsl -T ps_6_9 -HV 2021` compiles
   it to DXIL without diagnostics.
 
+
+## Round 6 — skip emission when `user::ad::{fwd,bwd}::F` already exists
+
+The user-facing motivation is two-fold:
+
+1. Power users may hand-write a differential — typically because the
+   automatic translation is too conservative or the function uses a
+   construct the rewriter flags as non-differentiable.
+2. Teams that check the generated differentials into source control want
+   `dxr -generate-differentials` to be idempotent on a tree that already
+   contains the previous run's output. Without the skip behaviour each
+   re-run produces a second definition of `f` inside `user::ad::fwd`,
+   which is an ODR violation.
+
+### Implementation
+
+`PrintTranslationUnitWithDifferentials` now walks the translation unit
+*twice*:
+
+1. First it descends through the (possibly multiply-reopened)
+   `user -> ad -> fwd|bwd` namespace chains and collects the unqualified
+   names of every `FunctionDecl` defined or merely declared in each.
+   The recursion is in a small helper `collectFunctionNamesInNamespace`,
+   parameterised on the path so the same code feeds both
+   `ExistingFwd` and `ExistingBwd` sets.
+2. The decision loop that decides whether to emit `#include <ad/fwd>`
+   and `#include <ad/bwd>` is then driven by the same predicate that
+   `EmitAutoDiffForFunction` uses — `Attr->hasForward() &&
+   !ExistingFwd.count(Name)` — so a translation unit that already
+   contains every generated differential ends up identical (modulo
+   pretty-printer whitespace) to its input.
+
+A subtle decision: the check is name-based, not signature-based. If the
+user has shadowed `f` with an overload set inside `user::ad::fwd`, the
+rewriter still backs off and assumes the user knows what they are
+doing. The alternative — matching by parameter types after the
+`Value<T>` / `Variable<T>` rewrite — would re-enter the type system and
+the rewriter is deliberately syntactic.
+
+### Test surface
+
+Three new FileCheck tests live alongside the rest in
+`tools/clang/test/HLSLFileCheck/rewriter/autodiff/`:
+
+* `skip_existing_fwd.hlsl` — single-mode positive case for fwd.
+* `skip_existing_bwd.hlsl` — single-mode positive case for bwd.
+* `skip_existing_mixed.hlsl` — mode-by-mode check: only fwd is
+  pre-defined, bwd must still be generated. This also pins the
+  output ordering: because `EmitAutoDiffForFunction` runs inline as
+  the `TranslationUnitDecl::print` loop visits the annotated function,
+  the generated `bwd` block appears *between* the original `f` and the
+  user-provided `fwd` namespace.
+
+Each test declares minimal local stub templates (`template <typename
+T> struct Value;` etc.) instead of `#include <ad/fwd>`. The rewriter
+only needs the user namespace to *parse*; it never instantiates the
+templates. This keeps the tests independent of `-HV 2021` and of the
+ongoing `enable_if`/`<ad/matrix_utils>` build flags. The existing
+`autodiff_fwd.hlsl` family still exercises the real header via its
+follow-up `%dxc -I %hlsl_headers -verify %t.gen.hlsl` step.
