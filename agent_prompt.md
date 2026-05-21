@@ -18,7 +18,7 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Can you update all the tests for `-generate-differentials` so that in addition
-to verifying the output of the rewritten code, they also run the generated code
-through dxc to compile it and verify (using DXC's -verify floag) either that no
-diagnostics are generated, or that the expected static asserts are generated?
+The `autodiff_verify_stubs.hlsli` file is a hack that does the wrong thing. The
+generated rewritten code should just include the <ad/fwd> and/or <ad/bwd>
+headers. Please fix that so that it includes the correct headers and maps the
+include path.
