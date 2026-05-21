@@ -433,6 +433,134 @@ public:
     E->printPretty(OS, nullptr, Policy);
   }
 
+  // Translate a single statement. `Indent` is the leading whitespace for the
+  // line(s) produced. Unrecognised statements pass through verbatim with a
+  // TODO marker and flag the function as non-differentiable so it gets a
+  // stub.
+  void emitStmt(const Stmt *S, StringRef Indent) {
+    if (!S) {
+      OS << Indent << ";\n";
+      return;
+    }
+    // [[no_diff]] copies the substatement verbatim.
+    if (const auto *AS = dyn_cast<AttributedStmt>(S)) {
+      for (const Attr *A : AS->getAttrs()) {
+        if (isa<HLSLNoDiffAttr>(A)) {
+          OS << Indent;
+          AS->getSubStmt()->printPretty(OS, nullptr, Policy);
+          OS << "\n";
+          return;
+        }
+      }
+      // Other attributes: fall through and process the substatement.
+      emitStmt(AS->getSubStmt(), Indent);
+      return;
+    }
+    if (const auto *CS = dyn_cast<CompoundStmt>(S)) {
+      OS << Indent << "{\n";
+      SmallString<32> Nested(Indent);
+      Nested += "  ";
+      for (const Stmt *Child : CS->body())
+        emitStmt(Child, Nested);
+      OS << Indent << "}\n";
+      return;
+    }
+    if (const auto *RS = dyn_cast<ReturnStmt>(S)) {
+      OS << Indent << "return";
+      if (RS->getRetValue()) {
+        OS << " ";
+        emitExpr(RS->getRetValue());
+      }
+      OS << ";\n";
+      return;
+    }
+    if (const auto *IS = dyn_cast<IfStmt>(S)) {
+      // Control flow with data-dependent conditions is unsound to
+      // differentiate without special handling. Flag it but still emit
+      // structurally so the stub diagnostic is informative.
+      markNonDifferentiable(
+          "data-dependent control flow (if) is not differentiable; "
+          "use [[no_diff]] or branchless math");
+      OS << Indent << "if (";
+      if (IS->getCond())
+        IS->getCond()->printPretty(OS, nullptr, Policy);
+      OS << ")\n";
+      emitStmt(IS->getThen(), Indent);
+      if (IS->getElse()) {
+        OS << Indent << "else\n";
+        emitStmt(IS->getElse(), Indent);
+      }
+      return;
+    }
+    if (const auto *WS = dyn_cast<WhileStmt>(S)) {
+      markNonDifferentiable(
+          "data-dependent control flow (while) is not differentiable");
+      OS << Indent << "while (";
+      if (WS->getCond())
+        WS->getCond()->printPretty(OS, nullptr, Policy);
+      OS << ")\n";
+      emitStmt(WS->getBody(), Indent);
+      return;
+    }
+    if (const auto *FS = dyn_cast<ForStmt>(S)) {
+      markNonDifferentiable(
+          "data-dependent control flow (for) is not differentiable");
+      OS << Indent << "for (";
+      if (FS->getInit())
+        FS->getInit()->printPretty(OS, nullptr, Policy);
+      else
+        OS << ";";
+      if (FS->getCond()) {
+        OS << " ";
+        FS->getCond()->printPretty(OS, nullptr, Policy);
+      }
+      OS << ";";
+      if (FS->getInc()) {
+        OS << " ";
+        FS->getInc()->printPretty(OS, nullptr, Policy);
+      }
+      OS << ")\n";
+      emitStmt(FS->getBody(), Indent);
+      return;
+    }
+    if (const auto *DS = dyn_cast<DeclStmt>(S)) {
+      // Declarations: translate each VarDecl, mapping its initializer
+      // through the expression translator. The static type becomes
+      // Value<T>/Variable<T> for the chosen mode.
+      const char *Wrap = (M == Fwd) ? "Value" : "Variable";
+      for (const Decl *D : DS->decls()) {
+        const auto *VD = dyn_cast<VarDecl>(D);
+        if (!VD) {
+          markNonDifferentiable("unsupported declaration in body");
+          OS << Indent;
+          DS->printPretty(OS, nullptr, Policy);
+          OS << "\n";
+          return;
+        }
+        OS << Indent << Wrap << "<" << ElemType << "> " << VD->getName();
+        if (VD->hasInit()) {
+          OS << " = ";
+          emitExpr(VD->getInit());
+        }
+        OS << ";\n";
+      }
+      return;
+    }
+    // ExprStmt / NullStmt and friends. Use printPretty for ExprStmt, but
+    // translate the expression where possible.
+    if (const auto *E = dyn_cast<Expr>(S)) {
+      OS << Indent;
+      emitExpr(E);
+      OS << ";\n";
+      return;
+    }
+    // Anything else: flag and pass through.
+    markNonDifferentiable("unsupported statement in function body");
+    OS << Indent << "/*TODO: unsupported statement*/ ";
+    S->printPretty(OS, nullptr, Policy);
+    OS << "\n";
+  }
+
 private:
   Mode M;
   StringRef ElemType;
@@ -693,38 +821,8 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
                << P->getName() << ");\n";
       }
     }
-    for (const Stmt *S : CS->body()) {
-      // [[no_diff]] suppresses translation: copy the wrapped statement
-      // verbatim. The attribute is parsed as an AttributedStmt that wraps
-      // the user statement.
-      if (const auto *AS = dyn_cast<AttributedStmt>(S)) {
-        bool HasNoDiff = false;
-        for (const Attr *A : AS->getAttrs()) {
-          if (isa<HLSLNoDiffAttr>(A)) {
-            HasNoDiff = true;
-            break;
-          }
-        }
-        if (HasNoDiff) {
-          BodyOS << "    ";
-          AS->getSubStmt()->printPretty(BodyOS, nullptr, Policy);
-          BodyOS << "\n";
-          continue;
-        }
-      }
-      if (const auto *RS = dyn_cast<ReturnStmt>(S)) {
-        BodyOS << "    return ";
-        Em.emitExpr(RS->getRetValue());
-        BodyOS << ";\n";
-        continue;
-      }
-      // Best-effort pass-through for non-return statements; flag the
-      // function as containing an unsupported construct so the stub
-      // assertion fires.
-      BodyOS << "    /*TODO: unsupported statement*/ ";
-      S->printPretty(BodyOS, nullptr, Policy);
-      BodyOS << "\n";
-    }
+    for (const Stmt *S : CS->body())
+      Em.emitStmt(S, "    ");
     BodyOS.flush();
     ValidBody = !Em.sawNonDifferentiable();
     if (!ValidBody)
