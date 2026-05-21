@@ -18,7 +18,8 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-The `autodiff_verify_stubs.hlsli` file is a hack that does the wrong thing. The
-generated rewritten code should just include the <ad/fwd> and/or <ad/bwd>
-headers. Please fix that so that it includes the correct headers and maps the
-include path.
+When processing a translation unit, if the namespaced `user::ad` functions for a
+function that has the `[[dxc::autodiff(...)]]` attribute  already exist, skip
+it. This will allow users to (1) provide their own implementations of
+differential functions and (2) check in the differential functions to source
+control iteratively.
