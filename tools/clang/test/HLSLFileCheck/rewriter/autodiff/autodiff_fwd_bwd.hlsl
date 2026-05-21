@@ -1,4 +1,9 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
+//
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: cat %S/Inputs/autodiff_verify_stubs.hlsli %t.gen.hlsl > %t.full.hlsl
+// RUN: echo '// expected-no-diagnostics' >> %t.full.hlsl
+// RUN: %dxc -T ps_6_0 -verify %t.full.hlsl
 
 // Combined forward and backward autodiff: both variants are emitted in
 // their respective namespaces, and the unary math intrinsics sin/cos/exp

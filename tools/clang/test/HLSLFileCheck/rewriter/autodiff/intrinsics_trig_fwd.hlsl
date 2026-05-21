@@ -1,4 +1,9 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
+//
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: cat %S/Inputs/autodiff_verify_stubs.hlsli %t.gen.hlsl > %t.full.hlsl
+// RUN: echo '// expected-no-diagnostics' >> %t.full.hlsl
+// RUN: %dxc -T ps_6_0 -verify %t.full.hlsl
 
 // Trig intrinsics in forward mode are preserved as-is on Value<T> -- the
 // hlsl/ad/fwd library overloads sin/cos/... directly. No '*Expr' rename

@@ -1,4 +1,9 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
+//
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: cat %S/Inputs/autodiff_verify_stubs.hlsli %t.gen.hlsl > %t.full.hlsl
+// RUN: echo '// expected-no-diagnostics' >> %t.full.hlsl
+// RUN: %dxc -T ps_6_0 -verify %t.full.hlsl
 
 // Backward-only autodiff: emits a Variable<float>-based backward variant in
 // user::ad::bwd. Parameter references are rewritten to _expr wrappers and a
