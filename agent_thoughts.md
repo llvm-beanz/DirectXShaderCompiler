@@ -262,3 +262,78 @@ prototype:
    `ninja check-all` passes with 4610 expected-pass tests and no
    failures.
 
+
+## Follow-up session: `[[dxc::no_diff]]` rename, expanded tests, library coverage
+
+This second pass addresses four follow-up asks: namespace the no_diff
+attribute under `dxc`, broaden the no_diff regression set, mirror the
+backward-only tests in forward mode, and finish populating the fwd/bwd
+AD support libraries.
+
+1. **`[[no_diff]]` → `[[dxc::no_diff]]`.** Changed the `HLSLNoDiff`
+   spelling in `Attr.td` from `CXX11<"", "no_diff", 2015>` to
+   `CXX11<"dxc", "no_diff", 2015>`, matching the existing
+   `[[dxc::autodiff]]` convention. `ParseDeclCXX::hasCXXAttributeInHLSL`
+   was extended to accept `no_diff` under the `dxc` scope so the HLSL
+   parser entry point recognises the new spelling. The Sema printout in
+   `SemaHLSL.cpp` was updated, as was the rewriter's stale comment and
+   the non-differentiable reason string that suggests the attribute.
+
+2. **Statement-attribute on bare expressions.** While adding tests in
+   step 3 I noticed that `[[dxc::no_diff]] expr;` lost its trailing
+   semicolon in the rewriter output: `printPretty` on an `Expr *`
+   (dynamic type) doesn't emit `;` because expression printing is
+   context-free. Fixed in `emitStmt`'s AttributedStmt branch by
+   detecting `isa<Expr>(Sub)` and appending `;` explicitly.
+
+3. **Broader no_diff coverage.** Four new tests:
+   `no_diff_user_call.hlsl` and `no_diff_builtin_call.hlsl` cover call
+   expressions to a user function and an HLSL intrinsic respectively;
+   `no_diff_operator.hlsl` covers an operator expression statement;
+   `no_diff_var_decl.hlsl` documents the block-wrap workaround
+   (`[[dxc::no_diff]] { float a = ...; }`) needed because the HLSL
+   parser still drops statement attributes on `DeclStmt`.
+
+4. **Forward-mode counterparts.** Backward-only tests added in the
+   previous session were duplicated with `*_fwd.hlsl` files:
+   `compound_assign_fwd.hlsl`, `intrinsics_trig_fwd.hlsl`,
+   `intrinsics_exp_log_fwd.hlsl`, `intrinsics_algebraic_fwd.hlsl`,
+   `nondiff_ternary_fwd.hlsl`, `nondiff_if_fwd.hlsl`. Forward mode
+   preserves intrinsic call syntax on `Value<T>` (overload resolution
+   handles the derivative side) instead of renaming to `*Expr`, and
+   parenthesises compound assigns as `(a += x)`; the CHECK lines were
+   adjusted accordingly.
+
+5. **Full intrinsic coverage in `hlsl/ad/{fwd,bwd}`.** Cross-checked
+   the rewriter's `GetBackwardIntrinsicBuilder` table against the
+   support libraries and added the missing overloads. On the fwd side
+   that meant `Value<T>` scalar overloads for the rest of the trig and
+   hyperbolic families, exp2/log2/log10, rsqrt/rcp,
+   abs/saturate/clamp/min/max/lerp/mad/fma/smoothstep,
+   sign/step/floor/ceil/round/trunc/frac/fmod/modf,
+   degrees/radians/ldexp, and the geometric helpers
+   distance/reflect/refract/faceforward/lit. Each calls the underlying
+   HLSL intrinsic for the primal and applies the analytic chain rule to
+   the stored derivative; piecewise-constant intrinsics use the
+   subgradient convention of zero. On the bwd side three small macros
+   (`MAKE_BACK_UNARY_EXPR`, `MAKE_BACK_BINARY_EXPR`,
+   `MAKE_BACK_TERNARY_EXPR`) plus explicit templates for the geometric
+   helpers produce the matching `BackXxxExpr` records, builder
+   functions, and `compute_gradients` overloads. Two coverage tests
+   (`coverage_fwd.hlsl`, `coverage_bwd.hlsl`) FileCheck the library
+   headers directly to assert each required symbol exists.
+
+   The library headers themselves still cannot be compiled end-to-end
+   by `dxc` today because of pre-existing issues that are out of scope:
+   `#include <matrix_utils>` uses angle brackets which the HLSL
+   preprocessor rejects, and `matrix_utils` references
+   `hlsl::enable_if` without including its header. Those bugs predate
+   this work.
+
+Validation: `cd build-rel && ninja check-all` reports 4610 expected
+passes / 9 expected failures / 33 unsupported, unchanged from the
+pre-rename baseline. Each rewriter test under
+`tools/clang/test/HLSLFileCheck/rewriter/autodiff/` was additionally
+verified manually with `bin/dxr -generate-differentials | bin/FileCheck`
+(the BatchHLSL runner still doesn't recurse into the `rewriter/`
+subtree, so the manual run remains the per-commit gate).
