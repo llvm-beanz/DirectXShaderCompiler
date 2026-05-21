@@ -15220,6 +15220,13 @@ Attr *hlsl::ProcessStmtAttributeForHLSL(Sema &S, Stmt *St,
     result = ::new (S.Context) HLSLCallAttr(A.getRange(), S.Context,
                                             A.getAttributeSpellingListIndex());
     break;
+  case AttributeList::AT_HLSLNoDiff:
+    // [[no_diff]] is a marker for the dxr -generate-differentials rewriter.
+    // No statement-shape validation is required: the attribute is meaningful
+    // on any statement that the rewriter would otherwise transform.
+    result = ::new (S.Context) HLSLNoDiffAttr(
+        A.getRange(), S.Context, A.getAttributeSpellingListIndex());
+    break;
   default:
     Handled = false;
     break;
@@ -16521,6 +16528,11 @@ void hlsl::CustomPrintHLSLAttr(const clang::Attr *A, llvm::raw_ostream &Out,
     Out << "[loop]\n";
     break;
 
+  case clang::attr::HLSLNoDiff:
+    Indent(Indentation, Out);
+    Out << "[no_diff]\n";
+    break;
+
   case clang::attr::HLSLUnroll: {
     Attr *noconst = const_cast<Attr *>(A);
     HLSLUnrollAttr *ACast = static_cast<HLSLUnrollAttr *>(noconst);
@@ -16763,6 +16775,7 @@ bool hlsl::IsHLSLAttr(clang::attr::Kind AttrKind) {
   case clang::attr::HLSLMaxTessFactor:
   case clang::attr::HLSLNoInterpolation:
   case clang::attr::HLSLNoPerspective:
+  case clang::attr::HLSLNoDiff:
   case clang::attr::HLSLNumThreads:
   case clang::attr::HLSLRootSignature:
   case clang::attr::HLSLOut:

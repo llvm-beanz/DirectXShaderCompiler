@@ -270,6 +270,24 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   const Stmt *Body = FD->getBody();
   if (const auto *CS = dyn_cast_or_null<CompoundStmt>(Body)) {
     for (const Stmt *S : CS->body()) {
+      // [[no_diff]] suppresses translation: copy the wrapped statement
+      // verbatim. The attribute is parsed as an AttributedStmt that wraps
+      // the user statement.
+      if (const auto *AS = dyn_cast<AttributedStmt>(S)) {
+        bool HasNoDiff = false;
+        for (const Attr *A : AS->getAttrs()) {
+          if (isa<HLSLNoDiffAttr>(A)) {
+            HasNoDiff = true;
+            break;
+          }
+        }
+        if (HasNoDiff) {
+          OS << "    ";
+          AS->getSubStmt()->printPretty(OS, nullptr, Policy);
+          OS << "\n";
+          continue;
+        }
+      }
       if (const auto *RS = dyn_cast<ReturnStmt>(S)) {
         OS << "    return ";
         Em.emitExpr(RS->getRetValue());
