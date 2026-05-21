@@ -1,9 +1,8 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 //
 // RUN: %dxr -generate-differentials %s > %t.gen.hlsl
-// RUN: cat %S/Inputs/autodiff_verify_stubs.hlsli %t.gen.hlsl > %t.full.hlsl
-// RUN: echo '// expected-no-diagnostics' >> %t.full.hlsl
-// RUN: %dxc -T ps_6_0 -verify %t.full.hlsl
+// RUN: echo '// expected-no-diagnostics' >> %t.gen.hlsl
+// RUN: %dxc -I %hlsl_headers -T ps_6_9 -HV 2021 -verify %t.gen.hlsl
 
 // Exponential / logarithm / power family in forward mode: the calls remain
 // untransformed, since the Value<T> overloads supply the differential

@@ -8,8 +8,7 @@
 //
 // RUN: %dxr -generate-differentials %s > %t.gen.hlsl
 // RUN: sed -E 's@(_Static_assert\(false.*)@\1 // expected-error{{static_assert failed}}@;s@(return (Value|Variable)<[^>]*>\(\).*)@\1 // expected-error{{cannot have an explicit empty initializer}}@' %t.gen.hlsl > %t.gen.ann.hlsl
-// RUN: cat %S/Inputs/autodiff_verify_stubs.hlsli %t.gen.ann.hlsl > %t.full.hlsl
-// RUN: %dxc -T ps_6_0 -verify %t.full.hlsl
+// RUN: %dxc -I %hlsl_headers -T ps_6_9 -HV 2021 -verify %t.gen.ann.hlsl
 
 // Forward-mode counterpart to nondiff_ternary.hlsl: the ternary ?: is not
 // differentiable, so the forward-mode generated function is replaced by a
