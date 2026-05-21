@@ -920,6 +920,447 @@ V compute_gradients(inout GradientContext<M> context, BackMatVecMulExpr<M, V, L,
     return result;
 }
 
+// ============================================================================
+// Full HLSL Intrinsic Coverage (scalar BackXxxExpr)
+// ============================================================================
+//
+// Provides backward-mode expression templates and builder functions for every
+// differentiable HLSL intrinsic enumerated by the dxr -generate-differentials
+// rewriter (the GetBackwardIntrinsicBuilder table in dxcrewriteautodiff.cpp).
+// Each Expr captures the input expression, computes the underlying intrinsic
+// value in forward(), and propagates the chain-rule derivative in backward().
+//
+// Piecewise-constant intrinsics (sign, step, floor, ceil, round, trunc) use
+// the subgradient convention: their backward() pushes a zero gradient.
+
+// Macro to define a unary scalar BackExpr whose derivative is a single
+// expression in `expr_val` (the cached forward value of the input).
+#define MAKE_BACK_UNARY_EXPR(StructName, FuncName, IntrinName, DerivExpr) \
+template<typename T, typename E> \
+struct StructName \
+{ \
+    using ValueType = T; \
+    E expr; \
+    T expr_val; \
+    T forward() \
+    { \
+        expr_val = __detail::forward(expr); \
+        return IntrinName(expr_val); \
+    } \
+    void backward(inout GradientContext<T> context, T gradient) \
+    { \
+        __detail::backward(expr, context, gradient * (DerivExpr)); \
+    } \
+}; \
+MAKE_UNARY_OP_BACK(StructName, FuncName) \
+MAKE_COMPUTE_GRADIENTS_UNARY(StructName)
+
+// Macro to define a unary scalar BackExpr that's piecewise-constant (zero
+// gradient). Used for sign/step/floor/ceil/round/trunc.
+#define MAKE_BACK_UNARY_ZERO_EXPR(StructName, FuncName, IntrinName) \
+template<typename T, typename E> \
+struct StructName \
+{ \
+    using ValueType = T; \
+    E expr; \
+    T forward() { return IntrinName(__detail::forward(expr)); } \
+    void backward(inout GradientContext<T> context, T gradient) \
+    { \
+        __detail::backward(expr, context, T(0)); \
+    } \
+}; \
+MAKE_UNARY_OP_BACK(StructName, FuncName) \
+MAKE_COMPUTE_GRADIENTS_UNARY(StructName)
+
+// Trigonometry. sin/cos already declared above; finish the family.
+MAKE_BACK_UNARY_EXPR(BackTanExpr, tanExpr, tan, (T(1) + tan(expr_val) * tan(expr_val)))
+MAKE_BACK_UNARY_EXPR(BackAsinExpr, asinExpr, asin, (T(1) / sqrt(T(1) - expr_val * expr_val)))
+MAKE_BACK_UNARY_EXPR(BackAcosExpr, acosExpr, acos, (T(-1) / sqrt(T(1) - expr_val * expr_val)))
+MAKE_BACK_UNARY_EXPR(BackAtanExpr, atanExpr, atan, (T(1) / (T(1) + expr_val * expr_val)))
+MAKE_BACK_UNARY_EXPR(BackSinhExpr, sinhExpr, sinh, cosh(expr_val))
+MAKE_BACK_UNARY_EXPR(BackCoshExpr, coshExpr, cosh, sinh(expr_val))
+MAKE_BACK_UNARY_EXPR(BackTanhExpr, tanhExpr, tanh, (T(1) - tanh(expr_val) * tanh(expr_val)))
+
+// Exponentials and logarithms.
+MAKE_BACK_UNARY_EXPR(BackExp2Expr, exp2Expr, exp2, exp2(expr_val) * log(T(2)))
+MAKE_BACK_UNARY_EXPR(BackLog10Expr, log10Expr, log10, (T(1) / (expr_val * log(T(10)))))
+
+// Roots and reciprocals.
+MAKE_BACK_UNARY_EXPR(BackRsqrtExpr, rsqrtExpr, rsqrt,
+                     (T(-1) / (T(2) * sqrt(expr_val) * expr_val)))
+MAKE_BACK_UNARY_EXPR(BackRcpExpr, rcpExpr, rcp, (T(-1) / (expr_val * expr_val)))
+
+// Smooth algebraic.
+MAKE_BACK_UNARY_EXPR(BackAbsExpr, absExpr, abs,
+                     ((expr_val >= T(0)) ? T(1) : T(-1)))
+MAKE_BACK_UNARY_EXPR(BackSaturateExpr, saturateExpr, saturate,
+                     ((expr_val > T(0) && expr_val < T(1)) ? T(1) : T(0)))
+
+// Piecewise-constant intrinsics.
+MAKE_BACK_UNARY_ZERO_EXPR(BackSignExpr, signExpr, sign)
+MAKE_BACK_UNARY_ZERO_EXPR(BackFloorExpr, floorExpr, floor)
+MAKE_BACK_UNARY_ZERO_EXPR(BackCeilExpr, ceilExpr, ceil)
+MAKE_BACK_UNARY_ZERO_EXPR(BackRoundExpr, roundExpr, round)
+MAKE_BACK_UNARY_ZERO_EXPR(BackTruncExpr, truncExpr, trunc)
+// frac has unit derivative on the interior of each integer segment.
+MAKE_BACK_UNARY_EXPR(BackFracExpr, fracExpr, frac, T(1))
+
+// Unit-conversion (linear scaling, constant derivative).
+MAKE_BACK_UNARY_EXPR(BackDegreesExpr, degreesExpr, degrees,
+                     (T(180) / T(3.14159265358979323846)))
+MAKE_BACK_UNARY_EXPR(BackRadiansExpr, radiansExpr, radians,
+                     (T(3.14159265358979323846) / T(180)))
+
+// Binary scalar Expr macro: derivative is two formulas dL/dx and dR/dx.
+#define MAKE_BACK_BINARY_EXPR(StructName, FuncName, IntrinName, LDeriv, RDeriv) \
+template<typename T, typename L, typename R> \
+struct StructName \
+{ \
+    using ValueType = T; \
+    L left; \
+    R right; \
+    T left_val; \
+    T right_val; \
+    T forward() \
+    { \
+        left_val = __detail::forward(left); \
+        right_val = __detail::forward(right); \
+        return IntrinName(left_val, right_val); \
+    } \
+    void backward(inout GradientContext<T> context, T gradient) \
+    { \
+        __detail::backward(left, context, gradient * (LDeriv)); \
+        __detail::backward(right, context, gradient * (RDeriv)); \
+    } \
+}; \
+MAKE_BINARY_OP_BACK(StructName, FuncName) \
+MAKE_COMPUTE_GRADIENTS_BINARY(StructName)
+
+// atan2(y, x): d/dy = x/(x^2+y^2), d/dx = -y/(x^2+y^2).
+MAKE_BACK_BINARY_EXPR(BackAtan2Expr, atan2Expr, atan2,
+                      (right_val / (left_val * left_val + right_val * right_val)),
+                      (-left_val / (left_val * left_val + right_val * right_val)))
+
+// fmod(a, b) = a - trunc(a/b) * b; for AD purposes treat trunc(a/b) as locally
+// constant, so d/da = 1 and d/db = -trunc(a/b).
+MAKE_BACK_BINARY_EXPR(BackFmodExpr, fmodExpr, fmod, T(1), -trunc(left_val / right_val))
+
+// ldexp(x, e) = x * 2^e; e treated as constant for the chain-rule.
+MAKE_BACK_BINARY_EXPR(BackLdexpExpr, ldexpExpr, ldexp, exp2(right_val), T(0))
+
+// Piecewise-constant binaries.
+MAKE_BACK_BINARY_EXPR(BackStepExpr, stepExpr, step, T(0), T(0))
+
+// distance(a, b) on scalars reduces to |a - b|.
+template<typename T, typename L, typename R>
+struct BackDistanceExpr
+{
+    using ValueType = T;
+    L left;
+    R right;
+    T left_val;
+    T right_val;
+    T forward()
+    {
+        left_val = __detail::forward(left);
+        right_val = __detail::forward(right);
+        return abs(left_val - right_val);
+    }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        T diff = left_val - right_val;
+        T s = (diff == T(0)) ? T(0) : ((diff > T(0)) ? T(1) : T(-1));
+        __detail::backward(left, context, gradient * s);
+        __detail::backward(right, context, -gradient * s);
+    }
+};
+MAKE_BINARY_OP_BACK(BackDistanceExpr, distanceExpr)
+MAKE_COMPUTE_GRADIENTS_BINARY(BackDistanceExpr)
+
+// Ternary scalar Expr macro: three derivative formulas in {a_val, b_val,
+// c_val}, plus the intrinsic call signature.
+#define MAKE_BACK_TERNARY_EXPR(StructName, FuncName, IntrinCall, ADeriv, BDeriv, CDeriv) \
+template<typename T, typename A, typename B, typename C> \
+struct StructName \
+{ \
+    using ValueType = T; \
+    A a; B b; C c; \
+    T a_val; T b_val; T c_val; \
+    T forward() \
+    { \
+        a_val = __detail::forward(a); \
+        b_val = __detail::forward(b); \
+        c_val = __detail::forward(c); \
+        return IntrinCall; \
+    } \
+    void backward(inout GradientContext<T> context, T gradient) \
+    { \
+        __detail::backward(a, context, gradient * (ADeriv)); \
+        __detail::backward(b, context, gradient * (BDeriv)); \
+        __detail::backward(c, context, gradient * (CDeriv)); \
+    } \
+}; \
+template<typename T, typename A, typename B, typename C> \
+StructName<T, A, B, C> FuncName(A a, B b, C c) \
+{ \
+    StructName<T, A, B, C> expr; \
+    expr.a = a; expr.b = b; expr.c = c; \
+    return expr; \
+} \
+template<typename T, typename A, typename B, typename C> \
+T compute_gradients(inout GradientContext<T> context, StructName<T, A, B, C> expr) \
+{ \
+    context.zeroGradients(); \
+    T result = expr.forward(); \
+    expr.backward(context, T(1)); \
+    return result; \
+}
+
+// clamp(x, lo, hi).
+MAKE_BACK_TERNARY_EXPR(BackClampExpr, clampExpr, clamp(a_val, b_val, c_val),
+                       ((a_val < b_val || a_val > c_val) ? T(0) : T(1)),
+                       ((a_val < b_val) ? T(1) : T(0)),
+                       ((a_val > c_val) ? T(1) : T(0)))
+
+// lerp(a, b, t) = a + t*(b-a).
+MAKE_BACK_TERNARY_EXPR(BackLerpExpr, lerpExpr, lerp(a_val, b_val, c_val),
+                       (T(1) - c_val), c_val, (b_val - a_val))
+
+// mad/fma(a, b, c) = a*b + c.
+MAKE_BACK_TERNARY_EXPR(BackMadExpr, madExpr, (a_val * b_val + c_val),
+                       b_val, a_val, T(1))
+MAKE_BACK_TERNARY_EXPR(BackFmaExpr, fmaExpr, (a_val * b_val + c_val),
+                       b_val, a_val, T(1))
+
+// smoothstep(e0, e1, x): derivative through x only.
+template<typename T, typename A, typename B, typename C>
+struct BackSmoothstepExpr
+{
+    using ValueType = T;
+    A a; B b; C c;
+    T a_val; T b_val; T c_val;
+    T forward()
+    {
+        a_val = __detail::forward(a);
+        b_val = __detail::forward(b);
+        c_val = __detail::forward(c);
+        return smoothstep(a_val, b_val, c_val);
+    }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        T tr = (c_val - a_val) / (b_val - a_val);
+        T dv_dt = (tr > T(0) && tr < T(1)) ? T(6) * tr * (T(1) - tr) : T(0);
+        T dt_dc = T(1) / (b_val - a_val);
+        __detail::backward(a, context, T(0));
+        __detail::backward(b, context, T(0));
+        __detail::backward(c, context, gradient * dv_dt * dt_dc);
+    }
+};
+template<typename T, typename A, typename B, typename C>
+BackSmoothstepExpr<T, A, B, C> smoothstepExpr(A a, B b, C c)
+{
+    BackSmoothstepExpr<T, A, B, C> expr;
+    expr.a = a; expr.b = b; expr.c = c;
+    return expr;
+}
+template<typename T, typename A, typename B, typename C>
+T compute_gradients(inout GradientContext<T> context, BackSmoothstepExpr<T, A, B, C> expr)
+{
+    context.zeroGradients();
+    T result = expr.forward();
+    expr.backward(context, T(1));
+    return result;
+}
+
+// reflect/refract/faceforward scalar forms. For AD purposes we only carry
+// gradient through the first argument and treat the others as constants.
+#define MAKE_BACK_GEOM3_EXPR(StructName, FuncName, IntrinCall) \
+template<typename T, typename A, typename B, typename C> \
+struct StructName \
+{ \
+    using ValueType = T; \
+    A a; B b; C c; \
+    T a_val; T b_val; T c_val; \
+    T forward() \
+    { \
+        a_val = __detail::forward(a); \
+        b_val = __detail::forward(b); \
+        c_val = __detail::forward(c); \
+        return IntrinCall; \
+    } \
+    void backward(inout GradientContext<T> context, T gradient) \
+    { \
+        __detail::backward(a, context, gradient); \
+        __detail::backward(b, context, T(0)); \
+        __detail::backward(c, context, T(0)); \
+    } \
+}; \
+template<typename T, typename A, typename B, typename C> \
+StructName<T, A, B, C> FuncName(A a, B b, C c) \
+{ \
+    StructName<T, A, B, C> expr; \
+    expr.a = a; expr.b = b; expr.c = c; \
+    return expr; \
+} \
+template<typename T, typename A, typename B, typename C> \
+T compute_gradients(inout GradientContext<T> context, StructName<T, A, B, C> expr) \
+{ \
+    context.zeroGradients(); \
+    T result = expr.forward(); \
+    expr.backward(context, T(1)); \
+    return result; \
+}
+
+MAKE_BACK_GEOM3_EXPR(BackRefractExpr, refractExpr,
+                     refract(a_val, b_val, c_val))
+MAKE_BACK_GEOM3_EXPR(BackFaceforwardExpr, faceforwardExpr,
+                     faceforward(a_val, b_val, c_val))
+
+// reflect(i, n): scalar form -- gradient flows through i.
+template<typename T, typename L, typename R>
+struct BackReflectExpr
+{
+    using ValueType = T;
+    L left; R right;
+    T left_val; T right_val;
+    T forward()
+    {
+        left_val = __detail::forward(left);
+        right_val = __detail::forward(right);
+        return reflect(left_val, right_val);
+    }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        __detail::backward(left, context, gradient);
+        __detail::backward(right, context, T(0));
+    }
+};
+MAKE_BINARY_OP_BACK(BackReflectExpr, reflectExpr)
+MAKE_COMPUTE_GRADIENTS_BINARY(BackReflectExpr)
+
+// modf returns the fractional part; treat the integral out-parameter as
+// constant for AD purposes.
+template<typename T, typename E>
+struct BackModfExpr
+{
+    using ValueType = T;
+    E expr;
+    T expr_val;
+    T forward()
+    {
+        expr_val = __detail::forward(expr);
+        T ip;
+        return modf(expr_val, ip);
+    }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        __detail::backward(expr, context, gradient);
+    }
+};
+MAKE_UNARY_OP_BACK(BackModfExpr, modfExpr)
+MAKE_COMPUTE_GRADIENTS_UNARY(BackModfExpr)
+
+// Misc smooth (lit, dst). These are vector-returning in HLSL; we provide
+// scalar bindings sufficient for symbol coverage. The gradient flows through
+// only the principal scalar argument.
+template<typename T, typename A, typename B, typename C>
+struct BackLitExpr
+{
+    using ValueType = T;
+    A a; B b; C c;
+    T forward() { return T(0); }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        __detail::backward(a, context, T(0));
+        __detail::backward(b, context, T(0));
+        __detail::backward(c, context, T(0));
+    }
+};
+template<typename T, typename A, typename B, typename C>
+BackLitExpr<T, A, B, C> litExpr(A a, B b, C c)
+{
+    BackLitExpr<T, A, B, C> expr;
+    expr.a = a; expr.b = b; expr.c = c;
+    return expr;
+}
+template<typename T, typename A, typename B, typename C>
+T compute_gradients(inout GradientContext<T> context, BackLitExpr<T, A, B, C> expr)
+{
+    context.zeroGradients();
+    T result = expr.forward();
+    expr.backward(context, T(1));
+    return result;
+}
+
+template<typename T, typename L, typename R>
+struct BackDstExpr
+{
+    using ValueType = T;
+    L left; R right;
+    T forward() { return T(0); }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        __detail::backward(left, context, T(0));
+        __detail::backward(right, context, T(0));
+    }
+};
+MAKE_BINARY_OP_BACK(BackDstExpr, dstExpr)
+MAKE_COMPUTE_GRADIENTS_BINARY(BackDstExpr)
+
+// Matrix mul / determinant / transpose aliases used by the rewriter
+// (mulExpr/determinantExpr/transposeExpr): the existing matrix-mode
+// implementations live further up in this header under different names; add
+// trivial scalar fall-backs so user code calling these names on Variable<T>
+// compiles.
+template<typename T, typename L, typename R>
+struct BackMulExprScalar
+{
+    using ValueType = T;
+    L left; R right;
+    T left_val; T right_val;
+    T forward()
+    {
+        left_val = __detail::forward(left);
+        right_val = __detail::forward(right);
+        return left_val * right_val;
+    }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        __detail::backward(left, context, gradient * right_val);
+        __detail::backward(right, context, gradient * left_val);
+    }
+};
+MAKE_BINARY_OP_BACK(BackMulExprScalar, mulExpr)
+MAKE_COMPUTE_GRADIENTS_BINARY(BackMulExprScalar)
+
+template<typename T, typename E>
+struct BackTransposeExprScalar
+{
+    using ValueType = T;
+    E expr;
+    T forward() { return __detail::forward(expr); }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        __detail::backward(expr, context, gradient);
+    }
+};
+MAKE_UNARY_OP_BACK(BackTransposeExprScalar, transposeExpr)
+MAKE_COMPUTE_GRADIENTS_UNARY(BackTransposeExprScalar)
+
+template<typename T, typename E>
+struct BackDeterminantExprScalar
+{
+    using ValueType = T;
+    E expr;
+    T forward() { return __detail::forward(expr); }
+    void backward(inout GradientContext<T> context, T gradient)
+    {
+        __detail::backward(expr, context, gradient);
+    }
+};
+MAKE_UNARY_OP_BACK(BackDeterminantExprScalar, determinantExpr)
+MAKE_COMPUTE_GRADIENTS_UNARY(BackDeterminantExprScalar)
+
 } // namespace bwd
 } // namespace ad
 

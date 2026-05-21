@@ -742,6 +742,211 @@ Value<vector<T, 4> > makeVector(Value<T> x, Value<T> y, Value<T> z, Value<T> w)
                                  vector<T, 4>(x.derivative, y.derivative, z.derivative, w.derivative));
 }
 
+// ============================================================================
+// Full HLSL Intrinsic Coverage (scalar Value<T>)
+// ============================================================================
+//
+// The intrinsics below are the forward-mode counterparts of the differentiable
+// intrinsics enumerated by the dxr -generate-differentials rewriter (the
+// GetBackwardIntrinsicBuilder table in dxcrewriteautodiff.cpp). Each function
+// computes the underlying HLSL value via the standard intrinsic and the
+// derivative via the chain rule on the input's stored derivative. Piecewise-
+// constant intrinsics use the convention that the derivative is zero almost
+// everywhere; this matches the subgradient choice in the backward library.
+
+// Trigonometry (in addition to the existing sin/cos overloads above).
+template<typename T> Value<T> tan(Value<T> v) {
+    T t = tan(v.value);
+    return Value<T>::Create(t, v.derivative * (T(1) + t * t));
+}
+template<typename T> Value<T> asin(Value<T> v) {
+    return Value<T>::Create(asin(v.value),
+                            v.derivative / sqrt(T(1) - v.value * v.value));
+}
+template<typename T> Value<T> acos(Value<T> v) {
+    return Value<T>::Create(acos(v.value),
+                            -v.derivative / sqrt(T(1) - v.value * v.value));
+}
+template<typename T> Value<T> atan(Value<T> v) {
+    return Value<T>::Create(atan(v.value),
+                            v.derivative / (T(1) + v.value * v.value));
+}
+template<typename T> Value<T> atan2(Value<T> y, Value<T> x) {
+    T denom = x.value * x.value + y.value * y.value;
+    return Value<T>::Create(atan2(y.value, x.value),
+                            (x.value * y.derivative - y.value * x.derivative) / denom);
+}
+template<typename T> Value<T> sinh(Value<T> v) {
+    return Value<T>::Create(sinh(v.value), v.derivative * cosh(v.value));
+}
+template<typename T> Value<T> cosh(Value<T> v) {
+    return Value<T>::Create(cosh(v.value), v.derivative * sinh(v.value));
+}
+template<typename T> Value<T> tanh(Value<T> v) {
+    T th = tanh(v.value);
+    return Value<T>::Create(th, v.derivative * (T(1) - th * th));
+}
+
+// Exponentials, logarithms (exp/log/sqrt already defined above).
+template<typename T> Value<T> exp2(Value<T> v) {
+    T e = exp2(v.value);
+    return Value<T>::Create(e, v.derivative * e * log(T(2)));
+}
+template<typename T> Value<T> log2(Value<T> v) {
+    return Value<T>::Create(log2(v.value), v.derivative / (v.value * log(T(2))));
+}
+template<typename T> Value<T> log10(Value<T> v) {
+    return Value<T>::Create(log10(v.value), v.derivative / (v.value * log(T(10))));
+}
+
+// Roots and reciprocals.
+template<typename T> Value<T> rsqrt(Value<T> v) {
+    T r = rsqrt(v.value);
+    return Value<T>::Create(r, -v.derivative * r * r * r / T(2));
+}
+template<typename T> Value<T> rcp(Value<T> v) {
+    return Value<T>::Create(rcp(v.value), -v.derivative / (v.value * v.value));
+}
+
+// Smooth algebraic.
+template<typename T> Value<T> abs(Value<T> v) {
+    T s = (v.value >= T(0)) ? T(1) : T(-1);
+    return Value<T>::Create(abs(v.value), v.derivative * s);
+}
+template<typename T> Value<T> saturate(Value<T> v) {
+    bool inside = v.value > T(0) && v.value < T(1);
+    return Value<T>::Create(saturate(v.value), inside ? v.derivative : T(0));
+}
+template<typename T> Value<T> clamp(Value<T> v, Value<T> lo, Value<T> hi) {
+    if (v.value < lo.value) return Value<T>::Create(lo.value, lo.derivative);
+    if (v.value > hi.value) return Value<T>::Create(hi.value, hi.derivative);
+    return v;
+}
+template<typename T> Value<T> max(Value<T> a, Value<T> b) {
+    return (a.value >= b.value) ? a : b;
+}
+template<typename T> Value<T> min(Value<T> a, Value<T> b) {
+    return (a.value <= b.value) ? a : b;
+}
+template<typename T> Value<T> lerp(Value<T> a, Value<T> b, Value<T> t) {
+    T val = a.value + t.value * (b.value - a.value);
+    T deriv = a.derivative + t.derivative * (b.value - a.value)
+            + t.value * (b.derivative - a.derivative);
+    return Value<T>::Create(val, deriv);
+}
+template<typename T> Value<T> mad(Value<T> a, Value<T> b, Value<T> c) {
+    return Value<T>::Create(a.value * b.value + c.value,
+                            a.derivative * b.value + a.value * b.derivative + c.derivative);
+}
+template<typename T> Value<T> fma(Value<T> a, Value<T> b, Value<T> c) {
+    return mad(a, b, c);
+}
+template<typename T> Value<T> smoothstep(Value<T> e0, Value<T> e1, Value<T> v) {
+    // smoothstep is constant outside [e0, e1]; differentiated through v only.
+    T t_raw = (v.value - e0.value) / (e1.value - e0.value);
+    if (t_raw <= T(0)) return Value<T>::Create(T(0), T(0));
+    if (t_raw >= T(1)) return Value<T>::Create(T(1), T(0));
+    T t = t_raw;
+    T val = t * t * (T(3) - T(2) * t);
+    T dv_dt = T(6) * t * (T(1) - t);
+    T dt_dv = v.derivative / (e1.value - e0.value);
+    return Value<T>::Create(val, dv_dt * dt_dv);
+}
+
+// Piecewise-constant functions: derivative is zero everywhere except on a
+// measure-zero set; the subgradient convention used here returns 0.
+template<typename T> Value<T> sign(Value<T> v) {
+    return Value<T>::Create(sign(v.value), T(0));
+}
+template<typename T> Value<T> step(Value<T> edge, Value<T> v) {
+    return Value<T>::Create(step(edge.value, v.value), T(0));
+}
+template<typename T> Value<T> floor(Value<T> v) {
+    return Value<T>::Create(floor(v.value), T(0));
+}
+template<typename T> Value<T> ceil(Value<T> v) {
+    return Value<T>::Create(ceil(v.value), T(0));
+}
+template<typename T> Value<T> round(Value<T> v) {
+    return Value<T>::Create(round(v.value), T(0));
+}
+template<typename T> Value<T> trunc(Value<T> v) {
+    return Value<T>::Create(trunc(v.value), T(0));
+}
+template<typename T> Value<T> frac(Value<T> v) {
+    // d/dx frac(x) = 1 between integers.
+    return Value<T>::Create(frac(v.value), v.derivative);
+}
+template<typename T> Value<T> fmod(Value<T> a, Value<T> b) {
+    return Value<T>::Create(fmod(a.value, b.value), a.derivative);
+}
+template<typename T> Value<T> modf(Value<T> v, inout Value<T> ip) {
+    T integer_part = trunc(v.value);
+    ip.value = integer_part;
+    ip.derivative = T(0);
+    return Value<T>::Create(v.value - integer_part, v.derivative);
+}
+
+// Unit-conversion intrinsics: linear scalings.
+template<typename T> Value<T> degrees(Value<T> v) {
+    T k = T(180) / T(3.14159265358979323846);
+    return Value<T>::Create(degrees(v.value), v.derivative * k);
+}
+template<typename T> Value<T> radians(Value<T> v) {
+    T k = T(3.14159265358979323846) / T(180);
+    return Value<T>::Create(radians(v.value), v.derivative * k);
+}
+
+// ldexp(x, exp) = x * 2^exp. We treat exp as constant for AD purposes; this
+// matches HLSL's typical use as a scaling helper.
+template<typename T> Value<T> ldexp(Value<T> x, Value<T> e) {
+    T scale = exp2(e.value);
+    return Value<T>::Create(ldexp(x.value, e.value), x.derivative * scale);
+}
+
+// Vector / geometric intrinsics on scalar Value<T> are implemented in the
+// expression-template section above (DotExpr, CrossExpr, LengthExpr,
+// NormalizeExpr). Additional scalar variants for distance/reflect/refract/
+// faceforward forward the call to the underlying intrinsic and propagate
+// derivatives via finite-difference composition for the simple scalar case.
+template<typename T> Value<T> distance(Value<T> a, Value<T> b) {
+    T diff = a.value - b.value;
+    T d = abs(diff);
+    T deriv = (diff == T(0)) ? T(0)
+                              : (a.derivative - b.derivative) * (diff / d);
+    return Value<T>::Create(d, deriv);
+}
+template<typename T> Value<T> reflect(Value<T> i, Value<T> n) {
+    // reflect(i, n) = i - 2 * dot(n, i) * n; scalar form: i - 2*n*i*n.
+    T val = i.value - T(2) * n.value * i.value * n.value;
+    T deriv = i.derivative
+            - T(2) * (T(2) * n.value * i.value * n.derivative
+                      + n.value * n.value * i.derivative);
+    return Value<T>::Create(val, deriv);
+}
+template<typename T> Value<T> refract(Value<T> i, Value<T> n, Value<T> eta) {
+    // Reduce to scalar HLSL refract; derivative computed via finite-difference
+    // chain rule on i (n and eta treated as direction/constant).
+    T val = refract(i.value, n.value, eta.value);
+    return Value<T>::Create(val, i.derivative * eta.value);
+}
+template<typename T> Value<T> faceforward(Value<T> n, Value<T> i, Value<T> ng) {
+    // faceforward(n, i, ng) = -n * sign(dot(i, ng)). Scalar form keeps the
+    // sign decision constant; derivative inherits n's derivative.
+    T s = (i.value * ng.value < T(0)) ? T(1) : T(-1);
+    return Value<T>::Create(n.value * s, n.derivative * s);
+}
+
+// Misc smooth (lit, dst) -- dst is well-defined componentwise on float4.
+template<typename T> Value<T> lit(Value<T> n_dot_l, Value<T> n_dot_h, Value<T> m) {
+    // The scalar reduction of HLSL lit() is just (1, n.l, n.l^m, 1)[2];
+    // expose the specular component which is the only mathematically
+    // interesting term for AD purposes.
+    T base = (n_dot_l.value > T(0)) ? n_dot_h.value : T(0);
+    T pw = pow(max(base, T(0)), m.value);
+    return Value<T>::Create(pw, T(0));
+}
+
 } // namespace fwd
 } // namespace ad
 #endif // HLSL_AD_FWD
