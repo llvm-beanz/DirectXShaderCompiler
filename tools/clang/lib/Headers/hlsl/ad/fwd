@@ -3,7 +3,7 @@
 
 #include <type_traits>
 #include <enable_if.h>
-#include <matrix_utils>
+#include <ad/matrix_utils>
 
 namespace ad {
 namespace fwd {
