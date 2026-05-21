@@ -1390,6 +1390,8 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
         Args.hasFlag(OPT_rw_line_directive, OPT_INVALID, false);
     opts.RWOpt.DeclGlobalCB =
         Args.hasFlag(OPT_rw_decl_global_cb, OPT_INVALID, false);
+    opts.RWOpt.GenerateDifferentials =
+        Args.hasFlag(OPT_rw_generate_differentials, OPT_INVALID, false);
     if (opts.EntryPoint.empty() &&
         (opts.RWOpt.RemoveUnusedGlobals || opts.RWOpt.ExtractEntryUniforms ||
          opts.RWOpt.RemoveUnusedFunctions)) {
