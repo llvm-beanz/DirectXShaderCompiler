@@ -823,10 +823,12 @@ template<typename T> Value<T> clamp(Value<T> v, Value<T> lo, Value<T> hi) {
     return v;
 }
 template<typename T> Value<T> max(Value<T> a, Value<T> b) {
-    return (a.value >= b.value) ? a : b;
+    if (a.value >= b.value) return a;
+    return b;
 }
 template<typename T> Value<T> min(Value<T> a, Value<T> b) {
-    return (a.value <= b.value) ? a : b;
+    if (a.value <= b.value) return a;
+    return b;
 }
 template<typename T> Value<T> lerp(Value<T> a, Value<T> b, Value<T> t) {
     T val = a.value + t.value * (b.value - a.value);
