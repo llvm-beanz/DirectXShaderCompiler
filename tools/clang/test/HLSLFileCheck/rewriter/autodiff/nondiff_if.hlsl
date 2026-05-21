@@ -6,7 +6,7 @@
 
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: Variable<float> branchy(inout GradientContext<float> context, Variable<float> x)
-// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'branchy': data-dependent control flow (if) is not differentiable; use {{\[\[}}no_diff]] or branchless math");
+// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'branchy': data-dependent control flow (if) is not differentiable; use {{\[\[}}dxc::no_diff]] or branchless math");
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(bwd)]]

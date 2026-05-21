@@ -442,7 +442,7 @@ public:
       OS << Indent << ";\n";
       return;
     }
-    // [[no_diff]] copies the substatement verbatim.
+    // [[dxc::no_diff]] copies the substatement verbatim.
     if (const auto *AS = dyn_cast<AttributedStmt>(S)) {
       for (const Attr *A : AS->getAttrs()) {
         if (isa<HLSLNoDiffAttr>(A)) {
@@ -480,7 +480,7 @@ public:
       // structurally so the stub diagnostic is informative.
       markNonDifferentiable(
           "data-dependent control flow (if) is not differentiable; "
-          "use [[no_diff]] or branchless math");
+          "use [[dxc::no_diff]] or branchless math");
       OS << Indent << "if (";
       if (IS->getCond())
         IS->getCond()->printPretty(OS, nullptr, Policy);

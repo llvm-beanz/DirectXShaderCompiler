@@ -1,6 +1,6 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 
-// The [[no_diff]] statement attribute marks a statement that should NOT be
+// The [[dxc::no_diff]] statement attribute marks a statement that should NOT be
 // translated by the auto-diff rewriter; the wrapped statement is copied
 // verbatim into the generated function. The attribute can be applied to any
 // statement that wraps into an AttributedStmt -- typically a compound block,
@@ -18,7 +18,7 @@
 
 [[dxc::autodiff(fwd, bwd)]]
 float f(float x) {
-  [[no_diff]] return x * x + x;
+  [[dxc::no_diff]] return x * x + x;
 }
 
 float main(float x : A) : SV_Target { return f(x); }

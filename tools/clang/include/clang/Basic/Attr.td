@@ -637,11 +637,11 @@ def HLSLUnroll : Attr {
   let Documentation = [Undocumented];
 }
 
-// [[no_diff]] marks a statement that should NOT be transformed by the dxr
+// [[dxc::no_diff]] marks a statement that should NOT be transformed by the dxr
 // auto-differentiation rewriter; the statement is copied verbatim instead.
 // The attribute is ignored during normal compilation.
 def HLSLNoDiff : Attr {
-  let Spellings = [CXX11<"", "no_diff", 2015>];
+  let Spellings = [CXX11<"dxc", "no_diff", 2015>];
   let Documentation = [Undocumented];
 }
 

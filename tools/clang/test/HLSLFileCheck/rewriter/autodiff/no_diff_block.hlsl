@@ -1,6 +1,6 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 
-// [[no_diff]] applied to a compound statement: the rewriter copies the entire
+// [[dxc::no_diff]] applied to a compound statement: the rewriter copies the entire
 // block verbatim into both forward and backward generated functions.
 
 // CHECK: namespace user { namespace ad { namespace fwd {
@@ -13,7 +13,7 @@
 
 [[dxc::autodiff(fwd)]]
 float f(float x) {
-  [[no_diff]] {
+  [[dxc::no_diff]] {
     float t = x * x;
     return t + x;
   }

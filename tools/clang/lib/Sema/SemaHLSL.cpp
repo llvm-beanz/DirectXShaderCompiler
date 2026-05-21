@@ -15221,7 +15221,7 @@ Attr *hlsl::ProcessStmtAttributeForHLSL(Sema &S, Stmt *St,
                                             A.getAttributeSpellingListIndex());
     break;
   case AttributeList::AT_HLSLNoDiff:
-    // [[no_diff]] is a marker for the dxr -generate-differentials rewriter.
+    // [[dxc::no_diff]] is a marker for the dxr -generate-differentials rewriter.
     // No statement-shape validation is required: the attribute is meaningful
     // on any statement that the rewriter would otherwise transform.
     result = ::new (S.Context) HLSLNoDiffAttr(
@@ -16530,7 +16530,7 @@ void hlsl::CustomPrintHLSLAttr(const clang::Attr *A, llvm::raw_ostream &Out,
 
   case clang::attr::HLSLNoDiff:
     Indent(Indentation, Out);
-    Out << "[no_diff]\n";
+    Out << "[[dxc::no_diff]]\n";
     break;
 
   case clang::attr::HLSLUnroll: {
