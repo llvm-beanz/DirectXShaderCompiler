@@ -1,0 +1,30 @@
+---
+model: claude-opus-4.7
+---
+
+# Initial Guidelines
+
+Please make sure that your changes are appropriately tested with unit tests
+covering each phase of translation in the compiler, and that your changes
+conform to the [LVLM Coding Standards](llvm/docs/CodingStandards.rst).
+
+Verify your changes by building and testing using the
+cmake/caches/PredefinedParams.cmake file with CMake's -C flag to configure the
+build. Test the compiler and runtime support with the targets: check-all.
+
+Break your changes into small code changes with each change committed
+spearately. Record your thought process into a file named "agent_thoughts.md" at
+the root of the repository and commit it in its own commit when you're done.
+
+# Request
+
+Please add support for `auto` as a return type of a function matching C++14
+rules.
+
+Please ensure that code generation is tested for both DXIL and SPIRV. Please
+ensure that testing covers appropriate diagnostics when functions are
+incorrectly specified.
+
+Please enable the `auto` return type in all language modes from HLSL 2016+, and
+issue a diagnostic that `auto` is an HLSL 202x extension if the language mode is
+less than 202x.
