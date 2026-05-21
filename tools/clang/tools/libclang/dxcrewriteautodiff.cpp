@@ -865,11 +865,13 @@ void EmitAutoDiffForFunction(const FunctionDecl *FD,
                              const PrintingPolicy &Policy, raw_ostream &OS) {
   if (Attr->hasForward()) {
     OS << "\nnamespace user { namespace ad { namespace fwd {\n";
+    OS << "using namespace ::ad::fwd;\n";
     emitAutoDiffFunction(FD, AutoDiffEmitter::Fwd, Policy, OS);
     OS << "} } } // namespace user::ad::fwd\n";
   }
   if (Attr->hasBackward()) {
     OS << "\nnamespace user { namespace ad { namespace bwd {\n";
+    OS << "using namespace ::ad::bwd;\n";
     emitAutoDiffFunction(FD, AutoDiffEmitter::Bwd, Policy, OS);
     OS << "} } } // namespace user::ad::bwd\n";
   }
@@ -882,6 +884,29 @@ namespace hlsl {
 void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
                                            raw_ostream &OS,
                                            PrintingPolicy &Policy) {
+  // Determine which auto-diff library headers the generated output needs
+  // and emit the corresponding #include directives at the very top of the
+  // file. The wrapped namespace blocks pull names in with a
+  // `using namespace ::ad::{fwd,bwd};` directive each, so the rewritten
+  // bodies can stay free of fully-qualified names.
+  bool NeedFwd = false;
+  bool NeedBwd = false;
+  for (Decl *D : tu->decls()) {
+    const auto *FD = dyn_cast<FunctionDecl>(D);
+    if (!FD)
+      continue;
+    if (const auto *AD = FD->getAttr<HLSLAutoDiffAttr>()) {
+      NeedFwd |= AD->hasForward();
+      NeedBwd |= AD->hasBackward();
+    }
+  }
+  if (NeedFwd)
+    OS << "#include <ad/fwd>\n";
+  if (NeedBwd)
+    OS << "#include <ad/bwd>\n";
+  if (NeedFwd || NeedBwd)
+    OS << "\n";
+
   for (Decl *D : tu->decls()) {
     if (D->isImplicit())
       continue;
