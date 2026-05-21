@@ -134,3 +134,131 @@ test is written without `not`.
 - Whether the consumer of the rewritten file can find
   `hlsl/ad/{fwd,bwd}` on its include path is the consumer's problem;
   the rewriter does not synthesise an `#include`.
+
+## Follow-on session — exhaustive coverage, `[[no_diff]]`, stubs
+
+A second pass addressed six specific requests on top of the original
+prototype:
+
+1. **Refactor.** The auto-diff translator lived inside
+   `dxcrewriteunused.cpp` (~280 lines of class definitions and helpers).
+   It now lives in `tools/clang/tools/libclang/dxcrewriteautodiff.{h,cpp}`
+   exposing a single `hlsl::PrintTranslationUnitWithDifferentials` entry
+   point. `dxcrewriteunused.cpp` calls into it from the
+   `opts.RWOpt.GenerateDifferentials` branch.
+
+   Wrinkle: `clang/AST/PrettyPrinter.h` declares `PrintingPolicy` as a
+   `struct`. Using `class PrintingPolicy;` as a forward declaration in
+   the header produces a `-Wmismatched-tags` warning under the
+   default-enabled `-Werror` builds.
+
+2. **Exhaustive intrinsic dispatch.** Two large `StringSwitch` tables
+   replace the ad-hoc per-name switch:
+
+   * `GetBackwardIntrinsicBuilder` maps every differentiable HLSL math
+     intrinsic from `utils/hct/gen_intrin_main.txt` to the corresponding
+     `*Expr<T>` backward-mode builder (trig + hyperbolics + their
+     inverses; `exp`, `exp2`, `log`, `log2`, `log10`; `pow` -> `power`;
+     `sqrt`, `rsqrt`, `rcp`, `abs`; `min`/`max`/`clamp`; `lerp`,
+     `saturate`, `step`, `smoothstep`; `fmod`; geometric `dot`,
+     `length`, `distance`, `cross`, `normalize`, `reflect`, `refract`,
+     `faceforward`; matrix `mul`, `determinant`, `transpose`; `mad`,
+     `frac`, `modf`, `sign`).
+
+   * `GetNonDifferentiableReason` is an explicit enumeration of
+     intrinsics that are *not* differentiable — predicates (`any`,
+     `all`, `isinf`, `isnan`, `isfinite`), bit casts (`asint`,
+     `asuint`, `asfloat`, `f16tof32`, `f32tof16`), bitcount / bit ops,
+     side-effecting helpers (`sincos`, `clip`, `errorf`,
+     `printf`), atomics, barriers / sync, ddx/ddy and their variants,
+     wave / quad ops, mesh-shader output, raytracing intrinsics,
+     system-value queries (`GetRenderTargetSampleCount`, etc.),
+     tessellator helpers, and the classic d3d9 `tex*` family. The
+     reason string is propagated into the generated stub.
+
+   * `IsTextureLikeIntrinsic` catches the resource-sampling families
+     by name prefix (`Sample*`, `Load*`, `Gather*`,
+     `CalculateLevelOfDetail*`, `__builtin_LinAlg*`) so new entries
+     are non-differentiable by default rather than silently miscompiled.
+
+3. **Builtin operator classification.** `emitBinaryOp` now classifies
+   every `BinaryOperatorKind` value: `+ - * /` and the compound
+   assignment forms map to `add/subtract/multiply/divide` and
+   `addAssign/subAssign/mulAssign/divAssign`; comparison, logical,
+   bitwise, shift, and remainder operators each call
+   `markNonDifferentiable` with a specific reason. `emitUnaryOp` does
+   the same for `+`, `-` (differentiable) versus `!`, `~`, `++`, `--`
+   (not). `ConditionalOperator` (the ternary `?:`) is flagged.
+
+4. **`[[no_diff]]` statement attribute.** A new `HLSLNoDiff` attribute
+   is registered in `Attr.td` with the C++11 spelling
+   `[[no_diff]]`. The HLSL Sema path
+   (`SemaHLSL::ProcessStmtAttributeForHLSL`) accepts it on any
+   `Stmt *S`, returning the existing `S` wrapped in an
+   `AttributedStmt` carrying the new attribute. The emitter, when
+   processing the body, detects the wrapper and copies the
+   substatement verbatim through `printPretty` rather than running it
+   through the translator.
+
+   Limitation: in HLSL, the parser's statement entry point passes
+   leading attributes straight into `ParseDeclaration` for declaration
+   statements, and the HLSLNoDiff attribute is not a declaration
+   attribute, so it is dropped before any AST node is built.
+   Practically this means `[[no_diff]] float a = expr;` does *not*
+   work; users have to wrap the declaration in a block:
+   `[[no_diff]] { float a = expr; }`. This is documented in the test
+   `no_diff_block.hlsl`.
+
+5. **`_Static_assert(false, ...)` stubs.** `emitAutoDiffFunction`
+   buffers the translated body into a `SmallString` via
+   `raw_string_ostream`. After translating every statement it checks
+   `AutoDiffEmitter::sawNonDifferentiable()`. If true, the buffered
+   body is discarded and replaced with
+
+   ```cpp
+   _Static_assert(false, "auto-diff cannot generate <mode>-mode for
+     '<fn>': <reason>");
+   return Value<T>();   // or Variable<T>() in backward mode
+   ```
+
+   The fallback `return` keeps the function syntactically well-formed
+   so the surrounding namespace and consumers still parse; the
+   `_Static_assert` fires only if the function is ever instantiated.
+
+6. **Statement translation.** `AutoDiffEmitter::emitStmt` is a small
+   recursive descent that now translates `CompoundStmt`, `DeclStmt`
+   (each `VarDecl` becomes `Value<T> name = <translated init>;`),
+   `ReturnStmt`, `IfStmt`, `WhileStmt`, `ForStmt`, plain expression
+   statements, and `AttributedStmt`. Control-flow forms emit
+   structurally but flag the function as non-differentiable so the
+   stub assertion fires with a message pointing at `[[no_diff]]`. The
+   body loop in `emitAutoDiffFunction` collapses to
+
+   ```cpp
+   for (Stmt *S : CS->body()) Em.emitStmt(S, "    ");
+   ```
+
+7. **Tests.** Eight new FileCheck tests under
+   `tools/clang/test/HLSLFileCheck/rewriter/autodiff/`:
+
+   * `intrinsics_trig.hlsl`, `intrinsics_exp_log.hlsl`,
+     `intrinsics_algebraic.hlsl` — cover every entry in the
+     differentiable intrinsic table by family.
+   * `compound_assign.hlsl` — `+= -= *= /=` -> `*Assign` builders.
+   * `local_decls.hlsl` — DeclStmt translation in both fwd and bwd.
+   * `nondiff_bitcast.hlsl`, `nondiff_ternary.hlsl`, `nondiff_if.hlsl`
+     — `_Static_assert` stub generation for each failure family.
+   * Plus the previously committed `no_diff_block.hlsl` and
+     `no_diff_return.hlsl` from the `[[no_diff]]` commit.
+
+   Note that the BatchHLSL test runner in
+   `tools/clang/unittests/HLSL/CompilerTest.cpp` walks
+   `..\HLSLFileCheck\hlsl` and not the `rewriter` subdirectory; these
+   tests therefore are not picked up by `check-clang-hlsl` today.
+   `check-all` (`check-clang`) still runs the lit suite under
+   `tools/clang/test/Rewriter/HLSL` which exercises the unchanged
+   paths. Running each new test manually against `bin/dxr` +
+   `bin/FileCheck` was used as the per-commit gate; the final
+   `ninja check-all` passes with 4610 expected-pass tests and no
+   failures.
+
