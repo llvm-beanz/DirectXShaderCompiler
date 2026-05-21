@@ -18,76 +18,22 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-I've added a new set of headers under the lib/Headers/hlsl/ad folder, which
-includes an implementation for an automatic differentiation library. To make it
-easier for users to use this, I'd like to add a new rewriter capability to the
-dxr tool, that generates differentiable versions of functions.
+The new dxr -generate-differentials flag is a great start. A few changes:
 
-To facilitate this, I would like to add a new attribute to DXC
-`[[dxc::autodiff(...)]]` which supports taking arguments `fwd` or `bwd` in the
-forms:
-
-```
-[[dxc::autodiff(fwd)]]
-[[dxc::autodiff(bwd)]]
-[[dxc::autodiff(fwd, bwd)]]
-[[dxc::autodiff(bwd, fwd)]]
-```
-
-The attribute should apply only to function definitions, and should be ingored
-during normal compilation.
-
-
-When the rewriter is run with the `--generate-differentials` flag the rewriter
-will walk the AST and find any functions annotated with new attributes.
-
-It will then generate new functions that translate the existing function into a
-version using the appropriate differntial api. Place generated functions into
-either the `user::ad::fwd` or `user::ad::bwd` namespace as appropriate.
-
-For example, if I have a function:
-
-```
-[[dxc::autodiff(fwd, bwd)]]
-float f(float x) {
-  return sin(x) * cos(x) + exp(x);
-}
-```
-
-The rewriter should add new functions something like:
-```
-namespace user {
-napespace ad {
-namespace fwd {
-Value<float> fn(Value<float> x)
-{
-    // Define the function: f(x) = sin(x) * cos(x) + exp(x)
-    Value<float> sin_x = sin(x);
-    Value<float> cos_x = cos(x);
-    Value<float> sin_cos = sin_x * cos_x;
-    Value<float> exp_x = exp(x);
-    return sin_cos + exp_x;
-}
-} // namespace fwd
-
-namespace bwd {
-
-Variable<float> fn(GradientContext<float> context, Variable<float> x)
-{
-    VariableExpr<float> x_expr = makeVariableExpr<float>(x);
-
-    // f(x) = sin(x) * cos(x) + exp(x)
-    auto sin_x = sinExpr<float>(x_expr);
-    auto cos_x = cosExpr<float>(x_expr);
-    auto sin_cos = multiply<float>(sin_x, cos_x);
-    auto exp_x = expExpr<float>(x_expr);
-    return add<float>(sin_cos, exp_x);
-}
-
-} // namespace bwd
-} // namespace ad
-} // namespace user
-```
-
-The new functions should be added immediately after the function they are
-generated based on.
+1) Move the differential generaton code out into a separate source file from the
+   dxcrewriteunused.cpp file. Adding more code there will make this
+   unmaintainable.
+2) We need to exhaustively extend the fwd and bwd implementations with all the
+   HLSL intrinsics defined in gen_intrin_main.txt and the builtin operators for
+   math functions that are differential.
+3) We need to exhaustively extend the rewriter to support all the builtin
+   operations.
+4) We need exhaustive test coverage for all the points above.
+5) We need to handle the failure cases, there are some operations that are not
+   differentiable, for those we should generate stub functions in the rewriter
+   output and put `_Static_assert(false, "...")` with a helpful message into the
+   rewritten output.
+6) We will need some way to mark code that is expected to not be differential in
+   the translation. Can you add a statement attribute `[[no_diff]]` which, when
+   present the rewriter will copy the source statement directly instead of
+   making it differentiated.
