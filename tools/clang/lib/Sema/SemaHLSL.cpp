@@ -16453,6 +16453,19 @@ void hlsl::CustomPrintHLSLAttr(const clang::Attr *A, llvm::raw_ostream &Out,
     break;
   }
 
+  case clang::attr::HLSLAutoDiff: {
+    Attr *noconst = const_cast<Attr *>(A);
+    HLSLAutoDiffAttr *ACast = static_cast<HLSLAutoDiffAttr *>(noconst);
+    Indent(Indentation, Out);
+    Out << "[[dxc::autodiff(";
+    if (ACast->getMode1())
+      Out << ACast->getMode1()->getName();
+    if (ACast->getMode2())
+      Out << ", " << ACast->getMode2()->getName();
+    Out << ")]]\n";
+    break;
+  }
+
   case clang::attr::HLSLMaxVertexCount: {
     Attr *noconst = const_cast<Attr *>(A);
     HLSLMaxVertexCountAttr *ACast =
@@ -16730,6 +16743,7 @@ void hlsl::CustomPrintHLSLAttr(const clang::Attr *A, llvm::raw_ostream &Out,
 bool hlsl::IsHLSLAttr(clang::attr::Kind AttrKind) {
   switch (AttrKind) {
   case clang::attr::HLSLAllowUAVCondition:
+  case clang::attr::HLSLAutoDiff:
   case clang::attr::HLSLBranch:
   case clang::attr::HLSLCall:
   case clang::attr::HLSLCentroid:
