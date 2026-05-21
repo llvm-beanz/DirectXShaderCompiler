@@ -446,8 +446,14 @@ public:
     if (const auto *AS = dyn_cast<AttributedStmt>(S)) {
       for (const Attr *A : AS->getAttrs()) {
         if (isa<HLSLNoDiffAttr>(A)) {
+          const Stmt *Sub = AS->getSubStmt();
           OS << Indent;
-          AS->getSubStmt()->printPretty(OS, nullptr, Policy);
+          Sub->printPretty(OS, nullptr, Policy);
+          // Bare expressions used in statement position don't print their
+          // trailing semicolon themselves; add it so the generated body
+          // remains syntactically well-formed.
+          if (isa<Expr>(Sub))
+            OS << ";";
           OS << "\n";
           return;
         }
