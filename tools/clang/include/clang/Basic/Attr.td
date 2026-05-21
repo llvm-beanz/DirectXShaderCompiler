@@ -918,6 +918,30 @@ def HLSLWaveSensitive : InheritableAttr {
   let Documentation = [Undocumented];
 }
 
+def HLSLAutoDiff : InheritableAttr {
+  // [[dxc::autodiff(fwd)]], [[dxc::autodiff(bwd)]],
+  // [[dxc::autodiff(fwd, bwd)]] or [[dxc::autodiff(bwd, fwd)]].
+  // The attribute is ignored during normal compilation; it is consumed by
+  // the dxr rewriter when invoked with --generate-differentials.
+  let Spellings = [CXX11<"dxc", "autodiff", 2015>];
+  let Subjects = SubjectList<[Function], ErrorDiag, "ExpectedFunction">;
+  let Args = [IdentifierArgument<"Mode1">, IdentifierArgument<"Mode2", 1>];
+  let LangOpts = [HLSL];
+  let Documentation = [Undocumented];
+
+  let AdditionalMembers = [{
+    public:
+      bool hasForward() const {
+        return (getMode1() && getMode1()->getName() == "fwd") ||
+               (getMode2() && getMode2()->getName() == "fwd");
+      }
+      bool hasBackward() const {
+        return (getMode1() && getMode1()->getName() == "bwd") ||
+               (getMode2() && getMode2()->getName() == "bwd");
+      }
+  }];
+}
+
 def HLSLWaveSize : InheritableAttr {
   let Spellings = [CXX11<"", "wavesize", 2017>];
   let Args = [IntArgument<"Min">, DefaultIntArgument<"Max", 0>, DefaultIntArgument<"Preferred", 0>];

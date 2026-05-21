@@ -14829,6 +14829,37 @@ void hlsl::HandleDeclAttributeForHLSL(Sema &S, Decl *D, const AttributeList &A,
         ValidateAttributeStringArg(S, A, nullptr, 1),
         A.getAttributeSpellingListIndex());
     break;
+  case AttributeList::AT_HLSLAutoDiff: {
+    auto getIdentArg = [&](unsigned Idx) -> IdentifierInfo * {
+      if (Idx >= A.getNumArgs())
+        return nullptr;
+      if (!A.isArgIdent(Idx)) {
+        S.Diag(A.getLoc(), diag::err_attribute_argument_n_type)
+            << A.getName() << (Idx + 1) << /*identifier*/ 3 << A.getRange();
+        return nullptr;
+      }
+      IdentifierInfo *II = A.getArgAsIdent(Idx)->Ident;
+      StringRef N = II->getName();
+      if (N != "fwd" && N != "bwd") {
+        S.Diag(A.getLoc(), diag::err_attribute_argument_n_type)
+            << A.getName() << (Idx + 1) << /*identifier*/ 3 << A.getRange();
+        return nullptr;
+      }
+      return II;
+    };
+    if (A.getNumArgs() < 1 || A.getNumArgs() > 2) {
+      S.Diag(A.getLoc(), diag::err_attribute_wrong_number_arguments)
+          << A.getName() << A.getRange();
+      return;
+    }
+    IdentifierInfo *M1 = getIdentArg(0);
+    IdentifierInfo *M2 = getIdentArg(1);
+    if (!M1)
+      return;
+    declAttr = ::new (S.Context) HLSLAutoDiffAttr(
+        A.getRange(), S.Context, M1, M2, A.getAttributeSpellingListIndex());
+    break;
+  }
   case AttributeList::AT_NoInline:
     declAttr = ::new (S.Context) NoInlineAttr(
         A.getRange(), S.Context, A.getAttributeSpellingListIndex());
