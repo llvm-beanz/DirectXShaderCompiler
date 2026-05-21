@@ -1,5 +1,8 @@
 // Header for enable_if APIs.
 
+#ifndef HLSL_ENABLE_IF_H
+#define HLSL_ENABLE_IF_H
+
 #if ((__SHADER_TARGET_MAJOR > 6) ||                                            \
      (__SHADER_TARGET_MAJOR == 6 && __SHADER_TARGET_MINOR >= 9)) &&            \
     (__HLSL_VERSION >= 2021)
@@ -15,3 +18,5 @@ template <typename T> struct enable_if<true, T> {
 } // namespace hlsl
 
 #endif
+
+#endif // HLSL_ENABLE_IF_H
