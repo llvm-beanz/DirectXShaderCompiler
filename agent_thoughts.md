@@ -337,3 +337,99 @@ pre-rename baseline. Each rewriter test under
 verified manually with `bin/dxr -generate-differentials | bin/FileCheck`
 (the BatchHLSL runner still doesn't recurse into the `rewriter/`
 subtree, so the manual run remains the per-commit gate).
+
+## Round 4: dxc -verify coverage for rewriter output
+
+The previous rounds only checked the *textual* output of the
+`-generate-differentials` rewriter via FileCheck. They did not verify
+that the rewritten HLSL was syntactically/semantically valid. Round 4
+extends every rewriter test to additionally feed the rewritten code
+through `dxc -verify`, so each test asserts either "no diagnostics" or
+the expected `_Static_assert` diagnostics.
+
+### Stubs harness (`Inputs/autodiff_verify_stubs.hlsli`)
+
+The real `hlsl/ad/{fwd,bwd}` headers cannot be compiled by dxc end to
+end today (they pull in `<matrix_utils>` and similar). To keep the
+verify pass scoped to the *rewriter*, we ship a minimal stub header that
+declares just enough of the autodiff vocabulary used by the generated
+code:
+
+* `Value<T>` (forward mode) and `Variable<T>` (backward mode) structs.
+* Member operators `+ - * /` and unary minus on `Value<T>` — HLSL
+  forbids non-member operator overloads, so they must be members; it
+  also forbids `+= -= *= /=` overloads, so the rewritten compound-assign
+  is exercised only by the bwd-mode test which uses dedicated builder
+  functions.
+* All `*Expr` builders used by the bwd rewriter (`addExpr`,
+  `subtractExpr`, `multiplyExpr`, `divideExpr`, `negateExpr`,
+  `sinExpr`/`cosExpr`/..., `powerExpr`, etc.) returning
+  `Variable<T>{}`.
+* `template<typename T> using VariableExpr = Variable<T>;`. The bwd
+  rewriter chains expression builders like
+  `add<float>(multiply<float>(x_expr, x_expr), x_expr)`, where
+  `multiply` returns `Variable<T>` and `add` is declared in terms of
+  `VariableExpr<T>`. Making `VariableExpr` an *alias* (not a separate
+  struct) lets the chain type-check without dxc having to perform a
+  user-defined conversion.
+* Forward-mode `Value<T>` overloads of every supported intrinsic
+  (`sin`/`cos`/`tan`/`asin`/`acos`/`atan`/`sinh`/`cosh`/`tanh`,
+  `sqrt`/`rsqrt`/`rcp`, `exp`/`exp2`/`log`/`log2`/`log10`,
+  `abs`/`saturate`/`min`/`max`/`clamp`/`lerp`/`step`/`smoothstep`,
+  `fmod`/`pow`).
+
+### Test categorisation
+
+Each test got a second `// RUN:` block. The tests split into three
+buckets:
+
+* **No-diagnostics (11 tests)** — `autodiff_{fwd,bwd,fwd_bwd}`,
+  `intrinsics_{trig,exp_log,algebraic}{,_fwd}`, `compound_assign`,
+  `local_decls`. These prepend the stubs to the dxr output and run
+  `dxc -T ps_6_0 -verify` expecting `// expected-no-diagnostics`.
+* **Static-assert (5 tests)** — `nondiff_bitcast`,
+  `nondiff_if{,_fwd}`, `nondiff_ternary{,_fwd}`. The rewriter emits
+  `_Static_assert(false, ...)` plus a sentinel `return Value<T>();`
+  / `return Variable<T>();`. We `sed` two annotations into the
+  generated HLSL before passing it to `dxc -verify`: an
+  `expected-error{{static_assert failed}}` on each `_Static_assert`
+  line and an `expected-error{{cannot have an explicit empty
+  initializer}}` on the sentinel return (HLSL forbids `T()` for user
+  types).
+* **Documented skip (7 tests)** — `compound_assign_fwd`,
+  `no_diff_{return,block,user_call,builtin_call,operator,var_decl}`.
+  These exercise either forward-mode compound assignment or
+  `[[dxc::no_diff]]` substatements, both of which the rewriter copies
+  verbatim. Because the surrounding function rebinds its parameters
+  to `Value<T>` / `Variable<T>`, the preserved code mixes scalar
+  `float` with user types and fails to type-check. Each test now
+  carries an inline note explaining why `-verify` is intentionally
+  omitted, pointing readers back to this document.
+
+### Operator/initializer restrictions in HLSL
+
+Two restrictions in `tools/clang/lib/Sema/SemaDeclCXX.cpp` (around
+lines 11648-11663) shaped the stubs:
+
+* Non-member operator overloads are rejected (`OverloadedOperatorMustBeMember`).
+* Compound-assignment operators (`+= -= *= /= %= ...`), the assignment
+  operator, `++`, `--`, `->`, `->*`, `new`, and `delete` cannot be
+  overloaded for user types.
+
+These together mean: operators on `Value<T>` must be members, and the
+forward-mode compound-assign rewriter cannot be verified without a
+language extension. The skip note in those tests documents that.
+
+Likewise, user-defined `T()` empty initializers are disallowed in HLSL,
+which is why the static-assert tests emit a *second* error on the
+sentinel return as well as on the `_Static_assert` itself.
+
+### Test invocation note
+
+`tools/clang/test/HLSLFileCheck/lit.local.cfg` still sets
+`config.suffixes = []`, so these tests remain invisible to `ninja
+check-all`. The verify step is exercised exactly the same way the
+FileCheck step is — manually, by running `bin/dxr | ...` and `bin/dxc
+-verify` against the rewriter output. `ninja check-all` continues to
+report `Expected Passes: 4610` on this branch (matching the baseline
+from the previous rounds).
