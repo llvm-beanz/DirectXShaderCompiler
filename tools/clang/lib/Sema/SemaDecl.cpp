@@ -7438,6 +7438,13 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
         FunctionTemplate->setInvalidDecl();
     }
 
+    // HLSL Change Begin - HLSL 2016+ supports C++14-style deduced return types.
+    bool DeducedReturnEnabled =
+        getLangOpts().CPlusPlus14 ||
+        (getLangOpts().HLSL &&
+         getLangOpts().HLSLVersion >= hlsl::LangStd::v2016);
+    // HLSL Change End
+
     // C++ [dcl.fct.spec]p5:
     //   The virtual specifier shall only be used in declarations of
     //   nonstatic class member functions that appear within a
@@ -7463,12 +7470,13 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
         NewFD->setVirtualAsWritten(true);
       }
 
-      if (getLangOpts().CPlusPlus14 &&
+      // HLSL Change - HLSL 2016+ supports C++14-style deduced return types.
+      if (DeducedReturnEnabled &&
           NewFD->getReturnType()->isUndeducedType())
         Diag(D.getDeclSpec().getVirtualSpecLoc(), diag::err_auto_fn_virtual);
     }
 
-    if (getLangOpts().CPlusPlus14 &&
+    if (DeducedReturnEnabled && // HLSL Change
         (NewFD->isDependentContext() ||
          (isFriend && CurContext->isDependentContext())) &&
         NewFD->getReturnType()->isUndeducedType()) {
@@ -10870,7 +10878,13 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
   if (FD) {
     FD->setBody(Body);
 
-    if (getLangOpts().CPlusPlus14 && !FD->isInvalidDecl() && Body &&
+    // HLSL Change Begin - HLSL 2016+ supports C++14-style deduced return types.
+    bool DeducedReturnEnabled =
+        getLangOpts().CPlusPlus14 ||
+        (getLangOpts().HLSL &&
+         getLangOpts().HLSLVersion >= hlsl::LangStd::v2016);
+    if (DeducedReturnEnabled && !FD->isInvalidDecl() && Body &&
+    // HLSL Change End
         !FD->isDependentContext() && FD->getReturnType()->isUndeducedType()) {
       // If the function has a deduced result type but contains no 'return'
       // statements, the result type as written must be exactly 'auto', and

@@ -3170,7 +3170,11 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
 
   // FIXME: Add a flag to the ScopeInfo to indicate whether we're performing
   // deduction.
-  if (getLangOpts().CPlusPlus14) {
+  // HLSL Change Begin - HLSL 2016+ supports C++14-style deduced return types.
+  if (getLangOpts().CPlusPlus14 ||
+      (getLangOpts().HLSL &&
+       getLangOpts().HLSLVersion >= hlsl::LangStd::v2016)) {
+  // HLSL Change End
     if (AutoType *AT = FnRetType->getContainedAutoType()) {
       FunctionDecl *FD = cast<FunctionDecl>(CurContext);
       if (DeduceFunctionTypeFromReturnExpr(FD, ReturnLoc, RetValExp, AT)) {

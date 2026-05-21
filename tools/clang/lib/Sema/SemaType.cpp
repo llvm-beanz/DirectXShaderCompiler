@@ -2658,8 +2658,15 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
   // type (this is checked later) and we can skip this. In other languages
   // using auto, we need to check regardless.
   // C++14 In generic lambdas allow 'auto' in their parameters.
+  // HLSL Change Begin - HLSL 2016+ supports 'auto' as a function declarator
+  // return type with C++14-style deduction; skip this check for functions.
+  bool HLSLAutoFnDeclEnabled =
+      SemaRef.getLangOpts().HLSL &&
+      SemaRef.getLangOpts().HLSLVersion >= hlsl::LangStd::v2016;
   if (ContainsPlaceholderType &&
-      (!SemaRef.getLangOpts().CPlusPlus11 || !D.isFunctionDeclarator())) {
+      (!(SemaRef.getLangOpts().CPlusPlus11 || HLSLAutoFnDeclEnabled) ||
+       !D.isFunctionDeclarator())) {
+  // HLSL Change End
     int Error = -1;
 
     switch (D.getContext()) {
@@ -3748,9 +3755,14 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       if (!D.isInvalidType()) {
         // trailing-return-type is only required if we're declaring a function,
         // and not, for instance, a pointer to a function.
+        // HLSL Change Begin - HLSL 2016+ supports C++14-style deduced return types.
+        bool DeducedReturnAllowed =
+            S.getLangOpts().CPlusPlus14 ||
+            (S.getLangOpts().HLSL &&
+             S.getLangOpts().HLSLVersion >= hlsl::LangStd::v2016);
         if (D.getDeclSpec().containsPlaceholderType() &&
             !FTI.hasTrailingReturnType() && chunkIndex == 0 &&
-            !S.getLangOpts().CPlusPlus14) {
+            !DeducedReturnAllowed) {
           S.Diag(D.getDeclSpec().getTypeSpecTypeLoc(),
                  D.getDeclSpec().getTypeSpecType() == DeclSpec::TST_auto
                      ? diag::err_auto_missing_trailing_return
@@ -3758,6 +3770,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
           T = Context.IntTy;
           D.setInvalidType(true);
         } else if (FTI.hasTrailingReturnType()) {
+        // HLSL Change End
           // T must be exactly 'auto' at this point. See CWG issue 681.
           if (isa<ParenType>(T)) {
             S.Diag(D.getDeclSpec().getTypeSpecTypeLoc(),
