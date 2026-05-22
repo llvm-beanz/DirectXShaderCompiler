@@ -382,8 +382,8 @@ public:
   enum Mode { Fwd, Bwd };
 
   AutoDiffEmitter(Mode M, StringRef ElemType, raw_ostream &OS,
-                  const PrintingPolicy &P)
-      : M(M), ElemType(ElemType), OS(OS), Policy(P) {}
+                  const PrintingPolicy &P, const ASTContext &Ctx)
+      : M(M), ElemType(ElemType), OS(OS), Policy(P), Ctx(Ctx) {}
 
   // Whether emission of the current function has encountered a construct that
   // is fundamentally not differentiable. Such constructs cause the emitter to
@@ -393,6 +393,18 @@ public:
 
   // Emit `<expr>` translated into the chosen mode.
   void emitExpr(const Expr *E) {
+    // `[[dxc::no_diff]] <sub-expr>` is recorded as a side-table mark on the
+    // sub-expression itself by the parser. Honour it here: copy the
+    // sub-expression verbatim rather than running it through the
+    // mode-specific translator. We probe both the original Expr and the
+    // ParenImpCast-stripped form so the user can write the attribute either
+    // in front of a bare call or in front of a parenthesised sub-expression.
+    const Expr *Orig = E;
+    if (Orig && (Ctx.isHLSLNoDiffExpr(Orig) ||
+                 Ctx.isHLSLNoDiffExpr(Orig->IgnoreParenImpCasts()))) {
+      Orig->IgnoreParenImpCasts()->printPretty(OS, nullptr, Policy);
+      return;
+    }
     E = E ? E->IgnoreParenImpCasts() : nullptr;
     if (!E) {
       OS << "/*null*/";
@@ -584,6 +596,7 @@ private:
   StringRef ElemType;
   raw_ostream &OS;
   const PrintingPolicy &Policy;
+  const ASTContext &Ctx;
   bool NonDifferentiable = false;
   std::string Reason;
 
@@ -851,7 +864,7 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   bool ValidBody = false;
 
   if (const auto *CS = dyn_cast_or_null<CompoundStmt>(FD->getBody())) {
-    AutoDiffEmitter Em(M, ElemType, BodyOS, Policy);
+    AutoDiffEmitter Em(M, ElemType, BodyOS, Policy, FD->getASTContext());
     if (M == AutoDiffEmitter::Bwd) {
       for (const ParmVarDecl *P : FD->parameters()) {
         BodyOS << "    VariableExpr<" << ElemType << "> " << P->getName()
