@@ -413,6 +413,17 @@ public:
       emitDeclRef(DRE);
       return;
     }
+    if (const auto *ME = dyn_cast<MemberExpr>(E)) {
+      emitMember(ME);
+      return;
+    }
+    if (isa<CXXThisExpr>(E)) {
+      // `this` refers to the wrapper-class instance. The wrapper inherits
+      // from the original record, so member accesses through `this` resolve
+      // to the inherited data members; emit it verbatim.
+      OS << "this";
+      return;
+    }
     if (isa<ConditionalOperator>(E)) {
       // Ternary is not differentiable in a sound way unless both arms have
       // identical gradients; flag the function and emit the expression as-is
@@ -770,6 +781,26 @@ private:
       return;
     }
     OS << Name;
+  }
+
+  // Translate `obj.member` / `this->member`. The wrapper class inherits from
+  // the user's record, so member accesses are still valid against `this`.
+  // The translated body treats the underlying member as an opaque scalar of
+  // the chosen element type and emits the access verbatim; the autodiff
+  // library is expected to provide the conversions that make this type-check
+  // (typically Value<T> * T or constant<T>(...) wrappers).
+  void emitMember(const MemberExpr *ME) {
+    const Expr *Base = ME->getBase();
+    if (Base && !isa<CXXThisExpr>(Base->IgnoreParenImpCasts())) {
+      emitExpr(Base);
+      OS << (ME->isArrow() ? "->" : ".");
+    } else if (Base && ME->isArrow()) {
+      OS << "this->";
+    } else {
+      OS << "this.";
+    }
+    if (const NamedDecl *MD = ME->getMemberDecl())
+      OS << MD->getName();
   }
 };
 
