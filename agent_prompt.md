@@ -18,12 +18,9 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Let's make member functions of classes and structs differentiable. If a class
-has any members marked with the autodiff attribute generate a new class in the
-`user::ad::*` namespace with the same name that inherits from the user-supplied
-class, and add new methods inside that class that implement the differential of
-the function.
+I'd like to be able to apply the no_diff attribute to a specific call
+expression. For example:
 
-You should support the case where a user may explicitly provide the
-`user::ad::*` class as empty, or with a subset of member functions declared and
-the tooling should insert additional functions as needed.
+```
+float val = x - [[dxc::no_diff]] floor(uv); // only applies to the floor call
+```
