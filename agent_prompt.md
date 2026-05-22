@@ -18,8 +18,7 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-When processing a translation unit, if the namespaced `user::ad` functions for a
-function that has the `[[dxc::autodiff(...)]]` attribute  already exist, skip
-it. This will allow users to (1) provide their own implementations of
-differential functions and (2) check in the differential functions to source
-control iteratively.
+1) Add a test verifying that the rewriter does not modify the file at all if
+   there are no attributed functions.
+2) Add tests that handle user functions which call other user functions which
+   may not be attributed correctly.
