@@ -22,6 +22,7 @@
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/Stmt.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1084,6 +1085,108 @@ void EmitAutoDiffForRecord(const CXXRecordDecl *RD,
     EmitMode(AutoDiffEmitter::Bwd, "bwd", UserBwdWrapper);
 }
 
+// Build the textual replacement for a user-supplied `user::ad::{fwd,bwd}::C`
+// wrapper class, augmented with auto-generated methods for every annotated
+// source-class method that the user has not implemented.
+//
+// The returned string contains a `using namespace ::ad::{fwd,bwd};` directive
+// (so generated bodies do not need to fully qualify Value<T>/Variable<T>) and
+// a single complete `struct C : <user bases> { ... };` definition. It is
+// substituted in-place for the user's CXXRecordDecl during translation-unit
+// printing.
+std::string buildMergedWrapperClass(const CXXRecordDecl *UserRD,
+                                    const CXXRecordDecl *SrcRD,
+                                    AutoDiffEmitter::Mode Mode,
+                                    const PrintingPolicy &Policy) {
+  std::string Result;
+  raw_string_ostream OS(Result);
+  const char *NS = (Mode == AutoDiffEmitter::Fwd) ? "fwd" : "bwd";
+  OS << "using namespace ::ad::" << NS << ";\n";
+  OS << (UserRD->isStruct() ? "struct " : "class ") << UserRD->getName();
+  // Preserve the user's base specifier list verbatim. Auto-diff convention
+  // is `: ::C`; we do not invent or alter inheritance.
+  bool First = true;
+  for (const auto &B : UserRD->bases()) {
+    OS << (First ? " : " : ", ");
+    First = false;
+    if (B.isVirtual())
+      OS << "virtual ";
+    switch (B.getAccessSpecifierAsWritten()) {
+    case AS_public: OS << "public "; break;
+    case AS_protected: OS << "protected "; break;
+    case AS_private: OS << "private "; break;
+    case AS_none: break;
+    }
+    B.getType().print(OS, Policy);
+  }
+  OS << " {\n";
+  // Pass through every non-implicit user declaration inside the wrapper.
+  // This preserves access specifiers, fields, typedefs, and the user's
+  // hand-written methods exactly as they were typed.
+  for (const Decl *D : UserRD->decls()) {
+    if (D->isImplicit())
+      continue;
+    OS << "  ";
+    D->print(OS, Policy);
+    OS << "\n";
+  }
+  // Append auto-generated bodies for any annotated source method whose name
+  // the user has not already declared inside the wrapper.
+  StringSet<> Existing;
+  collectUserAdMethodNames(UserRD, Existing);
+  for (const Decl *D : SrcRD->decls()) {
+    const auto *MD = dyn_cast<CXXMethodDecl>(D);
+    if (!MD)
+      continue;
+    const auto *AD = MD->getAttr<HLSLAutoDiffAttr>();
+    if (!AD)
+      continue;
+    bool Wants = (Mode == AutoDiffEmitter::Fwd) ? AD->hasForward()
+                                                : AD->hasBackward();
+    if (!Wants)
+      continue;
+    if (Existing.count(MD->getName()))
+      continue;
+    OS << "  ";
+    emitAutoDiffFunction(MD, Mode, Policy, OS);
+  }
+  OS << "};\n";
+  OS.flush();
+  return Result;
+}
+
+// Recursively print \p D, substituting any CXXRecordDecl found in \p Subs
+// with the precomputed merged class text. NamespaceDecls are descended into
+// so that a record buried inside `user::ad::fwd` is reached; all other
+// decl kinds are forwarded to clang's standard DeclPrinter.
+void printDeclWithSubstitutions(
+    const Decl *D,
+    const DenseMap<const CXXRecordDecl *, std::string> &Subs,
+    raw_ostream &OS, const PrintingPolicy &Policy) {
+  if (D->isImplicit())
+    return;
+  if (const auto *NS = dyn_cast<NamespaceDecl>(D)) {
+    OS << "namespace ";
+    if (NS->getIdentifier())
+      OS << NS->getName() << " ";
+    OS << "{\n";
+    for (const Decl *Child : NS->decls()) {
+      printDeclWithSubstitutions(Child, Subs, OS, Policy);
+    }
+    OS << "}\n";
+    return;
+  }
+  if (const auto *RD = dyn_cast<CXXRecordDecl>(D)) {
+    auto It = Subs.find(RD);
+    if (It != Subs.end()) {
+      OS << It->second;
+      return;
+    }
+  }
+  D->print(OS, Policy);
+  OS << "\n";
+}
+
 } // anonymous namespace
 
 namespace hlsl {
@@ -1107,6 +1210,17 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
   // header if we are actually about to emit at least one function for
   // that mode; functions whose user-provided differentials are already
   // present do not require us to drag the library in.
+  // Build the substitution map for user-supplied wrapper classes. A
+  // user::ad::fwd::C / user::ad::bwd::C record found in the input is
+  // suppressed from the normal print path and replaced with a merged class
+  // definition that retains the user's hand-written methods and appends
+  // auto-generated bodies for any annotated source method the user did not
+  // provide. Records that are not in this map are printed as-is by
+  // printDeclWithSubstitutions.
+  DenseMap<const CXXRecordDecl *, std::string> Subs;
+  static const StringRef FwdPath[] = {"user", "ad", "fwd"};
+  static const StringRef BwdPath[] = {"user", "ad", "bwd"};
+
   bool NeedFwd = false;
   bool NeedBwd = false;
   for (Decl *D : tu->decls()) {
@@ -1123,19 +1237,39 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
     if (const auto *RD = dyn_cast<CXXRecordDecl>(D)) {
       if (!RD->isCompleteDefinition() || !RD->getIdentifier())
         continue;
-      static const StringRef FwdPath[] = {"user", "ad", "fwd"};
-      static const StringRef BwdPath[] = {"user", "ad", "bwd"};
-      const CXXRecordDecl *UserFwd = findUserAdRecord(tu, FwdPath, RD->getName());
-      const CXXRecordDecl *UserBwd = findUserAdRecord(tu, BwdPath, RD->getName());
+      if (!recordHasAutoDiffMember(RD))
+        continue;
+      const CXXRecordDecl *UserFwd =
+          findUserAdRecord(tu, FwdPath, RD->getName());
+      const CXXRecordDecl *UserBwd =
+          findUserAdRecord(tu, BwdPath, RD->getName());
+      StringSet<> FwdMethods, BwdMethods;
+      collectUserAdMethodNames(UserFwd, FwdMethods);
+      collectUserAdMethodNames(UserBwd, BwdMethods);
+      bool NeedFwdMerge = false;
+      bool NeedBwdMerge = false;
       for (const Decl *Inner : RD->decls()) {
         const auto *MD = dyn_cast<CXXMethodDecl>(Inner);
         if (!MD)
           continue;
-        if (const auto *AD = MD->getAttr<HLSLAutoDiffAttr>()) {
-          NeedFwd |= AD->hasForward() && !UserFwd;
-          NeedBwd |= AD->hasBackward() && !UserBwd;
-        }
+        const auto *AD = MD->getAttr<HLSLAutoDiffAttr>();
+        if (!AD)
+          continue;
+        bool MissingFwd =
+            AD->hasForward() && !FwdMethods.count(MD->getName());
+        bool MissingBwd =
+            AD->hasBackward() && !BwdMethods.count(MD->getName());
+        NeedFwd |= MissingFwd;
+        NeedBwd |= MissingBwd;
+        NeedFwdMerge |= MissingFwd && UserFwd;
+        NeedBwdMerge |= MissingBwd && UserBwd;
       }
+      if (UserFwd && NeedFwdMerge)
+        Subs[UserFwd] =
+            buildMergedWrapperClass(UserFwd, RD, AutoDiffEmitter::Fwd, Policy);
+      if (UserBwd && NeedBwdMerge)
+        Subs[UserBwd] =
+            buildMergedWrapperClass(UserBwd, RD, AutoDiffEmitter::Bwd, Policy);
     }
   }
   if (NeedFwd)
@@ -1148,11 +1282,7 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
   for (Decl *D : tu->decls()) {
     if (D->isImplicit())
       continue;
-    D->print(OS, Policy);
-    // DeclPrinter typically does not append trailing semicolons for some
-    // forms; we always insert a newline so that any subsequent text we
-    // write begins on its own line.
-    OS << "\n";
+    printDeclWithSubstitutions(D, Subs, OS, Policy);
     if (auto *FD = dyn_cast<FunctionDecl>(D)) {
       if (auto *AD = FD->getAttr<HLSLAutoDiffAttr>())
         EmitAutoDiffForFunction(FD, AD, ExistingFwd, ExistingBwd, Policy, OS);
@@ -1163,12 +1293,13 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
         continue;
       if (!recordHasAutoDiffMember(RD))
         continue;
-      static const StringRef FwdPath[] = {"user", "ad", "fwd"};
-      static const StringRef BwdPath[] = {"user", "ad", "bwd"};
       const CXXRecordDecl *UserFwd =
           findUserAdRecord(tu, FwdPath, RD->getName());
       const CXXRecordDecl *UserBwd =
           findUserAdRecord(tu, BwdPath, RD->getName());
+      // EmitAutoDiffForRecord skips a mode whose user wrapper is present;
+      // partial-merge cases are handled by the substitution above, so the
+      // post-record emit only runs for "no user wrapper at all" modes.
       EmitAutoDiffForRecord(RD, UserFwd, UserBwd, Policy, OS);
     }
   }
