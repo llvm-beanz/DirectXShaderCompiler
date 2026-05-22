@@ -618,3 +618,83 @@ templates. This keeps the tests independent of `-HV 2021` and of the
 ongoing `enable_if`/`<ad/matrix_utils>` build flags. The existing
 `autodiff_fwd.hlsl` family still exercises the real header via its
 follow-up `%dxc -I %hlsl_headers -verify %t.gen.hlsl` step.
+
+## Round 7: no-op rewriter when nothing is attributed; user→user call coverage
+
+The follow-up prompt asked for two additional pieces of regression
+coverage:
+
+1. **No modification at all when no functions are attributed.** The
+   rewriter's autodiff pass already short-circuits in this case: with
+   zero `HLSLAutoDiffAttr` declarations in the TU, `NeedFwd` and
+   `NeedBwd` both stay `false`, so no `#include <ad/...>` is emitted
+   and the per-decl loop in `PrintTranslationUnitWithDifferentials`
+   skips every `EmitAutoDiffForFunction` call. Empirically, the bytes
+   produced by `dxr -generate-differentials` are then identical to a
+   plain `dxr` invocation on the same TU. The new
+   `no_attributed_functions.hlsl` test pins this down with two RUN
+   lines: the first diffs the two outputs for byte equality, and the
+   second runs `FileCheck` with `CHECK-NOT` guards against every piece
+   of auto-diff scaffolding (the `#include`s, the `namespace user`
+   block headers, `Value<`, `Variable<`, `GradientContext`). Either
+   line on its own would be enough to fail if the generator ever
+   started emitting stubs for unannotated TUs; together they document
+   both the byte-level and the structural invariant.
+
+2. **User functions that call other user functions which may not be
+   attributed correctly.** Three new tests cover the cross product of
+   "is the callee annotated?" and "does its annotation match the
+   caller's modes?":
+
+   * `user_call_attributed.hlsl` — caller and callee both annotated
+     `[[dxc::autodiff(fwd, bwd)]]`. Forward composes via unqualified
+     lookup inside the regenerated `user::ad::fwd` namespace, so the
+     emitted `Value<float> f` body just contains `(g(x) + x)`.
+     Backward, however, currently falls into the
+     `GetBackwardIntrinsicBuilder` "unknown callee" path because the
+     emitter has no notion of dispatching to a user-defined
+     `user::ad::bwd::g`. The test records the
+     `_Static_assert(false, "auto-diff cannot generate backward-mode
+     for 'f': unknown callee 'g' has no auto-diff builder")` stub so
+     that a future improvement that routes attributed callees through
+     `user::ad::bwd::g(context, args...)` updates the expectation
+     deliberately.
+
+   * `user_call_unattributed.hlsl` — caller annotated `(fwd, bwd)`,
+     callee unannotated. Forward emits the call verbatim and lets
+     overload resolution at the next compile stage diagnose the
+     `Value<float>` mismatch; backward emits the same unknown-callee
+     `_Static_assert` stub. `CHECK-NOT` guards confirm the rewriter
+     does not synthesise a `user::ad::{fwd,bwd}::g` overload that the
+     user never asked for.
+
+   * `user_call_mode_mismatch.hlsl` — caller `(fwd, bwd)`, callee
+     `(fwd)` only. Forward correctly resolves to the regenerated
+     `user::ad::fwd::g`, but backward still emits the
+     unknown-callee stub because the emitter does not consult the
+     callee's auto-diff modes. A `CHECK-NOT: Variable<float> g(`
+     line confirms that the rewriter respects the user's request and
+     does not invent a backward overload of `g`.
+
+All three tests deliberately skip the secondary `dxc -verify` step
+used by the simpler positive cases. The cross-mode lookup behaviour
+of the rewritten code is sensitive to header surface area (e.g. the
+exact `Value<T>` / `Variable<T>` templates exposed by `<ad/fwd>` and
+`<ad/bwd>`) and is already covered by the existing `coverage_*`
+tests; the new tests focus narrowly on what the rewriter itself
+prints.
+
+### Known limitation surfaced by these tests
+
+The backward-mode emitter currently has no path that recognises an
+attributed user callee. `emitCall` looks the callee name up in
+`GetBackwardIntrinsicBuilder` and, if absent, marks the whole
+generated function non-differentiable. A natural follow-up would be
+to (a) detect a callee that carries `HLSLAutoDiffAttr` with the
+backward bit set, (b) emit `g(context, args_expr...)` mirroring the
+runtime ABI of the regenerated `user::ad::bwd::g`, and (c) leave
+truly unknown callees on the existing static_assert path. The new
+`user_call_attributed.hlsl` and `user_call_mode_mismatch.hlsl` tests
+are written so that this future change only needs to update the
+"expected" `_Static_assert` lines into expected real call sites,
+without otherwise reshuffling the test layout.
