@@ -18,7 +18,12 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-1) Add a test verifying that the rewriter does not modify the file at all if
-   there are no attributed functions.
-2) Add tests that handle user functions which call other user functions which
-   may not be attributed correctly.
+Let's make member functions of classes and structs differentiable. If a class
+has any members marked with the autodiff attribute generate a new class in the
+`user::ad::*` namespace with the same name that inherits from the user-supplied
+class, and add new methods inside that class that implement the differential of
+the function.
+
+You should support the case where a user may explicitly provide the
+`user::ad::*` class as empty, or with a subset of member functions declared and
+the tooling should insert additional functions as needed.
