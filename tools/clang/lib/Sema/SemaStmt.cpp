@@ -508,21 +508,15 @@ ExprResult Sema::ActOnHLSLNoDiffExpr(SourceLocation AttrLoc,
   if (!SubExpr)
     return ExprError();
 
-  // Only `[[dxc::no_diff]]` is meaningful on an in-expression attribute. Any
-  // other attribute appearing in that position is a user error -- diagnose
-  // and otherwise leave the sub-expression alone so downstream parsing can
-  // continue.
-  bool Marked = false;
+  // Only `[[dxc::no_diff]]` is meaningful on an in-expression attribute. The
+  // parser already filters out other attributes from the list before calling
+  // us, so this loop only sees HLSLNoDiff entries in well-formed code; any
+  // other attribute is silently treated as a no-op.
   for (const Attr *A : Attrs) {
-    if (isa<HLSLNoDiffAttr>(A)) {
+    if (isa<HLSLNoDiffAttr>(A))
       Context.markHLSLNoDiffExpr(SubExpr);
-      Marked = true;
-    } else {
-      Diag(A->getLocation(), diag::warn_attribute_ignored)
-          << A->getSpelling();
-    }
   }
-  (void)Marked; (void)AttrLoc;
+  (void)AttrLoc;
   return SubExpr;
 }
 // HLSL Change End
