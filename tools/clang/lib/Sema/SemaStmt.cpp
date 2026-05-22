@@ -501,6 +501,32 @@ StmtResult Sema::ActOnAttributedStmt(SourceLocation AttrLoc,
   return LS;
 }
 
+// HLSL Change Start - [[dxc::no_diff]] applied to an expression.
+ExprResult Sema::ActOnHLSLNoDiffExpr(SourceLocation AttrLoc,
+                                     ArrayRef<const Attr *> Attrs,
+                                     Expr *SubExpr) {
+  if (!SubExpr)
+    return ExprError();
+
+  // Only `[[dxc::no_diff]]` is meaningful on an in-expression attribute. Any
+  // other attribute appearing in that position is a user error -- diagnose
+  // and otherwise leave the sub-expression alone so downstream parsing can
+  // continue.
+  bool Marked = false;
+  for (const Attr *A : Attrs) {
+    if (isa<HLSLNoDiffAttr>(A)) {
+      Context.markHLSLNoDiffExpr(SubExpr);
+      Marked = true;
+    } else {
+      Diag(A->getLocation(), diag::warn_attribute_ignored)
+          << A->getSpelling();
+    }
+  }
+  (void)Marked; (void)AttrLoc;
+  return SubExpr;
+}
+// HLSL Change End
+
 StmtResult
 Sema::ActOnIfStmt(SourceLocation IfLoc, FullExprArg CondVal, Decl *CondVar,
                   Stmt *thenStmt, SourceLocation ElseLoc,
