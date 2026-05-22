@@ -844,3 +844,137 @@ round-7 baseline.
   multiple reopened blocks (a use case the existing per-function path
   also doesn't support cleanly), only the first occurrence found by
   `findUserAdRecord` is substituted and merged.
+
+## Round 9: `[[dxc::no_diff]]` on a sub-expression
+
+The previous rounds only supported `[[dxc::no_diff]]` at *statement*
+granularity — either as a statement attribute on a single statement or
+wrapping a block (`[[dxc::no_diff]] { ... }`). The follow-up ask is to
+support it at *expression* granularity:
+
+```hlsl
+float val = x - [[dxc::no_diff]] floor(uv); // only applies to floor()
+```
+
+so the user can opt a single sub-expression out of the rewrite without
+having to hoist it into a separate statement.
+
+### Why not introduce an AttributedExpr AST node
+
+The obvious-looking design — a parallel `AttributedExpr` AST class
+mirroring `AttributedStmt` — touches a lot of surface area in clang
+(StmtNodes.td, the recursive visitor, the pretty printer, the stmt
+profiler, serialization, traversal in CodeGen, etc.). The attribute
+itself has no semantics for any compiler phase *except* the autodiff
+rewriter, so a full AST node is way more machinery than the feature
+warrants.
+
+Instead the attribute is implemented as a **side table on
+`ASTContext`**: `markHLSLNoDiffExpr(const Expr *)` adds the pointer to
+a small `SmallPtrSet`, `isHLSLNoDiffExpr(const Expr *)` queries it.
+The pointer identity is stable for as long as `ASTContext` is alive,
+which spans both Sema and the rewriter. Codegen, analysis, and every
+other pass remain entirely unaware of the marker.
+
+### Parser
+
+`Parser::ParseCastExpression` gains an HLSL-gated prologue: if it sees
+`[[ ... ]]` immediately before a cast-expression, it parses the
+attribute list via the standard `ParseCXX11Attributes` machinery,
+recursively parses the cast-expression itself, then materialises any
+`HLSLNoDiff` entries into real `HLSLNoDiffAttr` objects and hands the
+list plus the sub-expression to `Sema::ActOnHLSLNoDiffExpr`. Any other
+attribute parsed in expression position triggers the existing
+`warn_attribute_no_decl` diagnostic, matching the behaviour for
+declaration-site attributes the parser can't apply.
+
+Putting the hook at the top of `ParseCastExpression` is correct
+because:
+
+* All in-expression positions feed through `ParseCastExpression`
+  (assignment-expression -> conditional -> ... -> cast-expression).
+* The hook recurses into `ParseCastExpression` so the attribute can be
+  followed by any cast-expression form: a call, a parenthesised
+  expression, a unary, etc.
+* It runs before the `switch(SavedKind)` that would otherwise consume
+  `tok::l_square` as a postfix-array-subscript marker on the wrong
+  token.
+
+### Sema
+
+`Sema::ActOnHLSLNoDiffExpr(SourceLocation, ArrayRef<const Attr*>,
+Expr*)` just walks the supplied attribute list, calls
+`Context.markHLSLNoDiffExpr(SubExpr)` for each `HLSLNoDiffAttr`, and
+returns the sub-expression unchanged. There is no new AST shape, no
+new type, and no diagnostic from Sema in the well-formed case. This
+keeps the attribute completely transparent to overload resolution,
+template instantiation, codegen, etc.
+
+### Rewriter
+
+`AutoDiffEmitter` now carries a `const ASTContext &Ctx` member. In
+`emitExpr`, before any of the existing dispatch, it probes both the
+incoming `Expr *` *and* its `IgnoreParenImpCasts()` form against
+`Ctx.isHLSLNoDiffExpr`. If either matches, the sub-expression is
+pretty-printed verbatim (using the existing `printPretty` path) and
+the per-mode translator is skipped entirely. Probing both forms is
+necessary because the immediate parent (typically a `BinaryOperator`)
+may store the marked node behind one or more `ImplicitCastExpr`s.
+
+This piggybacks on the previously-existing `emitStmt`/`AttributedStmt`
+no_diff path: that one fires on a *whole statement* (`[[dxc::no_diff]]
+foo = bar;`); this one fires inside `emitExpr` on a single sub-
+expression. The two cases are independent and do not conflict.
+
+### Tests
+
+Three new FileCheck tests under
+`tools/clang/test/HLSLFileCheck/rewriter/autodiff/`:
+
+* `no_diff_expr_call.hlsl` — the canonical
+  `x - [[dxc::no_diff]] floor(uv)` example. Asserts the surrounding
+  subtraction is still rewritten to the bwd-mode `subtract<>` builder
+  while the marked call is preserved verbatim.
+* `no_diff_expr_nondiff_intrinsic.hlsl` — applies the attribute to a
+  call to `asuint`, a non-differentiable intrinsic. Without the
+  attribute the rewriter would mark the whole function
+  non-differentiable and emit a `_Static_assert` stub; with the
+  attribute it proceeds normally. A `CHECK-NOT: _Static_assert` line
+  pins this down.
+* `no_diff_expr_paren.hlsl` — applies the attribute to a parenthesised
+  sub-expression `(sin(x) * cos(x))` and confirms the whole bundle is
+  preserved verbatim instead of being broken into per-call rewrites.
+
+All three follow the same `dxc -verify`-skip convention as the existing
+statement-level `no_diff_*` tests: the surrounding Value<T>/Variable<T>
+parameter rewrite still doesn't type-check when a scalar-float sub-
+expression is preserved verbatim, which is documented in this file.
+
+### Validation
+
+`cd build-rel && ninja check-all` reports `Expected Passes: 4610`,
+unchanged from the round-8 baseline. The three new tests are exercised
+manually via `bin/dxr -generate-differentials | bin/FileCheck`, like the
+rest of the autodiff tests (the lit suite still doesn't recurse into
+`HLSLFileCheck/rewriter/autodiff/`).
+
+### Known limitations
+
+* The attribute is only recognised by `Parser::ParseCastExpression`.
+  Constant-expression contexts that bypass the cast-expression path
+  (e.g. inside an `enum` initializer, an `alignas` specifier, or a
+  template argument that's parsed as an integral-constant-expression)
+  do not see it. Those positions aren't differentiable anyway, so this
+  matches user expectation.
+* The marker is stored by pointer identity. Anything that clones the
+  `Expr` (template instantiation, certain TreeTransform paths) would
+  drop the mark from the clone. In HLSL the only path that performs
+  such cloning is template instantiation, and the rewriter operates
+  on the source-level AST before instantiation, so this isn't an
+  issue in practice.
+* Like the statement-level form, the secondary `dxc -verify` step on
+  the rewriter output is skipped because the surrounding Value<T> /
+  Variable<T> parameter rewrite mixes types with the preserved scalar
+  sub-expression. Fixing that requires moving the no_diff sub-
+  expression into the `Value<T>::value` / `Variable<T>::value` field
+  explicitly, which is a follow-up.
