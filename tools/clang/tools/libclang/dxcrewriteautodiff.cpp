@@ -920,6 +920,38 @@ void collectFunctionNamesInNamespace(const DeclContext *DC,
   }
 }
 
+// Locate the user-supplied wrapper record (`user::ad::fwd::ClassName` or
+// `user::ad::bwd::ClassName`) for a given source class. Returns the first
+// CXXRecordDecl found at the requested namespace path with the matching
+// name, or nullptr if the user has not provided one.
+//
+// The lookup descends through possibly-reopened namespace chains; the
+// match is by unqualified name only (mirroring collectUserAdFunctionNames).
+const CXXRecordDecl *findUserAdRecord(const DeclContext *DC,
+                                      ArrayRef<StringRef> Path,
+                                      StringRef ClassName) {
+  if (Path.empty()) {
+    for (const Decl *D : DC->decls()) {
+      const auto *RD = dyn_cast<CXXRecordDecl>(D);
+      if (!RD || !RD->getIdentifier())
+        continue;
+      if (RD->getName() == ClassName)
+        return RD;
+    }
+    return nullptr;
+  }
+  StringRef Head = Path.front();
+  ArrayRef<StringRef> Tail = Path.slice(1);
+  for (const Decl *D : DC->decls()) {
+    const auto *NS = dyn_cast<NamespaceDecl>(D);
+    if (!NS || !NS->getIdentifier() || NS->getName() != Head)
+      continue;
+    if (const CXXRecordDecl *Found = findUserAdRecord(NS, Tail, ClassName))
+      return Found;
+  }
+  return nullptr;
+}
+
 // Populate \p FwdNames and \p BwdNames with the unqualified names of every
 // function the user has already declared (or defined) inside
 // `user::ad::fwd` and `user::ad::bwd` respectively. These names are used to
@@ -962,6 +994,96 @@ void EmitAutoDiffForFunction(const FunctionDecl *FD,
   }
 }
 
+// Return true if any method of \p RD carries HLSLAutoDiffAttr (any mode).
+bool recordHasAutoDiffMember(const CXXRecordDecl *RD) {
+  for (const Decl *D : RD->decls()) {
+    if (const auto *MD = dyn_cast<CXXMethodDecl>(D))
+      if (MD->hasAttr<HLSLAutoDiffAttr>())
+        return true;
+  }
+  return false;
+}
+
+// Collect the names of every method already declared inside the user's
+// `user::ad::{fwd,bwd}::ClassName` record (if any). Mirrors the per-namespace
+// skip used for free functions, scoped to a specific wrapper class.
+void collectUserAdMethodNames(const CXXRecordDecl *UserAdRD,
+                              StringSet<> &MethodNames) {
+  if (!UserAdRD)
+    return;
+  for (const Decl *D : UserAdRD->decls()) {
+    if (const auto *MD = dyn_cast<CXXMethodDecl>(D)) {
+      if (MD->getIdentifier())
+        MethodNames.insert(MD->getName());
+    }
+  }
+}
+
+// Emit the auto-diff wrapper class for \p RD, containing a generated method
+// per HLSLAutoDiffAttr-bearing member function. The wrapper is named the same
+// as the source class and inherits from it, so existing member data and
+// non-differentiable methods remain accessible.
+//
+// Forward and backward modes are emitted in separate
+// `namespace user { ad { fwd|bwd } }` blocks, each containing one
+// `struct ClassName : ::ClassName { ... };` definition. A mode is skipped
+// entirely if no method of \p RD requests that mode, or if the user has
+// already supplied a wrapper class for the corresponding mode. (Partial /
+// per-method merging with a user-supplied wrapper class is a follow-up.)
+void EmitAutoDiffForRecord(const CXXRecordDecl *RD,
+                           const CXXRecordDecl *UserFwdWrapper,
+                           const CXXRecordDecl *UserBwdWrapper,
+                           const PrintingPolicy &Policy, raw_ostream &OS) {
+  StringRef ClassName = RD->getName();
+
+  // Determine which modes are actually requested by any method.
+  bool AnyFwd = false;
+  bool AnyBwd = false;
+  for (const Decl *D : RD->decls()) {
+    const auto *MD = dyn_cast<CXXMethodDecl>(D);
+    if (!MD)
+      continue;
+    if (const auto *AD = MD->getAttr<HLSLAutoDiffAttr>()) {
+      AnyFwd |= AD->hasForward();
+      AnyBwd |= AD->hasBackward();
+    }
+  }
+
+  auto EmitMode = [&](AutoDiffEmitter::Mode Mode, const char *NS,
+                      const CXXRecordDecl *UserWrapper) {
+    OS << "\nnamespace user { namespace ad { namespace " << NS << " {\n";
+    OS << "using namespace ::ad::" << NS << ";\n";
+    OS << "struct " << ClassName << " : ::" << ClassName << " {\n";
+    StringSet<> ExistingMethods;
+    collectUserAdMethodNames(UserWrapper, ExistingMethods);
+    for (const Decl *D : RD->decls()) {
+      const auto *MD = dyn_cast<CXXMethodDecl>(D);
+      if (!MD)
+        continue;
+      const auto *AD = MD->getAttr<HLSLAutoDiffAttr>();
+      if (!AD)
+        continue;
+      bool WantsThisMode = (Mode == AutoDiffEmitter::Fwd)
+                               ? AD->hasForward()
+                               : AD->hasBackward();
+      if (!WantsThisMode)
+        continue;
+      if (ExistingMethods.count(MD->getName()))
+        continue;
+      // Methods sit inside the wrapper class, so indent one level.
+      OS << "  ";
+      emitAutoDiffFunction(MD, Mode, Policy, OS);
+    }
+    OS << "};\n";
+    OS << "} } } // namespace user::ad::" << NS << "\n";
+  };
+
+  if (AnyFwd && !UserFwdWrapper)
+    EmitMode(AutoDiffEmitter::Fwd, "fwd", UserFwdWrapper);
+  if (AnyBwd && !UserBwdWrapper)
+    EmitMode(AutoDiffEmitter::Bwd, "bwd", UserBwdWrapper);
+}
+
 } // anonymous namespace
 
 namespace hlsl {
@@ -988,13 +1110,32 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
   bool NeedFwd = false;
   bool NeedBwd = false;
   for (Decl *D : tu->decls()) {
-    const auto *FD = dyn_cast<FunctionDecl>(D);
-    if (!FD)
+    if (const auto *FD = dyn_cast<FunctionDecl>(D)) {
+      if (const auto *AD = FD->getAttr<HLSLAutoDiffAttr>()) {
+        StringRef Name = FD->getName();
+        NeedFwd |= AD->hasForward() && !ExistingFwd.count(Name);
+        NeedBwd |= AD->hasBackward() && !ExistingBwd.count(Name);
+      }
       continue;
-    if (const auto *AD = FD->getAttr<HLSLAutoDiffAttr>()) {
-      StringRef Name = FD->getName();
-      NeedFwd |= AD->hasForward() && !ExistingFwd.count(Name);
-      NeedBwd |= AD->hasBackward() && !ExistingBwd.count(Name);
+    }
+    // Classes / structs whose methods carry HLSLAutoDiffAttr also trigger
+    // generation of a wrapper class, which references the AD library types.
+    if (const auto *RD = dyn_cast<CXXRecordDecl>(D)) {
+      if (!RD->isCompleteDefinition() || !RD->getIdentifier())
+        continue;
+      static const StringRef FwdPath[] = {"user", "ad", "fwd"};
+      static const StringRef BwdPath[] = {"user", "ad", "bwd"};
+      const CXXRecordDecl *UserFwd = findUserAdRecord(tu, FwdPath, RD->getName());
+      const CXXRecordDecl *UserBwd = findUserAdRecord(tu, BwdPath, RD->getName());
+      for (const Decl *Inner : RD->decls()) {
+        const auto *MD = dyn_cast<CXXMethodDecl>(Inner);
+        if (!MD)
+          continue;
+        if (const auto *AD = MD->getAttr<HLSLAutoDiffAttr>()) {
+          NeedFwd |= AD->hasForward() && !UserFwd;
+          NeedBwd |= AD->hasBackward() && !UserBwd;
+        }
+      }
     }
   }
   if (NeedFwd)
@@ -1012,11 +1153,24 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
     // forms; we always insert a newline so that any subsequent text we
     // write begins on its own line.
     OS << "\n";
-    auto *FD = dyn_cast<FunctionDecl>(D);
-    if (!FD)
+    if (auto *FD = dyn_cast<FunctionDecl>(D)) {
+      if (auto *AD = FD->getAttr<HLSLAutoDiffAttr>())
+        EmitAutoDiffForFunction(FD, AD, ExistingFwd, ExistingBwd, Policy, OS);
       continue;
-    if (auto *AD = FD->getAttr<HLSLAutoDiffAttr>())
-      EmitAutoDiffForFunction(FD, AD, ExistingFwd, ExistingBwd, Policy, OS);
+    }
+    if (auto *RD = dyn_cast<CXXRecordDecl>(D)) {
+      if (!RD->isCompleteDefinition() || !RD->getIdentifier())
+        continue;
+      if (!recordHasAutoDiffMember(RD))
+        continue;
+      static const StringRef FwdPath[] = {"user", "ad", "fwd"};
+      static const StringRef BwdPath[] = {"user", "ad", "bwd"};
+      const CXXRecordDecl *UserFwd =
+          findUserAdRecord(tu, FwdPath, RD->getName());
+      const CXXRecordDecl *UserBwd =
+          findUserAdRecord(tu, BwdPath, RD->getName());
+      EmitAutoDiffForRecord(RD, UserFwd, UserBwd, Policy, OS);
+    }
   }
 }
 
