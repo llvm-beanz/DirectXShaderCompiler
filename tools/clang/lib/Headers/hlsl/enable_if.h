@@ -3,9 +3,7 @@
 #ifndef HLSL_ENABLE_IF_H
 #define HLSL_ENABLE_IF_H
 
-#if ((__SHADER_TARGET_MAJOR > 6) ||                                            \
-     (__SHADER_TARGET_MAJOR == 6 && __SHADER_TARGET_MINOR >= 9)) &&            \
-    (__HLSL_VERSION >= 2021)
+#if __HLSL_VERSION >= 2021
 
 namespace hlsl {
 

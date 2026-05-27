@@ -5,6 +5,8 @@
 // Provides minor matrix extraction, cofactor matrices, and determinant
 // derivatives for square matrices from 1x1 through 4x4.
 
+#include <enable_if.h>
+#include <ad/matrix_utils>
 namespace ad {
 namespace __detail {
 
