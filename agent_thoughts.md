@@ -978,3 +978,108 @@ rest of the autodiff tests (the lit suite still doesn't recurse into
   sub-expression. Fixing that requires moving the no_diff sub-
   expression into the `Value<T>::value` / `Variable<T>::value` field
   explicitly, which is a follow-up.
+
+---
+
+# Agent Thoughts: stop the rewriter from dumping `#include`d headers
+
+## Problem
+
+The user reported that the HLSL rewriter "is dumping the contents of included
+headers into the output". Looking at the existing gold test outputs (e.g.
+`tools/clang/test/HLSL/rewriter/correct_rewrites/includes_gold.hlsl`)
+confirmed the symptom: when a source file `#include`s a header, every decl
+defined in that header was being emitted verbatim into the rewriter's output.
+
+## Investigation
+
+The rewriter implementation lives in
+`tools/clang/tools/libclang/dxcrewriteunused.cpp`. There are three relevant
+output paths:
+
+1. `DoRewriteUnused` (called by the `-remove-unused-globals` API path), which
+   ends in `tu->print(o, p)`.
+2. `DoSimpleReWrite` (used by `RewriteUnchanged`,
+   `RewriteUnchangedWithInclude`, and `RewriteWithOptions`), which also ends
+   in `tu->print(o, p)` (with variants for entry-point uniform extraction and
+   differentials).
+3. `DoReWriteWithLineDirective` (used only when
+   `opts.RWOpt.WithLineDirective` is set), which goes through a separate
+   `Rewriter` + preprocessor pipeline.
+
+The first two paths call `TranslationUnitDecl::print`, which iterates every
+top-level decl in the TU, including decls created while parsing `#include`d
+files. The `WithLineDirective` path uses the source-level rewriter; it
+preserves include contents intentionally (its emitted `#line` markers point
+back to the original headers), so changing that mode would risk regressing
+behavior its callers rely on. I scoped this fix to the "simple" rewrite
+paths used by the public `IDxcRewriter` APIs and the `dxr` lit smoke test.
+
+## Approach considered
+
+1. **Filter at print time** by iterating decls and calling a custom printer
+   that skips non-main-file decls. This requires duplicating logic from
+   `DeclPrinter` because the public `tu->print` entry point doesn't accept a
+   per-decl filter, and `DeclPrinter` itself is internal.
+2. **Remove non-main-file decls from the TU** via `tu->removeDecl`. This
+   mutates the AST in a heavyweight way (lookup tables, etc.) and risks
+   asserting if a decl is also present in identifier lookup.
+3. **Mark non-main-file top-level decls as implicit** before printing.
+   `DeclPrinter::printDeclContext` already skips decls where
+   `D->isImplicit()` returns true, and the existing code in
+   `PrintTranslationUnitWithTranslatedUniformParams` uses exactly this trick
+   to hide the entry function temporarily.
+
+Option (3) is the smallest, most surgical change, matches an existing pattern
+in the file, and does not perturb AST lookup. I used
+`SourceManager::isWrittenInMainFile` rather than `isInMainFile` because we
+want to filter purely on the actual buffer the decl was parsed from, not on
+`#line` directives.
+
+## Implementation
+
+* Added a `HideIncludedDecls(TranslationUnitDecl *)` helper in
+  `dxcrewriteunused.cpp` that walks `tu->decls()`, skips decls that are
+  already implicit, and calls `setImplicit(true)` on any decl whose location
+  is invalid or not written in the main file.
+* Called the helper in `DoRewriteUnused` (right before its `tu->print`) and
+  in `DoSimpleReWrite` (right before its branching between entry-point
+  translation, differentials, and plain `tu->print`).
+
+## Test updates
+
+* `tools/clang/test/HLSL/rewriter/correct_rewrites/includes_gold.hlsl` and
+  `..._gold_nobody.hlsl`: regenerated to no longer contain the included
+  `includedFunc{,2,3}` declarations.
+* `tools/clang/test/DXC/dxr_test.test`: this lit test previously asserted
+  the presence of `int f2(int g)`, which came from the included header
+  `inc2.hlsli`. Updated to assert that `main` is present and that the unused
+  global plus the included function decls are *not* present.
+* `tools/clang/unittests/HLSL/RewriterTest.cpp`: added a new test
+  `RewriterTest::RunIncludeNotDumped` that runs the rewriter on
+  `rewriter/includes.hlsl` and asserts both the positive (main-file decls
+  present) and the negative (included decls absent) properties of the
+  output.
+
+## Commit breakdown
+
+1. `[rewriter] Do not emit decls from included headers` — source change only.
+2. `[rewriter][tests] Update gold files for include suppression` — test
+   fixture updates needed for the new behavior.
+3. `[rewriter][tests] Add unit test for include-not-dumped behavior` — new
+   unit test that pins down the contract.
+4. `[rewriter] Record agent thought process` — this file.
+
+## Verification
+
+Configured with `cmake -G Ninja -C cmake/caches/PredefinedParams.cmake` and
+built. Ran `ninja check-all`:
+
+```
+Expected Passes    : 4610
+Expected Failures  : 9
+Unsupported Tests  : 33
+```
+
+Ran `ClangHLSLTests --gtest_filter='RewriterTest.*'`: all 38 tests pass,
+including the newly added `RunIncludeNotDumped`.
