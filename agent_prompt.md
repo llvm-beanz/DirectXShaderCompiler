@@ -18,9 +18,5 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-I'd like to be able to apply the no_diff attribute to a specific call
-expression. For example:
-
-```
-float val = x - [[dxc::no_diff]] floor(uv); // only applies to the floor call
-```
+The current rewriter is dumping the contents of included headers into the
+output. Please make it not do that.
