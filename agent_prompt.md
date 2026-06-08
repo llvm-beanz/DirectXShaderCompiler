@@ -18,5 +18,20 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-The current rewriter is dumping the contents of included headers into the
-output. Please make it not do that.
+If I apply the `[[dxc::no_diff]]` attribute to a variable all uses of that
+variable should be treated as `no_diff`. For example:
+
+```
+[[dxc::no_diff]] float x0 = floor(loc.x);
+if (x0 < 0)
+  x0 += 2;
+```
+
+When I run the rewriter this should generate autodiff code exactly matching the
+input:
+
+```
+[[dxc::no_diff]] float x0 = floor(loc.x);
+if (x0 < 0)
+  x0 += 2;
+```
