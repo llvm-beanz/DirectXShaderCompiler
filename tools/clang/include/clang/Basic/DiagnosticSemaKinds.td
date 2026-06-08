@@ -6368,9 +6368,11 @@ def warn_side_effects_unevaluated_context : Warning<
 def warn_side_effects_typeid : Warning<
   "expression with side effects will be evaluated despite being used as an "
   "operand to 'typeid'">, InGroup<PotentiallyEvaluatedExpression>;
-def warn_unused_result : Warning<
-  "ignoring return value of function declared with warn_unused_result "
-  "attribute">, InGroup<DiagGroup<"unused-result">>;
+// HLSL Change Begin - allow attribute spelling to come in.
+def warn_unused_result
+    : Warning<"ignoring return value of function declared with %0 attribute">,
+      InGroup<DiagGroup<"unused-result">>;
+// HLSL Change End
 def warn_unused_volatile : Warning<
   "expression result unused; assign into a variable to force a volatile load">,
   InGroup<DiagGroup<"unused-volatile-lvalue">>;
@@ -8063,6 +8065,13 @@ def err_hlsl_linalg_unsupported_stage : Error<
 
 def err_hlsl_pointers_unsupported : Error<
   "%select{pointers|references}0 are unsupported in HLSL">;
+
+def err_hlsl_auto_descriptor_heap : Error<
+  "'auto' cannot deduce the type of '%select{ResourceDescriptorHeap|SamplerDescriptorHeap}0'; "
+  "use a specific resource or sampler type instead">;
+
+def err_hlsl_auto_undeducible_type : Error<
+  "'auto' cannot deduce type %0">;
 
 // HLSL Change Ends
 

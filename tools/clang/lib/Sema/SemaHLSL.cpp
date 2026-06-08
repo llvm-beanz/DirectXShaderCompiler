@@ -1170,12 +1170,14 @@ static const ArBasicKind g_RayQueryCT[] = {AR_OBJECT_RAY_QUERY,
                                            AR_BASIC_UNKNOWN};
 
 static const ArBasicKind g_LinAlgCT[] = {
+    AR_BASIC_LITERAL_FLOAT, AR_BASIC_FLOAT16,
     AR_BASIC_FLOAT32,       AR_BASIC_FLOAT32_PARTIAL_PRECISION,
-    AR_BASIC_FLOAT16,       AR_BASIC_INT32,
-    AR_BASIC_INT16,         AR_BASIC_UINT32,
-    AR_BASIC_UINT16,        AR_BASIC_INT8_4PACKED,
-    AR_BASIC_UINT8_4PACKED, AR_BASIC_NOCAST,
-    AR_BASIC_UNKNOWN};
+    AR_BASIC_FLOAT64,       AR_BASIC_LITERAL_INT,
+    AR_BASIC_UINT16,        AR_BASIC_UINT32,
+    AR_BASIC_UINT64,        AR_BASIC_INT16,
+    AR_BASIC_INT32,         AR_BASIC_INT64,
+    AR_BASIC_UINT8_4PACKED, AR_BASIC_INT8_4PACKED,
+    AR_BASIC_NOCAST,        AR_BASIC_UNKNOWN};
 
 static const ArBasicKind g_AccelerationStructCT[] = {
     AR_OBJECT_ACCELERATION_STRUCT, AR_BASIC_UNKNOWN};
@@ -3005,6 +3007,7 @@ StartSubobjectDecl(ASTContext &context, const char *name,
       NoLoc, &id, nullptr, DelayTypeCreationTrue);
   decl->addAttr(HLSLSubObjectAttr::CreateImplicit(
       context, static_cast<unsigned>(Kind), static_cast<unsigned>(HGT)));
+  decl->addAttr(HLSLNonAutoDeducibleAttr::CreateImplicit(context));
   decl->addAttr(FinalAttr::CreateImplicit(context, FinalAttr::Keyword_final));
   decl->startDefinition();
   return decl;
@@ -3526,6 +3529,8 @@ private:
                               &m_context->Idents.get(StringRef(type1Name)));
     sampleSliceTypeDecl->setAccess(AS_public);
     sampleSliceTypeDecl->setImplicit();
+    sampleSliceTypeDecl->addAttr(
+        HLSLNonAutoDeducibleAttr::CreateImplicit(*m_context));
     recordDecl->addDecl(sampleSliceTypeDecl);
     sampleSliceTypeDecl->startDefinition();
     const bool MutableFalse = false;
@@ -3554,6 +3559,8 @@ private:
     recordDecl->addDecl(sampleTypeDecl);
     sampleTypeDecl->startDefinition();
     sampleTypeDecl->setImplicit();
+    sampleTypeDecl->addAttr(
+        HLSLNonAutoDeducibleAttr::CreateImplicit(*m_context));
 
     FieldDecl *sampleHandleDecl = FieldDecl::Create(
         *m_context, sampleTypeDecl, NoLoc, NoLoc,
@@ -4769,6 +4776,26 @@ public:
       type = GetTypeElementType(arrayType->getElementType());
     }
     return type;
+  }
+
+  bool IsTypeDeducibleWithAuto(QualType type) {
+    if (type.isNull())
+      return false;
+
+    if (hlsl::IsStringType(type) || hlsl::IsStringLiteralType(type))
+      return false;
+
+    if (const CXXRecordDecl *recordDecl =
+            GetStructuralForm(type)->getAsCXXRecordDecl()) {
+      if (!recordDecl->hasAttr<HLSLNonAutoDeducibleAttr>())
+        if (const CXXRecordDecl *pattern =
+                recordDecl->getTemplateInstantiationPattern())
+          recordDecl = pattern;
+      if (recordDecl->hasAttr<HLSLNonAutoDeducibleAttr>())
+        return false;
+    }
+
+    return true;
   }
 
   /// <summary>Given a Clang type, return the ArBasicKind classification for its
@@ -12783,6 +12810,10 @@ bool hlsl::DiagnoseTypeElements(Sema &S, SourceLocation Loc, QualType Ty,
   llvm::SmallPtrSet<const RecordDecl *, 8> CheckedDecls;
   return DiagnoseElementTypes(S, Loc, Ty, Empty, ObjDiagContext,
                               LongVecDiagContext, CheckedDecls, FD);
+}
+
+bool hlsl::IsTypeDeducibleWithAuto(Sema &S, QualType Ty) {
+  return HLSLExternalSource::FromSema(&S)->IsTypeDeducibleWithAuto(Ty);
 }
 
 bool hlsl::DiagnoseNodeStructArgument(Sema *self, TemplateArgumentLoc ArgLoc,
