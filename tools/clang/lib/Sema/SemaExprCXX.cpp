@@ -4294,25 +4294,7 @@ static bool EvaluateBinaryTypeTrait(Sema &Self, TypeTrait BTT, QualType LhsT,
     if (!RhsT->isIncompleteType())
       Self.RequireCompleteType(KeyLoc, RhsT,
                                diag::err_incomplete_type_used_in_type_trait_expr);
-    if (hlsl::IsHLSLIntangibleType(LhsT) || hlsl::IsHLSLIntangibleType(RhsT))
-      return false;
-    llvm::SmallVector<QualType, 8> LhsLeaves;
-    llvm::SmallVector<QualType, 8> RhsLeaves;
-    hlsl::GetHLSLFlattenedScalarTypes(LhsT, LhsLeaves);
-    hlsl::GetHLSLFlattenedScalarTypes(RhsT, RhsLeaves);
-    if (LhsLeaves.size() != RhsLeaves.size() || LhsLeaves.empty())
-      return false;
-    for (unsigned I = 0, N = LhsLeaves.size(); I != N; ++I) {
-      QualType L = LhsLeaves[I];
-      QualType R = RhsLeaves[I];
-      if (Self.Context.hasSameUnqualifiedType(L, R))
-        continue;
-      // Allow any pair of arithmetic scalar types.
-      if (L->isArithmeticType() && R->isArithmeticType())
-        continue;
-      return false;
-    }
-    return true;
+    return hlsl::IsHLSLScalarLayoutCompatible(Self, LhsT, RhsT);
   }
   case BTT_TypeCompatible:
     return Self.Context.typesAreCompatible(LhsT.getUnqualifiedType(),

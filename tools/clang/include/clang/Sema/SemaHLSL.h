@@ -145,6 +145,13 @@ GetBestViableFunction(clang::Sema &S, clang::SourceLocation Loc,
 bool ShouldSkipNRVO(clang::Sema &sema, clang::QualType returnType,
                     clang::VarDecl *VD, clang::FunctionDecl *FD);
 
+/// <summary>Returns true if Lhs and Rhs have the same scalar layout: i.e.,
+/// flattening both into their leaf scalar types yields sequences of equal
+/// (non-zero) length whose corresponding entries are either the same type
+/// or both arithmetic. Intangible operands are never compatible.</summary>
+bool IsHLSLScalarLayoutCompatible(clang::Sema &S, clang::QualType Lhs,
+                                  clang::QualType Rhs);
+
 /// <summary>Processes an attribute for a declaration.</summary>
 /// <param name="S">Sema with context.</param>
 /// <param name="D">Annotated declaration.</param>

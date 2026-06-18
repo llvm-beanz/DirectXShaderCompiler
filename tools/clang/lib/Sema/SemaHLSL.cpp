@@ -13826,6 +13826,49 @@ FlattenedTypeIterator::CompareTypesForInit(HLSLExternalSource &source,
   return CompareIterators(source, leftLoc, leftIter, rightIter);
 }
 
+namespace hlsl {
+
+bool IsHLSLScalarLayoutCompatible(clang::Sema &S, clang::QualType Lhs,
+                                  clang::QualType Rhs) {
+  if (Lhs.isNull() || Rhs.isNull())
+    return false;
+  // Intangible types (resources, node objects, etc.) have no scalar layout.
+  if (IsHLSLIntangibleType(Lhs) || IsHLSLIntangibleType(Rhs))
+    return false;
+
+  HLSLExternalSource *source = HLSLExternalSource::FromSema(&S);
+  FlattenedTypeIterator LhsIter(SourceLocation(), Lhs, *source);
+  FlattenedTypeIterator RhsIter(SourceLocation(), Rhs, *source);
+
+  bool Empty = true;
+  while (LhsIter.hasCurrentElement() && RhsIter.hasCurrentElement()) {
+    Empty = false;
+    QualType L = LhsIter.getCurrentElement();
+    QualType R = RhsIter.getCurrentElement();
+    unsigned LCount = LhsIter.getCurrentElementSize();
+    unsigned RCount = RhsIter.getCurrentElementSize();
+
+    // Per-element type compatibility: same unqualified type, or both
+    // arithmetic.
+    if (!S.Context.hasSameUnqualifiedType(L, R) &&
+        !(L->isArithmeticType() && R->isArithmeticType()))
+      return false;
+
+    // Consume one element from whichever run is shorter and recheck.
+    unsigned Step = std::min(LCount, RCount);
+    LhsIter.advanceCurrentElement(Step);
+    RhsIter.advanceCurrentElement(Step);
+  }
+
+  // Compatible only if both iterators were exhausted together and produced
+  // at least one scalar.
+  if (LhsIter.hasCurrentElement() || RhsIter.hasCurrentElement())
+    return false;
+  return !Empty;
+}
+
+} // namespace hlsl
+
 ////////////////////////////////////////////////////////////////////////////////
 // Attribute processing support.                                              //
 

@@ -545,61 +545,6 @@ bool IsHLSLIntangibleType(clang::QualType type) {
   return !IsHLSLNumericOrAggregateOfNumericType(type);
 }
 
-// Recursively flattens the type into a sequence of scalar leaf types. Walks
-// arrays, vectors, matrices, and record types in declaration order.
-void GetHLSLFlattenedScalarTypes(clang::QualType type,
-                                 llvm::SmallVectorImpl<clang::QualType> &out) {
-  if (type.isNull())
-    return;
-  type = type.getCanonicalType().getUnqualifiedType();
-
-  // Arrays: recurse N times for the element type.
-  while (const ArrayType *AT = type->getAsArrayTypeUnsafe()) {
-    uint64_t count = 1;
-    if (const ConstantArrayType *CAT = dyn_cast<ConstantArrayType>(AT))
-      count = CAT->getSize().getLimitedValue();
-    QualType ET = AT->getElementType();
-    for (uint64_t i = 0; i < count; ++i)
-      GetHLSLFlattenedScalarTypes(ET, out);
-    return;
-  }
-
-  // Vectors and matrices: expand into element count copies of the element type.
-  if (IsHLSLVecType(type)) {
-    QualType ET = GetHLSLVecElementType(type);
-    uint32_t N = GetHLSLVecSize(type);
-    for (uint32_t i = 0; i < N; ++i)
-      GetHLSLFlattenedScalarTypes(ET, out);
-    return;
-  }
-  if (IsHLSLMatType(type)) {
-    QualType ET = GetHLSLMatElementType(type);
-    uint32_t R = 0, C = 0;
-    GetHLSLMatRowColCount(type, R, C);
-    for (uint32_t i = 0; i < R * C; ++i)
-      GetHLSLFlattenedScalarTypes(ET, out);
-    return;
-  }
-
-  if (const RecordType *RT = type->getAs<RecordType>()) {
-    const RecordDecl *RD = RT->getDecl();
-    if (const CXXRecordDecl *CXXRD = dyn_cast<CXXRecordDecl>(RD)) {
-      if (CXXRD->hasDefinition()) {
-        for (const CXXBaseSpecifier &Base : CXXRD->bases())
-          GetHLSLFlattenedScalarTypes(Base.getType(), out);
-      }
-    }
-    if (RD->isCompleteDefinition()) {
-      for (const FieldDecl *FD : RD->fields())
-        GetHLSLFlattenedScalarTypes(FD->getType(), out);
-    }
-    return;
-  }
-
-  // Treat everything else as a single scalar leaf.
-  out.push_back(type);
-}
-
 DXIL::NodeIOKind GetNodeIOType(clang::QualType type) {
   if (const HLSLNodeObjectAttr *Attr = getAttr<HLSLNodeObjectAttr>(type))
     return Attr->getNodeIOType();

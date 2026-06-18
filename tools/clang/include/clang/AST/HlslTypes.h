@@ -481,8 +481,6 @@ bool IsHLSLTriangleStreamType(clang::QualType type);
 bool IsHLSLStreamOutputType(clang::QualType type);
 bool IsHLSLResourceType(clang::QualType type);
 bool IsHLSLIntangibleType(clang::QualType type);
-void GetHLSLFlattenedScalarTypes(clang::QualType type,
-                                 llvm::SmallVectorImpl<clang::QualType> &out);
 bool IsHLSLNodeInputType(clang::QualType type);
 bool IsHLSLDynamicResourceType(clang::QualType type);
 bool IsHLSLDynamicSamplerType(clang::QualType type);
