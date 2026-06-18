@@ -25,6 +25,7 @@
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 
@@ -479,6 +480,9 @@ bool IsHLSLLineStreamType(clang::QualType type);
 bool IsHLSLTriangleStreamType(clang::QualType type);
 bool IsHLSLStreamOutputType(clang::QualType type);
 bool IsHLSLResourceType(clang::QualType type);
+bool IsHLSLIntangibleType(clang::QualType type);
+void GetHLSLFlattenedScalarTypes(clang::QualType type,
+                                 llvm::SmallVectorImpl<clang::QualType> &out);
 bool IsHLSLNodeInputType(clang::QualType type);
 bool IsHLSLDynamicResourceType(clang::QualType type);
 bool IsHLSLDynamicSamplerType(clang::QualType type);

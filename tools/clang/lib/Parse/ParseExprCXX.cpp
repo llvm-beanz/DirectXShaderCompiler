@@ -2960,14 +2960,19 @@ static unsigned TypeTraitArity(tok::TokenKind kind) {
 ///          type-id ...[opt] type-id-seq[opt]
 ///
 ExprResult Parser::ParseTypeTrait() {
-  // HLSL Change Starts
+  // HLSL Change Starts: only a small allow-list of HLSL-specific type traits
+  // is supported in HLSL mode. Reject all other type traits.
   if (getLangOpts().HLSL) {
-    Diag(Tok, diag::err_hlsl_unsupported_construct) << Tok.getName();
-    ConsumeToken();
-    BalancedDelimiterTracker p(*this, tok::l_paren);
-    if (!p.expectAndConsume())
-      p.skipToEnd();
-    return ExprError();
+    tok::TokenKind K = Tok.getKind();
+    if (K != tok::kw___is_intangible &&
+        K != tok::kw___is_scalar_layout_compatible) {
+      Diag(Tok, diag::err_hlsl_unsupported_construct) << Tok.getName();
+      ConsumeToken();
+      BalancedDelimiterTracker p(*this, tok::l_paren);
+      if (!p.expectAndConsume())
+        p.skipToEnd();
+      return ExprError();
+    }
   }
   // HLSL Change Ends
   tok::TokenKind Kind = Tok.getKind();

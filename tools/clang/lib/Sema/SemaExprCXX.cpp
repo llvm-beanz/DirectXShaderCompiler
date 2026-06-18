@@ -22,6 +22,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
+#include "clang/AST/HlslTypes.h" // HLSL Change
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/PartialDiagnostic.h"
@@ -3646,6 +3647,7 @@ static bool CheckUnaryTypeTraitTypeCompleteness(Sema &S, TypeTrait UTT,
   case UTT_IsPolymorphic:
   case UTT_IsAbstract:
   case UTT_IsInterfaceClass:
+  case UTT_IsIntangible:
   case UTT_IsDestructible:
   case UTT_IsNothrowDestructible:
     // Fall-through
@@ -3831,6 +3833,9 @@ static bool EvaluateUnaryTypeTrait(Sema &Self, TypeTrait UTT,
       if (FinalAttr *FA = RD->getAttr<FinalAttr>())
         return FA->isSpelledAsSealed();
     return false;
+  case UTT_IsIntangible:
+    // HLSL Change: __is_intangible
+    return hlsl::IsHLSLIntangibleType(T);
   case UTT_IsSigned:
     return T->isSignedIntegerType();
   case UTT_IsUnsigned:
@@ -4279,6 +4284,36 @@ static bool EvaluateBinaryTypeTrait(Sema &Self, TypeTrait BTT, QualType LhsT,
   }
   case BTT_IsSame:
     return Self.Context.hasSameType(LhsT, RhsT);
+  case BTT_IsScalarLayoutCompatible: {
+    // HLSL Change: __is_scalar_layout_compatible
+    // Both types must be complete (or void/incomplete array, which yields
+    // empty flattenings).
+    if (!LhsT->isIncompleteType())
+      Self.RequireCompleteType(KeyLoc, LhsT,
+                               diag::err_incomplete_type_used_in_type_trait_expr);
+    if (!RhsT->isIncompleteType())
+      Self.RequireCompleteType(KeyLoc, RhsT,
+                               diag::err_incomplete_type_used_in_type_trait_expr);
+    if (hlsl::IsHLSLIntangibleType(LhsT) || hlsl::IsHLSLIntangibleType(RhsT))
+      return false;
+    llvm::SmallVector<QualType, 8> LhsLeaves;
+    llvm::SmallVector<QualType, 8> RhsLeaves;
+    hlsl::GetHLSLFlattenedScalarTypes(LhsT, LhsLeaves);
+    hlsl::GetHLSLFlattenedScalarTypes(RhsT, RhsLeaves);
+    if (LhsLeaves.size() != RhsLeaves.size() || LhsLeaves.empty())
+      return false;
+    for (unsigned I = 0, N = LhsLeaves.size(); I != N; ++I) {
+      QualType L = LhsLeaves[I];
+      QualType R = RhsLeaves[I];
+      if (Self.Context.hasSameUnqualifiedType(L, R))
+        continue;
+      // Allow any pair of arithmetic scalar types.
+      if (L->isArithmeticType() && R->isArithmeticType())
+        continue;
+      return false;
+    }
+    return true;
+  }
   case BTT_TypeCompatible:
     return Self.Context.typesAreCompatible(LhsT.getUnqualifiedType(),
                                            RhsT.getUnqualifiedType());
