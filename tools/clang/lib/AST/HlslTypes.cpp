@@ -532,60 +532,17 @@ bool IsHLSLHitObjectType(QualType type) {
   return nullptr != getAttr<HLSLHitObjectAttr>(type);
 }
 
-// Returns true if the type is, or recursively contains, an HLSL type whose
-// in-memory layout/size is not known to the front-end and which therefore
-// cannot be stored in a resource or groupshared memory. This includes HLSL
-// resource types, node-record/input/output types, hit object and ray query
-// types, and dynamic resource/sampler handles. Aggregates that transitively
-// contain such types are also intangible.
+// A type is intangible if it is not, and does not recursively contain, a
+// type whose in-memory layout is known to the front-end. This is the exact
+// negation of IsHLSLNumericOrAggregateOfNumericType: numeric scalars,
+// vectors, matrices, enums, arrays of those, and user-defined records
+// whose bases and fields are all numeric form the "tangible" set; HLSL
+// resources, node objects, ray queries, hit objects, dynamic resources
+// and any aggregate that transitively contains them are intangible.
 bool IsHLSLIntangibleType(clang::QualType type) {
   if (type.isNull())
     return false;
-  // Strip qualifiers and arrays.
-  type = type.getCanonicalType().getUnqualifiedType();
-  while (const ArrayType *AT = type->getAsArrayTypeUnsafe()) {
-    type = AT->getElementType().getCanonicalType().getUnqualifiedType();
-  }
-
-  if (IsHLSLResourceType(type))
-    return true;
-  if (IsHLSLNodeType(type))
-    return true;
-  if (IsHLSLNodeRecordArrayType(type))
-    return true;
-  if (IsHLSLHitObjectType(type))
-    return true;
-  if (IsHLSLRayQueryType(type))
-    return true;
-  if (IsHLSLDynamicResourceType(type))
-    return true;
-  if (IsHLSLDynamicSamplerType(type))
-    return true;
-
-  // Vector and matrix types are never intangible: their element types must
-  // already be numeric.
-  if (IsHLSLVecMatType(type))
-    return false;
-
-  // Recurse into record types looking for intangible fields or bases.
-  if (const RecordType *RT = type->getAs<RecordType>()) {
-    const RecordDecl *RD = RT->getDecl();
-    if (const CXXRecordDecl *CXXRD = dyn_cast<CXXRecordDecl>(RD)) {
-      if (CXXRD->hasDefinition()) {
-        for (const CXXBaseSpecifier &Base : CXXRD->bases()) {
-          if (IsHLSLIntangibleType(Base.getType()))
-            return true;
-        }
-      }
-    }
-    if (RD->isCompleteDefinition()) {
-      for (const FieldDecl *FD : RD->fields()) {
-        if (IsHLSLIntangibleType(FD->getType()))
-          return true;
-      }
-    }
-  }
-  return false;
+  return !IsHLSLNumericOrAggregateOfNumericType(type);
 }
 
 // Recursively flattens the type into a sequence of scalar leaf types. Walks
