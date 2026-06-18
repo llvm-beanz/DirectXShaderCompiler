@@ -81,3 +81,54 @@ Unsupported Tests  : 33
 ```
 
 No new failures were introduced.
+
+## Follow-up: unifying the type predicates and reusing FlattenedTypeIterator
+
+A code review pointed out two duplications worth fixing as small NFC
+commits.
+
+### `IsHLSLIntangibleType` vs `IsHLSLNumericOrAggregateOfNumericType`
+
+These are the two halves of the same partition: a type either has a
+front-end-known scalar layout (numeric scalar, vector, matrix, enum, an
+array of those, or a user-defined record made up of those) or it
+doesn't (resources, node objects, ray queries, hit objects, dynamic
+resources, or aggregates that transitively contain them). Walking both
+sets independently invites them to drift out of sync — e.g., a future
+intangible-like type added to one walker but forgotten in the other
+would silently mis-classify.
+
+I collapsed `IsHLSLIntangibleType` down to
+`return !IsHLSLNumericOrAggregateOfNumericType(type)` (with a null
+guard preserved for the existing callers). The existing
+`IsHLSLCopyableAnnotatableRecord` body that
+`IsHLSLNumericOrAggregateOfNumericType` calls already does the same
+field-and-base walk that the old hand-written intangible recursion
+did, so the behavior on every "real" HLSL type — and on every test in
+`is-intangible.hlsl` — is unchanged. The behavior on degenerate
+non-HLSL types (function types, `signed char`) shifts to "intangible",
+which matches the trait's intent (anything not flattenable to a
+numeric scalar sequence).
+
+### `__is_scalar_layout_compatible` and `FlattenedTypeIterator`
+
+`GetHLSLFlattenedScalarTypes` was a second flattener that produced a
+`SmallVector<QualType>` of leaves. SemaHLSL already has the canonical
+walker — `FlattenedTypeIterator` — which is what overload resolution
+and initialization use to compare aggregates. Maintaining a parallel
+one is exactly the duplication the prompt called out.
+
+I added `hlsl::IsHLSLScalarLayoutCompatible(Sema&, QualType, QualType)`
+in `SemaHLSL.h`, implemented in `SemaHLSL.cpp` next to the iterator
+class so it has access to `HLSLExternalSource`. The implementation
+constructs two iterators, advances them in lockstep with
+`getCurrentElementSize()` runs (so an `int[1000]` doesn't cost 1000
+iterations), and accepts each step if the element types are the same
+or both arithmetic. Intangible operands are still rejected up front.
+`GetHLSLFlattenedScalarTypes` and its header declaration are deleted.
+
+`SemaExprCXX.cpp` now just calls the helper. The
+`is-scalar-layout-compatible.hlsl` test continues to pass unchanged
+and `ninja check-all` reports the same
+4630 / 9 / 33 numbers as before.
+
