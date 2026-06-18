@@ -10772,7 +10772,20 @@ TreeTransform<Derived>::TransformBlockExpr(BlockExpr *E) {
 template<typename Derived>
 ExprResult
 TreeTransform<Derived>::TransformAsTypeExpr(AsTypeExpr *E) {
-  llvm_unreachable("Cannot transform asType expressions yet");
+  // HLSL Change: needed so the hlsl::bit_cast template (and any future
+  // user of AsTypeExpr inside templates) can be instantiated.
+  QualType RetTy = getDerived().TransformType(E->getType());
+  ExprResult Src = getDerived().TransformExpr(E->getSrcExpr());
+  if (Src.isInvalid())
+    return ExprError();
+  if (!getDerived().AlwaysRebuild() && RetTy == E->getType() &&
+      Src.get() == E->getSrcExpr())
+    return E;
+  // Rebuild via the HLSL bit_cast action so size/intangible checks fire on
+  // the substituted types.
+  return SemaRef.ActOnHLSLBuiltinBitCast(
+      E->getBuiltinLoc(), SemaRef.CreateParsedType(RetTy, nullptr),
+      Src.get(), E->getRParenLoc());
 }
 
 template<typename Derived>

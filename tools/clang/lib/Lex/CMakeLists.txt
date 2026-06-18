@@ -40,6 +40,7 @@ set(generate_embedded_headers_script
     "${LLVM_MAIN_SRC_DIR}/utils/generate_hlsl_embedded_headers.py")
 
 set(hlsl_embedded_inputs
+    bit_cast.h
     enable_if.h
     vector_utils.h
     dx/linalg.h
