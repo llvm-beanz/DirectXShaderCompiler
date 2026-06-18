@@ -5162,6 +5162,70 @@ ExprResult Sema::ActOnAsTypeExpr(Expr *E, ParsedType ParsedDestTy,
   return new (Context) AsTypeExpr(E, DstTy, VK, OK, BuiltinLoc, RParenLoc);
 }
 
+/// ActOnHLSLBuiltinBitCast - HLSL bit_cast primitive.
+///
+///   __builtin_bit_cast( destination-type, source-expression )
+///
+/// Requires the destination type and the source expression's type to have
+/// the same size and to be non-intangible. Produces an rvalue of the
+/// destination type that preserves the bit pattern of the source.
+ExprResult Sema::ActOnHLSLBuiltinBitCast(SourceLocation BuiltinLoc,
+                                         ParsedType ParsedDestTy, Expr *E,
+                                         SourceLocation RParenLoc) {
+  QualType DstTy = GetTypeFromParser(ParsedDestTy);
+  QualType SrcTy = E->getType();
+
+  // Defer all checks for dependent operands until instantiation.
+  if (DstTy->isDependentType() || SrcTy->isDependentType()) {
+    return new (Context) AsTypeExpr(
+        E, DstTy, Expr::getValueKindForType(DstTy), OK_Ordinary, BuiltinLoc,
+        RParenLoc);
+  }
+
+  if (RequireCompleteType(BuiltinLoc, DstTy,
+                          diag::err_incomplete_type_used_in_type_trait_expr))
+    return ExprError();
+  if (!SrcTy->isIncompleteType() &&
+      RequireCompleteType(BuiltinLoc, SrcTy,
+                          diag::err_incomplete_type_used_in_type_trait_expr))
+    return ExprError();
+
+  if (hlsl::IsHLSLIntangibleType(DstTy))
+    return ExprError(
+        Diag(BuiltinLoc, diag::err_hlsl_bit_cast_intangible) << DstTy);
+  if (hlsl::IsHLSLIntangibleType(SrcTy))
+    return ExprError(
+        Diag(BuiltinLoc, diag::err_hlsl_bit_cast_intangible) << SrcTy);
+
+  uint64_t SrcBits = Context.getTypeSize(SrcTy);
+  uint64_t DstBits = Context.getTypeSize(DstTy);
+  if (SrcBits != DstBits) {
+    Diag(BuiltinLoc, diag::err_hlsl_bit_cast_size_mismatch)
+        << SrcTy << (unsigned)SrcBits << DstTy << (unsigned)DstBits
+        << E->getSourceRange();
+    return ExprError();
+  }
+
+  // Currently only scalar and HLSL vector types are supported by the
+  // underlying AsTypeExpr codegen. Reject other shapes (matrices, records,
+  // arrays) with a clear diagnostic.
+  auto IsScalarOrVec = [&](QualType T) -> bool {
+    if (T->isArithmeticType())
+      return true;
+    if (hlsl::IsHLSLVecType(T))
+      return true;
+    return false;
+  };
+  if (!IsScalarOrVec(SrcTy) || !IsScalarOrVec(DstTy)) {
+    Diag(BuiltinLoc, diag::err_hlsl_bit_cast_unsupported_type)
+        << (IsScalarOrVec(SrcTy) ? DstTy : SrcTy);
+    return ExprError();
+  }
+
+  return new (Context)
+      AsTypeExpr(E, DstTy, VK_RValue, OK_Ordinary, BuiltinLoc, RParenLoc);
+}
+
 /// ActOnConvertVectorExpr - create a new convert-vector expression from the
 /// provided arguments.
 ///

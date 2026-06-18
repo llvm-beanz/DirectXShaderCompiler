@@ -1084,6 +1084,30 @@ HLSLReservedKeyword:
   case tok::kw___builtin_convertvector:
     if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - not supported
     return ParseBuiltinPrimaryExpression();
+  case tok::kw___builtin_bit_cast: { // HLSL Change: __builtin_bit_cast(T, expr)
+    SourceLocation BuiltinLoc = ConsumeToken();
+    BalancedDelimiterTracker PT(*this, tok::l_paren);
+    if (PT.expectAndConsume(diag::err_expected_lparen_after, "__builtin_bit_cast"))
+      return ExprError();
+    TypeResult Ty = ParseTypeName();
+    if (Ty.isInvalid()) {
+      PT.skipToEnd();
+      return ExprError();
+    }
+    if (ExpectAndConsume(tok::comma)) {
+      PT.skipToEnd();
+      return ExprError();
+    }
+    ExprResult Operand(ParseAssignmentExpression());
+    if (Operand.isInvalid()) {
+      PT.skipToEnd();
+      return ExprError();
+    }
+    if (PT.consumeClose())
+      return ExprError();
+    return Actions.ActOnHLSLBuiltinBitCast(BuiltinLoc, Ty.get(), Operand.get(),
+                                           PT.getCloseLocation());
+  }
   case tok::kw___null:
     if (getLangOpts().HLSL) { goto HLSLReservedKeyword; } // HLSL Change - not supported
     return Actions.ActOnGNUNullExpr(ConsumeToken());

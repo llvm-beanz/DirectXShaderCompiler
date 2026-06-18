@@ -4084,6 +4084,12 @@ public:
                              SourceLocation BuiltinLoc,
                              SourceLocation RParenLoc);
 
+  /// HLSL __builtin_bit_cast(DestType, expr) - bit-preserving cast that
+  /// requires matching sizes and non-intangible types.
+  ExprResult ActOnHLSLBuiltinBitCast(SourceLocation BuiltinLoc,
+                                     ParsedType ParsedDestTy, Expr *E,
+                                     SourceLocation RParenLoc);
+
   // HLSL Change Starts
   //===---------------------------- HLSL Features -------------------------===//
 

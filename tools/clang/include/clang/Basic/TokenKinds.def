@@ -523,6 +523,7 @@ ALIAS("technique11", technique      , KEYHLSL)
 // HLSL Change: HLSL-specific type traits.
 TYPE_TRAIT_1(__is_intangible, IsIntangible, KEYHLSL)
 TYPE_TRAIT_2(__is_scalar_layout_compatible, IsScalarLayoutCompatible, KEYHLSL)
+KEYWORD(__builtin_bit_cast          , KEYHLSL)
 
 // OpenCL address space qualifiers
 KEYWORD(__global                    , KEYOPENCL)

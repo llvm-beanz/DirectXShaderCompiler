@@ -7496,6 +7496,13 @@ def err_opencl_constant_no_init : Error<
 let CategoryName = "HLSL Issue" in {
 def err_hlsl_array_element_index_out_of_bounds: Error<
   "array index %0 is out of bounds">;
+def err_hlsl_bit_cast_size_mismatch : Error<
+  "__builtin_bit_cast source type %0 (%1 bits) and destination type %2 (%3 bits) "
+  "must have the same size">;
+def err_hlsl_bit_cast_intangible : Error<
+  "__builtin_bit_cast cannot be used with intangible type %0">;
+def err_hlsl_bit_cast_unsupported_type : Error<
+  "__builtin_bit_cast currently supports only scalar and vector types; got %0">;
 def err_hlsl_attribute_expects_string_literal: Error<
   "attribute %0 must have a string literal argument">;
 def err_hlsl_attribute_expects_string_literal_from_list: Error<
