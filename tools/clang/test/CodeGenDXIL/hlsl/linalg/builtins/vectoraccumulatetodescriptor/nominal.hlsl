@@ -15,5 +15,5 @@ void main() {
   // CHECK2: call void @"dx.hl.op..void (i32, <4 x float>, %dx.types.Handle, i32, i32)"
   // CHECK2-SAME: (i32 423, <4 x float> %{{.*}}, %dx.types.Handle %{{.*}}, i32 16, i32 64)
   float4 vec = {9.0, 8.0, 7.0, 6.0};
-  __builtin_LinAlg_VectorAccumulateToDescriptor(vec, outbuf, 16, 64);
+  hlsl::__builtin_LinAlg_VectorAccumulateToDescriptor(vec, outbuf, 16, 64);
 }
