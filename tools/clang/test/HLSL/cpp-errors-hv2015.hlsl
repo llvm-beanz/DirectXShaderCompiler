@@ -20,7 +20,7 @@ thread_local int g_threadLocal; // expected-error {{expected unqualified-id}} ex
 _Thread_local int g_Thread_local; // expected-error {{'_Thread_local' is a reserved keyword in HLSL}}
 _Alignas(float) int g_Alignas; // expected-error {{'_Alignas' is a reserved keyword in HLSL}}
 alignas(float) int g_alignas; // expected-error {{HLSL requires a type specifier for all declarations}} expected-error {{expected ';' after top level declarator}}
-constexpr int g_constexpr = 3; // expected-error {{expected unqualified-id}} expected-error {{unknown type name 'constexpr'}}
+constexpr int g_constexpr = 3; // expected-error {{'constexpr' is only supported in HLSL 202x or later}}
 friend int f_friend; // expected-error {{'friend' is a reserved keyword in HLSL}}
 
 // Alternate numerics and builtin types.
