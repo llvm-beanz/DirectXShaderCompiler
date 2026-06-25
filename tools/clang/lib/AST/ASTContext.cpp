@@ -8587,8 +8587,11 @@ bool ASTContext::DeclMustBeEmitted(const Decl *D) {
         Linkage == GVA_DiscardableODR)
       return false;
     // HLSL Change Starts
-    // Don't just return true because of visibility, unless building a library
-    return FD->getName() == getLangOpts().HLSLEntryFunction ||
+    // Don't just return true because of visibility, unless building a library.
+    // Operator functions and other non-identifier names cannot match the entry
+    // function name, so guard the comparison.
+    return (FD->getDeclName().isIdentifier() &&
+            FD->getName() == getLangOpts().HLSLEntryFunction) ||
            IsPatchConstantFunctionDecl(FD) || getLangOpts().IsHLSLLibrary;
     // HLSL Change Ends
   }

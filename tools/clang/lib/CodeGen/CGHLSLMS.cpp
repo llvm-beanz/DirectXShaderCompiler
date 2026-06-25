@@ -6188,8 +6188,15 @@ void CGMSHLSLRuntime::EmitHLSLOutParamConversionInit(
     llvm::SmallVector<const Stmt *, 8> &argList,
     llvm::SmallVector<LValue, 8> &lifetimeCleanupList,
     const std::function<void(const VarDecl *, llvm::Value *)> &TmpArgMap) {
-  // Special case: skip first argument of CXXOperatorCall (it is "this").
-  unsigned ArgsToSkip = isa<CXXOperatorCallExpr>(E) ? 1 : 0;
+  // Special case: skip first argument of CXXOperatorCall when the callee is
+  // a non-static member function (the first argument is the implicit object
+  // parameter / "this"). Free (non-member) operator overloads have one
+  // CallExpr argument per FunctionDecl parameter.
+  unsigned ArgsToSkip = 0;
+  if (isa<CXXOperatorCallExpr>(E))
+    if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(FD))
+      if (MD->isInstance())
+        ArgsToSkip = 1;
   llvm::SmallSet<llvm::Value *, 8> ArgVals;
   for (uint32_t i = 0; i < FD->getNumParams(); i++) {
     const ParmVarDecl *Param = FD->getParamDecl(i);

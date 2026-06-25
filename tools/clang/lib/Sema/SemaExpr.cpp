@@ -10970,6 +10970,22 @@ ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
       return BuildOverloadedBinOp(*this, S, OpLoc, Opc, LHSExpr, RHSExpr);
   }
 
+  // HLSL Change: HLSL 202x allows non-member operator overloads for class and
+  // enumeration types. Route through the C++ overload-resolution path so the
+  // lookup considers both member and namespace-scope candidates (including
+  // those found by argument-dependent lookup). Assignment and compound
+  // assignment operators are not overloadable in HLSL, so leave them on the
+  // existing built-in path to preserve HLSL semantics (and to avoid triggering
+  // implicit copy-assignment definition, which relies on C++-only machinery).
+  if (getLangOpts().CPlusPlus && getLangOpts().HLSL &&
+      getLangOpts().HLSLVersion >= hlsl::LangStd::v202x &&
+      !BinaryOperator::isAssignmentOp(Opc) &&
+      (LHSExpr->isTypeDependent() || RHSExpr->isTypeDependent() ||
+       LHSExpr->getType()->isOverloadableType() ||
+       RHSExpr->getType()->isOverloadableType())) {
+    return BuildOverloadedBinOp(*this, S, OpLoc, Opc, LHSExpr, RHSExpr);
+  }
+
   // Build a built-in binary operation.
   return CreateBuiltinBinOp(OpLoc, Opc, LHSExpr, RHSExpr);
 }
@@ -11196,8 +11212,20 @@ static bool isQualifiedMemberAccess(Expr *E) {
 ExprResult Sema::BuildUnaryOp(Scope *S, SourceLocation OpLoc,
                               UnaryOperatorKind Opc, Expr *Input) {
   // HLSL Change Starts - placeholders and overloaded operators not supported
-  if (getLangOpts().HLSL)
-    return CreateBuiltinUnaryOp(OpLoc, Opc, Input);
+  // in HLSL 2021 and earlier. HLSL 202x permits unary operator overloads
+  // for class and enumeration types, both as members and as namespace-scope
+  // declarations, so route those through the C++ overload-resolution path.
+  // Increment/decrement and address-of are not overloadable in HLSL, so they
+  // remain on the built-in path.
+  if (getLangOpts().HLSL) {
+    if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x ||
+        UnaryOperator::isIncrementDecrementOp(Opc) || Opc == UO_AddrOf ||
+        Opc == UO_Deref ||
+        (!Input->isTypeDependent() &&
+         !Input->getType()->isOverloadableType()) ||
+        UnaryOperator::getOverloadedOperator(Opc) == OO_None)
+      return CreateBuiltinUnaryOp(OpLoc, Opc, Input);
+  }
   // HLSL Change Ends
 
   // First things first: handle placeholders so that the

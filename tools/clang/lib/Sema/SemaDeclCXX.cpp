@@ -11655,7 +11655,11 @@ bool Sema::CheckOverloadedOperatorDeclaration(FunctionDecl *FnDecl) {
                   diag::err_hlsl_overloading_operator_disallowed)
              << FnDecl->getDeclName() << 0;
     }
-    if (!isa<CXXMethodDecl>(FnDecl))
+    // HLSL 2021 and earlier do not allow non-member operator overloads.
+    // HLSL 202x lifts that restriction so users may declare global operator
+    // overloads (subject to the disallowed-operator list above).
+    if (!isa<CXXMethodDecl>(FnDecl) &&
+        LangOpts.HLSLVersion < hlsl::LangStd::v202x)
       return Diag(FnDecl->getLocation(),
                   diag::err_hlsl_overloading_operator_disallowed)
              << FnDecl->getDeclName() << 1;
