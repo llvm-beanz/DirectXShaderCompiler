@@ -9314,6 +9314,7 @@ class db_hlsl_intrinsic(object):
         min_shader_model,
         static_member,
         class_prefix,
+        mutable_method,
     ):
         self.name = name  # Function name
         self.idx = idx  # Unique number within namespace
@@ -9361,6 +9362,7 @@ class db_hlsl_intrinsic(object):
                 min_shader_model[1] & 0x0F
             )
         self.static_member = static_member  # HLSL static member function
+        self.mutable_method = mutable_method  # Mutates the object; not callable on const
         self.key = (
             ("%3d" % ns_idx)
             + "!"
@@ -9755,6 +9757,7 @@ class db_hlsl(object):
             readnone = False  # Not read memory
             argmemonly = False  # Only reads memory through pointer arguments
             static_member = False  # Static member function
+            mutable_method = False  # Mutates the object; not callable on const
             is_wave = False
             class_prefix = False  # Insert class name as enum_prefix
             # Is wave-sensitive
@@ -9784,6 +9787,9 @@ class db_hlsl(object):
                     continue
                 if a == "static":
                     static_member = True
+                    continue
+                if a == "mutable":
+                    mutable_method = True
                     continue
                 if a == "class_prefix":
                     class_prefix = True
@@ -9833,6 +9839,7 @@ class db_hlsl(object):
                 min_shader_model,
                 static_member,
                 class_prefix,
+                mutable_method,
             )
 
         current_namespace = None
@@ -9883,6 +9890,7 @@ class db_hlsl(object):
                     min_shader_model,
                     static_member,
                     class_prefix,
+                    mutable_method,
                 ) = process_attr(attr)
                 # Add an entry for this intrinsic.
                 if bracket_cleanup_re.search(opts):
@@ -9926,6 +9934,7 @@ class db_hlsl(object):
                         min_shader_model,
                         static_member,
                         class_prefix,
+                        mutable_method,
                     )
                 )
                 num_entries += 1

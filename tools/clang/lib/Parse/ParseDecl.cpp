@@ -5667,8 +5667,19 @@ void Parser::ParseTypeQualifierListOpt(DeclSpec &DS, unsigned AttrReqs,
       case tok::code_completion:
         Actions.CodeCompleteTypeQualifiers(DS);
         return cutOffParsing();
+      case tok::kw_const:
+        // HLSL 202x supports `const` instance methods; accept the qualifier
+        // here so that the parser can attach it to the method declarator.
+        if (getLangOpts().HLSLVersion >= hlsl::LangStd::v202x) {
+          isInvalid = DS.SetTypeQual(DeclSpec::TQ_const, Loc, PrevSpec, DiagID,
+                                     getLangOpts());
+          break;
+        }
+        // FALL THROUGH for pre-202x.
+        LLVM_FALLTHROUGH;
       case tok::kw___attribute:
-        if (AttrReqs & AR_GNUAttributesParsed) {
+        if (Tok.getKind() == tok::kw___attribute &&
+            (AttrReqs & AR_GNUAttributesParsed)) {
           ParseGNUAttributes(DS.getAttributes());
           continue; // do *not* consume the next token!
         }
@@ -6550,7 +6561,16 @@ void Parser::ParseFunctionDeclarator(Declarator &D,
       if (!DS.getSourceRange().getEnd().isInvalid()) {
         // HLSL Change Starts
         if (getLangOpts().HLSL) {
-          Diag(DS.getSourceRange().getEnd(), diag::err_hlsl_unsupported_construct) << "qualifiers";
+          // HLSL 202x supports `const` on instance methods. Any other
+          // cv-qualifier (volatile, restrict) remains unsupported.
+          unsigned Quals = DS.getTypeQualifiers();
+          bool OnlyConst = (Quals == DeclSpec::TQ_const);
+          if (!(OnlyConst &&
+                getLangOpts().HLSLVersion >= hlsl::LangStd::v202x)) {
+            Diag(DS.getSourceRange().getEnd(),
+                 diag::err_hlsl_unsupported_construct)
+                << "qualifiers";
+          }
         }
         // HLSL Change Ends
         EndLoc = DS.getSourceRange().getEnd();

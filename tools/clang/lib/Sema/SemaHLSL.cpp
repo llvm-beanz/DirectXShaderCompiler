@@ -1999,6 +1999,16 @@ static bool IsStaticMember(const HLSL_INTRINSIC *fn) {
   return fn->Flags & INTRIN_FLAG_STATIC_MEMBER;
 }
 
+// Returns true if the intrinsic is a non-static, non-mutating (read-only or
+// read-none) instance method that should be callable on a const-qualified
+// object.
+static bool IsConstMemberIntrinsic(const HLSL_INTRINSIC *fn) {
+  if (IsStaticMember(fn))
+    return false;
+  // A method is const unless it explicitly mutates the object.
+  return !(fn->Flags & INTRIN_FLAG_MUTABLE_METHOD);
+}
+
 static bool IsVariadicIntrinsicFunction(const HLSL_INTRINSIC *fn) {
   return fn->pArgs[fn->uNumArgs - 1].uTemplateId == INTRIN_TEMPLATE_VARARGS;
 }
@@ -3428,11 +3438,12 @@ private:
     DeclarationName declarationName = DeclarationName(ii);
 
     StorageClass SC = IsStaticMember(intrinsic) ? SC_Static : SC_None;
+    bool isConst = IsConstMemberIntrinsic(intrinsic);
 
     CXXMethodDecl *functionDecl = CreateObjectFunctionDeclarationWithParams(
         *m_context, recordDecl, functionResultQT,
         ArrayRef<QualType>(argsQTs, numParams),
-        ArrayRef<StringRef>(argNames, numParams), declarationName, true, SC,
+        ArrayRef<StringRef>(argNames, numParams), declarationName, isConst, SC,
         templateParamNamedDeclsCount > 0);
     functionDecl->setImplicit(true);
 
@@ -6376,6 +6387,11 @@ public:
     TemplateDeclInstantiator declInstantiator(*this->m_sema, owner,
                                               mlTemplateArgumentList);
     FunctionProtoType::ExtProtoInfo EmptyEPI;
+    // Carry over the const-qualification of the method declared on the class
+    // so that const-qualified objects can call the resolved specialization.
+    // Only read-only and read-none (non-mutating) instance methods are const.
+    if (IsConstMemberIntrinsic(intrinsic))
+      EmptyEPI.TypeQuals = Qualifiers::Const;
     QualType functionType = m_context->getFunctionType(
         parameterTypes[0],
         ArrayRef<QualType>(parameterTypes + 1, parameterTypeCount - 1),
@@ -8674,6 +8690,24 @@ UINT64 HLSLExternalSource::ScoreFunction(OverloadCandidateSet::iterator &Cand) {
       return SCORE_MAX;
     }
     result += score;
+  }
+
+  // HLSL 202x: when both const and non-const overloads of a method are
+  // viable for a non-const object, prefer the non-const overload. Add a
+  // small tie-breaking penalty when the implicit object argument requires
+  // adding `const` to call a const-qualified method.
+  if (CXXMethodDecl *Method =
+          dyn_cast_or_null<CXXMethodDecl>(Cand->Function)) {
+    if (!Cand->IgnoreObjectArgument &&
+        (Method->getTypeQualifiers() & Qualifiers::Const)) {
+      const ImplicitConversionSequence &ICS = Cand->Conversions[0];
+      if (ICS.isStandard()) {
+        QualType FromType = ICS.Standard.getFromType();
+        if (!FromType.isNull() && !FromType.isConstQualified()) {
+          result += 1;
+        }
+      }
+    }
   }
   return result;
 }
