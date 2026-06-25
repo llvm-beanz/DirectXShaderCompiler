@@ -6957,7 +6957,12 @@ static void extendRight(SourceRange &R, const SourceRange &After) {
 void Sema::CheckConversionDeclarator(Declarator &D, QualType &R,
                                      StorageClass& SC) {
   // HLSL Change Starts
-  if (getLangOpts().HLSL) {
+  // HLSL historically disallowed user-defined conversion operators because
+  // overload resolution did not consider them. They are supported starting
+  // in HLSL 202x. In HLSL 2021 and earlier they remain disallowed because
+  // the language version is locked.
+  if (getLangOpts().HLSL &&
+      getLangOpts().HLSLVersion < hlsl::LangStd::v202x) {
     Diag(D.getIdentifierLoc(), diag::err_hlsl_unsupported_conversion_operator);
     D.setInvalidType();
     return;
@@ -7105,7 +7110,9 @@ void Sema::CheckConversionDeclarator(Declarator &D, QualType &R,
     R = Context.getFunctionType(ConvType, None, Proto->getExtProtoInfo(), None); // HLSL Change
 
   // C++0x explicit conversion operators.
-  if (D.getDeclSpec().isExplicitSpecified())
+  if (D.getDeclSpec().isExplicitSpecified() &&
+      !getLangOpts().HLSL) // HLSL Change: explicit conversion operators are a
+                           // first-class HLSL 202x feature, not an extension.
     Diag(D.getDeclSpec().getExplicitSpecLoc(),
          getLangOpts().CPlusPlus11 ?
            diag::warn_cxx98_compat_explicit_conversion_functions :

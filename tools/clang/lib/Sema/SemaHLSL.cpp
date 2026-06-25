@@ -8839,6 +8839,24 @@ void HLSLExternalSource::InitializeInitSequenceForHLSL(
         Kind.isExplicitCast()
             ? Sema::CheckedConversionKind::CCK_CStyleCast
             : Sema::CheckedConversionKind::CCK_ImplicitConversion;
+
+    // Look for a user-defined conversion operator on the source type. User-
+    // defined conversion operators are only supported starting in HLSL 202x;
+    // earlier language versions performed an elementwise cast for compound-
+    // to-compound conversions and cannot retroactively gain this behavior.
+    bool ExplicitCast = (cck == Sema::CCK_CStyleCast ||
+                         cck == Sema::CCK_FunctionalCast);
+    if (m_sema->getLangOpts().HLSLVersion >= hlsl::LangStd::v202x) {
+      if (CXXConversionDecl *Conv = hlsl::FindUserDefinedConversionOperator(
+              m_sema, firstArg, destType, ExplicitCast)) {
+        DeclAccessPair Found = DeclAccessPair::make(Conv, Conv->getAccess());
+        initSequence->AddUserConversionStep(Conv, Found,
+                                            destType.getNonReferenceType(),
+                                            /*HadMultipleCandidates=*/false);
+        return;
+      }
+    }
+
     unsigned int msg = 0;
     CastKind castKind;
     CXXCastPath basePath;
@@ -16846,6 +16864,52 @@ bool hlsl::CanConvert(clang::Sema *self, clang::SourceLocation loc,
                       clang::StandardConversionSequence *standard) {
   return HLSLExternalSource::FromSema(self)->CanConvert(
       loc, sourceExpr, target, explicitConversion, nullptr, standard);
+}
+
+clang::CXXConversionDecl *
+hlsl::FindUserDefinedConversionOperator(clang::Sema *self, clang::Expr *From,
+                                        clang::QualType DestType,
+                                        bool AllowExplicit) {
+  if (!From || DestType.isNull())
+    return nullptr;
+
+  // Source must be a complete (CXX) record type to have conversion functions.
+  QualType SrcType = From->getType().getNonReferenceType();
+  if (SrcType.isNull())
+    return nullptr;
+  const RecordType *RT = SrcType->getAs<RecordType>();
+  if (!RT)
+    return nullptr;
+  CXXRecordDecl *RD = dyn_cast<CXXRecordDecl>(RT->getDecl());
+  if (!RD)
+    return nullptr;
+  if (self->RequireCompleteType(From->getExprLoc(), SrcType, 0))
+    return nullptr;
+
+  CanQualType CanDest =
+      self->Context.getCanonicalType(DestType).getUnqualifiedType();
+
+  CXXConversionDecl *Found = nullptr;
+  for (NamedDecl *D : RD->getVisibleConversionFunctions()) {
+    // Skip conversion function templates - HLSL overload resolution for
+    // conversion operators does not deduce template arguments here.
+    if (isa<FunctionTemplateDecl>(D))
+      continue;
+    CXXConversionDecl *Conv = dyn_cast<CXXConversionDecl>(D->getUnderlyingDecl());
+    if (!Conv)
+      continue;
+    if (Conv->isExplicit() && !AllowExplicit)
+      continue;
+    CanQualType ConvType =
+        self->Context.getCanonicalType(Conv->getConversionType())
+            .getUnqualifiedType();
+    if (ConvType != CanDest)
+      continue;
+    if (Found && Found != Conv)
+      return nullptr; // Ambiguous - fall back to other paths/diagnostics.
+    Found = Conv;
+  }
+  return Found;
 }
 
 void hlsl::Indent(unsigned int Indentation, llvm::raw_ostream &Out) {

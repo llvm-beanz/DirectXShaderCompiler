@@ -4775,6 +4775,32 @@ TryCopyInitialization(Sema &S, Expr *From, QualType ToType,
     // The correct fix should go to implicit conversions, but because the type
     // system isn't currently up to spec, it's easier to isolate the behavior by
     // putting this only on this path.
+
+    // First, check for a user-defined conversion operator on the source
+    // class type. This enables passing an instance of a class that defines
+    // `operator T()` to a parameter of type `T`. User-defined conversion
+    // operators are only supported starting in HLSL 202x.
+    if (S.getLangOpts().HLSLVersion >= hlsl::LangStd::v202x) {
+      if (CXXConversionDecl *Conv = ::hlsl::FindUserDefinedConversionOperator(
+              &S, From, ToType, /*AllowExplicit=*/false)) {
+        ImplicitConversionSequence ICS;
+        ICS.setUserDefined();
+        ICS.UserDefined.Before.setAsIdentityConversion();
+        ICS.UserDefined.Before.setFromType(From->getType());
+        ICS.UserDefined.Before.setAllToTypes(
+            S.Context.getTagDeclType(Conv->getParent()));
+        ICS.UserDefined.After.setAsIdentityConversion();
+        ICS.UserDefined.After.setFromType(Conv->getConversionType());
+        ICS.UserDefined.After.setAllToTypes(ToType);
+        ICS.UserDefined.ConversionFunction = Conv;
+        ICS.UserDefined.FoundConversionFunction =
+            DeclAccessPair::make(Conv, Conv->getAccess());
+        ICS.UserDefined.HadMultipleCandidates = false;
+        ICS.UserDefined.EllipsisConversion = false;
+        return ICS;
+      }
+    }
+
     const bool ListInitFalse = false;
     const bool SuppressDiagTrue = true;
     const Sema::CheckedConversionKind kind = Sema::CCK_ImplicitConversion;

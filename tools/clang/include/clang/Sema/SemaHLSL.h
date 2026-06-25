@@ -32,6 +32,7 @@ namespace clang {
 class Expr;
 class ExternalSemaSource;
 class ImplicitConversionSequence;
+class CXXConversionDecl;
 } // namespace clang
 
 namespace hlsl {
@@ -256,6 +257,18 @@ bool CanConvert(clang::Sema *self, clang::SourceLocation loc,
                 clang::Expr *sourceExpr, clang::QualType target,
                 bool explicitConversion,
                 clang::StandardConversionSequence *standard);
+
+/// Find a user-defined conversion operator on the type of \p From that
+/// converts to a type matching \p DestType (compared by canonical, unqualified
+/// type). Returns nullptr if no such conversion operator is visible, the
+/// source is not a class type, or multiple candidates were found.
+///
+/// Explicit conversion operators are only considered when \p AllowExplicit is
+/// true. Conversion function templates are not considered.
+clang::CXXConversionDecl *
+FindUserDefinedConversionOperator(clang::Sema *self, clang::Expr *From,
+                                  clang::QualType DestType,
+                                  bool AllowExplicit);
 
 // This function takes the external sema source rather than the sema object
 // itself because the wire-up doesn't happen until parsing is initialized and we
