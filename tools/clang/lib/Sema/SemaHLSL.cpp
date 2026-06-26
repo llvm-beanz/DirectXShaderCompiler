@@ -4277,10 +4277,19 @@ private:
       samplerDecl->setImplicit(true);
 
       // Create decls for each deprecated effect object type:
+      // The legacy effects syntax is removed in HLSL 202x, so these type names
+      // are not registered in 202x and later. Using them then produces a
+      // natural "unknown type name" diagnostic.
       unsigned effectObjBase = _countof(g_ArBasicKindsAsTypes);
-      // TypeSourceInfo* effectObjTypeSource =
-      // m_context->getTrivialTypeSourceInfo(GetBasicKindType(AR_OBJECT_LEGACY_EFFECT));
+      bool registerEffectObjects =
+          m_sema->getLangOpts().HLSLVersion < hlsl::LangStd::v202x;
       for (unsigned i = 0; i < _countof(g_DeprecatedEffectObjectNames); i++) {
+        if (!registerEffectObjects) {
+          // Leave the map slot empty so it is never matched by a lookup.
+          m_objectTypeDeclsMap[i + effectObjBase] =
+              std::make_pair(nullptr, 0u);
+          continue;
+        }
         IdentifierInfo &idInfo =
             m_context->Idents.get(StringRef(g_DeprecatedEffectObjectNames[i]),
                                   tok::TokenKind::identifier);
