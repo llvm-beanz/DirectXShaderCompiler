@@ -2668,7 +2668,10 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
     SourceLocation EqualLoc = ConsumeToken();
 
     // HLSL Change Starts - skip legacy effects sampler_state { ... } assignment and warn
-    if (Tok.is(tok::kw_sampler_state)) {
+    // Removed in HLSL 202x: only skip for earlier language versions so that
+    // 202x produces a natural diagnostic for the unexpected 'sampler_state'.
+    if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x &&
+        Tok.is(tok::kw_sampler_state)) {
       Diag(Tok.getLocation(), diag::warn_hlsl_effect_sampler_state);
       SkipUntil(tok::l_brace); // skip until '{'
       SkipUntil(tok::r_brace); // skip until '}'
@@ -2806,11 +2809,14 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
                                    /*DirectInit=*/true, TypeContainsAuto);
 
     // HLSL Change Starts
-  } else if (getLangOpts().HLSL && Tok.is(tok::l_brace) &&
-             !D.isFunctionDeclarator()) {
+  } else if (getLangOpts().HLSL &&
+             getLangOpts().HLSLVersion < hlsl::LangStd::v202x &&
+             Tok.is(tok::l_brace) && !D.isFunctionDeclarator()) {
     // HLSL allows for a block definition here that it silently ignores.
     // This is to allow for effects state block definitions.  Detect a
     // block here, warn about effect deprecation, and ignore the block.
+    // Effects syntax is removed in HLSL 202x, so this is only done for
+    // earlier language versions; 202x produces a natural diagnostic.
     Diag(Tok.getLocation(), diag::warn_hlsl_effect_state_block);
     ConsumeBrace();
     SkipUntil(tok::r_brace); // skip until '}'
@@ -6330,7 +6336,10 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
   if (getLangOpts().HLSL) {
     if (MaybeParseHLSLAttributes(D))
       D.setInvalidType();
-    if (Tok.is(tok::less)) {
+    // Legacy effects annotations (< ... >) are removed in HLSL 202x. Only skip
+    // them for earlier language versions; in 202x the '<' falls through and
+    // produces a natural diagnostic.
+    if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x && Tok.is(tok::less)) {
       // Consume effects annotations
       Diag(Tok.getLocation(), diag::warn_hlsl_effect_annotation);
       ConsumeToken();

@@ -586,12 +586,18 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result) {
     return true;
 
   // HLSL Change Starts - skip legacy effects technique syntax
+  // The legacy effects syntax is removed in HLSL 202x, so only skip it for
+  // earlier language versions. In 202x and later the token falls through to
+  // the default handling, producing a natural diagnostic.
   case tok::kw_technique:
-    Diag(Tok.getLocation(), diag::warn_hlsl_effect_technique);
-    SkipUntil(tok::l_brace);    // skip through {
-    SkipUntil(tok::r_brace);    // skip through matching }
-    Result = DeclGroupPtrTy();
-    return false;
+    if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x) {
+      Diag(Tok.getLocation(), diag::warn_hlsl_effect_technique);
+      SkipUntil(tok::l_brace);    // skip through {
+      SkipUntil(tok::r_brace);    // skip through matching }
+      Result = DeclGroupPtrTy();
+      return false;
+    }
+    break;
   // HLSL Change Ends
 
   default:
