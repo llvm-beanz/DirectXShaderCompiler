@@ -7,6 +7,7 @@
 #
 # Usage: python3 gen_intrin_names.py [path/to/gen_intrin_main.txt]
 
+import argparse
 import re
 import sys
 import os
@@ -587,11 +588,24 @@ def parse(filepath):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Print HLSL intrinsic function signatures with all type permutations.")
+    parser.add_argument("filepath", nargs="?", default=None,
+                        help="Path to gen_intrin_main.txt (default: same directory as this script)")
+    parser.add_argument("--filter", dest="filter_prefix", default=None,
+                        metavar="SCOPE",
+                        help="Only print signatures whose scope matches SCOPE. "
+                             "Examples: 'dx', 'dx::HitObject', 'RWBuffer'")
+    args = parser.parse_args()
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
     default_path = os.path.join(script_dir, "gen_intrin_main.txt")
-    filepath = sys.argv[1] if len(sys.argv) > 1 else default_path
+    filepath = args.filepath if args.filepath else default_path
+
+    prefix = (args.filter_prefix + "::") if args.filter_prefix else None
     for sig in parse(filepath):
-        print(sig)
+        if prefix is None or sig.startswith(prefix):
+            print(sig)
 
 
 if __name__ == "__main__":
