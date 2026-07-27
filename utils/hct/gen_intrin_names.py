@@ -762,6 +762,8 @@ def main():
                         metavar="CATEGORY",
                         help="Only print classes in CATEGORY (from ClassCategories.json). "
                              "Use 'None' for uncategorized classes and free functions.")
+    parser.add_argument("--functions-only", dest="functions_only", action="store_true",
+                        help="Only print free functions (not methods of a class).")
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -793,6 +795,10 @@ def main():
             rec for rec in records
             if _get_category(*_scope_to_ns_class(rec[0]), name_to_cat) == cat_filter
         ]
+
+    # Apply --functions-only filter.
+    if args.functions_only:
+        records = [rec for rec in records if _scope_to_ns_class(rec[0])[1] is None]
 
     if records:
         print(_format_output(records, name_to_cat or None, cat_order or None))
