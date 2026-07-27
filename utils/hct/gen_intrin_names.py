@@ -8,6 +8,7 @@
 # Usage: python3 gen_intrin_names.py [path/to/gen_intrin_main.txt]
 
 import argparse
+import json
 import re
 import sys
 import os
@@ -256,6 +257,9 @@ def namespace_to_scope(ns_name):
         scope = ns_name[: -len("Methods")]
         # TextureCUBE* -> TextureCube* (HLSL spells it with lowercase 'ube')
         scope = scope.replace("CUBE", "Cube")
+        # Vk-prefixed types belong to the vk:: namespace
+        if scope.startswith("Vk"):
+            return "vk::" + scope[2:]
         return scope
     return ns_name
 
@@ -307,12 +311,14 @@ _TYPEREF_RE = re.compile(r"^\$type(\d+)$")
 
 
 def _parse_declaration_line(line):
-    """Return (ret_type_cleaned, func_name, params_cleaned) or None."""
+    """Return (ret_type_cleaned, func_name, params_cleaned, is_static) or None."""
     cleaned = _clean_brackets(line.strip())
     m = _DECL_RE.match(cleaned)
     if not m:
         return None
-    return m.group(1).strip(), m.group(3), m.group(4).strip()
+    attrs = [a.strip() for a in m.group(2).split(",")]
+    is_static = "static" in attrs
+    return m.group(1).strip(), m.group(3), m.group(4).strip(), is_static
 
 
 def _parse_params(params_cleaned):
@@ -357,8 +363,29 @@ def _get_base_type(type_str):
     return m.group(1) if m else None
 
 
-def expand_overloads(scope, func_name, ret_type_str, params):
-    """Yield one string per valid overload signature.
+def _render_params(param_info, idx_to_lc, lc_to_type):
+    """Render parameter list as a list of 'type name' strings."""
+    def concrete(idx):
+        lc = idx_to_lc.get(idx)
+        return lc_to_type.get(lc, "T") if lc else "T"
+    parts = []
+    for (idx, dqual, name, _lc, _tref) in param_info:
+        if name == "...":
+            parts.append("...")
+            continue
+        t = concrete(idx)
+        parts.append(f"{dqual} {t} {name}".strip() if dqual else f"{t} {name}")
+    return parts
+
+
+def _render_sig(scope, func_name, params_rendered, ret):
+    """Build the flat signature string used for deduplication."""
+    scoped = f"{scope}::{func_name}" if scope else func_name
+    return f"{scoped}({', '.join(params_rendered)}) -> {ret}"
+
+
+def expand_overloads(scope, func_name, is_static, ret_type_str, params):
+    """Yield (sig_key, scope, func_name, is_static, params_rendered, ret) per overload.
 
     Type-expansion algorithm
     ------------------------
@@ -438,35 +465,21 @@ def expand_overloads(scope, func_name, ret_type_str, params):
 
     # --- Step 4: cartesian product and render ---
     if not free_lcs:
-        yield _render_sig(scope, func_name, ret_type_str, param_info, idx_to_lc, {})
+        params_r = _render_params(param_info, idx_to_lc, {})
+        ret = _resolve_ret(ret_type_str, idx_to_lc, {})
+        yield (_render_sig(scope, func_name, params_r, ret),
+               scope, func_name, is_static, params_r, ret)
         return
 
     seen_sigs = set()
     for combo in itertools.product(*[lc_types[lc] for lc in free_lcs]):
         lc_to_type = dict(zip(free_lcs, combo))
-        sig = _render_sig(scope, func_name, ret_type_str, param_info, idx_to_lc, lc_to_type)
-        if sig not in seen_sigs:
-            seen_sigs.add(sig)
-            yield sig
-
-
-def _render_sig(scope, func_name, ret_type_str, param_info, idx_to_lc, lc_to_type):
-    scoped = f"{scope}::{func_name}" if scope else func_name
-
-    def concrete(idx):
-        lc = idx_to_lc.get(idx)
-        return lc_to_type.get(lc, "T") if lc else "T"
-
-    parts = []
-    for (idx, dqual, name, _lc, _tref) in param_info:
-        if name == "...":
-            parts.append("...")
-            continue
-        t = concrete(idx)
-        parts.append(f"{dqual} {t} {name}".strip() if dqual else f"{t} {name}")
-
-    ret = _resolve_ret(ret_type_str, idx_to_lc, lc_to_type)
-    return f"{scoped}({', '.join(parts)}) -> {ret}"
+        params_r = _render_params(param_info, idx_to_lc, lc_to_type)
+        ret = _resolve_ret(ret_type_str, idx_to_lc, lc_to_type)
+        sig_key = _render_sig(scope, func_name, params_r, ret)
+        if sig_key not in seen_sigs:
+            seen_sigs.add(sig_key)
+            yield (sig_key, scope, func_name, is_static, params_r, ret)
 
 
 def _resolve_ret(ret_type_str, idx_to_lc, lc_to_type):
@@ -529,7 +542,7 @@ def _resolve_ret(ret_type_str, idx_to_lc, lc_to_type):
 # ---------------------------------------------------------------------------
 
 def parse(filepath):
-    """Parse gen_intrin_main.txt and yield overload signature strings."""
+    """Parse gen_intrin_main.txt and yield (scope, func_name, is_static, params_rendered, ret) tuples."""
     # First pass: collect all namespace names so we can detect which non-RW
     # Methods namespaces have a RW counterpart (RW types inherit non-RW methods).
     all_namespaces = set()
@@ -564,7 +577,7 @@ def parse(filepath):
             if parsed is None:
                 continue
 
-            ret_type_str, func_name, params_cleaned = parsed
+            ret_type_str, func_name, params_cleaned, is_static = parsed
             params = _parse_params(params_cleaned)
 
             # Determine scopes for this declaration.
@@ -580,32 +593,209 @@ def parse(filepath):
             else:
                 scopes = [""]
 
-            for scope in scopes:
-                for sig in expand_overloads(scope, func_name, ret_type_str, params):
-                    if sig not in seen_global:
-                        seen_global.add(sig)
-                        yield sig
+            for scope_val in scopes:
+                for (sig_key, _, fn, is_static_val, params_r, ret) in expand_overloads(
+                        scope_val, func_name, is_static, ret_type_str, params):
+                    if sig_key not in seen_global:
+                        seen_global.add(sig_key)
+                        yield (scope_val, fn, is_static_val, params_r, ret)
+
+
+# ---------------------------------------------------------------------------
+# Output formatting
+# ---------------------------------------------------------------------------
+
+def _uses_bare_T(*strs):
+    """Return True if any string contains T as a standalone type (not inside <>)."""
+    combined = " ".join(strs)
+    cleaned = re.sub(r'<[^>]*>', '', combined)
+    return bool(re.search(r'\bT\b', cleaned))
+
+
+def _scope_to_ns_class(scope):
+    """Return (outer_ns, class_name) from scope string.
+
+    ''              -> ('hlsl', None)    global HLSL function
+    'vk'            -> ('vk',  None)    free function in vk namespace
+    'dx'            -> ('dx',  None)    free function in dx namespace
+    'vk::Foo'       -> ('vk',  'Foo')   class in vk namespace
+    'dx::HitObject' -> ('dx',  'HitObject')
+    'Buffer'        -> ('hlsl', 'Buffer')  class in implicit hlsl namespace
+    """
+    if not scope:
+        return ('hlsl', None)
+    parts = scope.split('::')
+    if parts[0] in ('vk', 'dx'):
+        outer_ns = parts[0]
+        class_name = '::'.join(parts[1:]) if len(parts) > 1 else None
+        return (outer_ns, class_name)
+    return ('hlsl', scope)
+
+
+def load_categories(script_dir):
+    """Load ClassCategories.json next to the script.
+
+    Returns (name_to_cat, cat_order) where name_to_cat maps
+    (outer_ns, class_name) -> category string, and cat_order is the
+    ordered list of category names from the JSON file.
+    Returns ({}, []) if the file does not exist.
+    """
+    path = os.path.join(script_dir, "ClassCategories.json")
+    if not os.path.exists(path):
+        return {}, []
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    name_to_cat: dict = {}
+    cat_order = list(data.keys())
+    for cat, names in data.items():
+        for raw_name in names:
+            # Normalize spaces (e.g. "Ray Query" -> "RayQuery")
+            name = raw_name.replace(" ", "")
+            if "::" in name:
+                ns, cls = name.split("::", 1)
+                name_to_cat[(ns, cls)] = cat
+            else:
+                name_to_cat[("hlsl", name)] = cat
+    return name_to_cat, cat_order
+
+
+def _get_category(outer_ns, class_name, name_to_cat):
+    """Return the category for a class, or None if uncategorized."""
+    if class_name is None or not name_to_cat:
+        return None
+    return name_to_cat.get((outer_ns, class_name))
+
+
+def _format_output(records, name_to_cat=None, cat_order=None):
+    """Format (scope, func_name, is_static, params_r, ret) records as C++ pseudo-code."""
+    # Group by (outer_ns, class_name) preserving declaration order.
+    groups: dict = {}
+    group_order: list = []
+    for (scope, fn, is_static, params_r, ret) in records:
+        key = _scope_to_ns_class(scope)
+        if key not in groups:
+            groups[key] = []
+            group_order.append(key)
+        groups[key].append((fn, is_static, params_r, ret))
+
+    # Further group by outer_ns.
+    ns_groups: dict = {}
+    ns_order: list = []
+    for key in group_order:
+        outer_ns = key[0]
+        if outer_ns not in ns_groups:
+            ns_groups[outer_ns] = []
+            ns_order.append(outer_ns)
+        ns_groups[outer_ns].append((key[1], groups[key]))
+
+    def render_class(class_name, methods):
+        all_strs = []
+        for (_, _, p, r) in methods:
+            all_strs.append(r)
+            all_strs.extend(p)
+        lines = []
+        if _uses_bare_T(*all_strs):
+            lines.append("template <typename T>")
+        lines.append(f"class {class_name} {{")
+        for (fn, is_static, params_r, ret) in methods:
+            static_str = "static " if is_static else ""
+            lines.append(f"  {static_str}{ret} {fn}({', '.join(params_r)});")
+        lines.append("};")
+        return "\n".join(lines)
+
+    output_parts = []
+    for outer_ns in ns_order:
+        block_parts = []
+        classes_list = [(cn, ms) for cn, ms in ns_groups[outer_ns] if cn is not None]
+        free_funcs_list = [(cn, ms) for cn, ms in ns_groups[outer_ns] if cn is None]
+
+        if name_to_cat and cat_order:
+            # Group classes by category, preserving category order.
+            cat_to_classes: dict = {}
+            for cn, ms in classes_list:
+                cat = _get_category(outer_ns, cn, name_to_cat)
+                if cat not in cat_to_classes:
+                    cat_to_classes[cat] = []
+                cat_to_classes[cat].append((cn, ms))
+
+            for cat in cat_order:
+                if cat in cat_to_classes:
+                    block_parts.append(f"// {cat}")
+                    for cn, ms in cat_to_classes[cat]:
+                        block_parts.append(render_class(cn, ms))
+
+            # Uncategorized classes (not listed in any category)
+            if None in cat_to_classes:
+                for cn, ms in cat_to_classes[None]:
+                    block_parts.append(render_class(cn, ms))
+        else:
+            for cn, ms in classes_list:
+                block_parts.append(render_class(cn, ms))
+
+        # Free functions at the end of each namespace block.
+        for (_, ms) in free_funcs_list:
+            func_lines = []
+            for (fn, _is_static, params_r, ret) in ms:
+                func_lines.append(f"{ret} {fn}({', '.join(params_r)});")
+            block_parts.append("\n".join(func_lines))
+
+        block = "\n\n".join(block_parts)
+        if outer_ns == 'hlsl':
+            output_parts.append(block)
+        else:
+            output_parts.append(
+                f"namespace {outer_ns} {{\n\n{block}\n\n}} // namespace {outer_ns}")
+
+    return "\n\n".join(output_parts)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Print HLSL intrinsic function signatures with all type permutations.")
+        description="Print HLSL intrinsic declarations as C++ pseudo-code.")
     parser.add_argument("filepath", nargs="?", default=None,
                         help="Path to gen_intrin_main.txt (default: same directory as this script)")
     parser.add_argument("--filter", dest="filter_prefix", default=None,
                         metavar="SCOPE",
-                        help="Only print signatures whose scope matches SCOPE. "
+                        help="Only print declarations for SCOPE. "
                              "Examples: 'dx', 'dx::HitObject', 'RWBuffer'")
+    parser.add_argument("--category", dest="category", default=None,
+                        metavar="CATEGORY",
+                        help="Only print classes in CATEGORY (from ClassCategories.json). "
+                             "Use 'None' for uncategorized classes and free functions.")
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     default_path = os.path.join(script_dir, "gen_intrin_main.txt")
     filepath = args.filepath if args.filepath else default_path
 
+    name_to_cat, cat_order = load_categories(script_dir)
+
     prefix = (args.filter_prefix + "::") if args.filter_prefix else None
-    for sig in parse(filepath):
-        if prefix is None or sig.startswith(prefix):
-            print(sig)
+    def _matches(rec):
+        if prefix is None:
+            return True
+        scope, fn, _is_static, params_r, ret = rec
+        sig = _render_sig(scope, fn, params_r, ret)
+        if sig.startswith(prefix):
+            return True
+        # 'hlsl' is a special alias for the implicit hlsl namespace (global
+        # intrinsics and types with no explicit namespace qualifier).
+        if prefix == "hlsl::":
+            return _scope_to_ns_class(scope)[0] == 'hlsl'
+        return False
+
+    records = [rec for rec in parse(filepath) if _matches(rec)]
+
+    # Apply --category filter.
+    if args.category is not None:
+        cat_filter = None if args.category == "None" else args.category
+        records = [
+            rec for rec in records
+            if _get_category(*_scope_to_ns_class(rec[0]), name_to_cat) == cat_filter
+        ]
+
+    if records:
+        print(_format_output(records, name_to_cat or None, cat_order or None))
 
 
 if __name__ == "__main__":
