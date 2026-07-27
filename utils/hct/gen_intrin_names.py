@@ -194,7 +194,7 @@ LICOMPTYPE_TO_TYPES = {
     # g_RayQueryCT
     "LICOMPTYPE_RAY_QUERY":           ["RayQuery<T>"],
     # g_DxHitObjectCT
-    "LICOMPTYPE_HIT_OBJECT":          ["HitObject"],
+    "LICOMPTYPE_HIT_OBJECT":          ["dx::HitObject"],
     # g_BuiltInTrianglePositionsCT
     "LICOMPTYPE_BUILTIN_TRIANGLE_POSITIONS": ["BuiltInTriangleIntersectionAttributes"],
     # --- work graph node types ---
@@ -227,7 +227,7 @@ LICOMPTYPE_TO_TYPES = {
         "uint8_t4_packed", "int8_t4_packed",
     ],
     # --- SPIR-V types ---
-    "LICOMPTYPE_VK_BUFFER_POINTER": ["VkBufferPointer"],
+    "LICOMPTYPE_VK_BUFFER_POINTER": ["vk::BufferPointer"],
     # --- void (not a real overload type) ---
     "LICOMPTYPE_VOID": [],
 }
@@ -236,14 +236,26 @@ LICOMPTYPE_TO_TYPES = {
 def namespace_to_scope(ns_name):
     """Convert a namespace name to an HLSL scope prefix.
 
-    'Intrinsics'  -> '' (global HLSL built-in functions)
-    'XxxMethods'  -> 'Xxx' (object method namespace, strip 'Methods')
-    anything else -> kept verbatim (e.g. 'VkIntrinsics', 'DxIntrinsics')
+    'Intrinsics'        -> '' (global HLSL built-in functions)
+    'VkIntrinsics'      -> 'vk'
+    'DxIntrinsics'      -> 'dx'
+    'DxHitObjectMethods'-> 'dx::HitObject'
+    'XxxMethods'        -> 'Xxx' (strip 'Methods', lowercase CUBE -> Cube)
+    anything else       -> kept verbatim
     """
     if ns_name == "Intrinsics":
         return ""
+    if ns_name == "VkIntrinsics":
+        return "vk"
+    if ns_name == "DxIntrinsics":
+        return "dx"
+    if ns_name == "DxHitObjectMethods":
+        return "dx::HitObject"
     if ns_name.endswith("Methods"):
-        return ns_name[: -len("Methods")]
+        scope = ns_name[: -len("Methods")]
+        # TextureCUBE* -> TextureCube* (HLSL spells it with lowercase 'ube')
+        scope = scope.replace("CUBE", "Cube")
+        return scope
     return ns_name
 
 
@@ -517,7 +529,17 @@ def _resolve_ret(ret_type_str, idx_to_lc, lc_to_type):
 
 def parse(filepath):
     """Parse gen_intrin_main.txt and yield overload signature strings."""
+    # First pass: collect all namespace names so we can detect which non-RW
+    # Methods namespaces have a RW counterpart (RW types inherit non-RW methods).
+    all_namespaces = set()
+    with open(filepath, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"^namespace\s+(\w+)\s*\{", line.strip())
+            if m:
+                all_namespaces.add(m.group(1))
+
     current_ns = None
+    seen_global: set = set()
 
     with open(filepath, encoding="utf-8") as f:
         for line in f:
@@ -543,8 +565,25 @@ def parse(filepath):
 
             ret_type_str, func_name, params_cleaned = parsed
             params = _parse_params(params_cleaned)
-            scope = namespace_to_scope(current_ns) if current_ns else ""
-            yield from expand_overloads(scope, func_name, ret_type_str, params)
+
+            # Determine scopes for this declaration.
+            # Non-RW Methods namespaces also appear on their RW counterpart
+            # (e.g. Texture2D methods are also valid on RWTexture2D).
+            if current_ns:
+                scope = namespace_to_scope(current_ns)
+                scopes = [scope]
+                if (current_ns.endswith("Methods")
+                        and not current_ns.startswith("RW")
+                        and ("RW" + current_ns) in all_namespaces):
+                    scopes.append("RW" + scope)
+            else:
+                scopes = [""]
+
+            for scope in scopes:
+                for sig in expand_overloads(scope, func_name, ret_type_str, params):
+                    if sig not in seen_global:
+                        seen_global.add(sig)
+                        yield sig
 
 
 def main():
