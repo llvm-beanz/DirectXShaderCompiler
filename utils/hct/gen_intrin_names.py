@@ -716,6 +716,13 @@ def _record_category(rec, class_matchers, func_matchers):
     return _get_func_category(outer_ns, fn, func_matchers)
 
 
+def _category_matches_filter(cat, cat_filter):
+    """Return True if cat is cat_filter or one of its 'cat_filter/Sub' sub-categories."""
+    if cat_filter is None or cat is None:
+        return cat == cat_filter
+    return cat == cat_filter or cat.startswith(cat_filter + "/")
+
+
 def _format_output(records, class_matchers=None, class_cat_order=None,
                     func_matchers=None, func_cat_order=None):
     """Format (scope, func_name, is_static, params_r, ret) records as C++ pseudo-code."""
@@ -834,6 +841,7 @@ def main():
                         metavar="CATEGORY",
                         help="Only print classes/functions in CATEGORY (from the "
                              "'Classes'/'Functions' sections of ClassCategories.json). "
+                             "Sub-categories named 'CATEGORY/Sub' are included too. "
                              "Use 'None' for uncategorized classes and free functions.")
     parser.add_argument("--functions-only", dest="functions_only", action="store_true",
                         help="Only print free functions (not methods of a class).")
@@ -861,12 +869,13 @@ def main():
 
     records = [rec for rec in parse(filepath) if _matches(rec)]
 
-    # Apply --category filter.
+    # Apply --category filter (a filter of "Foo" also matches "Foo/Bar" sub-categories).
     if args.category is not None:
         cat_filter = None if args.category == "None" else args.category
         records = [
             rec for rec in records
-            if _record_category(rec, class_matchers, func_matchers) == cat_filter
+            if _category_matches_filter(
+                _record_category(rec, class_matchers, func_matchers), cat_filter)
         ]
 
     # Apply --functions-only filter.

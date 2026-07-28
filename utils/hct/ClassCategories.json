@@ -1,17 +1,17 @@
 {
   "Classes": {
-    "Typed Buffers": [
+    "Resources/Typed Buffers": [
       "Buffer",
       "RWBuffer"
     ],
-    "Raw Buffers": [
+    "Resources/Raw Buffers": [
       "ByteAddressBuffer",
       "RWByteAddressBuffer"
     ],
-    "Structured Buffers": [
+    "Resources/Structured Buffers": [
       ".*StructuredBuffer.*"
     ],
-    "Textures": [
+    "Resources/Textures": [
       "(RW)?Texture.*"
     ],
     "DirectX Shader Model 6.8": [
