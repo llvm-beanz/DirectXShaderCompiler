@@ -723,6 +723,30 @@ def _category_matches_filter(cat, cat_filter):
     return cat == cat_filter or cat.startswith(cat_filter + "/")
 
 
+def _render_class_block(class_name, methods):
+    """Render a class and its methods as C++ pseudo-code (used by both the
+    default and --latex-template output modes)."""
+    all_strs = []
+    for (_, _, p, r) in methods:
+        all_strs.append(r)
+        all_strs.extend(p)
+    lines = []
+    if _uses_bare_T(*all_strs):
+        lines.append("template <typename T>")
+    lines.append(f"class {class_name} {{")
+    for (fn, is_static, params_r, ret) in methods:
+        static_str = "static " if is_static else ""
+        lines.append(f"  {static_str}{ret} {fn}({', '.join(params_r)});")
+    lines.append("};")
+    return "\n".join(lines)
+
+
+def _render_proto(fn, is_static, params_r, ret):
+    """Render a single function/method prototype as a C++ pseudo-code statement."""
+    static_str = "static " if is_static else ""
+    return f"{static_str}{ret} {fn}({', '.join(params_r)});"
+
+
 def _format_output(records, class_matchers=None, class_cat_order=None,
                     func_matchers=None, func_cat_order=None):
     """Format (scope, func_name, is_static, params_r, ret) records as C++ pseudo-code."""
@@ -746,20 +770,7 @@ def _format_output(records, class_matchers=None, class_cat_order=None,
             ns_order.append(outer_ns)
         ns_groups[outer_ns].append((key[1], groups[key]))
 
-    def render_class(class_name, methods):
-        all_strs = []
-        for (_, _, p, r) in methods:
-            all_strs.append(r)
-            all_strs.extend(p)
-        lines = []
-        if _uses_bare_T(*all_strs):
-            lines.append("template <typename T>")
-        lines.append(f"class {class_name} {{")
-        for (fn, is_static, params_r, ret) in methods:
-            static_str = "static " if is_static else ""
-            lines.append(f"  {static_str}{ret} {fn}({', '.join(params_r)});")
-        lines.append("};")
-        return "\n".join(lines)
+    render_class = _render_class_block
 
     output_parts = []
     for outer_ns in ns_order:
@@ -828,6 +839,211 @@ def _format_output(records, class_matchers=None, class_cat_order=None,
     return "\n\n".join(output_parts)
 
 
+# ---------------------------------------------------------------------------
+# LaTeX clause-template output (see spec/library.tex, Library.Method.Structure)
+# ---------------------------------------------------------------------------
+
+# Member-function grouping order per Library.Method.Structure.Detailed.
+_METHOD_SECTION_ORDER = [
+    "Constructors",
+    "Copying and assignment",
+    "Modifying functions",
+    "Inspection functions",
+    "Operators",
+]
+
+
+def _classify_method(fn, class_name):
+    """Heuristically bucket a method into one of the Detailed Specification
+    member-function sections. This is only a starting point for the
+    template; authors should move entries as needed."""
+    if fn == class_name:
+        return "Constructors"
+    if fn == "operator=":
+        return "Copying and assignment"
+    if fn.startswith("operator"):
+        return "Operators"
+    if fn.startswith(("Get", "Load", "Is", "Has")):
+        return "Inspection functions"
+    return "Modifying functions"
+
+
+def _label(text):
+    """Turn a category title into a LaTeX label fragment (no spaces)."""
+    return re.sub(r"\s+", "", text)
+
+
+def _split_category(cat):
+    """Split a 'Top/Sub' category string into (top, sub); sub is None if absent."""
+    if cat is None:
+        return None, None
+    if "/" in cat:
+        top, sub = cat.split("/", 1)
+        return top, sub
+    return cat, None
+
+
+def _group_overloads(entries):
+    """Group (fn, is_static, params_r, ret) entries by function name,
+    preserving the order each name first appears."""
+    groups: dict = {}
+    order: list = []
+    for entry in entries:
+        fn = entry[0]
+        if fn not in groups:
+            groups[fn] = []
+            order.append(fn)
+        groups[fn].append(entry)
+    return [groups[fn] for fn in order]
+
+
+def _emit_member_detail(out, overloads):
+    """Emit every overload of a single function name in one \begin{HLSL}
+    block, followed by one placeholder semantics itemize covering all of
+    Requires/Effects/Synchronization/Returns/Remarks/Notes."""
+    out.append("\\begin{HLSL}")
+    for (fn, is_static, params_r, ret) in overloads:
+        out.append(_render_proto(fn, is_static, params_r, ret))
+    out.append("\\end{HLSL}")
+    out.append("")
+    out.append("\\begin{itemize}")
+    out.append("  \\item \\textit{Requires:} %% TODO")
+    out.append("  \\item \\textit{Effects:} %% TODO")
+    out.append("  \\item \\textit{Synchronization:} %% TODO")
+    out.append("  \\item \\textit{Returns:} %% TODO")
+    out.append("  \\item \\textit{Remarks:} %% TODO")
+    out.append("  \\item \\textit{Notes:} %% TODO")
+    out.append("\\end{itemize}")
+    out.append("")
+
+
+def _format_latex_template(records, class_matchers, class_cat_order,
+                            func_matchers, func_cat_order):
+    """Render `records` as a skeleton of LaTeX library clauses/sub-clauses
+    following the structure described in Library.Method.Structure
+    (spec/library.tex): one \\Ch per top-level category, an element \\Sec
+    per sub-category (or a 'Functions' \\Sec for free functions), and \\Sub
+    member-function groupings with placeholder semantics blocks.
+
+    Categories are only split into \\Ch/\\Sec via a single '/' separator
+    (e.g. "Resources/Typed Buffers" -> Ch "Resources", Sec "Typed Buffers").
+    """
+    # Group class records by (outer_ns, class_name), preserving order.
+    class_groups: dict = {}
+    class_group_order: list = []
+    for (scope, fn, is_static, params_r, ret) in records:
+        outer_ns, class_name = _scope_to_ns_class(scope)
+        if class_name is None:
+            continue
+        key = (outer_ns, class_name)
+        if key not in class_groups:
+            class_groups[key] = []
+            class_group_order.append(key)
+        class_groups[key].append((fn, is_static, params_r, ret))
+
+    # Free function records, preserving order.
+    func_records = [
+        (_scope_to_ns_class(scope)[0], fn, is_static, params_r, ret)
+        for (scope, fn, is_static, params_r, ret) in records
+        if _scope_to_ns_class(scope)[1] is None
+    ]
+
+    # Categorize classes: top -> [(sub_or_None, outer_ns, class_name, methods), ...]
+    class_by_top: dict = {}
+    top_order: list = []
+    for (outer_ns, class_name) in class_group_order:
+        cat = _get_category(outer_ns, class_name, class_matchers)
+        top, sub = _split_category(cat)
+        if top is None:
+            continue
+        if top not in class_by_top:
+            class_by_top[top] = []
+            top_order.append(top)
+        class_by_top[top].append((sub, outer_ns, class_name, class_groups[(outer_ns, class_name)]))
+
+    # Categorize free functions: top -> [(outer_ns, fn, is_static, params_r, ret), ...]
+    func_by_top: dict = {}
+    for (outer_ns, fn, is_static, params_r, ret) in func_records:
+        cat = _get_func_category(outer_ns, fn, func_matchers)
+        top, _sub = _split_category(cat)
+        if top is None:
+            continue
+        if top not in top_order:
+            top_order.append(top)
+        func_by_top.setdefault(top, []).append((outer_ns, fn, is_static, params_r, ret))
+
+    out: list = []
+    for top in top_order:
+        ch_label = _label(top)
+        out.append(f"\\Ch{{{top}}}{{{ch_label}}}")
+        out.append("")
+        out.append("%% TODO: Introduction.")
+        out.append("")
+
+        # Group this clause's classes by sub-category (element sub-clauses).
+        sub_order: list = []
+        classes_by_sub: dict = {}
+        for (sub, outer_ns, class_name, methods) in class_by_top.get(top, []):
+            key = sub if sub is not None else top
+            if key not in classes_by_sub:
+                classes_by_sub[key] = []
+                sub_order.append(key)
+            classes_by_sub[key].append((outer_ns, class_name, methods))
+
+        for sub_title in sub_order:
+            sec_label = f"{ch_label}.{_label(sub_title)}"
+            out.append(f"\\Sec{{{sub_title}}}{{{sec_label}}}")
+            out.append("")
+            out.append("%% TODO: Summary.")
+            out.append("")
+            out.append("\\begin{HLSL}")
+            class_blocks = []
+            for (outer_ns, class_name, methods) in classes_by_sub[sub_title]:
+                qualified = class_name if outer_ns == "hlsl" else f"{outer_ns}::{class_name}"
+                class_blocks.append(_render_class_block(qualified, methods))
+            out.append("\n\n".join(class_blocks))
+            out.append("\\end{HLSL}")
+            out.append("")
+
+            for (outer_ns, class_name, methods) in classes_by_sub[sub_title]:
+                qualified = class_name if outer_ns == "hlsl" else f"{outer_ns}::{class_name}"
+                sections: dict = {name: [] for name in _METHOD_SECTION_ORDER}
+                for (fn, is_static, params_r, ret) in methods:
+                    sections[_classify_method(fn, class_name)].append((fn, is_static, params_r, ret))
+                for section_name in _METHOD_SECTION_ORDER:
+                    entries = sections[section_name]
+                    if not entries:
+                        continue
+                    sub_label = f"{sec_label}.{_label(class_name)}.{_label(section_name)}"
+                    out.append(f"\\Sub{{{qualified} {section_name}}}{{{sub_label}}}")
+                    out.append("")
+                    for overloads in _group_overloads(entries):
+                        _emit_member_detail(out, overloads)
+
+        # Element sub-clause for this clause's free (non-member) functions.
+        funcs = func_by_top.get(top, [])
+        if funcs:
+            sec_label = f"{ch_label}.Functions"
+            out.append(f"\\Sec{{Functions}}{{{sec_label}}}")
+            out.append("")
+            out.append("%% TODO: Summary.")
+            out.append("")
+            out.append("\\begin{HLSL}")
+            out.append("\n".join(
+                _render_proto(fn, is_static, params_r, ret)
+                for (_outer_ns, fn, is_static, params_r, ret) in funcs))
+            out.append("\\end{HLSL}")
+            out.append("")
+            out.append(f"\\Sub{{Other Non-Member Functions}}{{{sec_label}.Other}}")
+            out.append("")
+            func_entries = [(fn, is_static, params_r, ret)
+                            for (_outer_ns, fn, is_static, params_r, ret) in funcs]
+            for overloads in _group_overloads(func_entries):
+                _emit_member_detail(out, overloads)
+
+    return "\n".join(out).rstrip() + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Print HLSL intrinsic declarations as C++ pseudo-code.")
@@ -845,6 +1061,10 @@ def main():
                              "Use 'None' for uncategorized classes and free functions.")
     parser.add_argument("--functions-only", dest="functions_only", action="store_true",
                         help="Only print free functions (not methods of a class).")
+    parser.add_argument("--latex-template", dest="latex_template", action="store_true",
+                        help="Print a skeleton of LaTeX library clauses/sub-clauses "
+                             "(spec/library.tex, Library.Method.Structure) instead of "
+                             "C++ pseudo-code.")
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -883,8 +1103,12 @@ def main():
         records = [rec for rec in records if _scope_to_ns_class(rec[0])[1] is None]
 
     if records:
-        print(_format_output(records, class_matchers or None, class_cat_order or None,
-                              func_matchers or None, func_cat_order or None))
+        if args.latex_template:
+            print(_format_latex_template(records, class_matchers, class_cat_order,
+                                          func_matchers, func_cat_order))
+        else:
+            print(_format_output(records, class_matchers or None, class_cat_order or None,
+                                  func_matchers or None, func_cat_order or None))
 
 
 if __name__ == "__main__":
