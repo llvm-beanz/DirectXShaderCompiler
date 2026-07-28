@@ -6,19 +6,17 @@
     ],
     "Resources/Raw Buffers": [
       "ByteAddressBuffer",
-      "RWByteAddressBuffer"
-    ],
-    "Resources/Structured Buffers": [
+      "RWByteAddressBuffer",
       ".*StructuredBuffer.*"
     ],
     "Resources/Textures": [
       "(RW)?Texture.*"
     ],
-    "DirectX Shader Model 6.8": [
-      ".*Node.*"
-    ],
     "Ray Tracing": [
       "RayQuery"
+    ],
+    "DirectX Shader Model 6.8": [
+      ".*Node.*"
     ],
     "DirectX Shader Model 6.9": [
       "dx::HitObject"
@@ -30,7 +28,7 @@
   "Functions": {
     "Resources" : ["CheckAccessFullyMapped", "NonUniformResourceIndex"],
     "Conversion Functions" : [
-      "asdouble", "asfloat(16)?", "as(u)?int(16|64)?", "f16tof32", "f32tof16"
+      "asdouble", "asfloat(16)?", "as(u)?int(16|64)?"
     ],
     "Atomic Operations": [
       "^Interlocked.*"
@@ -82,6 +80,6 @@
       "GetRenderTargetSampleCount",
       "GetRenderTargetSamplePosition"
     ],
-    "DirectX Legacy": ["D3DCOLOR.*", "tex(1|2||3)D.*", "texCUBE.*"]
+    "DirectX Legacy": ["D3DCOLOR.*", "tex(1|2||3)D.*", "texCUBE.*", "f16tof32", "f32tof16"]
   }
 }
