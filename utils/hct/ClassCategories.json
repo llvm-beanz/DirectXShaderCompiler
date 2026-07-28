@@ -47,7 +47,7 @@
       "WorldRayOrigin", "WorldRayDirection", "ObjectRayOrigin", "ObjectRayDirection",
       "RayTMin", "RayTCurrent", "PrimitiveIndex", "InstanceID", "InstanceIndex",
       "GeometryIndex", "HitKind", "RayFlags", "ObjectToWorld.*", "WorldToObject.*",
-      "TriangleObjectPositions"
+      "TriangleObjectPositions", "ClusterID"
     ],
     "DirectX Shader Model 6.8": [
       "GetRemainingRecursionLevels"

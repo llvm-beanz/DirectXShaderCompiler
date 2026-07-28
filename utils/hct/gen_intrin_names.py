@@ -311,14 +311,15 @@ _TYPEREF_RE = re.compile(r"^\$type(\d+)$")
 
 
 def _parse_declaration_line(line):
-    """Return (ret_type_cleaned, func_name, params_cleaned, is_static) or None."""
+    """Return (ret_type_cleaned, func_name, params_cleaned, is_static, is_hidden) or None."""
     cleaned = _clean_brackets(line.strip())
     m = _DECL_RE.match(cleaned)
     if not m:
         return None
     attrs = [a.strip() for a in m.group(2).split(",")]
     is_static = "static" in attrs
-    return m.group(1).strip(), m.group(3), m.group(4).strip(), is_static
+    is_hidden = "hidden" in attrs
+    return m.group(1).strip(), m.group(3), m.group(4).strip(), is_static, is_hidden
 
 
 def _parse_params(params_cleaned):
@@ -586,7 +587,9 @@ def parse(filepath):
             if parsed is None:
                 continue
 
-            ret_type_str, func_name, params_cleaned, is_static = parsed
+            ret_type_str, func_name, params_cleaned, is_static, is_hidden = parsed
+            if is_hidden:
+                continue
             params = _parse_params(params_cleaned)
 
             # Determine scopes for this declaration.
