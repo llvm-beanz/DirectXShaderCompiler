@@ -364,7 +364,11 @@ def _get_base_type(type_str):
 
 
 def _render_params(param_info, idx_to_lc, lc_to_type):
-    """Render parameter list as a list of 'type name' strings."""
+    """Render parameter list as a list of 'type name' strings.
+
+    A 'ref' qualifier is rendered as a C++ reference (appended '&' on the
+    type) rather than as a leading 'ref' keyword.
+    """
     def concrete(idx):
         lc = idx_to_lc.get(idx)
         return lc_to_type.get(lc, "T") if lc else "T"
@@ -374,7 +378,12 @@ def _render_params(param_info, idx_to_lc, lc_to_type):
             parts.append("...")
             continue
         t = concrete(idx)
-        parts.append(f"{dqual} {t} {name}".strip() if dqual else f"{t} {name}")
+        quals = dqual.split() if dqual else []
+        if "ref" in quals:
+            quals = [q for q in quals if q != "ref"]
+            t = f"{t}&"
+        prefix = " ".join(quals)
+        parts.append(f"{prefix} {t} {name}".strip() if prefix else f"{t} {name}")
     return parts
 
 
@@ -632,41 +641,79 @@ def _scope_to_ns_class(scope):
     return ('hlsl', scope)
 
 
+def _build_matchers(section_data):
+    """Build (matchers, cat_order) from a {category: [regex, ...]} mapping.
+
+    matchers is an ordered list of (compiled_regex, category) pairs, in the
+    same order categories/patterns appear in the JSON. cat_order is the
+    ordered list of category names.
+    """
+    matchers: list = []
+    cat_order = list(section_data.keys())
+    for cat, patterns in section_data.items():
+        for raw_pattern in patterns:
+            # Normalize spaces (e.g. "Ray Query" -> "RayQuery")
+            pattern = raw_pattern.replace(" ", "")
+            matchers.append((re.compile(pattern), cat))
+    return matchers, cat_order
+
+
 def load_categories(script_dir):
     """Load ClassCategories.json next to the script.
 
-    Returns (name_to_cat, cat_order) where name_to_cat maps
-    (outer_ns, class_name) -> category string, and cat_order is the
-    ordered list of category names from the JSON file.
-    Returns ({}, []) if the file does not exist.
+    The JSON file has top-level "Classes" and "Functions" keys, each mapping
+    category name -> list of regex patterns. Patterns are matched against
+    the full name (e.g. "dx::HitObject", "RWTexture2D", "InterlockedAdd").
+
+    Returns (class_matchers, class_cat_order, func_matchers, func_cat_order).
+    Returns ([], [], [], []) if the file does not exist.
     """
     path = os.path.join(script_dir, "ClassCategories.json")
     if not os.path.exists(path):
-        return {}, []
+        return [], [], [], []
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    name_to_cat: dict = {}
-    cat_order = list(data.keys())
-    for cat, names in data.items():
-        for raw_name in names:
-            # Normalize spaces (e.g. "Ray Query" -> "RayQuery")
-            name = raw_name.replace(" ", "")
-            if "::" in name:
-                ns, cls = name.split("::", 1)
-                name_to_cat[(ns, cls)] = cat
-            else:
-                name_to_cat[("hlsl", name)] = cat
-    return name_to_cat, cat_order
+    class_matchers, class_cat_order = _build_matchers(data.get("Classes", {}))
+    func_matchers, func_cat_order = _build_matchers(data.get("Functions", {}))
+    return class_matchers, class_cat_order, func_matchers, func_cat_order
 
 
-def _get_category(outer_ns, class_name, name_to_cat):
+def _match_category(name, matchers):
+    """Return the first category whose pattern fully matches name, or None."""
+    for pattern, cat in matchers:
+        if pattern.fullmatch(name):
+            return cat
+    return None
+
+
+def _get_category(outer_ns, class_name, class_matchers):
     """Return the category for a class, or None if uncategorized."""
-    if class_name is None or not name_to_cat:
+    if class_name is None or not class_matchers:
         return None
-    return name_to_cat.get((outer_ns, class_name))
+    name = class_name if outer_ns == "hlsl" else f"{outer_ns}::{class_name}"
+    return _match_category(name, class_matchers)
 
 
-def _format_output(records, name_to_cat=None, cat_order=None):
+def _get_func_category(func_name, func_matchers):
+    """Return the category for a free function, or None if uncategorized."""
+    if not func_matchers:
+        return None
+    return _match_category(func_name, func_matchers)
+
+
+def _record_category(rec, class_matchers, func_matchers):
+    """Return the category for a parsed record, checking classes or
+    functions depending on whether the record is a method or a free
+    function."""
+    scope, fn, _is_static, _params_r, _ret = rec
+    outer_ns, class_name = _scope_to_ns_class(scope)
+    if class_name is not None:
+        return _get_category(outer_ns, class_name, class_matchers)
+    return _get_func_category(fn, func_matchers)
+
+
+def _format_output(records, class_matchers=None, class_cat_order=None,
+                    func_matchers=None, func_cat_order=None):
     """Format (scope, func_name, is_static, params_r, ret) records as C++ pseudo-code."""
     # Group by (outer_ns, class_name) preserving declaration order.
     groups: dict = {}
@@ -709,16 +756,16 @@ def _format_output(records, name_to_cat=None, cat_order=None):
         classes_list = [(cn, ms) for cn, ms in ns_groups[outer_ns] if cn is not None]
         free_funcs_list = [(cn, ms) for cn, ms in ns_groups[outer_ns] if cn is None]
 
-        if name_to_cat and cat_order:
+        if class_matchers and class_cat_order:
             # Group classes by category, preserving category order.
             cat_to_classes: dict = {}
             for cn, ms in classes_list:
-                cat = _get_category(outer_ns, cn, name_to_cat)
+                cat = _get_category(outer_ns, cn, class_matchers)
                 if cat not in cat_to_classes:
                     cat_to_classes[cat] = []
                 cat_to_classes[cat].append((cn, ms))
 
-            for cat in cat_order:
+            for cat in class_cat_order:
                 if cat in cat_to_classes:
                     block_parts.append(f"// {cat}")
                     for cn, ms in cat_to_classes[cat]:
@@ -733,10 +780,31 @@ def _format_output(records, name_to_cat=None, cat_order=None):
                 block_parts.append(render_class(cn, ms))
 
         # Free functions at the end of each namespace block.
-        for (_, ms) in free_funcs_list:
-            func_lines = []
-            for (fn, _is_static, params_r, ret) in ms:
-                func_lines.append(f"{ret} {fn}({', '.join(params_r)});")
+        all_free_funcs = [m for (_, ms) in free_funcs_list for m in ms]
+        if func_matchers and func_cat_order:
+            # Group free functions by category, preserving category order.
+            cat_to_funcs: dict = {}
+            for (fn, is_static, params_r, ret) in all_free_funcs:
+                cat = _get_func_category(fn, func_matchers)
+                cat_to_funcs.setdefault(cat, []).append((fn, is_static, params_r, ret))
+
+            def render_funcs(funcs):
+                return "\n".join(
+                    f"{ret} {fn}({', '.join(params_r)});"
+                    for (fn, _is_static, params_r, ret) in funcs)
+
+            for cat in func_cat_order:
+                if cat in cat_to_funcs:
+                    block_parts.append(f"// {cat}")
+                    block_parts.append(render_funcs(cat_to_funcs[cat]))
+
+            # Uncategorized free functions (not matched by any pattern)
+            if None in cat_to_funcs:
+                block_parts.append(render_funcs(cat_to_funcs[None]))
+        elif all_free_funcs:
+            func_lines = [
+                f"{ret} {fn}({', '.join(params_r)});"
+                for (fn, _is_static, params_r, ret) in all_free_funcs]
             block_parts.append("\n".join(func_lines))
 
         block = "\n\n".join(block_parts)
@@ -760,7 +828,8 @@ def main():
                              "Examples: 'dx', 'dx::HitObject', 'RWBuffer'")
     parser.add_argument("--category", dest="category", default=None,
                         metavar="CATEGORY",
-                        help="Only print classes in CATEGORY (from ClassCategories.json). "
+                        help="Only print classes/functions in CATEGORY (from the "
+                             "'Classes'/'Functions' sections of ClassCategories.json). "
                              "Use 'None' for uncategorized classes and free functions.")
     parser.add_argument("--functions-only", dest="functions_only", action="store_true",
                         help="Only print free functions (not methods of a class).")
@@ -770,7 +839,7 @@ def main():
     default_path = os.path.join(script_dir, "gen_intrin_main.txt")
     filepath = args.filepath if args.filepath else default_path
 
-    name_to_cat, cat_order = load_categories(script_dir)
+    class_matchers, class_cat_order, func_matchers, func_cat_order = load_categories(script_dir)
 
     prefix = (args.filter_prefix + "::") if args.filter_prefix else None
     def _matches(rec):
@@ -793,7 +862,7 @@ def main():
         cat_filter = None if args.category == "None" else args.category
         records = [
             rec for rec in records
-            if _get_category(*_scope_to_ns_class(rec[0]), name_to_cat) == cat_filter
+            if _record_category(rec, class_matchers, func_matchers) == cat_filter
         ]
 
     # Apply --functions-only filter.
@@ -801,7 +870,8 @@ def main():
         records = [rec for rec in records if _scope_to_ns_class(rec[0])[1] is None]
 
     if records:
-        print(_format_output(records, name_to_cat or None, cat_order or None))
+        print(_format_output(records, class_matchers or None, class_cat_order or None,
+                              func_matchers or None, func_cat_order or None))
 
 
 if __name__ == "__main__":

@@ -1,9 +1,41 @@
 {
-  "Typed Buffers" : ["Buffer", "RWBuffer"],
-  "Raw Buffers" : ["ByteAddressBuffer", "RWByteAddressBuffer"],
-  "Structured Buffers" : ["StructuredBuffer", "RWStructuredBuffer", "AppendStructuredBuffer", "ConsumeStructuredBuffer"],
-  "Textures" : ["Texture1D", "Texture1DArray", "Texture2D", "Texture2DArray", "Texture2DMS", "Texture2DArrayMS", "Texture3D", "TextureCube", "TextureCubeArray", "RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", "RWTexture2DMS", "RWTexture2DMSArray", "RWTexture3D", "FeedbackTexture2D", "FeedbackTexture2DArray"],
-  "Work Graphs" : ["EmptyNodeInput", "EmptyNodeOutput", "NodeOutput", "RWDispatchNodeInputRecord", "GroupNodeInputRecords", "GroupOrThreadNodeInputRecords"],
-  "Ray Tracing" : ["RayQuery"],
-  "DirectX Shader Model 6.9" : ["dx::HitObject"]
+  "Classes": {
+    "Typed Buffers": [
+      "Buffer",
+      "RWBuffer"
+    ],
+    "Raw Buffers": [
+      "ByteAddressBuffer",
+      "RWByteAddressBuffer"
+    ],
+    "Structured Buffers": [
+      ".*StructuredBuffer.*"
+    ],
+    "Textures": [
+      "(RW)?Texture.*"
+    ],
+    "DirectX Work Graphs": [
+      ".*Node.*"
+    ],
+    "Ray Tracing": [
+      "RayQuery"
+    ],
+    "DirectX Shader Model 6.9": [
+      "dx::HitObject"
+    ]
+  },
+  "Functions": {
+    "Atomic Operations": [
+      "^Interlocked.*"
+    ],
+    "Threading Support": [
+      ".*Barrier.*"
+    ],
+    "SPMD Support": [
+      ".*Wave.*"
+    ],
+    "Ray Tracing": [
+      "TraceRay"
+    ]
+  }
 }
