@@ -22,6 +22,9 @@
     ],
     "DirectX Shader Model 6.9": [
       "dx::HitObject"
+    ],
+    "Vulkan": [
+      "vk::.*"
     ]
   },
   "Functions": {
@@ -36,6 +39,18 @@
     ],
     "Ray Tracing": [
       "TraceRay"
+    ],
+    "DirectX Shader Model 6.9": [
+      "dx::MaybeReorder.*"
+    ],
+    "DirectX Shader Model 6.10": [
+      "dx::IsDebuggingEnabled"
+    ],
+    "DirectX Shader Model 6.10 - impl": [
+      "__builtin_LinAlg.*"
+    ],
+    "Vulkan": [
+      "vk::.*"
     ]
   }
 }

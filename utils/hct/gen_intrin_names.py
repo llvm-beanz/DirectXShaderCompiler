@@ -694,11 +694,12 @@ def _get_category(outer_ns, class_name, class_matchers):
     return _match_category(name, class_matchers)
 
 
-def _get_func_category(func_name, func_matchers):
+def _get_func_category(outer_ns, func_name, func_matchers):
     """Return the category for a free function, or None if uncategorized."""
     if not func_matchers:
         return None
-    return _match_category(func_name, func_matchers)
+    name = func_name if outer_ns == "hlsl" else f"{outer_ns}::{func_name}"
+    return _match_category(name, func_matchers)
 
 
 def _record_category(rec, class_matchers, func_matchers):
@@ -709,7 +710,7 @@ def _record_category(rec, class_matchers, func_matchers):
     outer_ns, class_name = _scope_to_ns_class(scope)
     if class_name is not None:
         return _get_category(outer_ns, class_name, class_matchers)
-    return _get_func_category(fn, func_matchers)
+    return _get_func_category(outer_ns, fn, func_matchers)
 
 
 def _format_output(records, class_matchers=None, class_cat_order=None,
@@ -785,7 +786,7 @@ def _format_output(records, class_matchers=None, class_cat_order=None,
             # Group free functions by category, preserving category order.
             cat_to_funcs: dict = {}
             for (fn, is_static, params_r, ret) in all_free_funcs:
-                cat = _get_func_category(fn, func_matchers)
+                cat = _get_func_category(outer_ns, fn, func_matchers)
                 cat_to_funcs.setdefault(cat, []).append((fn, is_static, params_r, ret))
 
             def render_funcs(funcs):
