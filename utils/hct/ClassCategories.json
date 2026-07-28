@@ -14,7 +14,7 @@
     "Textures": [
       "(RW)?Texture.*"
     ],
-    "DirectX Work Graphs": [
+    "DirectX Shader Model 6.8": [
       ".*Node.*"
     ],
     "Ray Tracing": [
@@ -28,6 +28,10 @@
     ]
   },
   "Functions": {
+    "Resources" : ["CheckAccessFullyMapped", "NonUniformResourceIndex"],
+    "Conversion Functions" : [
+      "asdouble", "asfloat(16)?", "as(u)?int(16|64)?", "f16tof32", "f32tof16"
+    ],
     "Atomic Operations": [
       "^Interlocked.*"
     ],
@@ -35,10 +39,18 @@
       ".*Barrier.*"
     ],
     "SPMD Support": [
-      ".*Wave.*"
+      ".*Wave.*", "QuadRead.*", "QuadAny", "QuadAll"
     ],
     "Ray Tracing": [
-      "TraceRay"
+      "TraceRay", "RayQuery", "CallShader", "ReportHit", "IgnoreHit",
+      "AcceptHitAndEndSearch", "DispatchRaysIndex", "DispatchRaysDimensions",
+      "WorldRayOrigin", "WorldRayDirection", "ObjectRayOrigin", "ObjectRayDirection",
+      "RayTMin", "RayTCurrent", "PrimitiveIndex", "InstanceID", "InstanceIndex",
+      "GeometryIndex", "HitKind", "RayFlags", "ObjectToWorld.*", "WorldToObject.*",
+      "TriangleObjectPositions"
+    ],
+    "DirectX Shader Model 6.8": [
+      "GetRemainingRecursionLevels"
     ],
     "DirectX Shader Model 6.9": [
       "dx::MaybeReorder.*"
@@ -51,6 +63,25 @@
     ],
     "Vulkan": [
       "vk::.*"
-    ]
+    ],
+    "Barycentrics": [
+      "EvaluateAttribute.*",
+      "GetAttributeAtVertex"
+    ],
+    "Unsupported": [
+      "abort", "printf", "source_mark"
+    ],
+    "Tesselation Shaders": [
+      "Process.*TessFactors.*"
+    ],
+    "Mesh Shaders" : [
+      "DispatchMesh",
+      "SetMeshOutputCounts"
+    ],
+    "Pixel Shaders" : [
+      "GetRenderTargetSampleCount",
+      "GetRenderTargetSamplePosition"
+    ],
+    "DirectX Legacy": ["D3DCOLOR.*", "tex(1|2||3)D.*", "texCUBE.*"]
   }
 }
