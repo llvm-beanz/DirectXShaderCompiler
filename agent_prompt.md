@@ -15,4 +15,3 @@ the root of the repository and commit it in its own commit when you're done.
 # Request
 
 Can you rebase this branch on top of origin/main and address any issues?
-
