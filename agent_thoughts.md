@@ -88,3 +88,48 @@ built-in names compile correctly and don't produce wrong SPIR-V.
 
 Ran `check-clang-codegenspirv`: 1567 expected passes, 2 expected failures
 (the expected failures are pre-existing, unrelated to these changes).
+
+## Rebase onto origin/main (2026-08-10)
+
+Rebased `agent/string-names` onto `origin/main` (commit `a4c4950a7`).
+
+### Upstream overlap
+
+The upstream commit `a4c4950a7` ("Fix 8601 check for RayQuery user type (#8610)")
+independently made the same fix as our Commit 1: it changed `IsHLSLRayQueryType()`
+in `HlslTypes.cpp` to use `getAttr<HLSLRayQueryObjectAttr>(type)` instead of a
+string comparison, and updated `isOpaqueType` in `AstTypeProbe.cpp` to call
+`IsHLSLRayQueryType()`. It also added two test files:
+- `type.rayquery.user-defined-shadow.hlsl`
+- `type.rayquery.user-defined-shadow.template.hlsl`
+
+### Conflict resolution
+
+1. **Commit 1 dropped** (`hlsl: Use HLSLRayQueryObjectAttr in IsHLSLRayQueryType`):
+   The change was already present in the upstream commit. The two versions were
+   functionally identical (only operand order in the `nullptr !=` comparison
+   differed). The commit was skipped via `git rebase --skip`.
+
+2. **`isOpaqueType` conflict in `AstTypeProbe.cpp`**: The upstream version still
+   used the long string-comparison block (with the `RayQuery` check replaced by
+   `IsHLSLRayQueryType()`), while our branch replaced the whole function with the
+   compact attribute-based form. Resolved by keeping our branch's version:
+
+   ```cpp
+   bool isOpaqueType(QualType type) {
+     if (hlsl::IsHLSLResourceType(type) || hlsl::IsHLSLRayQueryType(type))
+       return true;
+     if (isSubpassInput(type))
+       return true;
+     return false;
+   }
+   ```
+
+   This is correct because `IsHLSLResourceType` covers all opaque resource types
+   (textures, buffers, samplers, `RaytracingAccelerationStructure`) via the
+   `HLSLResourceAttr` attached to their declarations. The upstream `SubpassInput`
+   name-check inside the string block is covered by our attribute-based
+   `isSubpassInput()` call.
+
+3. **Tests coexist**: Our three test files and the upstream two test files cover
+   overlapping but distinct scenarios. All five files remain in the tree.
