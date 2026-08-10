@@ -6103,7 +6103,8 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
     //   been expanded or contains auto; otherwise, it is parsed as part of the
     //   parameter-declaration-clause.
     if (Tok.is(tok::ellipsis) && D.getCXXScopeSpec().isEmpty() &&
-        !getLangOpts().HLSL && // HLSL Change: do not support ellipsis
+        (!getLangOpts().HLSL ||
+         getLangOpts().HLSLAllowsVariadicTemplates()) && // HLSL Change
         !((D.getContext() == Declarator::PrototypeContext ||
            D.getContext() == Declarator::LambdaExprParameterContext ||
            D.getContext() == Declarator::BlockLiteralContext) &&
