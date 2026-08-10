@@ -1,3 +1,7 @@
+---
+model: claude-sonnet-5
+---
+
 # Initial Guidelines
 
 Please make sure that your changes are appropriately tested with unit tests
@@ -14,4 +18,9 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Can you rebase this branch on top of origin/main and address any issues?
+Can you rewrite the code in CGHLSLMS.cpp to eliminate KeywordToKind and
+KeywordToClass, to instead use the attributes on the record types?
+
+Also please add an attribute to the AST to denote ROV types so that various
+places throughout the code that check `startswith("RasterizerOrdered")` can be
+cleaned up, and please clean those up too.
