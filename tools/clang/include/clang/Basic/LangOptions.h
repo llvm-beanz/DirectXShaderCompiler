@@ -188,6 +188,15 @@ public:
     return MSCompatibilityVersion >= MajorVersion * 10000000U;
   }
 
+  // HLSL Change Starts
+  /// \brief Whether C++-like variadic templates are enabled for HLSL. This
+  /// is only true under HLSL 202x (and later) language modes; earlier HLSL
+  /// versions diagnose variadic template syntax as unsupported.
+  bool HLSLAllowsVariadicTemplates() const {
+    return !HLSL || HLSLVersion >= hlsl::LangStd::v202x;
+  }
+  // HLSL Change Ends
+
   /// \brief Reset all of the options that are not considered when building a
   /// module.
   void resetNonModularOptions();
