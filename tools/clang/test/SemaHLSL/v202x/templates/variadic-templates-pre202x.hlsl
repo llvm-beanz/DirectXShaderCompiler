@@ -26,3 +26,12 @@ uint CallSizeofPack() {
   return sizeof...(Values);
   // expected-error@-1{{expected expression}}
 }
+
+int CallInitListExpansion() {
+  int a = 1, b = 2, c = 3;
+  // Pack expansion inside a braced-init-list also remains unsupported
+  // before HLSL 202x.
+  int values[3] = {a, b, c...};
+  // expected-error@-1{{expansion is unsupported in HLSL}}
+  return values[0];
+}
