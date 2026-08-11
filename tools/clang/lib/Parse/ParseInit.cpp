@@ -438,7 +438,7 @@ ExprResult Parser::ParseBraceInitializer() {
 
     if (Tok.is(tok::ellipsis)) {
       // HLSL Change Starts
-      if (getLangOpts().HLSL) {
+      if (getLangOpts().HLSL && !getLangOpts().HLSLAllowsVariadicTemplates()) {
         Diag(Tok, diag::err_hlsl_unsupported_construct) << "expansion";
         InitExprsOk = false;
         SkipUntil(tok::r_brace, StopBeforeMatch);
