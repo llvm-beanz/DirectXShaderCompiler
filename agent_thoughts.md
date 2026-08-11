@@ -312,3 +312,84 @@ this sandbox for the reasons already documented (Python 3 incompatibility
 in this fork's vendored `lit`); the RUN-line harness plus direct,
 individual verification of every new/changed test file is the strongest
 signal available in this environment.
+
+## Follow-up: initializer-list scalarization parity for packs
+
+A further request asked specifically about one of the odder corners of
+HLSL: its braced-initializer-list handling doesn't follow C/C++ aggregate-
+initialization rules. Instead HLSL "scalarizes" (flattens) every
+initializer element -- including aggregate elements like vectors -- into
+one flat stream of scalars, which is then used to fill the target's
+scalar slots one at a time; this flat stream can even overflow across the
+boundaries of individual elements in an array of aggregates (e.g.
+`float2 arr[2] = { a, b, c, d };`). Since a pack expansion inside a
+braced-init-list (`{ First, Others... }`) is expanded into exactly the
+same flat list of element expressions a hand-written list would contain,
+the goal was to prove this scalarization behaves identically regardless
+of whether the elements came from an expanded pack or were written by
+hand -- not just that it "doesn't crash."
+
+### Investigation
+
+I empirically probed the built `dxc` from `build-variadic` (already
+configured via `cmake/caches/PredefinedParams.cmake`) with a series of
+throwaway snippets (not committed) covering: exact-count vector
+scalarization, mixed scalar+vector element flattening, array-of-vector
+overflow, struct-member scalarization (including a vector-typed member),
+matrix scalarization, and the too-few/too-many-elements diagnostics --
+each written both as a hand-written initializer list and as a variadic-
+template function forwarding its pack into `{ vals... }`. In every case
+the pack-based version produced identical behavior to the hand-written
+version:
+- `-ast-dump` shows the instantiated pack-based function's `InitListExpr`
+  is structurally identical to the hand-written function's `InitListExpr`
+  (same element count, same per-element implicit casts).
+- The too-few/too-many-element diagnostics fire with byte-for-byte
+  identical wording (e.g. `too few elements in vector initialization
+  (expected 4 elements, have 2)`), whether the flat element count came
+  from a literal list or an expanded pack.
+- End-to-end DXIL CodeGen for a pack-based and hand-written version of the
+  same scalarization pattern, fed the same shader-input-dependent (i.e.
+  not constant-foldable) values, folds down to the exact same arithmetic
+  after optimization -- proving equivalence survives all the way through
+  CodeGen and optimization, not just at the AST level.
+
+No source changes were needed for any of this: the existing initializer-
+list-scalarization logic (`InitListChecker` in `SemaInit.cpp`) already
+operates on the fully pack-expanded list of element expressions by the
+time it runs (pack expansion happens during template instantiation,
+before `InitListChecker` sees the initializer list), so it was already
+correct for packs. This follow-up is therefore purely additive test
+coverage, not a bug fix.
+
+### Tests added
+
+1. `SemaHLSL/v202x/templates/variadic-templates-initlist-scalarize.hlsl`
+   (`-HV 202x`, `-verify` + `-ast-dump`/`FileCheck`): positive test with
+   paired `Manual*`/`Pack*` functions for vector-exact, vector-mixed
+   (scalar+vector element), array-of-vector overflow, struct-member, and
+   matrix scalarization, each pair fed through a single call site to force
+   instantiation. `CHECK` lines pin down that the pack-based function's
+   instantiated `InitListExpr` has the same type/shape as the hand-written
+   one.
+2. `SemaHLSL/v202x/templates/variadic-templates-initlist-scalarize-negative.hlsl`
+   (`-HV 202x`, `-verify`): negative test with paired `Manual*`/`Pack*`
+   functions proving the too-few/too-many-elements diagnostics (vector,
+   struct, matrix) have identical wording for both.
+3. `HLSLFileCheck/hlsl/template/variadic-initlist-scalarize.hlsl`: an
+   end-to-end CodeGen `FileCheck` test computing `pack-result +
+   manual-result` for each scalarization pattern using shader-input-
+   dependent values, checking the optimized DXIL collapses to the exact
+   expected integer-multiple-of-input arithmetic (`CHECK-DAG` on the
+   `fmul fast` coefficients), which would only happen if both code paths
+   compute identical results.
+
+### Verification
+
+All three new/changed test files were run directly against the built
+`dxc`/`FileCheck` binaries in `build-variadic` (rebuilt first to confirm
+it was current) before being written into the repository, confirming
+every `-verify` RUN line reports zero unexpected/missing diagnostics and
+every `FileCheck` RUN line's patterns match the actual output. As before,
+the full `check-all` lit target could not be run in this sandbox for the
+previously documented Python 3 / vendored-`lit` incompatibility reason.
