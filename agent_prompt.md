@@ -17,6 +17,15 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-HLSL 202x is going to enable support for C++-like variadic templates. Can you
-please implement that support in DXC under the HLSL 202x language mode and add
-tests as appropriate?
+On incorrect assumption that the last agent's work was biased by is that DXC has
+tested C++ language support. DXC disabled basically all the C++ language
+support, and much of that code has been subject to bitrot. We cannot therefore
+rely on Clang's testing for variadic templates to provide any real meaning to
+DXC's implementation of the feature.
+
+Given that correction, can you please extend the testing support for HLSL's new
+variadic template support to cover a more comprehensive set of use cases
+including template instantiations of HLSL built-in templates.
+
+Also please be sure to test the negative cases where things aren't expected to
+work, like base-class packs.
