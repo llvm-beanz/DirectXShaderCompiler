@@ -17,15 +17,10 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-On incorrect assumption that the last agent's work was biased by is that DXC has
-tested C++ language support. DXC disabled basically all the C++ language
-support, and much of that code has been subject to bitrot. We cannot therefore
-rely on Clang's testing for variadic templates to provide any real meaning to
-DXC's implementation of the feature.
+HLSL's initializer list handling is very wonky, so pack expansions in
+initializer lists could also be a bit odd.
 
-Given that correction, can you please extend the testing support for HLSL's new
-variadic template support to cover a more comprehensive set of use cases
-including template instantiations of HLSL built-in templates.
-
-Also please be sure to test the negative cases where things aren't expected to
-work, like base-class packs.
+Can you add some additional test coverage that verifies initializer lists with
+variadic template packs behave the same as initializer lists without them (i.e.
+scalarizing the elements of the initializer to initialize scalar elements of the
+target.)
