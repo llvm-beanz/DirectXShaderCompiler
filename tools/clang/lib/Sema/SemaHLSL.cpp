@@ -6980,6 +6980,7 @@ bool HLSLExternalSource::IsValidObjectElement(LPCSTR tableName,
 // Returns the element type of an array after stripping all of its array
 // dimensions. Types that aren't arrays are returned unchanged.
 static QualType GetArrayElementTypeRecursive(QualType Ty) {
+  Ty = Ty.getNonReferenceType();
   while (const ArrayType *ArrTy = Ty->getAsArrayTypeUnsafe())
     Ty = ArrTy->getElementType();
   return Ty;
