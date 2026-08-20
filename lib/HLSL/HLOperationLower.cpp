@@ -7094,6 +7094,20 @@ Value *TranslateLinAlgCopyConvertMatrix(CallInst *CI, IntrinsicOp IOP,
   return nullptr;
 }
 
+// LinAlg groupshared memory operations are overloaded on the scalar element
+// type of the array, so index all the way through the array dimensions and
+// through the vector element, if there is one, to get a scalar pointer.
+static Value *GetLinAlgMemoryPtr(IRBuilder<> &Builder, Value *Arr) {
+  Value *Zero = Builder.getInt32(0);
+  SmallVector<Value *, 4> Indices(1, Zero);
+  Type *EltTy = Arr->getType()->getPointerElementType();
+  while (isa<ArrayType>(EltTy) || isa<VectorType>(EltTy)) {
+    Indices.push_back(Zero);
+    EltTy = cast<SequentialType>(EltTy)->getElementType();
+  }
+  return Builder.CreateGEP(Arr, Indices);
+}
+
 Value *TranslateLinAlgMatrixLoadFromMemory(
     CallInst *CI, IntrinsicOp IOP, OP::OpCode OpCode,
     HLOperationLowerHelper &Helper, HLObjectOperationLowerHelper *ObjHelper,
@@ -7110,8 +7124,7 @@ Value *TranslateLinAlgMatrixLoadFromMemory(
   Value *Stride = CI->getArgOperand(4);
   Value *Layout = CI->getArgOperand(5);
 
-  Value *Zero = Builder.getInt32(0);
-  Value *ArrPtr = Builder.CreateGEP(Arr, {Zero, Zero});
+  Value *ArrPtr = GetLinAlgMemoryPtr(Builder, Arr);
   Type *ArrEltTy = ArrPtr->getType()->getPointerElementType();
 
   Constant *OpArg = HlslOp->GetU32Const((unsigned)OpCode);
@@ -7137,8 +7150,7 @@ Value *TranslateLinAlgMatrixStoreToMemory(
   Value *Stride = CI->getArgOperand(4);
   Value *Layout = CI->getArgOperand(5);
 
-  Value *Zero = Builder.getInt32(0);
-  Value *ArrPtr = Builder.CreateGEP(Arr, {Zero, Zero});
+  Value *ArrPtr = GetLinAlgMemoryPtr(Builder, Arr);
   Type *ArrEltTy = ArrPtr->getType()->getPointerElementType();
 
   Constant *OpArg = HlslOp->GetU32Const((unsigned)OpCode);
@@ -7162,8 +7174,7 @@ Value *TranslateLinAlgMatrixAccumToMemory(
   Value *Stride = CI->getArgOperand(5);
   Value *Layout = CI->getArgOperand(6);
 
-  Value *Zero = Builder.getInt32(0);
-  Value *ArrPtr = Builder.CreateGEP(Arr, {Zero, Zero});
+  Value *ArrPtr = GetLinAlgMemoryPtr(Builder, Arr);
   Type *ArrEltTy = ArrPtr->getType()->getPointerElementType();
 
   Constant *OpArg = HlslOp->GetU32Const((unsigned)OpCode);
