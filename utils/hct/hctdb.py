@@ -9628,6 +9628,7 @@ class db_hlsl(object):
         type_matrix_re = re.compile(r"(\S+)<(\S+)@(\S+)>$")
         type_vector_re = re.compile(r"(\S+)<(\S+)>$")
         type_any_re = re.compile(r"(\S+)<>$")
+        type_any_array_re = re.compile(r"(\S+)<>\[\]$")
         type_array_re = re.compile(r"(\S+)\[\]$")
         type_object_re = re.compile(
             r"""(
@@ -9737,6 +9738,12 @@ class db_hlsl(object):
                 template_list = "LITEMPLATE_ARRAY"
                 return base_type, rows, cols, template_list
 
+            def do_any_array(m):
+                base_type = m.group(1)
+                cols = "c"
+                template_list = "LITEMPLATE_ANY_ARRAY"
+                return base_type, rows, cols, template_list
+
             def do_object(m):
                 template_list = "LITEMPLATE_OBJECT"
                 return base_type, rows, cols, template_list
@@ -9745,6 +9752,7 @@ class db_hlsl(object):
                 (do_matrix, type_matrix_re),
                 (do_vector, type_vector_re),
                 (do_any, type_any_re),
+                (do_any_array, type_any_array_re),
                 (do_array, type_array_re),
                 (do_object, type_object_re),
             ]
