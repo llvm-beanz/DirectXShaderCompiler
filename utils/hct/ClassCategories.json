@@ -28,7 +28,7 @@
   "Functions": {
     "Resources" : ["CheckAccessFullyMapped", "NonUniformResourceIndex"],
     "Conversion Functions" : [
-      "asdouble", "asfloat(16)?", "as(u)?int(16|64)?"
+      "asdouble", "asfloat(16)?", "as(u)?int(16|64)?", "f(16|32)tof(16|32)"
     ],
     "Atomic Operations": [
       "^Interlocked.*"
