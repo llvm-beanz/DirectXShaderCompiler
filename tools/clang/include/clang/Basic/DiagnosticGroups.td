@@ -807,7 +807,12 @@ def HLSLAvailability: DiagGroup<"hlsl-availability">;
 def HLSLAvailabilityConstant: DiagGroup<"hlsl-availability-constant">;
 def HLSLBarrier : DiagGroup<"hlsl-barrier">;
 def HLSLLegacyLiterals : DiagGroup<"hlsl-legacy-literal">;
+def HLSL2026Effects : DiagGroup<"hlsl-2026-effects">;
+def HLSL2026Compat : DiagGroup<"hlsl-2026-compat", [
+  HLSLLegacyLiterals,
+  HLSL2026Effects
+]>;
+
 def HLSLGroupshared202x : DiagGroup<"hlsl-groupshared-202x">;
 def HLSL202xExtensions : DiagGroup<"hlsl-202x-extensions", [HLSLGroupshared202x]>;
-def HLSL2026Effects : DiagGroup<"hlsl-2026-effects">;
 // HLSL Change Ends
