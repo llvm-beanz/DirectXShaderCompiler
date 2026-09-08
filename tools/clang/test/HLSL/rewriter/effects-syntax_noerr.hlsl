@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -ffreestanding -verify %s
+// RUN: %clang_cc1 -fsyntax-only -ffreestanding -Weffects-syntax -verify %s
 // :FXC_VERIFY_ARGUMENTS: /E main /T ps_5_1 /Gec
 
 Texture2D tex : register(t1), tex2 : register(t2)

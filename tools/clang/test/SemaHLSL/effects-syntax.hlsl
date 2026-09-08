@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -verify %s
-// RUN: %dxc -Tps_6_0 -verify %s
+// RUN: %dxc -Tlib_6_3 -Weffects-syntax -verify %s
+// RUN: %dxc -Tps_6_0 -Weffects-syntax -verify %s
 
 // :FXC_VERIFY_ARGUMENTS: /E main /T ps_5_1 /Gec
 
@@ -182,5 +182,5 @@ int foobar4;
 /*verify-ast
   VarDecl <col:1, col:5> col:5 foobar4 'const int'
 */
-int foobar5[] {1, 2, 3};                                        /* expected-error {{definition of variable with array type needs an explicit size or an initializer}} expected-warning {{effect state block ignored - effect syntax is deprecated. To use braces as an initializer use them with equal signs.}} fxc-error {{X3000: syntax error: unexpected integer constant}} */
-int foobar6[4] {1, 2, 3, 4};                                    /* expected-warning {{effect state block ignored - effect syntax is deprecated. To use braces as an initializer use them with equal signs.}} fxc-error {{X3000: syntax error: unexpected integer constant}} */
+int foobar5[] {1, 2, 3};                                        /* expected-error {{definition of variable with array type needs an explicit size or an initializer}} expected-warning {{effect state block ignored - effect syntax is deprecated and will be removed in HLSL 2026. To use braces as an initializer use them with equal signs.}} fxc-error {{X3000: syntax error: unexpected integer constant}} */
+int foobar6[4] {1, 2, 3, 4};                                    /* expected-warning {{effect state block ignored - effect syntax is deprecated and will be removed in HLSL 2026. To use braces as an initializer use them with equal signs.}} fxc-error {{X3000: syntax error: unexpected integer constant}} */

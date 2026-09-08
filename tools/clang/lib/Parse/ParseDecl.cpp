@@ -2667,14 +2667,10 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
   if (isTokenEqualOrEqualTypo()) {
     SourceLocation EqualLoc = ConsumeToken();
 
-    // HLSL Change Starts - skip legacy effects sampler_state { ... } assignment and warn
-    // Removed in HLSL 202x: only skip for earlier language versions so that
-    // 202x produces a natural diagnostic for the unexpected 'sampler_state'.
+    // HLSL Change Starts - skip legacy effects sampler_state assignment
     if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x &&
         Tok.is(tok::kw_sampler_state)) {
-      Diag(Tok.getLocation(), diag::warn_hlsl_effect_sampler_state);
-      if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
-        Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_sampler_state);
+      Diag(Tok.getLocation(), diag::warn_hlsl_2026_effects) << 1 << 0 << 1;
       SkipUntil(tok::l_brace); // skip until '{'
       SkipUntil(tok::r_brace); // skip until '}'
     } else
@@ -2817,15 +2813,7 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
     // HLSL allows for a block definition here that it silently ignores.
     // This is to allow for effects state block definitions.  Detect a
     // block here, warn about effect deprecation, and ignore the block.
-    // Effects syntax is removed in HLSL 202x, so this is only done for
-    // earlier language versions; 202x produces a natural diagnostic.
-    // COPILOT-TODO: This is already in a block that will only run when effects
-    // syntax is parsed and ignored, so we don't need to have duplicate warnings
-    // for 2021. Please merge these warnings into a single diagnostic, eliminate
-    // the condition and clean up this note.
-    Diag(Tok.getLocation(), diag::warn_hlsl_effect_state_block);
-    if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
-      Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_state_block);
+    Diag(Tok.getLocation(), diag::warn_hlsl_2026_effects) << 2 << 1 << 1;
     ConsumeBrace();
     SkipUntil(tok::r_brace); // skip until '}'
     // Braces could have been used to initialize an array.
@@ -6344,14 +6332,9 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
   if (getLangOpts().HLSL) {
     if (MaybeParseHLSLAttributes(D))
       D.setInvalidType();
-    // Legacy effects annotations (< ... >) are removed in HLSL 202x. Only skip
-    // them for earlier language versions; in 202x the '<' falls through and
-    // produces a natural diagnostic.
     if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x && Tok.is(tok::less)) {
       // Consume effects annotations
-      Diag(Tok.getLocation(), diag::warn_hlsl_effect_annotation);
-      if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
-        Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_annotation);
+      Diag(Tok.getLocation(), diag::warn_hlsl_2026_effects) << 0 << 0 << 0;
       ConsumeToken();
       while (!Tok.is(tok::greater) && !Tok.is(tok::eof)) {
         SkipUntil(tok::semi); // skip through ;

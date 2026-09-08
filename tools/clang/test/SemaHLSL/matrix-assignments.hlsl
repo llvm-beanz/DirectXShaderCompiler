@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3   -verify %s
-// RUN: %dxc -Tps_6_0   -verify %s
+// RUN: %dxc -Tlib_6_3 -Weffects-syntax -verify %s
+// RUN: %dxc -Tps_6_0 -Weffects-syntax -verify %s
 
 // To test with the classic compiler, run
 // %sdxroot%\tools\x86\fxc.exe /T vs_2_0 matrix-assignments.hlsl
