@@ -592,6 +592,8 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result) {
   case tok::kw_technique:
     if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x) {
       Diag(Tok.getLocation(), diag::warn_hlsl_effect_technique);
+      if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
+        Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_technique);
       SkipUntil(tok::l_brace);    // skip through {
       SkipUntil(tok::r_brace);    // skip through matching }
       Result = DeclGroupPtrTy();

@@ -1012,15 +1012,27 @@ def warn_hlsl_minprecision_promotion : Warning <
 def warn_hlsl_effect_annotation : Warning <
   "possible effect annotation ignored - effect syntax is deprecated">,
   InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_2026_effect_annotation : Warning <
+  "effect annotations will be removed in HLSL 2026">,
+  InGroup<HLSL2026Effects>, DefaultIgnore;
 def warn_hlsl_effect_sampler_state : Warning <
   "effect sampler_state assignment ignored - effect syntax is deprecated">,
   InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_2026_effect_sampler_state : Warning <
+  "effect sampler_state assignments will be removed in HLSL 2026">,
+  InGroup<HLSL2026Effects>, DefaultIgnore;
 def warn_hlsl_effect_state_block : Warning <
   "effect state block ignored - effect syntax is deprecated. To use braces as an initializer use them with equal signs.">,
   InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_2026_effect_state_block : Warning <
+  "effect state blocks will be removed in HLSL 2026">,
+  InGroup<HLSL2026Effects>, DefaultIgnore;
 def warn_hlsl_effect_technique : Warning <
   "effect technique ignored - effect syntax is deprecated">,
   InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_2026_effect_technique : Warning <
+  "effect techniques will be removed in HLSL 2026">,
+  InGroup<HLSL2026Effects>, DefaultIgnore;
 def warn_hlsl_semantic_identifier_collision : Warning <
   "'%0' interpreted as semantic; previous definition(s) ignored">,
   InGroup< HLSLSemanticIdentifierCollision >;

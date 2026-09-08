@@ -15689,6 +15689,8 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
     bIsObject = true;
     if (bDeprecatedEffectObject) {
       Diag(D.getLocStart(), diag::warn_hlsl_effect_object);
+      if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
+        Diag(D.getLocStart(), diag::warn_hlsl_2026_effect_object);
       D.setInvalidType();
       return false;
     }

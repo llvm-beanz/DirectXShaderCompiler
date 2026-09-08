@@ -7853,6 +7853,9 @@ def err_hlsl_matrix_layout_wrong_type : Error<
 def warn_hlsl_effect_object : Warning <
   "effect object ignored - effect syntax is deprecated">,
   InGroup< HLSLEffectsSyntax >;
+def warn_hlsl_2026_effect_object : Warning <
+  "effect object types will be removed in HLSL 2026">,
+  InGroup<HLSL2026Effects>, DefaultIgnore;
 def warn_hlsl_unused_call : Warning<
   "ignoring return value of function that only reads data">,
   InGroup<UnusedValue>;

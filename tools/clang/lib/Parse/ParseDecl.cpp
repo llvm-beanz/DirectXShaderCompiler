@@ -2673,6 +2673,8 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
     if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x &&
         Tok.is(tok::kw_sampler_state)) {
       Diag(Tok.getLocation(), diag::warn_hlsl_effect_sampler_state);
+      if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
+        Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_sampler_state);
       SkipUntil(tok::l_brace); // skip until '{'
       SkipUntil(tok::r_brace); // skip until '}'
     } else
@@ -2818,6 +2820,8 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
     // Effects syntax is removed in HLSL 202x, so this is only done for
     // earlier language versions; 202x produces a natural diagnostic.
     Diag(Tok.getLocation(), diag::warn_hlsl_effect_state_block);
+    if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
+      Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_state_block);
     ConsumeBrace();
     SkipUntil(tok::r_brace); // skip until '}'
     // Braces could have been used to initialize an array.
@@ -6342,6 +6346,8 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
     if (getLangOpts().HLSLVersion < hlsl::LangStd::v202x && Tok.is(tok::less)) {
       // Consume effects annotations
       Diag(Tok.getLocation(), diag::warn_hlsl_effect_annotation);
+      if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
+        Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_annotation);
       ConsumeToken();
       while (!Tok.is(tok::greater) && !Tok.is(tok::eof)) {
         SkipUntil(tok::semi); // skip through ;
