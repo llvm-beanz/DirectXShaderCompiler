@@ -1,5 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -HV 202x -Whlsl-2026-effects -verify %s
-// RUN: %dxc -Tps_6_0 -HV 202x -Whlsl-2026-effects -verify %s
+// RUN: %dxc -Tlib_6_3 -HV 202x -verify %s
+// RUN: %dxc -Tps_6_0 -HV 202x -verify %s
 
 // The legacy HLSL effects syntax is removed in HLSL 202x. Constructs that
 // earlier language versions silently ignored (with an effects-syntax warning)

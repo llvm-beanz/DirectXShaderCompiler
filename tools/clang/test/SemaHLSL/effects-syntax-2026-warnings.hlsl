@@ -1,9 +1,5 @@
-// RUN: %dxc -Tlib_6_3 -HV 2021 -Werror %s
-// RUN: %dxc -Tps_6_0 -HV 2021 -Werror %s
-// RUN: %dxc -Tlib_6_3 -HV 2018 -Whlsl-2026-effects -verify %s
-// RUN: %dxc -Tps_6_0 -HV 2018 -Whlsl-2026-effects -verify %s
-// RUN: %dxc -Tlib_6_3 -HV 2021 -Whlsl-2026-effects -verify %s
-// RUN: %dxc -Tps_6_0 -HV 2021 -Whlsl-2026-effects -verify %s
+// RUN: %dxc -Tlib_6_3 -HV 2021 -verify %s
+// RUN: %dxc -Tps_6_0 -HV 2021 -verify %s
 
 Texture2D tex;
 

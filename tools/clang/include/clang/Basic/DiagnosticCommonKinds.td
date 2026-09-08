@@ -72,7 +72,7 @@ def warn_hlsl_2026_effects : Warning<
   "%select{possible |}2effect %select{annotation|sampler_state assignment|state "
   "block|technique|object}0 ignored - effect syntax is deprecated and will be "
   "removed in HLSL 2026%select{|. To use braces as an initializer use them "
-  "with equal signs.}1">, InGroup<HLSL2026Effects>, DefaultIgnore;
+  "with equal signs.}1">, InGroup<HLSLEffectsSyntax>;
 // HLSL Change Ends
 def ext_variadic_templates : ExtWarn<
   "variadic templates are a C++11 extension">, InGroup<CXX11>;

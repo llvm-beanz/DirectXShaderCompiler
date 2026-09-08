@@ -780,8 +780,7 @@ def CudaCompat : DiagGroup<"cuda-compat">;
 def FutureCompat : DiagGroup<"future-compat">;
 
 // HLSL Change Starts - HLSL diagnostic groups
-def HLSL2026Effects : DiagGroup<"hlsl-2026-effects">;
-def HLSLEffectsSyntax : DiagGroup<"effects-syntax", [HLSL2026Effects]>;
+def HLSLEffectsSyntax : DiagGroup<"effects-syntax">;
 def HLSLForRedefinition : DiagGroup<"for-redefinition">;
 def HLSLAttributeStatement : DiagGroup<"attribute-statement">;
 def HLSLAttributeType : DiagGroup<"attribute-type">;
@@ -810,7 +809,7 @@ def HLSLBarrier : DiagGroup<"hlsl-barrier">;
 def HLSLLegacyLiterals : DiagGroup<"hlsl-legacy-literal">;
 def HLSL2026Compat : DiagGroup<"hlsl-2026-compat", [
   HLSLLegacyLiterals,
-  HLSL2026Effects
+  HLSLEffectsSyntax
 ]>;
 
 def HLSLGroupshared202x : DiagGroup<"hlsl-groupshared-202x">;
