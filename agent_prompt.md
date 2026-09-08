@@ -1,5 +1,5 @@
 ---
-model: claude-opus-4.8
+model: gpt-5.6-sol
 ---
 
 # Initial Guidelines
@@ -18,6 +18,13 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-DXC has a whole bunch of modifications throughout the parser to allow it to ignore the legacy HLSL effects syntax. Under the HLSL 202x language mode, the effects syntax is now fully removed, meaning we should be able to disable the changes in the parser that allow DXC to ignore effects annotations and allow the compiler to generate diagnostics (errors) as it would naturally.
+The changes in this branch have a nice start on removing support for the legacy effects syntax.
 
-Can you please update DXC to remove the effects syntax support and add tests to verify that DXC produces diagnostics when it encounters effects annotations that are invalid syntax?
+I'd like to continue working on this by adding some new optional warnings.
+
+I've added a new diagnostic group `HLSL2026Effects`. I'd like you to add a new
+set of warning diagnostics that are disabled by default, and only trigger in
+HLSL 2021 and earlier which warn any time the compiler encounters effects
+syntax. The new warning should note that the effects syntax is being removed in
+HLSL 2026 (the compiler does not yet suppor the 2026 language mode, but it will
+be based on 202x which exists in the codebase today).
