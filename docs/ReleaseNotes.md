@@ -36,8 +36,8 @@ line upon naming the release. Refer to previous for appropriate section names.
 
 #### HLSL Language
 
-- Added the opt-in `-Whlsl-2026-effects` warning group for effects syntax that
-  will be removed in HLSL 2026.
+- Added the opt-in `-Whlsl-2026-compat` warning group for identifying issues
+  with language changes introduced in HLSL 2026.
 - Starting with HLSL 202x, the count in `[unroll(N)]` is a partial-unroll hint
   and no longer limits the number of loop iterations
   [#8789](https://github.com/microsoft/DirectXShaderCompiler/issues/8789).
