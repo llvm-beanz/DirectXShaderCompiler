@@ -18,13 +18,10 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-The changes in this branch have a nice start on removing support for the legacy effects syntax.
+I've added a few comments that start with `COPILOT-TODO` to provide feedback on
+the changes in this branch. Can you address the feedback and remove the comments
+when you are done?
 
-I'd like to continue working on this by adding some new optional warnings.
-
-I've added a new diagnostic group `HLSL2026Effects`. I'd like you to add a new
-set of warning diagnostics that are disabled by default, and only trigger in
-HLSL 2021 and earlier which warn any time the compiler encounters effects
-syntax. The new warning should note that the effects syntax is being removed in
-HLSL 2026 (the compiler does not yet suppor the 2026 language mode, but it will
-be based on 202x which exists in the codebase today).
+Also review the code in this branch to see if there are other places where the
+same feedback would apply, and if there are any other changes that should be
+revised based on the coding standards.

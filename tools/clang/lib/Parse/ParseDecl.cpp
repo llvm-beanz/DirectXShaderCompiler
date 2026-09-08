@@ -2819,6 +2819,10 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
     // block here, warn about effect deprecation, and ignore the block.
     // Effects syntax is removed in HLSL 202x, so this is only done for
     // earlier language versions; 202x produces a natural diagnostic.
+    // COPILOT-TODO: This is already in a block that will only run when effects
+    // syntax is parsed and ignored, so we don't need to have duplicate warnings
+    // for 2021. Please merge these warnings into a single diagnostic, eliminate
+    // the condition and clean up this note.
     Diag(Tok.getLocation(), diag::warn_hlsl_effect_state_block);
     if (getLangOpts().HLSLVersion <= hlsl::LangStd::v2021)
       Diag(Tok.getLocation(), diag::warn_hlsl_2026_effect_state_block);

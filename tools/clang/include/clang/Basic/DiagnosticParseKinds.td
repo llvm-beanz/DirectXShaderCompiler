@@ -1009,6 +1009,10 @@ def err_hlsl_nested_namespace_definition : Error<
   "nested namespace definition must define each namespace separately">;
 def warn_hlsl_minprecision_promotion : Warning <
   "%0 is promoted to %1">;
+// COPILOT-TODO: These warnings are all variations of the same message. We
+// should consider consolidating them into one warning with a parameter for the
+// specific construct. They should all also be default ignore as part of the
+// HLSL2026Effects group.
 def warn_hlsl_effect_annotation : Warning <
   "possible effect annotation ignored - effect syntax is deprecated">,
   InGroup< HLSLEffectsSyntax >;
