@@ -1,75 +1,73 @@
-# Agent Thoughts: Removing legacy HLSL effects syntax in HLSL 202x
+# Engineering Rationale: HLSL effects syntax
 
-## Goal
-DXC's parser contains special cases that *silently ignore* the legacy HLSL
-effects syntax (emitting `-Weffects-syntax` warnings and skipping tokens).
-Under HLSL 202x the effects syntax is fully removed, so these workarounds
-should be disabled for `HLSLVersion >= v202x`, letting the compiler produce its
-natural diagnostics (errors). Add tests proving the diagnostics appear.
+This file records the implementation rationale and validation decisions for the
+branch. It intentionally summarizes engineering conclusions rather than private
+chain-of-thought.
 
-## Investigation
-Searched for the effects handling and found it spread across the parser and
-semantic analysis:
+## Scope
 
-Parser phase (`tools/clang/lib/Parse`):
-1. `Parser.cpp` `case tok::kw_technique` — skips `technique { ... }`.
-2. `ParseDecl.cpp` `= sampler_state { ... }` — skips the assignment.
-3. `ParseDecl.cpp` "skip initializer of effect object" when
-   `D.isInvalidType()`.
-4. `ParseDecl.cpp` effect state block `{ ... }` after a declarator.
-5. `ParseDecl.cpp` effect annotation `< ... >` after a declarator.
+Legacy effects syntax is accepted through parser recovery in HLSL 2021 and
+earlier, but is rejected through normal parser and semantic diagnostics in HLSL
+202x. The branch also introduces an opt-in warning for constructs that will be
+removed.
 
-Sema phase (`tools/clang/lib/Sema/SemaHLSL.cpp`):
-6. `AddObjectTypes` registers the deprecated effect object *type names*
-   (`texture`, `PixelShader`, `BlendState`, ...). `DiagnoseHLSLDecl` then warns
-   `warn_hlsl_effect_object` and invalidates the declarator.
+The affected translation phases are:
 
-The HLSL language version is available everywhere via
-`getLangOpts().HLSLVersion` and compared against `hlsl::LangStd::v202x`
-(`include/dxc/Support/HLSLVersion.h`). Many existing sites already use this
-pattern.
+1. Parsing effect annotations, state blocks, `sampler_state` assignments, and
+   `technique` blocks.
+2. Semantic registration and diagnosis of deprecated effect object types.
+3. Diagnostic grouping and command-line warning control.
 
-## Approach
-Gate the parser effects skips (sites 1, 2, 4, 5) on
-`HLSLVersion < hlsl::LangStd::v202x`. For 202x and later the special cases are
-not taken, so the offending tokens flow into normal parsing and produce natural
-diagnostics:
-- `technique` -> "expected unqualified-id"
-- effect annotation `< ... >` -> "expected ';' after top level declarator"
-- effect state block `{ ... }` -> "expected ';' after top level declarator"
-- `= sampler_state { ... }` -> "expected expression"
+## Review feedback
 
-For the Sema phase (site 6) I chose to simply not register the deprecated
-effect object type names in 202x. Using one then yields a natural
-"unknown type name" diagnostic, which is cleaner and more consistent with the
-parser changes than keeping the warning. The fixed-size `std::array`
-`m_objectTypeDeclsMap` still has every slot initialized (the skipped entries
-are set to `{nullptr, 0}`) so the sorted lookup in `FindObjectBasicKindIndex`
-stays well-defined.
+The review comments identified duplicate diagnostics at each recovery site and
+requested a parameterized, default-ignored warning. The same pattern also
+appeared at the other parser recovery sites and in semantic analysis, so the
+fix was applied consistently to every effects construct.
 
-## Decision about site 3 (skip initializer of invalid effect object)
-Initially I also gated site 3, but `check-all` revealed a regression:
-`HLSLFileCheckLit/hlsl/auto/auto-no-pointer.hlsl` (compiled with `-HV 202x`)
-started emitting an extra "operator is not supported" error for `&x` in
-`auto* ptr = &x;`. Site 3 is in fact a *generic* recovery for any
-invalid-typed declarator with an initializer (it suppresses cascading errors),
-not something specific to effects syntax. Gating it changed unrelated error
-recovery, so I reverted that hunk and left site 3 applying to all versions.
-This also keeps the new 202x diagnostics clean (single error per construct).
+The separate parser and semantic diagnostics were replaced by one common
+`warn_hlsl_2026_effects` diagnostic. Its parameters select the construct,
+preserve the annotation's "possible" qualifier, and retain the state-block
+initializer guidance. Every recovery site now emits exactly one warning with
+no redundant HLSL-version condition.
 
-## Testing
-Added `tools/clang/test/SemaHLSL/effects-syntax-202x.hlsl` (run for both
-`lib_6_3` and `ps_6_0`, `-HV 202x`, `-verify`) covering:
-- parser phase: technique, effect annotation, effect state block,
-  sampler_state assignment;
-- sema phase: every deprecated effect object type name now being unknown;
-- a regression guard that `register()` annotations still parse and a normal
-  entry point still compiles.
+The warning belongs to the default-ignored `HLSL2026Effects` group.
+`HLSLEffectsSyntax` contains that group so the existing `-Weffects-syntax`
+spelling remains a compatibility alias.
 
-The pre-existing `SemaHLSL/effects-syntax.hlsl` (default HLSL version) continues
-to pass unchanged, proving older language modes keep the deprecation warnings.
+## Coding-standards review
 
-## Verification
-Configured/built with `cmake/caches/PredefinedParams.cmake` and ran the
-`check-all` target. Result: 4627 expected passes, 9 expected failures,
-33 unsupported, 0 unexpected failures.
+The HLSL 202x semantic change originally retained a fixed-size object lookup
+array by inserting null entries for effect types that were no longer declared.
+That made the lookup representation depend on synthetic values. The map now
+uses `SmallVector`, which is already the project convention in this file, and
+contains only declarations that actually exist. Newly introduced local names
+use LLVM-style capitalization.
+
+Comments added by the branch were reduced where they repeated the code. The
+`COPILOT-TODO` comments were removed after their feedback was applied.
+
+## Tests
+
+The warning test covers both library and pixel profiles in HLSL 2018 and 2021.
+It verifies:
+
+- warnings are ignored by default, even with `-Werror`;
+- `-Whlsl-2026-effects` emits one warning per parser and semantic construct;
+- the parameterized wording for all construct kinds.
+
+Existing effects and matrix tests now explicitly enable `-Weffects-syntax`,
+which verifies the compatibility alias. The HLSL 202x test covers natural
+parser errors for all recovered syntax forms and unknown-type semantic errors
+for every deprecated effect object type.
+
+## Validation
+
+The build directory was configured with:
+
+```text
+cmake -C cmake/caches/PredefinedParams.cmake -S . -B build-rel
+```
+
+The `check-all` target completed with 4,682 expected passes, 10 expected
+failures, 33 unsupported tests, and no unexpected failures.
