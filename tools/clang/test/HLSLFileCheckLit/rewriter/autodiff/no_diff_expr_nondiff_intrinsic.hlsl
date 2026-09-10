@@ -8,9 +8,9 @@
 // translation.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
-// CHECK: return add<float>(x_expr, (float)asuint(x));
+// CHECK: return compute_gradients(context, add<float>(x_expr, (float)asuint(x)));
 // CHECK-NOT: _Static_assert
 // CHECK: } } } // namespace user::ad::bwd
 

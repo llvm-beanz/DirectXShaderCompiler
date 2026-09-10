@@ -18,9 +18,9 @@
 // CHECK: return (uv - floor(uv));
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> frac_no_diff(inout GradientContext<float> context, Variable<float> uv)
+// CHECK: float frac_no_diff(inout GradientContext<float> context, Variable<float> uv)
 // CHECK: VariableExpr<float> uv_expr = makeVariableExpr<float>(uv);
-// CHECK: return subtract<float>(uv_expr, floor(uv));
+// CHECK: return compute_gradients(context, subtract<float>(uv_expr, floor(uv)));
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(fwd, bwd)]]

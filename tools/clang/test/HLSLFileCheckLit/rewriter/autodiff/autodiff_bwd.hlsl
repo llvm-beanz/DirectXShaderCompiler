@@ -1,28 +1,24 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
-//
-//
-// Note: this test only checks the rewriter output. Running `dxc -verify`
-// on the generated backward-mode code is intentionally skipped because
-// the rewriter declares the generated function to return `Variable<T>`
-// but the real hlsl/ad/bwd library's combinators (`add`, `multiply`,
-// ...) return expression-template types (e.g. `BackAddExpr<...>`). This
-// mismatch is a pre-existing rewriter limitation documented in
-// agent_thoughts.md and is out of scope for the include-path change.
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: cat %t.gen.hlsl %S/Inputs/autodiff_bwd_caller.hlsl > %t.run.hlsl
+// RUN: %dxc -T cs_6_9 -E main -HV 2021 -Fo %t.dxil %t.run.hlsl
+// RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// Backward-only autodiff: emits a Variable<float>-based backward variant in
-// user::ad::bwd. Parameter references are rewritten to _expr wrappers and a
-// VariableExpr<T> is declared per parameter.
+// Backward-only autodiff evaluates its expression graph, returns the primal,
+// and leaves parameter gradients in the caller-provided GradientContext.
 
 // CHECK: float f(float x)
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
-// CHECK: return add<float>(multiply<float>(x_expr, x_expr), x_expr);
+// CHECK: return compute_gradients(context, add<float>(multiply<float>(x_expr, x_expr), x_expr));
 // CHECK: } } } // namespace user::ad::bwd
+
+// f(2) = 6 and df/dx = 2x + 1 = 5.
+// EXEC: rawBufferStore.f32{{.*}}i32 0, i32 0, float 6.000000e+00
+// EXEC: rawBufferStore.f32{{.*}}i32 1, i32 0, float 5.000000e+00
 
 [[dxc::autodiff(bwd)]]
 float f(float x) {
   return x * x + x;
 }
-
-float main(float x : A) : SV_Target { return f(x); }

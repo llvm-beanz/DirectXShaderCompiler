@@ -7,8 +7,8 @@
 // the backward-mode builder chain.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> f(inout GradientContext<float> context, Variable<float> x)
-// CHECK: return add<float>(x_expr, sin(x) * cos(x));
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: return compute_gradients(context, add<float>(x_expr, sin(x) * cos(x)));
 // CHECK-NOT: multiply<float>(sinExpr
 // CHECK: } } } // namespace user::ad::bwd
 

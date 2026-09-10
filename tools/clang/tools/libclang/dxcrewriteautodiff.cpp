@@ -498,8 +498,13 @@ public:
     if (const auto *RS = dyn_cast<ReturnStmt>(S)) {
       OS << Indent << "return";
       if (RS->getRetValue()) {
-        OS << " ";
+        // Backward builders produce expression-template types. Evaluate the
+        // completed graph here, returning its primal value and accumulating
+        // parameter gradients in the caller-provided context.
+        OS << (M == Bwd ? " compute_gradients(context, " : " ");
         emitExpr(RS->getRetValue());
+        if (M == Bwd)
+          OS << ")";
       }
       OS << ";\n";
       return;
@@ -833,9 +838,10 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     OS << ")";
     return;
   }
-  // Backward mode.
-  OS << "Variable<" << ElemType << "> " << FD->getName()
-     << "(inout GradientContext<" << ElemType << "> context";
+  // Backward mode returns the primal value; derivatives are written to the
+  // GradientContext entries associated with the Variable<T> parameters.
+    OS << ElemType << " " << FD->getName() << "(inout GradientContext<"
+      << ElemType << "> context";
   for (const ParmVarDecl *P : FD->parameters()) {
     OS << ", Variable<" << ElemType << "> " << P->getName();
   }
@@ -897,7 +903,7 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     if (M == AutoDiffEmitter::Fwd)
       OS << "    return Value<" << ElemType << ">();\n";
     else
-      OS << "    return Variable<" << ElemType << ">();\n";
+      OS << "    return (" << ElemType << ")0;\n";
   }
   OS << "}\n";
   return true;

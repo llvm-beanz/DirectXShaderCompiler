@@ -18,7 +18,7 @@
 
 // CHECK-NOT: namespace user { namespace ad { namespace fwd
 // CHECK-NOT: Value<float> g(
-// CHECK-NOT: Variable<float> g(
+// CHECK-NOT: float g(inout GradientContext<float>
 
 // CHECK: namespace user { namespace ad { namespace fwd {
 // CHECK: Value<float> f(Value<float> x)
@@ -26,9 +26,9 @@
 // CHECK: } } } // namespace user::ad::fwd
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
 // CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': unknown callee 'g' has no auto-diff builder");
-// CHECK: return Variable<float>();
+// CHECK: return (float)0;
 // CHECK: } } } // namespace user::ad::bwd
 
 float g(float x) { return x * x; }

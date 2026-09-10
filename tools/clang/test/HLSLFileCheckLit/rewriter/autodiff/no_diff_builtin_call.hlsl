@@ -21,11 +21,11 @@
 // CHECK: return (a + x);
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
 // CHECK: Variable<float> a;
 // CHECK: a = sin(x);
-// CHECK: return add<float>(a, x_expr);
+// CHECK: return compute_gradients(context, add<float>(a, x_expr));
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(fwd, bwd)]]

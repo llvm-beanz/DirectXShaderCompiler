@@ -9,7 +9,7 @@
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: using namespace ::ad::bwd;
 // CHECK: struct Box : ::Box {
-// CHECK: Variable<float> volume(inout GradientContext<float> context, Variable<float> h)
+// CHECK: float volume(inout GradientContext<float> context, Variable<float> h)
 // CHECK: VariableExpr<float> h_expr = makeVariableExpr<float>(h);
 // CHECK: multiply<float>
 // CHECK: } } } // namespace user::ad::bwd

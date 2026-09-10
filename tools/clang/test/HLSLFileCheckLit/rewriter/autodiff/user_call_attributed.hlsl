@@ -20,8 +20,8 @@
 // CHECK: } } } // namespace user::ad::fwd
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> g(inout GradientContext<float> context, Variable<float> x)
-// CHECK: return multiply<float>(x_expr, x_expr);
+// CHECK: float g(inout GradientContext<float> context, Variable<float> x)
+// CHECK: return compute_gradients(context, multiply<float>(x_expr, x_expr));
 // CHECK: } } } // namespace user::ad::bwd
 
 // CHECK: namespace user { namespace ad { namespace fwd {
@@ -30,9 +30,9 @@
 // CHECK: } } } // namespace user::ad::fwd
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: Variable<float> f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
 // CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': unknown callee 'g' has no auto-diff builder");
-// CHECK: return Variable<float>();
+// CHECK: return (float)0;
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(fwd, bwd)]]
