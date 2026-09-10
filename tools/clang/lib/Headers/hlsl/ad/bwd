@@ -2,7 +2,7 @@
 #define HLSL_AD_BWD
 
 #include <type_traits>
-#include <enable_if.h>
+#include <enable_if>
 #include <ad/matrix_utils>
 
 namespace ad {

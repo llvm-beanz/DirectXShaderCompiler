@@ -38,7 +38,6 @@ template <typename T> struct is_arithmetic {
 #if __HLSL_ENABLE_16_BIT
 __ARITHMETIC_TYPE(uint16_t)
 __ARITHMETIC_TYPE(int16_t)
-__ARITHMETIC_TYPE(float16_t)
 #endif
 __ARITHMETIC_TYPE(uint)
 __ARITHMETIC_TYPE(int)
