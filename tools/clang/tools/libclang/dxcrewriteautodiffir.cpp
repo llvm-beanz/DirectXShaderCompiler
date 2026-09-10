@@ -136,9 +136,11 @@ private:
       ADExpr *Node = createExpr(ADExpr::Kind::DeclRef, E);
       Node->SourceDecl = D;
       Node->Value.SourceDecl = D;
-      Node->Value.Activity = !ForceInactive && isa<ParmVarDecl>(D)
-                                 ? ADActivity::Active
-                                 : ADActivity::Inactive;
+        const auto *Parameter = dyn_cast<ParmVarDecl>(D);
+        Node->Value.Activity =
+          !ForceInactive && Parameter && !Parameter->hasAttr<HLSLNoDiffAttr>()
+            ? ADActivity::Active
+            : ADActivity::Inactive;
       return Node;
     }
 
