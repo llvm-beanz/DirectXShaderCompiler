@@ -47,11 +47,11 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <array>
 #include <bitset>
 #include <float.h>
 
@@ -878,11 +878,10 @@ GetOrCreateTemplateSpecialization(ASTContext &context, Sema &sema,
     if (specializationDecl->getInstantiatedFrom().isNull()) {
       // InstantiateClassTemplateSpecialization returns true if it finds an
       // error.
-      DXVERIFY_NOMSG(false ==
-                     sema.InstantiateClassTemplateSpecialization(
-                         NoLoc, specializationDecl,
-                         TemplateSpecializationKind::TSK_ImplicitInstantiation,
-                         true));
+      if (sema.InstantiateClassTemplateSpecialization(
+              NoLoc, specializationDecl,
+              TemplateSpecializationKind::TSK_ImplicitInstantiation, true))
+        return QualType();
     }
     return context.getTemplateSpecializationType(
         TemplateName(templateDecl), templateArgs.data(), templateArgs.size(),
@@ -893,18 +892,20 @@ GetOrCreateTemplateSpecialization(ASTContext &context, Sema &sema,
       context, TagDecl::TagKind::TTK_Class, currentDeclContext, NoLoc, NoLoc,
       templateDecl, templateArgsForDecl.data(), templateArgsForDecl.size(),
       nullptr);
-  // InstantiateClassTemplateSpecialization returns true if it finds an error.
-  DXVERIFY_NOMSG(false ==
-                 sema.InstantiateClassTemplateSpecialization(
-                     NoLoc, specializationDecl,
-                     TemplateSpecializationKind::TSK_ImplicitInstantiation,
-                     true));
+  // template specialization isn't performed if a fatal error has occurred
+  if (!sema.Diags.hasFatalErrorOccurred()) {
+    // InstantiateClassTemplateSpecialization returns true if it finds an error.
+    [[maybe_unused]] bool errorFound =
+        sema.InstantiateClassTemplateSpecialization(
+            NoLoc, specializationDecl,
+            TemplateSpecializationKind::TSK_ImplicitInstantiation, true);
+    assert(!errorFound && "template specialization failed");
+  }
   templateDecl->AddSpecialization(specializationDecl, InsertPos);
   specializationDecl->setImplicit(true);
-
   QualType canonType = context.getTypeDeclType(specializationDecl);
-  DXASSERT(isa<RecordType>(canonType),
-           "type of non-dependent specialization is not a RecordType");
+  assert(isa<RecordType>(canonType) &&
+         "type of non-dependent specialization is not a RecordType");
   TemplateArgumentListInfo templateArgumentList(NoLoc, NoLoc);
   TemplateArgumentLocInfo NoTemplateArgumentLocInfo;
   for (unsigned i = 0; i < templateArgs.size(); i++) {
@@ -939,16 +940,17 @@ static QualType GetOrCreateMatrixSpecialization(
       context, *sema, matrixTemplateDecl,
       ArrayRef<TemplateArgument>(templateArgs));
 
-#ifndef NDEBUG
-  // Verify that we can read the field member from the template record.
-  DXASSERT(matrixSpecializationType->getAsCXXRecordDecl(),
+  if (!matrixSpecializationType.isNull() &&
+      !sema->Diags.hasFatalErrorOccurred()) {
+    assert(matrixSpecializationType->getAsCXXRecordDecl() &&
            "type of non-dependent specialization is not a RecordType");
-  DeclContext::lookup_result lookupResult =
-      matrixSpecializationType->getAsCXXRecordDecl()->lookup(
-          DeclarationName(&context.Idents.get(StringRef("h"))));
-  DXASSERT(!lookupResult.empty(),
+    // Verify that we can read the field member from the template record.
+    [[maybe_unused]] DeclContext::lookup_result lookupResult =
+        matrixSpecializationType->getAsCXXRecordDecl()->lookup(
+            DeclarationName(&context.Idents.get(StringRef("h"))));
+    assert(!lookupResult.empty() &&
            "otherwise matrix handle cannot be looked up");
-#endif
+  }
 
   return matrixSpecializationType;
 }
@@ -974,16 +976,17 @@ GetOrCreateVectorSpecialization(ASTContext &context, Sema *sema,
       context, *sema, vectorTemplateDecl,
       ArrayRef<TemplateArgument>(templateArgs));
 
-#ifndef NDEBUG
-  // Verify that we can read the field member from the template record.
-  DXASSERT(vectorSpecializationType->getAsCXXRecordDecl(),
+  if (!vectorSpecializationType.isNull() &&
+      !sema->Diags.hasFatalErrorOccurred()) {
+    assert(vectorSpecializationType->getAsCXXRecordDecl() &&
            "type of non-dependent specialization is not a RecordType");
-  DeclContext::lookup_result lookupResult =
-      vectorSpecializationType->getAsCXXRecordDecl()->lookup(
-          DeclarationName(&context.Idents.get(StringRef("h"))));
-  DXASSERT(!lookupResult.empty(),
+    // Verify that we can read the field member from the template record.
+    [[maybe_unused]] DeclContext::lookup_result lookupResult =
+        vectorSpecializationType->getAsCXXRecordDecl()->lookup(
+            DeclarationName(&context.Idents.get(StringRef("h"))));
+    assert(!lookupResult.empty() &&
            "otherwise vector handle cannot be looked up");
-#endif
+  }
 
   return vectorSpecializationType;
 }
@@ -1002,16 +1005,16 @@ GetOrCreateNodeOutputRecordSpecialization(ASTContext &context, Sema *sema,
   QualType specializationType = GetOrCreateTemplateSpecialization(
       context, *sema, templateDecl, ArrayRef<TemplateArgument>(templateArgs));
 
-#ifdef DBG
-  // Verify that we can read the field member from the template record.
-  DXASSERT(specializationType->getAsCXXRecordDecl(),
+  if (!specializationType.isNull() && !sema->Diags.hasFatalErrorOccurred()) {
+    assert(specializationType->getAsCXXRecordDecl() &&
            "type of non-dependent specialization is not a RecordType");
-  DeclContext::lookup_result lookupResult =
-      specializationType->getAsCXXRecordDecl()->lookup(
-          DeclarationName(&context.Idents.get(StringRef("h"))));
-  DXASSERT(!lookupResult.empty(),
+    // Verify that we can read the field member from the template record.
+    [[maybe_unused]] DeclContext::lookup_result lookupResult =
+        specializationType->getAsCXXRecordDecl()->lookup(
+            DeclarationName(&context.Idents.get(StringRef("h"))));
+    assert(!lookupResult.empty() &&
            "otherwise *NodeOutputRecords handle cannot be looked up");
-#endif
+  }
 
   return specializationType;
 }
@@ -1039,7 +1042,7 @@ static const ArTypeObjectKind g_ArrayTT[] = {AR_TOBJ_ARRAY, AR_TOBJ_UNKNOWN};
 
 const ArTypeObjectKind *g_LegalIntrinsicTemplates[] = {
     g_NullTT, g_ScalarTT, g_VectorTT, g_MatrixTT,
-    g_AnyTT,  g_ObjectTT, g_ArrayTT,
+    g_AnyTT,  g_ObjectTT, g_ArrayTT,  g_ArrayTT,
 };
 C_ASSERT(ARRAYSIZE(g_LegalIntrinsicTemplates) == LITEMPLATE_COUNT);
 
@@ -2087,12 +2090,31 @@ static void AddHLSLIntrinsicAttr(FunctionDecl *FD, ASTContext &context,
     FD->addAttr(PureAttr::CreateImplicit(context));
   if (pIntrinsic->Flags & INTRIN_FLAG_IS_WAVE)
     FD->addAttr(HLSLWaveSensitiveAttr::CreateImplicit(context));
-  if (pIntrinsic->MinShaderModel) {
-    unsigned Major = pIntrinsic->MinShaderModel >> 4;
-    unsigned Minor = pIntrinsic->MinShaderModel & 0xF;
+  if (pIntrinsic->MinShaderModel || pIntrinsic->MaxShaderModel) {
+    clang::VersionTuple Introduced;
+    if (pIntrinsic->MinShaderModel) {
+      unsigned Major = pIntrinsic->MinShaderModel >> 4;
+      unsigned Minor = pIntrinsic->MinShaderModel & 0xF;
+      Introduced = clang::VersionTuple(Major, Minor);
+    }
+    // The maximum shader model is the last one that still supports the
+    // intrinsic: it is deprecated there, and obsoleted in the next minor
+    // shader model version. We could give longer deprecation periods in the
+    // future if there is a need for that.
+    clang::VersionTuple Deprecated;
+    clang::VersionTuple Obsoleted;
+    if (pIntrinsic->MaxShaderModel) {
+      unsigned Major = pIntrinsic->MaxShaderModel >> 4;
+      unsigned Minor = pIntrinsic->MaxShaderModel & 0xF;
+      Deprecated = clang::VersionTuple(Major, Minor);
+      DXASSERT(
+          Minor <= 14,
+          "I don't know how we should handle this, so let's assert for now.");
+      Obsoleted = clang::VersionTuple(Major, Minor + 1);
+    }
     FD->addAttr(AvailabilityAttr::CreateImplicit(
-        context, &context.Idents.get(""), clang::VersionTuple(Major, Minor),
-        clang::VersionTuple(), clang::VersionTuple(), false, ""));
+        context, &context.Idents.get(""), Introduced, Deprecated, Obsoleted,
+        false, ""));
   }
 }
 
@@ -3247,9 +3269,9 @@ private:
   CXXRecordDecl *m_objectTypeDecls[_countof(g_ArBasicKindsAsTypes)];
   // Map from object decl to the object index.
   using ObjectTypeDeclMapType =
-      std::array<std::pair<CXXRecordDecl *, unsigned>,
-                 _countof(g_ArBasicKindsAsTypes) +
-                     _countof(g_DeprecatedEffectObjectNames)>;
+      SmallVector<std::pair<CXXRecordDecl *, unsigned>,
+                  _countof(g_ArBasicKindsAsTypes) +
+                      _countof(g_DeprecatedEffectObjectNames)>;
   ObjectTypeDeclMapType m_objectTypeDeclsMap;
 
   UsedIntrinsicStore m_usedIntrinsics;
@@ -4238,7 +4260,7 @@ private:
             *m_context, typeName, templateArgCount, typeDefault, Attr);
       }
       m_objectTypeDecls[i] = recordDecl;
-      m_objectTypeDeclsMap[i] = std::make_pair(recordDecl, i);
+      m_objectTypeDeclsMap.push_back(std::make_pair(recordDecl, i));
     }
 
     // Create an alias for SamplerState. 'sampler' is very commonly used.
@@ -4255,10 +4277,14 @@ private:
       samplerDecl->setImplicit(true);
 
       // Create decls for each deprecated effect object type:
-      unsigned effectObjBase = _countof(g_ArBasicKindsAsTypes);
-      // TypeSourceInfo* effectObjTypeSource =
-      // m_context->getTrivialTypeSourceInfo(GetBasicKindType(AR_OBJECT_LEGACY_EFFECT));
+      // The legacy effects syntax is removed in HLSL 202x, so these type names
+      // are not registered in 202x and later. Using them then produces a
+      // natural "unknown type name" diagnostic.
+      bool RegisterEffectObjects =
+          m_sema->getLangOpts().HLSLVersion < hlsl::LangStd::v202x;
       for (unsigned i = 0; i < _countof(g_DeprecatedEffectObjectNames); i++) {
+        if (!RegisterEffectObjects)
+          continue;
         IdentifierInfo &idInfo =
             m_context->Idents.get(StringRef(g_DeprecatedEffectObjectNames[i]),
                                   tok::TokenKind::identifier);
@@ -4269,8 +4295,8 @@ private:
                                   currentDeclContext, NoLoc, NoLoc, &idInfo);
         currentDeclContext->addDecl(effectObjDecl);
         effectObjDecl->setImplicit(true);
-        m_objectTypeDeclsMap[i + effectObjBase] =
-            std::make_pair(effectObjDecl, effectKindIndex);
+        m_objectTypeDeclsMap.push_back(
+            std::make_pair(effectObjDecl, effectKindIndex));
       }
     }
 
@@ -7161,7 +7187,23 @@ bool HLSLExternalSource::MatchArguments(
     case AR_TOBJ_BASIC:
     case AR_TOBJ_OBJECT:
     case AR_TOBJ_STRING:
+      break;
     case AR_TOBJ_ARRAY:
+      // Arrays of vectors are only allowed for LITEMPLATE_ANY_ARRAY
+      // parameters, where the vector size is matched the same way it would be
+      // for a plain vector parameter.
+      if (pIntrinsicArg->uLegalTemplates == LITEMPLATE_ANY_ARRAY) {
+        QualType EltType = QualType(pType->getBaseElementTypeUnsafe(), 0);
+        switch (GetTypeObjectKind(EltType)) {
+        case AR_TOBJ_VECTOR:
+          TypeInfoCols = GetHLSLVecSize(EltType);
+          break;
+        case AR_TOBJ_BASIC:
+          break;
+        default:
+          badArgIdx = std::min(badArgIdx, iArg);
+        }
+      }
       break;
     default:
       badArgIdx = std::min(badArgIdx, iArg); // no struct, arrays or void
@@ -7615,8 +7657,21 @@ bool HLSLExternalSource::MatchArguments(
         qwQual |= AR_QUAL_CONST;
 
       DXASSERT_VALIDBASICKIND(pEltType);
-      pNewType = NewSimpleAggregateType(Template[pArgument->uTemplateId],
-                                        pEltType, qwQual, uRows, uCols);
+
+      // Array parameters build the array element type here, which is later
+      // wrapped in the argument's array dimensions. For arrays of vectors the
+      // element has to be built as a vector, even when it holds a single
+      // component.
+      ArTypeObjectKind AggregateKind = Template[pArgument->uTemplateId];
+      if (i > 0 && AggregateKind == AR_TOBJ_ARRAY &&
+          pArgument->uLegalTemplates == LITEMPLATE_ANY_ARRAY &&
+          GetTypeObjectKind(QualType(
+              Args[i - 1]->getType()->getBaseElementTypeUnsafe(), 0)) ==
+              AR_TOBJ_VECTOR)
+        AggregateKind = AR_TOBJ_VECTOR;
+
+      pNewType =
+          NewSimpleAggregateType(AggregateKind, pEltType, qwQual, uRows, uCols);
 
       // If array type, wrap in the argument's array type.
       if (i > 0 && Template[pArgument->uTemplateId] == AR_TOBJ_ARRAY) {
@@ -9589,6 +9644,10 @@ clang::ExprResult HLSLExternalSource::PerformHLSLConversion(
     clang::Sema::CheckedConversionKind CCK) {
   QualType sourceType = From->getType();
   sourceType = GetStructuralForm(sourceType);
+
+  // Store off the type attributes that could be accidentially dropped.
+  const bool targetGloballyCoherent = hlsl::HasHLSLGloballyCoherent(targetType);
+  const bool targetReorderCoherent = hlsl::HasHLSLReorderCoherent(targetType);
   targetType = GetStructuralForm(targetType);
   ArTypeInfo SourceInfo, TargetInfo;
   CollectInfo(sourceType, &SourceInfo);
@@ -9605,9 +9664,23 @@ clang::ExprResult HLSLExternalSource::PerformHLSLConversion(
     //    convert that to an array of casts under a special kind of flat
     //    flat conversion node?  What do component conversion casts cast
     //    from?  We don't have a From expression for individiual components.
+    QualType flatCastType = targetType.getUnqualifiedType();
+    // Preserve coherence qualifiers when converting to a resource type so the
+    // converted expression's type still reflects the coherence of its
+    // destination.
+    if (hlsl::IsHLSLResourceType(flatCastType)) {
+      if (targetGloballyCoherent)
+        flatCastType = m_context->getAttributedType(
+            AttributedType::attr_hlsl_globallycoherent, flatCastType,
+            flatCastType);
+      else if (targetReorderCoherent)
+        flatCastType = m_context->getAttributedType(
+            AttributedType::attr_hlsl_reordercoherent, flatCastType,
+            flatCastType);
+    }
     From = m_sema
-               ->ImpCastExprToType(From, targetType.getUnqualifiedType(),
-                                   CK_FlatConversion, From->getValueKind(),
+               ->ImpCastExprToType(From, flatCastType, CK_FlatConversion,
+                                   From->getValueKind(),
                                    /*BasePath=*/0, CCK)
                .get();
     break;
@@ -10262,6 +10335,15 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
     // Handle explicit splats from single element numerical types (scalars,
     // vector1s and matrix1x1s) to aggregate types.
     if (explicitConversion) {
+      const bool SourceIsSingleElement =
+          SourceInfo.ShapeKind == AR_TOBJ_SCALAR ||
+          (hlsl::IsHLSLVecMatType(source) &&
+           hlsl::GetElementCount(source) == 1);
+      if (SourceIsSingleElement &&
+          (m_sema->RequireCompleteType(loc, target, 0) ||
+           !hlsl::IsHLSLNumericOrAggregateOfNumericType(target)))
+        return false;
+
       const BuiltinType *sourceSingleElementBuiltinType =
           source->getAs<BuiltinType>();
       if (sourceSingleElementBuiltinType == nullptr &&
@@ -10271,11 +10353,7 @@ bool HLSLExternalSource::CanConvert(SourceLocation loc, Expr *sourceExpr,
             hlsl::GetElementTypeOrType(source)->getAs<BuiltinType>();
       }
 
-      // We can only splat to target types that do not contain object/resource
-      // types
-      if (sourceSingleElementBuiltinType != nullptr &&
-          !m_sema->RequireCompleteType(loc, target, 0) &&
-          hlsl::IsHLSLNumericOrAggregateOfNumericType(target)) {
+      if (sourceSingleElementBuiltinType != nullptr) {
         BuiltinType::Kind kind = sourceSingleElementBuiltinType->getKind();
         switch (kind) {
         case BuiltinType::Kind::UInt:
@@ -15643,7 +15721,8 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
   if (hlsl::IsObjectType(this, qt, &bDeprecatedEffectObject)) {
     bIsObject = true;
     if (bDeprecatedEffectObject) {
-      Diag(D.getLocStart(), diag::warn_hlsl_effect_object);
+      Diag(D.getLocStart(), diag::warn_hlsl_2026_effects)
+          << /*object*/ 4 << /*known not possible*/ 1;
       D.setInvalidType();
       return false;
     }
@@ -17928,6 +18007,8 @@ ConvertLinAlgMatrixComponentTypeToString(hlsl::DXIL::ComponentType CompType) {
     return "ComponentType::F8_E4M3FN";
   case DXIL::ComponentType::F8_E5M2:
     return "ComponentType::F8_E5M2";
+  case DXIL::ComponentType::BFloat16:
+    return "ComponentType::BFloat16";
   default:
     llvm_unreachable("Unknown ComponentType");
   }

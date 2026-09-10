@@ -7682,6 +7682,29 @@ def warn_hlsl_builtin_constant_unavailable: Warning<
 def warn_hlsl_builtin_type_unavailable: Warning<
   "potential misuse of built-in type %0 in shader model %1; introduced"
   " in shader model %2">, DefaultError, InGroup<HLSLAvailability>;
+def warn_hlsl_builtin_constant_removed
+    : Warning<"built-in constant %0 is unavailable in shader model %1; it was "
+              "removed"
+              " in shader model %2">,
+      InGroup<HLSLAvailabilityConstant>;
+def warn_hlsl_builtin_type_removed
+    : Warning<
+          "built-in type %0 is unavailable in shader model %1; it was removed"
+          " in shader model %2">,
+      DefaultError,
+      InGroup<HLSLAvailability>;
+def warn_hlsl_intrinsic_removed
+    : Warning<
+          "intrinsic %0 potentially used by '%1' is unavailable; it was removed"
+          " in shader model %2">,
+      DefaultError,
+      InGroup<HLSLAvailability>;
+def warn_hlsl_node_shader_removed
+    : Warning<
+          "node shaders and other Work Graphs functionality are not supported"
+          " when targeting shader model %0">,
+      DefaultError,
+      InGroup<HLSLAvailability>;
 def err_hlsl_unsupported_char_literal : Error<
   "unsupported style of char literal - use a single-character char-based literal">;
 def err_hlsl_unsupported_clipplane_argument_expression : Error<
@@ -7738,7 +7761,7 @@ def err_hlsl_norm_float_only : Error<
 def err_hlsl_unsupported_conditional_syntax : Error<
   "x ?: y conditional operator syntax not supported in HLSL">;
 def err_hlsl_conditional_cond_typecheck : Error<
-  "conditional operator only supports condition with scalar, vector, or matrix types convertable to bool.">;
+  "conditional operator only supports condition with scalar, vector, or matrix types convertible to bool.">;
 def err_hlsl_conditional_result_typecheck : Error<
   "conditional operator only supports results with numeric scalar, vector, or matrix types.">;
 def err_hlsl_conditional_dimensions : Error<
@@ -7825,11 +7848,8 @@ def warn_hlsl_unsupported_statement_for_switch_attribute : Warning<
 def warn_hlsl_unsupported_statement_for_loop_attribute : Warning<
   "attribute %0 can only be applied to 'for', 'while' and 'do' loop statements">,
   InGroup<HLSLAttributeStatement>;
-def err_hlsl_matrix_layout_wrong_type : Error<
-  "%0 can only be used with a matrix type">;
-def warn_hlsl_effect_object : Warning <
-  "effect object ignored - effect syntax is deprecated">,
-  InGroup< HLSLEffectsSyntax >;
+def err_hlsl_matrix_layout_wrong_type
+    : Error<"%0 can only be used with a matrix type">;
 def warn_hlsl_unused_call : Warning<
   "ignoring return value of function that only reads data">,
   InGroup<UnusedValue>;
@@ -7957,7 +7977,7 @@ def err_hlsl_maxarraysize_template_arg : Error<
 def err_hlsl_maxrecord_attrs_on_same_arg : Error<
     "only one of MaxRecords or MaxRecordsSharedWith may be specified to the same parameter.">;
 def err_hlsl_maxrecordssharedwith_references_invalid_arg : Error<
-    "attribute MaxRecordsSharedWith must reference a valid ouput parameter name.">;
+    "attribute MaxRecordsSharedWith must reference a valid output parameter name.">;
 def err_hlsl_maxrecordssharedwith_references_itself : Error<
     "attribute MaxRecordsSharedWith must not reference the same parameter it is applied to.">;
 def err_hlsl_maxrecord_on_wrong_launch : Error<

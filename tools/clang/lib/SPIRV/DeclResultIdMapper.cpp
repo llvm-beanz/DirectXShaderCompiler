@@ -299,6 +299,14 @@ LocationAndComponent getLocationAndComponentCount(const ASTContext &astContext,
   return {0, 0, false};
 }
 
+/// Returns true if the given decl is a static variable declared inside
+/// a cbuffer/tbuffer/struct. These are not actually part of the
+/// cbuffer/tbuffer/struct, and should not consume a member index.
+bool isStaticBufferDecl(const Decl *decl) {
+  const auto *varDecl = dyn_cast<VarDecl>(decl);
+  return varDecl && varDecl->getStorageClass() == StorageClass::SC_Static;
+}
+
 bool shouldSkipInStructLayout(const Decl *decl) {
   // Ignore implicit generated struct declarations/constructors/destructors
   if (decl->isImplicit())
@@ -1455,7 +1463,7 @@ SpirvVariable *DeclResultIdMapper::createStructOrStructArrayVarOfExplicitLayout(
 
       // Static variables are not part of the struct from a layout perspective.
       // Thus, they should not be listed in the struct fields.
-      if (fieldVar->getStorageClass() == StorageClass::SC_Static) {
+      if (isStaticBufferDecl(fieldVar)) {
         continue;
       }
 
@@ -1558,8 +1566,11 @@ void DeclResultIdMapper::createCTBuffer(const HLSLBufferDecl *decl) {
     if (shouldSkipInStructLayout(subDecl))
       continue;
 
-    // If the subDecl is a resource, it is lowered as a standalone variable.
     const auto *varDecl = cast<VarDecl>(subDecl);
+
+    if (isStaticBufferDecl(varDecl))
+      continue;
+
     if (isResourceType(varDecl->getType())) {
       createExternVar(varDecl);
       continue;
@@ -1737,6 +1748,9 @@ DeclResultIdMapper::createShaderRecordBuffer(const HLSLBufferDecl *decl,
     if (isResourceType(varDecl->getType()))
       continue;
 
+    if (isStaticBufferDecl(varDecl))
+      continue;
+
     registerVariableForDecl(varDecl, createDeclSpirvInfo(bufferVar, index++));
   }
   return bufferVar;
@@ -1825,6 +1839,17 @@ SpirvFunction *DeclResultIdMapper::getOrRegisterFn(const FunctionDecl *fn) {
     spvBuilder.decorateLinkage(nullptr, spirvFunction, fn->getName(),
                                spv::LinkageType::Export, fn->getLocation());
   }
+
+  // Honor inline-SPIR-V attributes placed directly on a function. The
+  // entry-point path handles these only for entry functions, and the
+  // vk::ext_instruction path only for functions lowered to an instruction, so a
+  // plain function was previously skipped and these attributes silently
+  // dropped. These reuse the same helpers as the variable/parameter paths:
+  //   [[vk::ext_decorate(d, ...)]]  -> OpDecorate targeting the OpFunction
+  //   [[vk::ext_capability(c)]]     -> OpCapability for the module
+  //   [[vk::ext_extension("...")]]  -> OpExtension for the module
+  decorateWithIntrinsicAttrs(fn, spirvFunction);
+  registerCapabilitiesAndExtensionsForDecl(fn);
 
   // No need to dereference to get the pointer. Function returns that are
   // stand-alone aliases are already pointers to values. All other cases should
@@ -5047,6 +5072,34 @@ void DeclResultIdMapper::decorateWithIntrinsicAttrs(
   }
 }
 
+void DeclResultIdMapper::decorateWithIntrinsicAttrs(const NamedDecl *decl,
+                                                    SpirvFunction *targetFunc) {
+  if (!decl->hasAttrs())
+    return;
+
+  for (auto &attr : decl->getAttrs()) {
+    if (auto *decoAttr = dyn_cast<VKDecorateExtAttr>(attr)) {
+      spvBuilder.decorateWithLiterals(
+          targetFunc, decoAttr->getDecorate(),
+          {decoAttr->literals_begin(), decoAttr->literals_end()},
+          decl->getLocation());
+      continue;
+    }
+    // The id/string forms decorate a SpirvInstruction target; there is no
+    // SpirvFunction-target equivalent yet, so reject rather than silently drop.
+    if (isa<VKDecorateIdExtAttr>(attr)) {
+      emitError("vk::ext_decorate_id is not supported on functions",
+                decl->getLocation());
+      continue;
+    }
+    if (isa<VKDecorateStringExtAttr>(attr)) {
+      emitError("vk::ext_decorate_string is not supported on functions",
+                decl->getLocation());
+      continue;
+    }
+  }
+}
+
 void DeclResultIdMapper::decorateStageVarWithIntrinsicAttrs(
     const NamedDecl *decl, StageVar *stageVar, SpirvVariable *varInst) {
   auto checkBuiltInLocationDecoration =
@@ -5133,6 +5186,17 @@ void DeclResultIdMapper::storeOutStageVarsToStorage(
     storeOutStageVarsToStorage(cast<DeclaratorDecl>(field), ctrlPointID,
                                field->getType(), tempLocation);
     ++index;
+  }
+}
+
+void DeclResultIdMapper::registerCapabilitiesAndExtensionsForDecl(
+    const NamedDecl *decl) {
+  for (auto *attribute : decl->specific_attrs<VKExtensionExtAttr>()) {
+    spvBuilder.requireExtension(attribute->getName(), decl->getLocation());
+  }
+  for (auto *attribute : decl->specific_attrs<VKCapabilityExtAttr>()) {
+    spv::Capability cap = spv::Capability(attribute->getCapability());
+    spvBuilder.requireCapability(cap, decl->getLocation());
   }
 }
 

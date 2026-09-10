@@ -1924,16 +1924,8 @@ bool SpirvEmitter::validateVKAttributes(const NamedDecl *decl) {
 
 void SpirvEmitter::registerCapabilitiesAndExtensionsForVarDecl(
     const VarDecl *varDecl) {
-  // First record any extensions that are part of the actual variable
-  // declaration.
-  for (auto *attribute : varDecl->specific_attrs<VKExtensionExtAttr>()) {
-    clang::StringRef extensionName = attribute->getName();
-    spvBuilder.requireExtension(extensionName, varDecl->getLocation());
-  }
-  for (auto *attribute : varDecl->specific_attrs<VKCapabilityExtAttr>()) {
-    spv::Capability cap = spv::Capability(attribute->getCapability());
-    spvBuilder.requireCapability(cap, varDecl->getLocation());
-  }
+  // First record any extensions/capabilities declared on the variable itself.
+  declIdMapper.registerCapabilitiesAndExtensionsForDecl(varDecl);
 
   // Now check for any capabilities or extensions that are part of the type.
   const TypedefType *type = dyn_cast<TypedefType>(varDecl->getType());
@@ -1949,6 +1941,9 @@ void SpirvEmitter::doHLSLBufferDecl(const HLSLBufferDecl *bufferDecl) {
   // supported in Vulkan
   for (const auto *member : bufferDecl->decls()) {
     if (const auto *varMember = dyn_cast<VarDecl>(member)) {
+      if (varMember->getStorageClass() == StorageClass::SC_Static)
+        continue;
+
       if (!spirvOptions.noWarnIgnoredFeatures) {
         if (const auto *init = varMember->getInit())
           emitWarning("%select{tbuffer|cbuffer}0 member initializer "
@@ -1977,6 +1972,12 @@ void SpirvEmitter::doHLSLBufferDecl(const HLSLBufferDecl *bufferDecl) {
         DeclResultIdMapper::ContextUsageKind::ShaderRecordBufferKHR);
   } else {
     declIdMapper.createCTBuffer(bufferDecl);
+  }
+
+  for (const auto *member : bufferDecl->decls()) {
+    const auto *varMember = dyn_cast<VarDecl>(member);
+    if (varMember && varMember->getStorageClass() == StorageClass::SC_Static)
+      doVarDecl(varMember);
   }
 }
 
@@ -2173,9 +2174,11 @@ void SpirvEmitter::doVarDecl(const VarDecl *decl) {
   // ConstantBuffers and TextureBuffers are not HLSLBufferDecls.
   if (const auto *bufferDecl =
           dyn_cast<HLSLBufferDecl>(decl->getDeclContext())) {
-    // This is a VarDecl of cbuffer/tbuffer type.
-    doHLSLBufferDecl(bufferDecl);
-    return;
+    if (decl->getStorageClass() != StorageClass::SC_Static) {
+      // This is a VarDecl of cbuffer/tbuffer type.
+      doHLSLBufferDecl(bufferDecl);
+      return;
+    }
   }
 
   if (decl->getAttr<VKInputAttachmentIndexAttr>()) {
@@ -6658,6 +6661,8 @@ SpirvEmitter::doCXXOperatorCallExpr(const CXXOperatorCallExpr *expr,
       auto *decl = cast<VarDecl>(declRefExpr->getDecl());
       auto *var = declIdMapper.createResourceHeap(decl, resourceType);
 
+      if (hlsl::HasHLSLGloballyCoherent(resourceType))
+        spvBuilder.decorateCoherent(var, baseExpr->getExprLoc());
       auto *index = doExpr(indexExpr);
 
       if (spirvOptions.useDescriptorHeap) {
@@ -9794,7 +9799,7 @@ SpirvEmitter::processIntrinsicCallExpr(const CallExpr *callExpr) {
     retVal = processWaveQuadAnyAll(callExpr, hlslOpcode);
     break;
   case hlsl::IntrinsicOp::IOP_abort:
-  case hlsl::IntrinsicOp::IOP_DxIsDebuggerPresent:
+  case hlsl::IntrinsicOp::IOP_DxIsDebuggingEnabled:
   case hlsl::IntrinsicOp::IOP_GetRenderTargetSampleCount:
   case hlsl::IntrinsicOp::IOP_GetRenderTargetSamplePosition: {
     emitError("no equivalent for %0 intrinsic function in Vulkan", srcLoc)
@@ -11796,7 +11801,6 @@ SpirvInstruction *SpirvEmitter::processIntrinsicExtractRecordStruct(
   QualType objType = obj->getType();
   unsigned n = callExpr->getNumArgs();
   assert(hlsl::IsHLSLNodeType(objType));
-  assert(n == 0 || n == 1 && hlsl::IsHLSLNodeRecordArrayType(objType));
 
   QualType recordType = hlsl::GetHLSLNodeIOResultType(astContext, objType);
   SpirvInstruction *res = doExpr(obj);
@@ -16231,9 +16235,22 @@ SpirvInstruction *SpirvEmitter::processRawBufferLoad(const CallExpr *callExpr) {
     return nullptr;
   }
 
-  uint32_t alignment = callExpr->getNumArgs() == 1
-                           ? 4
-                           : getRawBufferAlignment(callExpr->getArg(1));
+  uint32_t alignment = 0;
+  if (callExpr->getNumArgs() == 1) {
+    // Compute the required scalar alignment from the loaded type.
+    // Per the Vulkan spec, PhysicalStorageBuffer alignment must be at least the
+    // largest scalar alignment within the type, this matches scalar layout
+    // rules. See:
+    // https://docs.vulkan.org/guide/latest/buffer_device_address_alignment.html
+    AlignmentSizeCalculator alignmentCalc(astContext, spirvOptions);
+    uint32_t stride = 0;
+    QualType bufferType = callExpr->getCallReturnType(astContext);
+    std::tie(alignment, std::ignore) =
+        alignmentCalc.getAlignmentAndSize(bufferType, SpirvLayoutRule::Scalar,
+                                          /*isRowMajor*/ llvm::None, &stride);
+  } else {
+    alignment = getRawBufferAlignment(callExpr->getArg(1));
+  }
   if (alignment == 0)
     return nullptr;
 
@@ -16334,9 +16351,22 @@ SpirvEmitter::processRawBufferStore(const CallExpr *callExpr) {
     return nullptr;
   }
 
-  uint32_t alignment = callExpr->getNumArgs() == 2
-                           ? 4
-                           : getRawBufferAlignment(callExpr->getArg(2));
+  uint32_t alignment = 0;
+  if (callExpr->getNumArgs() == 2) {
+    // Compute the required scalar alignment from the stored type.
+    // Per the Vulkan spec, PhysicalStorageBuffer alignment must be at least the
+    // largest scalar alignment within the type, this matches scalar layout
+    // rules. See:
+    // https://docs.vulkan.org/guide/latest/buffer_device_address_alignment.html
+    QualType bufferType = callExpr->getArg(1)->getType();
+    AlignmentSizeCalculator alignmentCalc(astContext, spirvOptions);
+    uint32_t stride = 0;
+    std::tie(alignment, std::ignore) =
+        alignmentCalc.getAlignmentAndSize(bufferType, SpirvLayoutRule::Scalar,
+                                          /*isRowMajor*/ llvm::None, &stride);
+  } else {
+    alignment = getRawBufferAlignment(callExpr->getArg(2));
+  }
   if (alignment == 0)
     return nullptr;
 

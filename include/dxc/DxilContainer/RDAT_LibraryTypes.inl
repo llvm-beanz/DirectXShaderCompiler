@@ -83,11 +83,12 @@ RDAT_ENUM_END()
 // High 32-bits of ShaderFeatureInfo from DFCC_FeatureInfo
 RDAT_ENUM_START(DxilFeatureInfo2, uint32_t)
   RDAT_ENUM_VALUE(ExtendedCommandInfo, 0x1)
+  RDAT_ENUM_VALUE(LinearAlgebra, 0x2)
   // OptFeatureInfo flags
   RDAT_ENUM_VALUE(Opt_UsesDerivatives, 0x100)
   RDAT_ENUM_VALUE(Opt_RequiresGroup, 0x200)
 #if DEF_RDAT_ENUMS == DEF_RDAT_DUMP_IMPL
-  static_assert(DXIL::ShaderFeatureInfoCount == 33,
+  static_assert(DXIL::ShaderFeatureInfoCount == 34,
                 "otherwise, RDAT_ENUM definition needs updating");
   static_assert(DXIL::OptFeatureInfoCount == 2,
                 "otherwise, RDAT_ENUM definition needs updating");
@@ -459,7 +460,7 @@ RDAT_STRUCT_END()
 
 #define RECORD_TYPE RuntimeDataFunctionInfo2
 RDAT_STRUCT_TABLE_DERIVED(RuntimeDataFunctionInfo2, RuntimeDataFunctionInfo,
-                          FunctionTable)
+                          FunctionTable, 1, 8)
 
   // 128 lanes is maximum that could be supported by HLSL
   RDAT_VALUE(uint8_t, MinimumExpectedWaveLaneCount) // 0 = none specified
@@ -569,9 +570,10 @@ RDAT_DXIL_ENUM_START(hlsl::DXIL::ComponentType, uint32_t)
   RDAT_ENUM_VALUE_NODEF(I8)
   RDAT_ENUM_VALUE_NODEF(F8_E4M3FN)
   RDAT_ENUM_VALUE_NODEF(F8_E5M2)
+  RDAT_ENUM_VALUE_NODEF(BFloat16)
   RDAT_ENUM_VALUE_NODEF(LastEntry)
 #if DEF_RDAT_ENUMS == DEF_RDAT_DUMP_IMPL
-  static_assert((unsigned)hlsl::DXIL::ComponentType::LastEntry == 23,
+  static_assert((unsigned)hlsl::DXIL::ComponentType::LastEntry == 24,
                 "otherwise, RDAT_DXIL_ENUM definition needs updating");
 #endif
 RDAT_ENUM_END()

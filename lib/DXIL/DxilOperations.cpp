@@ -2862,8 +2862,8 @@ static const OP::OpCodeProperty ExperimentalOps_OpCodeProps[] = {
      "linAlgMatrixLoadFromMemory",
      Attribute::None,
      2,
-     {{0x200}, {0xe7}},
-     {{0x0}, {0x0}}}, // Overloads: o,hfdwil
+     {{0x200}, {0x4e7}},
+     {{0x0}, {0xe7}}}, // Overloads: o,hfdwil<hfdwil
     {OC::LinAlgMatrixLength,
      "LinAlgMatrixLength",
      OCC::LinAlgMatrixLength,
@@ -2910,8 +2910,8 @@ static const OP::OpCodeProperty ExperimentalOps_OpCodeProps[] = {
      "linAlgMatrixStoreToMemory",
      Attribute::None,
      2,
-     {{0x200}, {0xe7}},
-     {{0x0}, {0x0}}}, // Overloads: o,hfdwil
+     {{0x200}, {0x4e7}},
+     {{0x0}, {0xe7}}}, // Overloads: o,hfdwil<hfdwil
     {OC::LinAlgMatrixQueryAccumulatorLayout,
      "LinAlgMatrixQueryAccumulatorLayout",
      OCC::LinAlgMatrixQueryAccumulatorLayout,
@@ -2966,8 +2966,8 @@ static const OP::OpCodeProperty ExperimentalOps_OpCodeProps[] = {
      "linAlgMatrixAccumulateToMemory",
      Attribute::None,
      2,
-     {{0x200}, {0xe7}},
-     {{0x0}, {0x0}}}, // Overloads: o,hfdwil
+     {{0x200}, {0x4e7}},
+     {{0x0}, {0xe7}}}, // Overloads: o,hfdwil<hfdwil
     {OC::LinAlgMatrixOuterProduct,
      "LinAlgMatrixOuterProduct",
      OCC::LinAlgMatrixOuterProduct,
@@ -3011,11 +3011,11 @@ static const OP::OpCodeProperty ExperimentalOps_OpCodeProps[] = {
      0,
      {},
      {}}, // Overloads: v
-    {OC::IsDebuggerPresent,
-     "IsDebuggerPresent",
-     OCC::IsDebuggerPresent,
-     "isDebuggerPresent",
-     Attribute::ReadOnly,
+    {OC::IsDebuggingEnabled,
+     "IsDebuggingEnabled",
+     OCC::IsDebuggingEnabled,
+     "isDebuggingEnabled",
+     Attribute::None,
      0,
      {},
      {}}, // Overloads: v
@@ -3316,16 +3316,24 @@ bool OP::IsDxilOpFuncName(StringRef name) {
   return name.startswith(OP::m_NamePrefix);
 }
 
-bool OP::IsDxilOpLinAlgFuncName(StringRef Name) {
-  return Name.startswith(OP::m_LinAlgNamePrefix);
-}
-
 bool OP::IsDxilOpFunc(const llvm::Function *F) {
   // Test for null to allow IsDxilOpFunc(Call.getCalledFunc()) to be resilient
   // to indirect calls
   if (F == nullptr || !F->hasName())
     return false;
   return IsDxilOpFuncName(F->getName());
+}
+
+bool OP::IsDxilOpLinAlgFuncName(StringRef Name) {
+  return Name.startswith(OP::m_LinAlgNamePrefix);
+}
+
+bool OP::IsDxilOpLinAlgFunc(const llvm::Function *F) {
+  // Test for null to allow IsDxilOpLinAlgFunc(Call.getCalledFunc()) to be
+  // resilient to indirect calls
+  if (F == nullptr || !F->hasName())
+    return false;
+  return IsDxilOpLinAlgFuncName(F->getName());
 }
 
 bool OP::IsDxilOpFuncCallInst(const llvm::Instruction *I) {
@@ -3396,6 +3404,19 @@ bool OP::IsDxilOpGradient(OpCode C) {
   return (60 <= op && op <= 61) || op == 64 || op == 81 ||
          (83 <= op && op <= 86) || (174 <= op && op <= 175) || op == 255;
   // OPCODE-GRADIENT:END
+}
+
+bool OP::IsDxilOpConvergent(OpCode C) {
+  unsigned op = (unsigned)C;
+  // clang-format off
+  // Python lines need to be not formatted.
+  /* <py::lines('OPCODE-CONVERGENT')>hctdb_instrhelp.get_instrs_pred("op", "is_convergent")</py>*/
+  // clang-format on
+  // OPCODE-CONVERGENT:BEGIN
+  // Instructions: DerivCoarseX=83, DerivCoarseY=84, DerivFineX=85,
+  // DerivFineY=86
+  return (83 <= op && op <= 86);
+  // OPCODE-CONVERGENT:END
 }
 
 bool OP::IsDxilOpFeedback(OpCode C) {
@@ -3957,7 +3978,7 @@ void OP::GetMinShaderModelAndMask(OpCode C, bool bWithTranslation,
   // LinAlgMatrixAccumulateToDescriptor=2147483675,
   // LinAlgMatrixOuterProduct=2147483677, LinAlgConvert=2147483678,
   // LinAlgVectorAccumulateToDescriptor=2147483679, DebugBreak=2147483681,
-  // IsDebuggerPresent=2147483682
+  // IsDebuggingEnabled=2147483682
   if (op == 2147483648 || (2147483652 <= op && op <= 2147483653) ||
       (2147483656 <= op && op <= 2147483657) || op == 2147483662 ||
       op == 2147483670 || (2147483673 <= op && op <= 2147483675) ||
@@ -3988,7 +4009,7 @@ void OP::GetMinShaderModelAndMask(OpCode C, bool bWithTranslation,
   if ((2147483649 <= op && op <= 2147483650)) {
     major = 6;
     minor = 10;
-    mask = SFLAG(Compute) | SFLAG(Mesh) | SFLAG(Amplification) | SFLAG(Node);
+    mask = SFLAG(Compute) | SFLAG(Mesh) | SFLAG(Amplification);
     return;
   }
   // Instructions: ClusterID=2147483651, TriangleObjectPosition=2147483655
@@ -6649,7 +6670,6 @@ Function *OP::GetOpFunc(OpCode opCode, Type *pOverloadType) {
     A(EXT(2));
     A(pI32);
     A(EXT(3));
-    A(pI32);
     break;
   case OpCode::LinAlgMatrixAccumulateToDescriptor:
     A(pV);
@@ -6686,10 +6706,10 @@ Function *OP::GetOpFunc(OpCode opCode, Type *pOverloadType) {
   case OpCode::LinAlgVectorAccumulateToDescriptor:
     A(pV);
     A(pI32);
-    A(pETy);
     A(pRes);
     A(pI32);
     A(pI32);
+    A(pETy);
     break;
 
     //
@@ -6703,7 +6723,7 @@ Function *OP::GetOpFunc(OpCode opCode, Type *pOverloadType) {
     A(pV);
     A(pI32);
     break;
-  case OpCode::IsDebuggerPresent:
+  case OpCode::IsDebuggingEnabled:
     A(pI1);
     A(pI32);
     break;
@@ -6858,6 +6878,7 @@ llvm::Type *OP::GetOverloadType(OpCode opCode, llvm::Function *F) {
   case OpCode::StorePrimitiveOutput:
   case OpCode::DispatchMesh:
   case OpCode::RawBufferVectorStore:
+  case OpCode::LinAlgVectorAccumulateToDescriptor:
     if (FT->getNumParams() <= 4)
       return nullptr;
     return FT->getParamType(4);
@@ -6886,7 +6907,6 @@ llvm::Type *OP::GetOverloadType(OpCode opCode, llvm::Function *F) {
   case OpCode::LinAlgMatrixGetCoordinate:
   case OpCode::LinAlgMatrixStoreToDescriptor:
   case OpCode::LinAlgMatrixAccumulateToDescriptor:
-  case OpCode::LinAlgVectorAccumulateToDescriptor:
     if (FT->getNumParams() <= 1)
       return nullptr;
     return FT->getParamType(1);
@@ -7015,7 +7035,7 @@ llvm::Type *OP::GetOverloadType(OpCode opCode, llvm::Function *F) {
   case OpCode::LinAlgMatrixQueryAccumulatorLayout:
   case OpCode::ReservedE0:
   case OpCode::DebugBreak:
-  case OpCode::IsDebuggerPresent:
+  case OpCode::IsDebuggingEnabled:
     return Type::getVoidTy(Ctx);
   case OpCode::QuadVote:
     return IntegerType::get(Ctx, 1);
