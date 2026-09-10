@@ -12,6 +12,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "dxcrewriteautodiff.h"
+#include "dxcrewriteautodiffir.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -823,6 +824,275 @@ private:
   }
 };
 
+// Lower a typed, straight-line AD plan. Forward mode preserves named locals
+// and assignments. Backward mode expands immutable local bindings into the
+// final expression graph so runtime expression-template types never need a
+// source-level local type.
+class TypedAutoDiffEmitter {
+public:
+  TypedAutoDiffEmitter(AutoDiffEmitter::Mode M, StringRef ElemType,
+                       raw_ostream &OS, const PrintingPolicy &P)
+      : M(M), ElemType(ElemType), OS(OS), Policy(P) {}
+
+  bool sawNonDifferentiable() const { return NonDifferentiable; }
+  StringRef nonDifferentiableReason() const { return Reason; }
+
+  void emitPlan(const hlsl::autodiff::ADFunctionPlan &Plan) {
+    for (const hlsl::autodiff::ADStmt &S : Plan.Statements) {
+      switch (S.K) {
+      case hlsl::autodiff::ADStmt::Kind::Declare:
+        if (M == AutoDiffEmitter::Fwd) {
+          OS << "    Value<" << ElemType << "> "
+             << S.Binding->SourceDecl->getName() << " = ";
+          if (S.Value->Value.Activity == hlsl::autodiff::ADActivity::Inactive) {
+            OS << "Value<" << ElemType << ">::CreateValue(";
+            emitPrimalExpr(S.Value);
+            OS << ")";
+          } else {
+            emitExpr(S.Value);
+          }
+          OS << ";\n";
+        }
+        break;
+      case hlsl::autodiff::ADStmt::Kind::Assign:
+        if (M == AutoDiffEmitter::Fwd) {
+          OS << "    " << S.Binding->SourceDecl->getName() << " = ";
+          emitExpr(S.Value);
+          OS << ";\n";
+        }
+        break;
+      case hlsl::autodiff::ADStmt::Kind::Return:
+        if (S.Value->Value.Activity == hlsl::autodiff::ADActivity::Inactive) {
+          if (M == AutoDiffEmitter::Bwd)
+            OS << "    context.zeroGradients();\n    return ";
+          else
+            OS << "    return Value<" << ElemType << ">::CreateValue(";
+          emitPrimalExpr(S.Value);
+          if (M == AutoDiffEmitter::Fwd)
+            OS << ")";
+          OS << ";\n";
+        } else {
+          OS << "    return ";
+          if (M == AutoDiffEmitter::Bwd)
+            OS << "compute_gradients(context, ";
+          emitExpr(S.Value);
+          if (M == AutoDiffEmitter::Bwd)
+            OS << ")";
+          OS << ";\n";
+        }
+        break;
+      }
+    }
+  }
+
+private:
+  AutoDiffEmitter::Mode M;
+  StringRef ElemType;
+  raw_ostream &OS;
+  const PrintingPolicy &Policy;
+  bool NonDifferentiable = false;
+  std::string Reason;
+
+  void markNonDifferentiable(StringRef R) {
+    if (!NonDifferentiable) {
+      NonDifferentiable = true;
+      Reason = R.str();
+    }
+  }
+
+  void emitPrimalExpr(const hlsl::autodiff::ADExpr *E) {
+    using ExprKind = hlsl::autodiff::ADExpr::Kind;
+    switch (E->K) {
+    case ExprKind::Literal:
+      E->SourceExpr->printPretty(OS, nullptr, Policy);
+      return;
+    case ExprKind::DeclRef:
+      OS << E->SourceDecl->getName();
+      if (isa<ParmVarDecl>(E->SourceDecl))
+        OS << ".value";
+      return;
+    case ExprKind::LocalRef:
+      if (M == AutoDiffEmitter::Bwd) {
+        emitPrimalExpr(E->Binding->Value);
+      } else {
+        OS << E->Binding->SourceDecl->getName() << ".value";
+      }
+      return;
+    case ExprKind::This:
+      OS << "this";
+      return;
+    case ExprKind::Member: {
+      const auto *ME = cast<MemberExpr>(E->SourceExpr);
+      const hlsl::autodiff::ADExpr *Base = E->Operands.front();
+      if (isa<CXXThisExpr>(Base->SourceExpr->IgnoreParenImpCasts()))
+        OS << (ME->isArrow() ? "this->" : "this.");
+      else {
+        emitPrimalExpr(Base);
+        OS << (ME->isArrow() ? "->" : ".");
+      }
+      OS << E->SourceDecl->getName();
+      return;
+    }
+    case ExprKind::Cast:
+      OS << "(";
+      E->Value.PrimalType.print(OS, Policy);
+      OS << ")";
+      emitPrimalExpr(E->Operands.front());
+      return;
+    case ExprKind::Unary:
+      OS << UnaryOperator::getOpcodeStr(E->UnaryOpcode) << "(";
+      emitPrimalExpr(E->Operands.front());
+      OS << ")";
+      return;
+    case ExprKind::Binary:
+      OS << "(";
+      emitPrimalExpr(E->Operands[0]);
+      OS << " " << BinaryOperator::getOpcodeStr(E->BinaryOpcode) << " ";
+      emitPrimalExpr(E->Operands[1]);
+      OS << ")";
+      return;
+    case ExprKind::Call:
+      OS << E->Callee->getName() << "(";
+      for (unsigned I = 0; I < E->Operands.size(); ++I) {
+        if (I)
+          OS << ", ";
+        emitPrimalExpr(E->Operands[I]);
+      }
+      OS << ")";
+      return;
+    }
+  }
+
+  void emitExpr(const hlsl::autodiff::ADExpr *E) {
+    using Activity = hlsl::autodiff::ADActivity;
+    using ExprKind = hlsl::autodiff::ADExpr::Kind;
+
+    if (E->Value.Activity == Activity::Inactive) {
+      if (M == AutoDiffEmitter::Fwd)
+        OS << "Value<" << ElemType << ">::CreateValue(";
+      emitPrimalExpr(E);
+      if (M == AutoDiffEmitter::Fwd)
+        OS << ")";
+      return;
+    }
+
+    switch (E->K) {
+    case ExprKind::Literal:
+      E->SourceExpr->printPretty(OS, nullptr, Policy);
+      return;
+    case ExprKind::DeclRef:
+      OS << E->SourceDecl->getName();
+      if (M == AutoDiffEmitter::Bwd && isa<ParmVarDecl>(E->SourceDecl))
+        OS << "_expr";
+      return;
+    case ExprKind::LocalRef:
+      if (M == AutoDiffEmitter::Bwd)
+        emitExpr(E->Binding->Value);
+      else
+        OS << E->Binding->SourceDecl->getName();
+      return;
+    case ExprKind::This:
+    case ExprKind::Member:
+      emitPrimalExpr(E);
+      return;
+    case ExprKind::Cast:
+      OS << "(";
+      E->Value.PrimalType.print(OS, Policy);
+      OS << ")";
+      emitExpr(E->Operands.front());
+      return;
+    case ExprKind::Unary:
+      if (M == AutoDiffEmitter::Fwd) {
+        OS << UnaryOperator::getOpcodeStr(E->UnaryOpcode) << "(";
+        emitExpr(E->Operands.front());
+        OS << ")";
+      } else if (E->UnaryOpcode == UO_Minus) {
+        OS << "negate<" << ElemType << ">(";
+        emitExpr(E->Operands.front());
+        OS << ")";
+      } else {
+        emitExpr(E->Operands.front());
+      }
+      return;
+    case ExprKind::Binary:
+      emitBinary(E);
+      return;
+    case ExprKind::Call:
+      emitCall(E);
+      return;
+    }
+  }
+
+  void emitBinary(const hlsl::autodiff::ADExpr *E) {
+    if (M == AutoDiffEmitter::Fwd) {
+      OS << "(";
+      emitExpr(E->Operands[0]);
+      OS << " " << BinaryOperator::getOpcodeStr(E->BinaryOpcode) << " ";
+      emitExpr(E->Operands[1]);
+      OS << ")";
+      return;
+    }
+
+    const char *Builder = nullptr;
+    switch (E->BinaryOpcode) {
+    case BO_Add:
+      Builder = "add";
+      break;
+    case BO_Sub:
+      Builder = "subtract";
+      break;
+    case BO_Mul:
+      Builder = "multiply";
+      break;
+    case BO_Div:
+      Builder = "divide";
+      break;
+    default:
+      markNonDifferentiable("unsupported binary operator in typed AD lowering");
+      E->SourceExpr->printPretty(OS, nullptr, Policy);
+      return;
+    }
+    OS << Builder << "<" << ElemType << ">(";
+    emitExpr(E->Operands[0]);
+    OS << ", ";
+    emitExpr(E->Operands[1]);
+    OS << ")";
+  }
+
+  void emitCall(const hlsl::autodiff::ADExpr *E) {
+    StringRef Name = E->Callee->getName();
+    if (const char *R = GetNonDifferentiableReason(Name))
+      markNonDifferentiable(R);
+    else if (IsTextureLikeIntrinsic(Name))
+      markNonDifferentiable("texture / linear-algebra intrinsic '" +
+                            std::string(Name) + "' is not differentiable");
+
+    StringRef EmittedName = Name;
+    if (M == AutoDiffEmitter::Bwd) {
+      EmittedName = GetBackwardIntrinsicBuilder(Name);
+      if (EmittedName.empty()) {
+        if (!NonDifferentiable)
+          markNonDifferentiable("unknown callee '" + std::string(Name) +
+                                "' has no auto-diff builder");
+        OS << "/*non-differentiable call " << Name << "*/ ";
+        E->SourceExpr->printPretty(OS, nullptr, Policy);
+        return;
+      }
+    }
+
+    OS << EmittedName;
+    if (M == AutoDiffEmitter::Bwd)
+      OS << "<" << ElemType << ">";
+    OS << "(";
+    for (unsigned I = 0; I < E->Operands.size(); ++I) {
+      if (I)
+        OS << ", ";
+      emitExpr(E->Operands[I]);
+    }
+    OS << ")";
+  }
+};
+
 // Render the autodiff signature for a function in either mode.
 void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
                            StringRef ElemType, raw_ostream &OS) {
@@ -870,7 +1140,10 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   bool ValidBody = false;
 
   if (const auto *CS = dyn_cast_or_null<CompoundStmt>(FD->getBody())) {
-    AutoDiffEmitter Em(M, ElemType, BodyOS, Policy, FD->getASTContext());
+    hlsl::autodiff::ADFunctionPlan Plan;
+    std::string PlanReason;
+    bool HasTypedPlan =
+        hlsl::autodiff::BuildADFunctionPlan(FD, Plan, PlanReason);
     if (M == AutoDiffEmitter::Bwd) {
       for (const ParmVarDecl *P : FD->parameters()) {
         BodyOS << "    VariableExpr<" << ElemType << "> " << P->getName()
@@ -878,12 +1151,22 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
                << P->getName() << ");\n";
       }
     }
-    for (const Stmt *S : CS->body())
-      Em.emitStmt(S, "    ");
-    BodyOS.flush();
-    ValidBody = !Em.sawNonDifferentiable();
-    if (!ValidBody)
-      Reason = Em.nonDifferentiableReason().str();
+    if (HasTypedPlan) {
+      TypedAutoDiffEmitter Em(M, ElemType, BodyOS, Policy);
+      Em.emitPlan(Plan);
+      BodyOS.flush();
+      ValidBody = !Em.sawNonDifferentiable();
+      if (!ValidBody)
+        Reason = Em.nonDifferentiableReason().str();
+    } else {
+      AutoDiffEmitter Em(M, ElemType, BodyOS, Policy, FD->getASTContext());
+      for (const Stmt *S : CS->body())
+        Em.emitStmt(S, "    ");
+      BodyOS.flush();
+      ValidBody = !Em.sawNonDifferentiable();
+      if (!ValidBody)
+        Reason = Em.nonDifferentiableReason().str();
+    }
   } else {
     ValidBody = false;
     Reason = "function has no body";
@@ -1203,6 +1486,8 @@ void printDeclWithSubstitutions(
     }
   }
   D->print(OS, Policy);
+  if (isa<TagDecl>(D))
+    OS << ";";
   OS << "\n";
 }
 

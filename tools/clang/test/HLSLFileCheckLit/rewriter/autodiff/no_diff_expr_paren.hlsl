@@ -1,4 +1,8 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: cat %t.gen.hlsl %S/Inputs/compound_assign_bwd_caller.hlsl > %t.run.hlsl
+// RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
+// RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 //
 // [[dxc::no_diff]] applied to a parenthesised sub-expression. The attribute
 // must propagate through ParenExpr / ImplicitCastExpr wrappers so the
@@ -8,9 +12,12 @@
 
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: float f(inout GradientContext<float> context, Variable<float> x)
-// CHECK: return compute_gradients(context, add<float>(x_expr, sin(x) * cos(x)));
+// CHECK: return compute_gradients(context, add<float>(x_expr, (sin(x.value) * cos(x.value))));
 // CHECK-NOT: multiply<float>(sinExpr
 // CHECK: } } } // namespace user::ad::bwd
+
+// The trigonometric product contributes to the primal but not the gradient.
+// EXEC: rawBufferStore.f32{{.*}}i32 1, i32 0, float 1.000000e+00
 
 [[dxc::autodiff(bwd)]]
 float f(float x) {

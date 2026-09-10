@@ -1,12 +1,6 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
-//
-// Note: this test intentionally does not run a `dxc -verify` pass on the
-// rewriter output. The rewriter preserves the `[[dxc::no_diff]]`
-// sub-expression verbatim, but the surrounding generated function rebinds
-// parameter types to `Value<T>` / `Variable<T>`, so the preserved code
-// mixes scalar `float` operations with user-type values and fails to
-// type-check. This is the same pre-existing rewriter limitation as for
-// the existing statement-level `no_diff_*` tests; see agent_thoughts.md.
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: %dxc -T ps_6_9 -HV 2021 -Fo %t.dxil %t.gen.hlsl
 
 // [[dxc::no_diff]] applied to a sub-expression inside a larger expression.
 // Only the marked sub-expression (the floor() call) should be copied
@@ -15,12 +9,12 @@
 
 // CHECK: namespace user { namespace ad { namespace fwd {
 // CHECK: Value<float> frac_no_diff(Value<float> uv)
-// CHECK: return (uv - floor(uv));
+// CHECK: return (uv - Value<float>::CreateValue(floor(uv.value)));
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: float frac_no_diff(inout GradientContext<float> context, Variable<float> uv)
 // CHECK: VariableExpr<float> uv_expr = makeVariableExpr<float>(uv);
-// CHECK: return compute_gradients(context, subtract<float>(uv_expr, floor(uv)));
+// CHECK: return compute_gradients(context, subtract<float>(uv_expr, floor(uv.value)));
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(fwd, bwd)]]

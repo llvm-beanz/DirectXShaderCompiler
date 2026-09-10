@@ -31,6 +31,7 @@ set(SOURCES
   dxcisenseimpl.cpp # HLSL Change
   dxcrewriteunused.cpp # HLSL Change
   dxcrewriteautodiff.cpp # HLSL Change
+  dxcrewriteautodiffir.cpp # HLSL Change
 
   ADDITIONAL_HEADERS
   CIndexDiagnostic.h
@@ -72,6 +73,7 @@ set(SOURCES
   dxcisenseimpl.cpp # HLSL Change
   dxcrewriteunused.cpp # HLSL Change
   dxcrewriteautodiff.cpp # HLSL Change
+  dxcrewriteautodiffir.cpp # HLSL Change
 
   ADDITIONAL_HEADERS
   CIndexDiagnostic.h
