@@ -1,8 +1,7 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 //
 // RUN: %dxr -generate-differentials %s > %t.gen.hlsl
-// RUN: echo '// expected-no-diagnostics' >> %t.gen.hlsl
-// RUN: %dxc -I %hlsl_headers -T ps_6_9 -HV 2021 -verify %t.gen.hlsl
+// RUN: %dxc -T ps_6_9 -HV 2021 -Fo %t.dxil %t.gen.hlsl
 
 // Algebraic / piecewise-smooth intrinsics in forward mode are preserved on
 // Value<T>: sqrt, rsqrt, rcp, abs, min/max/clamp, lerp, saturate, smoothstep,

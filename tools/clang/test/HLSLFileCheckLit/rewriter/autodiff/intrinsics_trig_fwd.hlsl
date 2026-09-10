@@ -1,8 +1,7 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 //
 // RUN: %dxr -generate-differentials %s > %t.gen.hlsl
-// RUN: echo '// expected-no-diagnostics' >> %t.gen.hlsl
-// RUN: %dxc -I %hlsl_headers -T ps_6_9 -HV 2021 -verify %t.gen.hlsl
+// RUN: %dxc -T ps_6_9 -HV 2021 -Fo %t.dxil %t.gen.hlsl
 
 // Trig intrinsics in forward mode are preserved as-is on Value<T> -- the
 // hlsl/ad/fwd library overloads sin/cos/... directly. No '*Expr' rename

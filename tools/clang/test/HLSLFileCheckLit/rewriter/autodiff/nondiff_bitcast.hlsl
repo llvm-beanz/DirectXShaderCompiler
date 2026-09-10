@@ -1,14 +1,15 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 //
-// Run the rewritten output through dxc -verify and confirm that the
-// generated _Static_assert fires. HLSL does not permit a parameter-less
-// constructor on the templated return type, so the rewriter-emitted
-// `return Value<float>();` / `return Variable<float>();` fallback also
-// produces an error; we expect that one explicitly too.
+// Compile the rewritten output and confirm that the generated _Static_assert
+// fires. The fallback returns also diagnose their empty initializers.
 //
 // RUN: %dxr -generate-differentials %s > %t.gen.hlsl
-// RUN: sed -E 's@(_Static_assert\(false.*)@\1 // expected-error{{static_assert failed}}@;s@(return (Value|Variable)<[^>]*>\(\).*)@\1 // expected-error{{cannot have an explicit empty initializer}}@' %t.gen.hlsl > %t.gen.ann.hlsl
-// RUN: %dxc -I %hlsl_headers -T ps_6_9 -HV 2021 -verify %t.gen.ann.hlsl
+// RUN: not %dxc -T ps_6_9 -HV 2021 %t.gen.hlsl 2>&1 | FileCheck %s --check-prefix=DIAG
+
+// DIAG: error: static_assert failed "auto-diff cannot generate forward-mode for 'uses_asint': bit-cast 'asint' is not differentiable"
+// DIAG: error: 'Value<float>' cannot have an explicit empty initializer
+// DIAG: error: static_assert failed "auto-diff cannot generate backward-mode for 'uses_asint': bit-cast 'asint' is not differentiable"
+// DIAG: error: 'Variable<float>' cannot have an explicit empty initializer
 
 // Non-differentiable intrinsics generate a _Static_assert stub with a
 // human-readable reason rather than miscompiling silently.

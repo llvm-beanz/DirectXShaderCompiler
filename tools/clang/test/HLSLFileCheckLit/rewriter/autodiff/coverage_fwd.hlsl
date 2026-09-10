@@ -1,4 +1,4 @@
-// RUN: cat %S/../../../../../lib/Headers/hlsl/ad/fwd | FileCheck %s
+// RUN: FileCheck %s --input-file="%hlsl_src_headers/ad/fwd"
 
 // Symbol-coverage regression test for the hlsl/ad/fwd library.
 //
