@@ -594,6 +594,122 @@ private:
     return true;
   }
 
+  bool buildCoupledActiveRuntimeFor(const ForStmt *FS, const VarDecl *Counter,
+                                    const ADExpr *Count,
+                                    const CompoundStmt *Body) {
+    if (Body->size() != 2)
+      return false;
+    auto It = Body->body_begin();
+    const auto *FirstUpdate = dyn_cast<BinaryOperator>(*It++);
+    const auto *SecondUpdate = dyn_cast<BinaryOperator>(*It);
+    if (!FirstUpdate || !SecondUpdate ||
+        (FirstUpdate->getOpcode() != BO_AddAssign &&
+         FirstUpdate->getOpcode() != BO_SubAssign) ||
+        (SecondUpdate->getOpcode() != BO_AddAssign &&
+         SecondUpdate->getOpcode() != BO_SubAssign &&
+         SecondUpdate->getOpcode() != BO_MulAssign &&
+         SecondUpdate->getOpcode() != BO_DivAssign))
+      return false;
+
+    const auto *FirstTargetRef =
+        dyn_cast<DeclRefExpr>(FirstUpdate->getLHS()->IgnoreParenImpCasts());
+    const auto *SecondTargetRef =
+        dyn_cast<DeclRefExpr>(SecondUpdate->getLHS()->IgnoreParenImpCasts());
+    const auto *PeerRef =
+        dyn_cast<DeclRefExpr>(FirstUpdate->getRHS()->IgnoreParenImpCasts());
+    const auto *FirstTarget =
+        FirstTargetRef ? dyn_cast<ParmVarDecl>(FirstTargetRef->getDecl())
+                       : nullptr;
+    const auto *SecondTarget =
+        SecondTargetRef ? dyn_cast<ParmVarDecl>(SecondTargetRef->getDecl())
+                        : nullptr;
+    if (!FirstTarget || !SecondTarget || !PeerRef ||
+        PeerRef->getDecl() != SecondTarget || FirstTarget == SecondTarget ||
+        FirstTarget->hasAttr<HLSLNoDiffAttr>() ||
+        SecondTarget->hasAttr<HLSLNoDiffAttr>() ||
+        !Ctx.hasSameType(FirstTarget->getType(), SecondTarget->getType()))
+      return false;
+
+    const ADExpr *SecondFactor = buildExpr(SecondUpdate->getRHS());
+    if (!SecondFactor || SecondFactor->Value.Activity == ADActivity::Active)
+      return false;
+
+    auto BuildInitialBinding = [&](const ParmVarDecl *Target,
+                                   const DeclRefExpr *TargetRef) {
+      const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
+      auto BindingIt = CurrentBindings.find(CanonicalTarget);
+      if (BindingIt != CurrentBindings.end())
+        return BindingIt->second;
+      ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRef);
+      Initial->SourceDecl = CanonicalTarget;
+      Initial->Value.SourceDecl = CanonicalTarget;
+      Initial->Value.Activity = ADActivity::Active;
+      return createBinding(Target, 0, Initial);
+    };
+
+    const ADBinding *FirstBefore =
+        BuildInitialBinding(FirstTarget, FirstTargetRef);
+    const ADBinding *SecondBefore =
+        BuildInitialBinding(SecondTarget, SecondTargetRef);
+    if (!FirstBefore->Value || !SecondBefore->Value)
+      return fail("coupled runtime loop reads an uninitialized value");
+
+    auto CreateResult =
+        [&](const ParmVarDecl *Target, const DeclRefExpr *TargetRef,
+            const ADBinding *Before, const BinaryOperator *Update,
+            const ADExpr *Factor) {
+          ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
+          Result->SourceDecl = getCanonicalValueDecl(Target);
+          Result->LoopCounter = Counter;
+          switch (Update->getOpcode()) {
+          case BO_AddAssign:
+            Result->BinaryOpcode = BO_Add;
+            break;
+          case BO_SubAssign:
+            Result->BinaryOpcode = BO_Sub;
+            break;
+          case BO_MulAssign:
+            Result->BinaryOpcode = BO_Mul;
+            break;
+          case BO_DivAssign:
+            Result->BinaryOpcode = BO_Div;
+            break;
+          default:
+            llvm_unreachable("validated coupled runtime loop update");
+          }
+          Result->Operands.push_back(createLocalRef(TargetRef, Before, false));
+          Result->Operands.push_back(Count);
+          Result->Operands.push_back(Factor);
+          Result->Value.Activity = ADActivity::Active;
+          Result->Value.PrimalType = Target->getType();
+          return Result;
+        };
+
+    const ADExpr *Peer = createLocalRef(PeerRef, SecondBefore, false);
+    ADExpr *FirstResult = CreateResult(FirstTarget, FirstTargetRef, FirstBefore,
+                                       FirstUpdate, Peer);
+    ADExpr *SecondResult =
+        CreateResult(SecondTarget, SecondTargetRef, SecondBefore, SecondUpdate,
+                     SecondFactor);
+    FirstResult->RuntimeLoopCoupledPeer = SecondResult;
+    FirstResult->RuntimeLoopCoupledPrimary = true;
+    FirstResult->RuntimeLoopSubtractsCoupledPeer =
+        FirstUpdate->getOpcode() == BO_SubAssign;
+    SecondResult->RuntimeLoopCoupledPeer = FirstResult;
+
+    const ADBinding *FirstAfter =
+        createBinding(FirstTarget, FirstBefore->Version + 1, FirstResult);
+    const ADBinding *SecondAfter =
+        createBinding(SecondTarget, SecondBefore->Version + 1, SecondResult);
+    CurrentBindings[getCanonicalValueDecl(FirstTarget)] = FirstAfter;
+    CurrentBindings[getCanonicalValueDecl(SecondTarget)] = SecondAfter;
+    ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, FirstResult, FS);
+    Statement.Values.push_back(FirstResult);
+    Statement.Values.push_back(SecondResult);
+    Plan.Statements.push_back(std::move(Statement));
+    return true;
+  }
+
   bool buildActiveRuntimeFor(const ForStmt *FS) {
     const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
     const auto *Counter = Init && Init->isSingleDecl()
@@ -629,6 +745,8 @@ private:
           return false;
         if (Count->Value.Activity == ADActivity::Active)
           return fail("active runtime loop count must be inactive");
+        if (buildCoupledActiveRuntimeFor(FS, Counter, Count, Compound))
+          return true;
         return buildIndependentActiveRuntimeFor(FS, Counter, Count, Compound);
       }
       Body = *Compound->body_begin();

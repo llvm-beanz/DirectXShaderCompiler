@@ -1428,6 +1428,16 @@ private:
           return false;
       return true;
     case Kind::RuntimeLoopResult:
+      if (E->RuntimeLoopCoupledPeer) {
+        const hlsl::autodiff::ADExpr *Primary =
+            E->RuntimeLoopCoupledPrimary ? E : E->RuntimeLoopCoupledPeer;
+        const hlsl::autodiff::ADExpr *Secondary =
+            E->RuntimeLoopCoupledPrimary ? E->RuntimeLoopCoupledPeer : E;
+        return Primary->Operands[1]->Value.Activity == Activity::Inactive &&
+               Secondary->Operands[2]->Value.Activity == Activity::Inactive &&
+               supports(Primary->Operands[0]) &&
+               supports(Secondary->Operands[0]);
+      }
       return E->Operands[1]->Value.Activity == Activity::Inactive &&
              (E->Operands[2]->Value.Activity == Activity::Inactive ||
               E->RuntimeLoopUsesPrimalTape) &&
@@ -1822,6 +1832,41 @@ private:
     case Kind::RuntimeLoopResult: {
       unsigned LoopID = RuntimeLoopIDs.lookup(E);
       std::string Type = printType(E->Value.PrimalType, Policy);
+      if (E->RuntimeLoopCoupledPeer) {
+        const hlsl::autodiff::ADExpr *Primary =
+            E->RuntimeLoopCoupledPrimary ? E : E->RuntimeLoopCoupledPeer;
+        const hlsl::autodiff::ADExpr *Secondary =
+            E->RuntimeLoopCoupledPrimary ? E->RuntimeLoopCoupledPeer : E;
+        std::string PrimaryAdjoint =
+            "__dxc_ad_loop_" + Twine(LoopID).str() + "_primary_adjoint";
+        std::string SecondaryAdjoint =
+            "__dxc_ad_loop_" + Twine(LoopID).str() + "_secondary_adjoint";
+        OS << "    " << Type << " " << PrimaryAdjoint << " = "
+           << (E->RuntimeLoopCoupledPrimary ? Cotangent.str()
+                                            : zero(E->Value.PrimalType))
+           << ";\n";
+        OS << "    " << Type << " " << SecondaryAdjoint << " = "
+           << (E->RuntimeLoopCoupledPrimary ? zero(E->Value.PrimalType)
+                                            : Cotangent.str())
+           << ";\n";
+        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
+        emitPrimal(Primary->Operands[1]);
+        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
+           << "        --" << E->LoopCounter->getName() << ";\n";
+        if (Secondary->BinaryOpcode == BO_Mul ||
+            Secondary->BinaryOpcode == BO_Div) {
+          OS << "        " << SecondaryAdjoint
+             << (Secondary->BinaryOpcode == BO_Mul ? " *= " : " /= ");
+          emitPrimal(Secondary->Operands[2]);
+          OS << ";\n";
+        }
+        OS << "        " << SecondaryAdjoint
+           << (Primary->RuntimeLoopSubtractsCoupledPeer ? " -= " : " += ")
+           << PrimaryAdjoint << ";\n    }\n";
+        emitAdjoint(Primary->Operands[0], PrimaryAdjoint);
+        emitAdjoint(Secondary->Operands[0], SecondaryAdjoint);
+        return;
+      }
       OS << "    " << Type << " __dxc_ad_loop_" << LoopID
          << "_adjoint = " << Cotangent << ";\n";
       if (E->RuntimeLoopUsesPrimalTape) {
