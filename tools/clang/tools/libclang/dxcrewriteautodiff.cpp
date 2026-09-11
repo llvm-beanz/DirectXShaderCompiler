@@ -1428,6 +1428,13 @@ private:
           return false;
       return true;
     case Kind::RuntimeLoopResult:
+      if (!E->RuntimeLoopLinearGroup.empty()) {
+        for (const hlsl::autodiff::ADExpr *Result : E->RuntimeLoopLinearGroup)
+          if (!supports(Result->Operands[0]))
+            return false;
+        return E->RuntimeLoopLinearGroup.back()->Operands[2]->Value.Activity ==
+               Activity::Inactive;
+      }
       if (E->RuntimeLoopCoupledPeer) {
         const hlsl::autodiff::ADExpr *Primary =
             E->RuntimeLoopCoupledPrimary ? E : E->RuntimeLoopCoupledPeer;
@@ -1832,6 +1839,41 @@ private:
     case Kind::RuntimeLoopResult: {
       unsigned LoopID = RuntimeLoopIDs.lookup(E);
       std::string Type = printType(E->Value.PrimalType, Policy);
+      if (!E->RuntimeLoopLinearGroup.empty()) {
+        SmallVector<std::string, 4> Adjoints;
+        for (unsigned I = 0; I < E->RuntimeLoopLinearGroup.size(); ++I) {
+          std::string Adjoint = "__dxc_ad_loop_" + Twine(LoopID).str() +
+                                "_state_" + Twine(I).str() + "_adjoint";
+          Adjoints.push_back(Adjoint);
+          OS << "    " << Type << " " << Adjoint << " = "
+             << (I == E->RuntimeLoopLinearGroupIndex
+                     ? Cotangent.str()
+                     : zero(E->Value.PrimalType))
+             << ";\n";
+        }
+        const hlsl::autodiff::ADExpr *Last = E->RuntimeLoopLinearGroup.back();
+        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
+        emitPrimal(E->Operands[1]);
+        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
+           << "        --" << E->LoopCounter->getName() << ";\n";
+        if (Last->BinaryOpcode == BO_Mul || Last->BinaryOpcode == BO_Div) {
+          OS << "        " << Adjoints.back()
+             << (Last->BinaryOpcode == BO_Mul ? " *= " : " /= ");
+          emitPrimal(Last->Operands[2]);
+          OS << ";\n";
+        }
+        for (unsigned I = E->RuntimeLoopLinearGroup.size() - 1; I > 0; --I) {
+          const hlsl::autodiff::ADExpr *Update =
+              E->RuntimeLoopLinearGroup[I - 1];
+          OS << "        " << Adjoints[I]
+             << (Update->BinaryOpcode == BO_Sub ? " -= " : " += ")
+             << Adjoints[I - 1] << ";\n";
+        }
+        OS << "    }\n";
+        for (unsigned I = 0; I < E->RuntimeLoopLinearGroup.size(); ++I)
+          emitAdjoint(E->RuntimeLoopLinearGroup[I]->Operands[0], Adjoints[I]);
+        return;
+      }
       if (E->RuntimeLoopCoupledPeer) {
         const hlsl::autodiff::ADExpr *Primary =
             E->RuntimeLoopCoupledPrimary ? E : E->RuntimeLoopCoupledPeer;

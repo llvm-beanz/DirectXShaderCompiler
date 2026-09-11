@@ -594,6 +594,114 @@ private:
     return true;
   }
 
+  bool buildLinearActiveRuntimeChain(const ForStmt *FS, const VarDecl *Counter,
+                                     const ADExpr *Count,
+                                     const CompoundStmt *Body) {
+    if (Body->size() < 3)
+      return false;
+    SmallVector<const BinaryOperator *, 4> Updates;
+    SmallVector<const ParmVarDecl *, 4> Targets;
+    SmallVector<const DeclRefExpr *, 4> TargetRefs;
+    SmallPtrSet<const ValueDecl *, 4> SeenTargets;
+    for (const Stmt *Child : Body->body()) {
+      const auto *Update = dyn_cast<BinaryOperator>(Child);
+      if (!Update || (Update->getOpcode() != BO_AddAssign &&
+                      Update->getOpcode() != BO_SubAssign &&
+                      Update->getOpcode() != BO_MulAssign &&
+                      Update->getOpcode() != BO_DivAssign))
+        return false;
+      const auto *TargetRef =
+          dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
+      const auto *Target =
+          TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
+      if (!Target || Target->hasAttr<HLSLNoDiffAttr>() ||
+          !SeenTargets.insert(getCanonicalValueDecl(Target)).second)
+        return false;
+      if (!Targets.empty() &&
+          !Ctx.hasSameType(Targets.front()->getType(), Target->getType()))
+        return false;
+      Updates.push_back(Update);
+      Targets.push_back(Target);
+      TargetRefs.push_back(TargetRef);
+    }
+
+    for (unsigned I = 0; I + 1 < Updates.size(); ++I) {
+      if (Updates[I]->getOpcode() != BO_AddAssign &&
+          Updates[I]->getOpcode() != BO_SubAssign)
+        return false;
+      const auto *Peer =
+          dyn_cast<DeclRefExpr>(Updates[I]->getRHS()->IgnoreParenImpCasts());
+      if (!Peer || Peer->getDecl() != Targets[I + 1])
+        return false;
+    }
+    const ADExpr *LastFactor = buildExpr(Updates.back()->getRHS());
+    if (!LastFactor || LastFactor->Value.Activity == ADActivity::Active)
+      return false;
+
+    SmallVector<const ADBinding *, 4> Before;
+    for (unsigned I = 0; I < Targets.size(); ++I) {
+      const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Targets[I]);
+      auto BindingIt = CurrentBindings.find(CanonicalTarget);
+      if (BindingIt != CurrentBindings.end()) {
+        if (!BindingIt->second->Value)
+          return fail("linear runtime chain reads an uninitialized value");
+        Before.push_back(BindingIt->second);
+        continue;
+      }
+      ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRefs[I]);
+      Initial->SourceDecl = CanonicalTarget;
+      Initial->Value.SourceDecl = CanonicalTarget;
+      Initial->Value.Activity = ADActivity::Active;
+      Before.push_back(createBinding(Targets[I], 0, Initial));
+    }
+
+    SmallVector<const ADExpr *, 4> Results;
+    for (unsigned I = 0; I < Targets.size(); ++I) {
+      ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Updates[I]);
+      Result->SourceDecl = getCanonicalValueDecl(Targets[I]);
+      Result->LoopCounter = Counter;
+      switch (Updates[I]->getOpcode()) {
+      case BO_AddAssign:
+        Result->BinaryOpcode = BO_Add;
+        break;
+      case BO_SubAssign:
+        Result->BinaryOpcode = BO_Sub;
+        break;
+      case BO_MulAssign:
+        Result->BinaryOpcode = BO_Mul;
+        break;
+      case BO_DivAssign:
+        Result->BinaryOpcode = BO_Div;
+        break;
+      default:
+        llvm_unreachable("validated linear runtime chain update");
+      }
+      const ADExpr *Factor =
+          I + 1 < Targets.size()
+              ? createLocalRef(Updates[I]->getRHS(), Before[I + 1], false)
+              : LastFactor;
+      Result->Operands.push_back(
+          createLocalRef(TargetRefs[I], Before[I], false));
+      Result->Operands.push_back(Count);
+      Result->Operands.push_back(Factor);
+      Result->Value.Activity = ADActivity::Active;
+      Result->Value.PrimalType = Targets[I]->getType();
+      Results.push_back(Result);
+    }
+    for (unsigned I = 0; I < Results.size(); ++I) {
+      ADExpr *Result = const_cast<ADExpr *>(Results[I]);
+      Result->RuntimeLoopLinearGroup = Results;
+      Result->RuntimeLoopLinearGroupIndex = I;
+      const ADBinding *After =
+          createBinding(Targets[I], Before[I]->Version + 1, Result);
+      CurrentBindings[getCanonicalValueDecl(Targets[I])] = After;
+    }
+    ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS);
+    Statement.Values = Results;
+    Plan.Statements.push_back(std::move(Statement));
+    return true;
+  }
+
   bool buildCoupledActiveRuntimeFor(const ForStmt *FS, const VarDecl *Counter,
                                     const ADExpr *Count,
                                     const CompoundStmt *Body) {
@@ -812,6 +920,8 @@ private:
           return false;
         if (Count->Value.Activity == ADActivity::Active)
           return fail("active runtime loop count must be inactive");
+        if (buildLinearActiveRuntimeChain(FS, Counter, Count, Compound))
+          return true;
         if (buildCoupledActiveRuntimeFor(FS, Counter, Count, Compound))
           return true;
         return buildIndependentActiveRuntimeFor(FS, Counter, Count, Compound);
