@@ -135,6 +135,14 @@ private:
     return Node;
   }
 
+  const ADExpr *createPrimalLocal(const Expr *Source, const VarDecl *VD) {
+    ADExpr *Node = createExpr(ADExpr::Kind::PrimalLocal, Source);
+    Node->SourceDecl = getCanonicalValueDecl(VD);
+    Node->Value.SourceDecl = Node->SourceDecl;
+    Node->Value.Activity = ADActivity::Inactive;
+    return Node;
+  }
+
   const ADExpr *buildExpr(const Expr *Input, bool ForceInactive = false) {
     if (!Input) {
       fail("null expression");
@@ -158,8 +166,11 @@ private:
       auto It = CurrentBindings.find(D);
       if (It != CurrentBindings.end()) {
         if (!It->second->Value) {
-          fail("read of uninitialized local in typed auto-diff IR");
-          return nullptr;
+          if (!ForceInactive) {
+            fail("read of uninitialized local in typed auto-diff IR");
+            return nullptr;
+          }
+          return createPrimalLocal(E, cast<VarDecl>(DRE->getDecl()));
         }
         return createLocalRef(E, It->second, ForceInactive);
       }
@@ -566,6 +577,50 @@ private:
       for (const Stmt *Child : CS->body())
         if (!buildStmt(Child, ForceInactive))
           return false;
+      return true;
+    }
+
+    if (const auto *Expression = dyn_cast<Expr>(S);
+        Expression && !(isa<BinaryOperator>(Expression) &&
+                        cast<BinaryOperator>(Expression)->isAssignmentOp())) {
+      if (!ForceInactive)
+        return fail("active expression statement in typed auto-diff IR");
+      const ADExpr *Value = buildExpr(Expression, /*ForceInactive=*/true);
+      if (!Value)
+        return false;
+      const auto *Call = dyn_cast<CallExpr>(Expression->IgnoreParenImpCasts());
+      const FunctionDecl *Callee = Call ? Call->getDirectCallee() : nullptr;
+      if (Call && Callee) {
+        for (unsigned I = 0;
+             I < Call->getNumArgs() && I < Callee->getNumParams(); ++I) {
+          const auto *Output =
+              dyn_cast<DeclRefExpr>(Call->getArg(I)->IgnoreParenImpCasts());
+          if (!Output)
+            continue;
+          const auto *VD = dyn_cast<VarDecl>(Output->getDecl());
+          if (!VD)
+            continue;
+          const ValueDecl *Target = getCanonicalValueDecl(VD);
+          auto It = CurrentBindings.find(Target);
+          bool IsExplicitOutput =
+              Callee->getParamDecl(I)->hasAttr<HLSLOutAttr>() ||
+              Callee->getParamDecl(I)->hasAttr<HLSLInOutAttr>();
+          bool IsUninitializedLocal =
+              It != CurrentBindings.end() && !It->second->Value;
+          if (!IsExplicitOutput && !IsUninitializedLocal)
+            continue;
+          if (It == CurrentBindings.end())
+            return fail("inactive out argument has no local binding");
+          const ADExpr *OutputValue = createPrimalLocal(Output, VD);
+          const ADBinding *Binding =
+              createBinding(VD, It->second->Version + 1, OutputValue);
+          CurrentBindings[Target] = Binding;
+          if (std::find(Plan.PrimalLocals.begin(), Plan.PrimalLocals.end(),
+                        VD) == Plan.PrimalLocals.end())
+            Plan.PrimalLocals.push_back(VD);
+        }
+      }
+      Plan.Statements.push_back({ADStmt::Kind::Expression, nullptr, Value});
       return true;
     }
 

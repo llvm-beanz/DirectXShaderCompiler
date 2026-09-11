@@ -41,6 +41,7 @@ struct ADExpr {
     Literal,
     DeclRef,
     LocalRef,
+    PrimalLocal,
     This,
     Member,
     Swizzle,
@@ -76,7 +77,7 @@ struct ADBinding {
 };
 
 struct ADStmt {
-  enum class Kind { Declare, Assign, Return };
+  enum class Kind { Declare, Assign, Expression, Return };
 
   Kind K;
   const ADBinding *Binding = nullptr;
@@ -89,6 +90,7 @@ struct ADFunctionPlan {
   std::vector<std::unique_ptr<ADExpr>> Expressions;
   std::vector<std::unique_ptr<ADBinding>> Bindings;
   std::vector<ADStmt> Statements;
+  llvm::SmallVector<const clang::VarDecl *, 4> PrimalLocals;
 };
 
 // Build a typed plan for a straight-line function. Returns false when the

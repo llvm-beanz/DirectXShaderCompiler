@@ -918,6 +918,10 @@ public:
   StringRef nonDifferentiableReason() const { return Reason; }
 
   void emitPlan(const hlsl::autodiff::ADFunctionPlan &Plan) {
+    if (M == AutoDiffEmitter::Bwd)
+      for (const VarDecl *Local : Plan.PrimalLocals)
+        OS << "    " << printType(Local->getType(), Policy) << " "
+           << Local->getName() << ";\n";
     for (const hlsl::autodiff::ADStmt &S : Plan.Statements) {
       switch (S.K) {
       case hlsl::autodiff::ADStmt::Kind::Declare:
@@ -952,6 +956,11 @@ public:
             emitExpr(S.Value);
           OS << ";\n";
         }
+        break;
+      case hlsl::autodiff::ADStmt::Kind::Expression:
+        OS << "    ";
+        emitPrimalExpr(S.Value);
+        OS << ";\n";
         break;
       case hlsl::autodiff::ADStmt::Kind::Return:
         if (S.Value->Value.Activity == hlsl::autodiff::ADActivity::Inactive) {
@@ -1015,6 +1024,9 @@ private:
         if (!Parameter || !isInactiveParameter(Parameter))
           OS << ".value";
       }
+      return;
+    case ExprKind::PrimalLocal:
+      OS << E->SourceDecl->getName();
       return;
     case ExprKind::This:
       OS << "this";
@@ -1276,6 +1288,16 @@ public:
     if (!Result || !supports(Result))
       return false;
 
+    for (const VarDecl *Local : Plan.PrimalLocals)
+      OS << "    " << printType(Local->getType(), Policy) << " "
+         << Local->getName() << ";\n";
+    for (const hlsl::autodiff::ADStmt &S : Plan.Statements)
+      if (S.K == hlsl::autodiff::ADStmt::Kind::Expression) {
+        OS << "    ";
+        emitPrimal(S.Value);
+        OS << ";\n";
+      }
+
     OS << "    " << ResultType << " __dxc_ad_primal = ";
     emitPrimal(Result);
     OS << ";\n";
@@ -1318,6 +1340,8 @@ private:
       return isa<ParmVarDecl>(E->SourceDecl);
     case Kind::LocalRef:
       return supports(E->Binding->Value);
+    case Kind::PrimalLocal:
+      return true;
     case Kind::Swizzle:
       return supports(E->Operands.front());
     case Kind::Subscript:
@@ -1373,6 +1397,15 @@ private:
     case Kind::LocalRef:
       emitPrimal(E->Binding->Value, Out);
       return;
+    case Kind::PrimalLocal:
+      Out << E->SourceDecl->getName();
+      return;
+    case Kind::Member: {
+      const auto *Member = cast<MemberExpr>(E->SourceExpr);
+      emitPrimal(E->Operands.front(), Out);
+      Out << (Member->isArrow() ? "->" : ".") << E->SourceDecl->getName();
+      return;
+    }
     case Kind::Swizzle:
       emitPrimal(E->Operands.front(), Out);
       Out << "."
@@ -1823,6 +1856,53 @@ SmallVector<ActiveContextInfo, 4> buildActiveContexts(const FunctionDecl *FD) {
   return Contexts;
 }
 
+bool hasBackwardCallCycle(const FunctionDecl *FD,
+                          SmallPtrSetImpl<const FunctionDecl *> &Active,
+                          SmallPtrSetImpl<const FunctionDecl *> &Complete);
+
+bool statementReachesBackwardCallCycle(
+    const Stmt *S, SmallPtrSetImpl<const FunctionDecl *> &Active,
+    SmallPtrSetImpl<const FunctionDecl *> &Complete) {
+  if (!S)
+    return false;
+  if (const auto *Call = dyn_cast<CallExpr>(S)) {
+    const FunctionDecl *Callee = Call->getDirectCallee();
+    const HLSLAutoDiffAttr *Attr = getAutoDiffAttr(Callee);
+    if (Callee && Attr && Attr->hasBackward() &&
+        hasBackwardCallCycle(Callee, Active, Complete))
+      return true;
+  }
+  for (const Stmt *Child : S->children())
+    if (statementReachesBackwardCallCycle(Child, Active, Complete))
+      return true;
+  return false;
+}
+
+bool hasBackwardCallCycle(const FunctionDecl *FD,
+                          SmallPtrSetImpl<const FunctionDecl *> &Active,
+                          SmallPtrSetImpl<const FunctionDecl *> &Complete) {
+  FD = FD->getCanonicalDecl();
+  if (Active.count(FD))
+    return true;
+  if (Complete.count(FD))
+    return false;
+
+  Active.insert(FD);
+  const FunctionDecl *Definition = nullptr;
+  bool HasCycle = FD->hasBody(Definition) &&
+                  statementReachesBackwardCallCycle(Definition->getBody(),
+                                                    Active, Complete);
+  Active.erase(FD);
+  Complete.insert(FD);
+  return HasCycle;
+}
+
+bool hasBackwardCallCycle(const FunctionDecl *FD) {
+  SmallPtrSet<const FunctionDecl *, 8> Active;
+  SmallPtrSet<const FunctionDecl *, 8> Complete;
+  return hasBackwardCallCycle(FD, Active, Complete);
+}
+
 // Emit the auto-diff variant of a single function inside the appropriate
 // namespace block. Returns true if anything was written.
 bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
@@ -1866,17 +1946,11 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
         }
     bool HasTerminalPlanFailure =
         !HasTypedPlan && StringRef(PlanReason).startswith("active ");
-    if (M == AutoDiffEmitter::Bwd && HasTypedPlan)
-      for (const std::unique_ptr<hlsl::autodiff::ADExpr> &Expr :
-           Plan.Expressions)
-        if (Expr->K == hlsl::autodiff::ADExpr::Kind::Call && Expr->Callee &&
-            Expr->Callee->getCanonicalDecl() == FD->getCanonicalDecl() &&
-            Expr->Value.Activity == hlsl::autodiff::ADActivity::Active) {
-          HasTypedPlan = false;
-          HasTerminalPlanFailure = true;
-          PlanReason = "recursive pullback composition is not supported";
-          break;
-        }
+    if (M == AutoDiffEmitter::Bwd && HasTypedPlan && hasBackwardCallCycle(FD)) {
+      HasTypedPlan = false;
+      HasTerminalPlanFailure = true;
+      PlanReason = "recursive pullback composition is not supported";
+    }
     if (M == AutoDiffEmitter::Bwd) {
       for (const ParmVarDecl *P : FD->parameters()) {
         if (isInactiveParameter(P))
