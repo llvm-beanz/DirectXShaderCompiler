@@ -1872,9 +1872,21 @@ private:
         for (unsigned I = E->RuntimeLoopLinearGroup.size() - 1; I > 0; --I) {
           const hlsl::autodiff::ADExpr *Update =
               E->RuntimeLoopLinearGroup[I - 1];
-          OS << "        " << Adjoints[I]
-             << (Update->BinaryOpcode == BO_Sub ? " -= " : " += ")
-             << Adjoints[I - 1] << ";\n";
+          if (Update->BinaryOpcode == BO_Mul) {
+            unsigned UpdateLoopID = RuntimeLoopIDs.lookup(Update);
+            unsigned PeerLoopID =
+                RuntimeLoopIDs.lookup(E->RuntimeLoopLinearGroup[I]);
+            OS << "        " << Adjoints[I] << " += __dxc_ad_loop_"
+               << UpdateLoopID << "_primal_tape[" << E->LoopCounter->getName()
+               << "] * " << Adjoints[I - 1] << ";\n";
+            OS << "        " << Adjoints[I - 1] << " *= __dxc_ad_loop_"
+               << PeerLoopID << "_primal_tape[" << E->LoopCounter->getName()
+               << "];\n";
+          } else {
+            OS << "        " << Adjoints[I]
+               << (Update->BinaryOpcode == BO_Sub ? " -= " : " += ")
+               << Adjoints[I - 1] << ";\n";
+          }
         }
         OS << "    }\n";
         for (unsigned I = 0; I < E->RuntimeLoopLinearGroup.size(); ++I)

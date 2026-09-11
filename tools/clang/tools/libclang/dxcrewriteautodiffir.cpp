@@ -594,9 +594,8 @@ private:
     return true;
   }
 
-  bool buildLinearActiveRuntimeChain(const ForStmt *FS, const VarDecl *Counter,
-                                     const ADExpr *Count,
-                                     const CompoundStmt *Body) {
+  bool buildActiveRuntimeChain(const ForStmt *FS, const VarDecl *Counter,
+                               const ADExpr *Count, const CompoundStmt *Body) {
     if (Body->size() < 3)
       return false;
     SmallVector<const BinaryOperator *, 4> Updates;
@@ -625,19 +624,26 @@ private:
       TargetRefs.push_back(TargetRef);
     }
 
+    SmallVector<bool, 4> NeedsPrimalTape(Updates.size(), false);
+    bool NeedsAnyPrimalTape = false;
     for (unsigned I = 0; I + 1 < Updates.size(); ++I) {
       if (Updates[I]->getOpcode() != BO_AddAssign &&
-          Updates[I]->getOpcode() != BO_SubAssign)
+          Updates[I]->getOpcode() != BO_SubAssign &&
+          Updates[I]->getOpcode() != BO_MulAssign)
         return false;
       const auto *Peer =
           dyn_cast<DeclRefExpr>(Updates[I]->getRHS()->IgnoreParenImpCasts());
       if (!Peer || Peer->getDecl() != Targets[I + 1])
         return false;
+      if (Updates[I]->getOpcode() == BO_MulAssign) {
+        NeedsPrimalTape[I] = true;
+        NeedsPrimalTape[I + 1] = true;
+        NeedsAnyPrimalTape = true;
+      }
     }
     const ADExpr *LastFactor = buildExpr(Updates.back()->getRHS());
     if (!LastFactor)
       return false;
-    bool LastUsesPrimalTape = false;
     unsigned TapeSize = 0;
     if (LastFactor->Value.Activity == ADActivity::Active) {
       const auto *FactorRef = dyn_cast<DeclRefExpr>(
@@ -645,6 +651,10 @@ private:
       if (Updates.back()->getOpcode() != BO_MulAssign || !FactorRef ||
           FactorRef->getDecl() != Targets.back())
         return false;
+      NeedsPrimalTape.back() = true;
+      NeedsAnyPrimalTape = true;
+    }
+    if (NeedsAnyPrimalTape && TapeSize == 0) {
       const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
       const auto *BoundCall =
           Condition
@@ -659,7 +669,6 @@ private:
       if (TapeSize == 0 || TapeSize > 1024)
         return fail("active nonlinear runtime chain requires a min(count, N) "
                     "bound with N between 1 and 1024");
-      LastUsesPrimalTape = true;
     }
 
     SmallVector<const ADBinding *, 4> Before;
@@ -710,7 +719,7 @@ private:
       Result->Operands.push_back(Factor);
       Result->Value.Activity = ADActivity::Active;
       Result->Value.PrimalType = Targets[I]->getType();
-      if (I + 1 == Targets.size() && LastUsesPrimalTape) {
+      if (NeedsPrimalTape[I]) {
         Result->RuntimeLoopUsesPrimalTape = true;
         Result->RuntimeLoopTapeSize = TapeSize;
       }
@@ -948,7 +957,7 @@ private:
           return false;
         if (Count->Value.Activity == ADActivity::Active)
           return fail("active runtime loop count must be inactive");
-        if (buildLinearActiveRuntimeChain(FS, Counter, Count, Compound))
+        if (buildActiveRuntimeChain(FS, Counter, Count, Compound))
           return true;
         if (buildCoupledActiveRuntimeFor(FS, Counter, Count, Compound))
           return true;
