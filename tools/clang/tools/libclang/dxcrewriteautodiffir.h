@@ -94,10 +94,16 @@ struct ADStmt {
     Return
   };
 
-  Kind K;
+  ADStmt() = default;
+  ADStmt(Kind K, const ADBinding *Binding = nullptr,
+         const ADExpr *Value = nullptr, const clang::Stmt *SourceStmt = nullptr)
+      : K(K), Binding(Binding), Value(Value), SourceStmt(SourceStmt) {}
+
+  Kind K = Kind::Declare;
   const ADBinding *Binding = nullptr;
   const ADExpr *Value = nullptr;
   const clang::Stmt *SourceStmt = nullptr;
+  llvm::SmallVector<const ADExpr *, 4> Values;
 };
 
 struct ADFunctionPlan {

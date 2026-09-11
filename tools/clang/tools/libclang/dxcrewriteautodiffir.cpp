@@ -512,6 +512,88 @@ private:
     return Left && Right ? Left + Right : 0;
   }
 
+  bool buildIndependentActiveRuntimeFor(const ForStmt *FS,
+                                        const VarDecl *Counter,
+                                        const ADExpr *Count,
+                                        const CompoundStmt *Body) {
+    SmallVector<const ADExpr *, 4> Results;
+    SmallPtrSet<const ValueDecl *, 4> Targets;
+    for (const Stmt *Child : Body->body()) {
+      const auto *Update = dyn_cast<BinaryOperator>(Child);
+      if (!Update || (Update->getOpcode() != BO_AddAssign &&
+                      Update->getOpcode() != BO_SubAssign &&
+                      Update->getOpcode() != BO_MulAssign &&
+                      Update->getOpcode() != BO_DivAssign))
+        return fail("active multi-carried runtime loop requires compound "
+                    "updates");
+      const auto *TargetRef =
+          dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
+      const auto *Target =
+          TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
+      if (!Target || Target->hasAttr<HLSLNoDiffAttr>())
+        return fail("active multi-carried runtime loop target is not active");
+      const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
+      if (!Targets.insert(CanonicalTarget).second)
+        return fail("active multi-carried runtime loop updates a target twice");
+
+      const ADExpr *Factor = buildExpr(Update->getRHS());
+      if (!Factor)
+        return false;
+      if (Factor->Value.Activity == ADActivity::Active)
+        return fail("active multi-carried runtime loop updates must be "
+                    "independent");
+
+      auto It = CurrentBindings.find(CanonicalTarget);
+      const ADBinding *Before = nullptr;
+      if (It == CurrentBindings.end()) {
+        ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRef);
+        Initial->SourceDecl = CanonicalTarget;
+        Initial->Value.SourceDecl = CanonicalTarget;
+        Initial->Value.Activity = ADActivity::Active;
+        Before = createBinding(Target, 0, Initial);
+      } else {
+        Before = It->second;
+      }
+      if (!Before->Value)
+        return fail(
+            "active multi-carried runtime loop reads an uninitialized value");
+
+      ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
+      Result->SourceDecl = CanonicalTarget;
+      Result->LoopCounter = Counter;
+      switch (Update->getOpcode()) {
+      case BO_AddAssign:
+        Result->BinaryOpcode = BO_Add;
+        break;
+      case BO_SubAssign:
+        Result->BinaryOpcode = BO_Sub;
+        break;
+      case BO_MulAssign:
+        Result->BinaryOpcode = BO_Mul;
+        break;
+      case BO_DivAssign:
+        Result->BinaryOpcode = BO_Div;
+        break;
+      default:
+        llvm_unreachable("validated independent runtime loop update");
+      }
+      Result->Operands.push_back(createLocalRef(TargetRef, Before, false));
+      Result->Operands.push_back(Count);
+      Result->Operands.push_back(Factor);
+      Result->Value.Activity = ADActivity::Active;
+      Result->Value.PrimalType = Target->getType();
+
+      const ADBinding *After =
+          createBinding(Target, Before->Version + 1, Result);
+      CurrentBindings[CanonicalTarget] = After;
+      Results.push_back(Result);
+    }
+    ADStmt Statement{ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS};
+    Statement.Values = Results;
+    Plan.Statements.push_back(std::move(Statement));
+    return true;
+  }
+
   bool buildActiveRuntimeFor(const ForStmt *FS) {
     const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
     const auto *Counter = Init && Init->isSingleDecl()
@@ -541,8 +623,14 @@ private:
 
     const Stmt *Body = FS->getBody();
     if (const auto *Compound = dyn_cast<CompoundStmt>(Body)) {
-      if (Compound->size() != 1)
-        return fail("active runtime loop requires one update statement");
+      if (Compound->size() != 1) {
+        const ADExpr *Count = buildExpr(Condition->getRHS());
+        if (!Count)
+          return false;
+        if (Count->Value.Activity == ADActivity::Active)
+          return fail("active runtime loop count must be inactive");
+        return buildIndependentActiveRuntimeFor(FS, Counter, Count, Compound);
+      }
       Body = *Compound->body_begin();
     }
     const auto *Update = dyn_cast<BinaryOperator>(Body);

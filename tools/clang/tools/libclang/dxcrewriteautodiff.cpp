@@ -1311,43 +1311,59 @@ public:
         S.SourceStmt->printPretty(OS, nullptr, Policy);
         OS << "\n";
       } else if (S.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
-        unsigned LoopID = NextLoopID++;
-        RuntimeLoopIDs[S.Value] = LoopID;
-        if (S.Value->RuntimeLoopUsesPrimalTape)
-          OS << "    " << printType(S.Value->Value.PrimalType, Policy)
-             << " __dxc_ad_loop_" << LoopID << "_primal_tape["
-             << S.Value->RuntimeLoopTapeSize << "];\n";
-        OS << "    for (uint " << S.Value->LoopCounter->getName() << " = 0; "
-           << S.Value->LoopCounter->getName() << " < ";
-        emitPrimal(S.Value->Operands[1]);
-        OS << "; ++" << S.Value->LoopCounter->getName() << ")";
-        if (S.Value->RuntimeLoopUsesPrimalTape)
-          OS << " {\n        __dxc_ad_loop_" << LoopID << "_primal_tape["
-             << S.Value->LoopCounter->getName()
-             << "] = " << S.Value->SourceDecl->getName() << ".value;\n    ";
-        OS << "\n        " << S.Value->SourceDecl->getName() << ".value ";
-        switch (S.Value->BinaryOpcode) {
-        case BO_Assign:
-          OS << "= ";
-          break;
-        case BO_Add:
-          OS << "+= ";
-          break;
-        case BO_Sub:
-          OS << "-= ";
-          break;
-        case BO_Mul:
-          OS << "*= ";
-          break;
-        case BO_Div:
-          OS << "/= ";
-          break;
-        default:
-          llvm_unreachable("validated active runtime loop operation");
+        SmallVector<const hlsl::autodiff::ADExpr *, 4> Results = S.Values;
+        if (Results.empty())
+          Results.push_back(S.Value);
+        SmallVector<unsigned, 4> LoopIDs;
+        bool NeedsBraces = Results.size() > 1;
+        for (const hlsl::autodiff::ADExpr *LoopResult : Results) {
+          unsigned LoopID = NextLoopID++;
+          LoopIDs.push_back(LoopID);
+          RuntimeLoopIDs[LoopResult] = LoopID;
+          NeedsBraces |= LoopResult->RuntimeLoopUsesPrimalTape;
+          if (LoopResult->RuntimeLoopUsesPrimalTape)
+            OS << "    " << printType(LoopResult->Value.PrimalType, Policy)
+               << " __dxc_ad_loop_" << LoopID << "_primal_tape["
+               << LoopResult->RuntimeLoopTapeSize << "];\n";
         }
-        emitPrimal(S.Value->Operands[2]);
-        OS << ";\n";
-        if (S.Value->RuntimeLoopUsesPrimalTape)
+        const hlsl::autodiff::ADExpr *FirstResult = Results.front();
+        OS << "    for (uint " << FirstResult->LoopCounter->getName()
+           << " = 0; " << FirstResult->LoopCounter->getName() << " < ";
+        emitPrimal(FirstResult->Operands[1]);
+        OS << "; ++" << FirstResult->LoopCounter->getName() << ")";
+        OS << (NeedsBraces ? " {\n" : "\n");
+        for (unsigned I = 0; I < Results.size(); ++I) {
+          const hlsl::autodiff::ADExpr *LoopResult = Results[I];
+          unsigned LoopID = LoopIDs[I];
+          if (LoopResult->RuntimeLoopUsesPrimalTape)
+            OS << "        __dxc_ad_loop_" << LoopID << "_primal_tape["
+               << LoopResult->LoopCounter->getName()
+               << "] = " << LoopResult->SourceDecl->getName() << ".value;\n";
+          OS << (NeedsBraces ? "        " : "        ")
+             << LoopResult->SourceDecl->getName() << ".value ";
+          switch (LoopResult->BinaryOpcode) {
+          case BO_Assign:
+            OS << "= ";
+            break;
+          case BO_Add:
+            OS << "+= ";
+            break;
+          case BO_Sub:
+            OS << "-= ";
+            break;
+          case BO_Mul:
+            OS << "*= ";
+            break;
+          case BO_Div:
+            OS << "/= ";
+            break;
+          default:
+            llvm_unreachable("validated active runtime loop operation");
+          }
+          emitPrimal(LoopResult->Operands[2]);
+          OS << ";\n";
+        }
+        if (NeedsBraces)
           OS << "    }\n";
       }
 
