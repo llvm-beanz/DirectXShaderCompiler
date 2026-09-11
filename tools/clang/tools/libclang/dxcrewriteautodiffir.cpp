@@ -426,6 +426,79 @@ private:
     return false;
   }
 
+  bool referencesActiveValue(const Stmt *S) const {
+    if (!S)
+      return false;
+    if (const auto *DRE = dyn_cast<DeclRefExpr>(S)) {
+      const ValueDecl *Decl = getCanonicalValueDecl(DRE->getDecl());
+      if (const auto *Parameter = dyn_cast<ParmVarDecl>(Decl))
+        return !Parameter->hasAttr<HLSLNoDiffAttr>();
+      auto It = CurrentBindings.find(Decl);
+      return It != CurrentBindings.end() && It->second->Value &&
+             It->second->Value->Value.Activity == ADActivity::Active;
+    }
+    for (const Stmt *Child : S->children())
+      if (referencesActiveValue(Child))
+        return true;
+    return false;
+  }
+
+  bool collectInactiveLoopAssignments(
+      const Stmt *S, const VarDecl *Counter,
+      SmallVectorImpl<std::pair<const ParmVarDecl *, const Expr *>> &Outputs) {
+    if (!S)
+      return true;
+    if (const auto *BO = dyn_cast<BinaryOperator>(S)) {
+      if (BO->isAssignmentOp()) {
+        const auto *LHS =
+            dyn_cast<DeclRefExpr>(BO->getLHS()->IgnoreParenImpCasts());
+        if (!LHS)
+          return false;
+        const auto *Parameter = dyn_cast<ParmVarDecl>(LHS->getDecl());
+        if (!Parameter || !Parameter->hasAttr<HLSLNoDiffAttr>())
+          return false;
+        Outputs.push_back({Parameter, LHS});
+      }
+    }
+    if (const auto *UO = dyn_cast<UnaryOperator>(S)) {
+      if (UO->isIncrementDecrementOp()) {
+        const auto *Target =
+            dyn_cast<DeclRefExpr>(UO->getSubExpr()->IgnoreParenImpCasts());
+        if (!Target || Target->getDecl() != Counter)
+          return false;
+      }
+    }
+    for (const Stmt *Child : S->children())
+      if (!collectInactiveLoopAssignments(Child, Counter, Outputs))
+        return false;
+    return true;
+  }
+
+  bool buildInactiveRuntimeFor(const ForStmt *FS) {
+    const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
+    const auto *Counter = Init && Init->isSingleDecl()
+                              ? dyn_cast<VarDecl>(Init->getSingleDecl())
+                              : nullptr;
+    if (!Counter || referencesActiveValue(FS->getCond()) ||
+        referencesActiveValue(FS->getBody()))
+      return fail("data-dependent control flow (for) is not differentiable");
+
+    SmallVector<std::pair<const ParmVarDecl *, const Expr *>, 4> Outputs;
+    if (!collectInactiveLoopAssignments(FS, Counter, Outputs))
+      return fail("inactive runtime loop may only update inactive parameters");
+    Plan.Statements.push_back({ADStmt::Kind::PrimalLoop, nullptr, nullptr, FS});
+    for (const auto &Output : Outputs) {
+      const ParmVarDecl *Parameter = Output.first;
+      const ValueDecl *Target = getCanonicalValueDecl(Parameter);
+      auto It = CurrentBindings.find(Target);
+      unsigned Version =
+          It == CurrentBindings.end() ? 0 : It->second->Version + 1;
+      const ADExpr *Value = createPrimalLocal(Output.second, Parameter);
+      CurrentBindings[Target] = createBinding(Parameter, Version, Value);
+    }
+    return true;
+  }
+
   bool buildStaticFor(const ForStmt *FS, bool ForceInactive) {
     const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
     if (!Init || !Init->isSingleDecl())
@@ -510,8 +583,14 @@ private:
       return true;
     }
 
-    if (const auto *FS = dyn_cast<ForStmt>(S))
-      return buildStaticFor(FS, ForceInactive);
+    if (const auto *FS = dyn_cast<ForStmt>(S)) {
+      const auto *Condition = dyn_cast_or_null<BinaryOperator>(FS->getCond());
+      const bool HasConstantBound =
+          Condition &&
+          isa<IntegerLiteral>(Condition->getRHS()->IgnoreParenImpCasts());
+      return HasConstantBound ? buildStaticFor(FS, ForceInactive)
+                              : buildInactiveRuntimeFor(FS);
+    }
 
     if (const auto *IS = dyn_cast<IfStmt>(S)) {
       if (IS->getConditionVariable())

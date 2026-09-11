@@ -962,6 +962,11 @@ public:
         emitPrimalExpr(S.Value);
         OS << ";\n";
         break;
+      case hlsl::autodiff::ADStmt::Kind::PrimalLoop:
+        OS << "    ";
+        S.SourceStmt->printPretty(OS, nullptr, Policy);
+        OS << "\n";
+        break;
       case hlsl::autodiff::ADStmt::Kind::Return:
         if (S.Value->Value.Activity == hlsl::autodiff::ADActivity::Inactive) {
           if (M == AutoDiffEmitter::Bwd)
@@ -1296,6 +1301,10 @@ public:
         OS << "    ";
         emitPrimal(S.Value);
         OS << ";\n";
+      } else if (S.K == hlsl::autodiff::ADStmt::Kind::PrimalLoop) {
+        OS << "    ";
+        S.SourceStmt->printPretty(OS, nullptr, Policy);
+        OS << "\n";
       }
 
     OS << "    " << ResultType << " __dxc_ad_primal = ";
@@ -1471,8 +1480,11 @@ private:
         }
       } else if (const auto *Method = dyn_cast<CXXMethodDecl>(E->Callee))
         Out << "::" << Method->getParent()->getName() << "::";
-      else
-        Out << "::";
+      else {
+        std::string QualifiedName = E->Callee->getQualifiedNameAsString();
+        Out << "::"
+            << StringRef(QualifiedName).drop_back(E->Callee->getName().size());
+      }
       Out << E->Callee->getName() << "(";
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
@@ -1626,6 +1638,18 @@ private:
     if (E->Receiver) {
       emitPrimal(E->Receiver);
       OS << ".";
+    } else if (!isa<CXXMethodDecl>(E->Callee)) {
+      SmallVector<StringRef, 4> ReversedNamespaces;
+      for (const DeclContext *DC = E->Callee->getDeclContext(); DC;
+           DC = DC->getParent()) {
+        const auto *Namespace = dyn_cast<NamespaceDecl>(DC);
+        if (Namespace && Namespace->getIdentifier())
+          ReversedNamespaces.push_back(Namespace->getName());
+      }
+      OS << "::user::ad::bwd::";
+      for (auto It = ReversedNamespaces.rbegin();
+           It != ReversedNamespaces.rend(); ++It)
+        OS << *It << "::";
     }
     OS << E->Callee->getName() << "(";
     bool First = true;
@@ -2128,6 +2152,39 @@ void emitDirectCalleePrototypes(const FunctionDecl *FD,
   }
 }
 
+SmallVector<StringRef, 4> getSourceNamespacePath(const FunctionDecl *FD) {
+  SmallVector<StringRef, 4> Reversed;
+  for (const DeclContext *DC = FD->getDeclContext(); DC; DC = DC->getParent()) {
+    const auto *NS = dyn_cast<NamespaceDecl>(DC);
+    if (NS && NS->getIdentifier())
+      Reversed.push_back(NS->getName());
+  }
+  SmallVector<StringRef, 4> Path;
+  for (auto It = Reversed.rbegin(); It != Reversed.rend(); ++It)
+    Path.push_back(*It);
+  return Path;
+}
+
+void openGeneratedNamespaces(ArrayRef<StringRef> SourcePath,
+                             AutoDiffEmitter::Mode Mode, raw_ostream &OS) {
+  OS << "\nnamespace user { namespace ad { namespace "
+     << (Mode == AutoDiffEmitter::Fwd ? "fwd" : "bwd") << " { ";
+  for (StringRef Name : SourcePath)
+    OS << "namespace " << Name << " { ";
+  OS << "\n";
+}
+
+void closeGeneratedNamespaces(ArrayRef<StringRef> SourcePath,
+                              AutoDiffEmitter::Mode Mode, raw_ostream &OS) {
+  for (size_t I = 0; I < SourcePath.size(); ++I)
+    OS << "} ";
+  OS << "} } } // namespace user::ad::"
+     << (Mode == AutoDiffEmitter::Fwd ? "fwd" : "bwd");
+  for (StringRef Name : SourcePath)
+    OS << "::" << Name;
+  OS << "\n";
+}
+
 // Emit forward and/or backward generated functions for a single annotated
 // function, wrapped in the user::ad::{fwd,bwd}:: namespaces.
 //
@@ -2141,21 +2198,22 @@ void EmitAutoDiffForFunction(const FunctionDecl *FD,
                              const StringSet<> &ExistingBwd,
                              const PrintingPolicy &Policy, raw_ostream &OS) {
   StringRef Name = FD->getName();
+  SmallVector<StringRef, 4> SourcePath = getSourceNamespacePath(FD);
   if (Attr->hasForward() && !ExistingFwd.count(Name)) {
-    OS << "\nnamespace user { namespace ad { namespace fwd {\n";
+    openGeneratedNamespaces(SourcePath, AutoDiffEmitter::Fwd, OS);
     OS << "using namespace ::ad::fwd;\n";
     emitDirectCalleePrototypes(FD, AutoDiffEmitter::Fwd, ExistingFwd, Policy,
                                OS);
     emitAutoDiffFunction(FD, AutoDiffEmitter::Fwd, Policy, OS);
-    OS << "} } } // namespace user::ad::fwd\n";
+    closeGeneratedNamespaces(SourcePath, AutoDiffEmitter::Fwd, OS);
   }
   if (Attr->hasBackward() && !ExistingBwd.count(Name)) {
-    OS << "\nnamespace user { namespace ad { namespace bwd {\n";
+    openGeneratedNamespaces(SourcePath, AutoDiffEmitter::Bwd, OS);
     OS << "using namespace ::ad::bwd;\n";
     emitDirectCalleePrototypes(FD, AutoDiffEmitter::Bwd, ExistingBwd, Policy,
                                OS);
     emitAutoDiffFunction(FD, AutoDiffEmitter::Bwd, Policy, OS);
-    OS << "} } } // namespace user::ad::bwd\n";
+    closeGeneratedNamespaces(SourcePath, AutoDiffEmitter::Bwd, OS);
   }
 }
 
@@ -2361,6 +2419,49 @@ void printDeclWithSubstitutions(
   OS << "\n";
 }
 
+void collectAnnotatedFreeFunctions(
+    const DeclContext *DC, SmallVectorImpl<const FunctionDecl *> &Functions,
+    SmallPtrSetImpl<const FunctionDecl *> &Seen) {
+  for (const Decl *D : DC->decls()) {
+    if (const auto *NS = dyn_cast<NamespaceDecl>(D)) {
+      collectAnnotatedFreeFunctions(NS, Functions, Seen);
+      continue;
+    }
+    const auto *FD = dyn_cast<FunctionDecl>(D);
+    if (!FD || isa<CXXMethodDecl>(FD) || !FD->doesThisDeclarationHaveABody() ||
+        !FD->hasAttr<HLSLAutoDiffAttr>())
+      continue;
+    const FunctionDecl *Canonical = FD->getCanonicalDecl();
+    if (Seen.insert(Canonical).second)
+      Functions.push_back(FD);
+  }
+}
+
+void orderAnnotatedFunctionDependencies(
+    const FunctionDecl *FD, SmallVectorImpl<const FunctionDecl *> &Ordered,
+    SmallPtrSetImpl<const FunctionDecl *> &Visiting,
+    SmallPtrSetImpl<const FunctionDecl *> &Emitted) {
+  const FunctionDecl *Canonical = FD->getCanonicalDecl();
+  if (Emitted.count(Canonical) || Visiting.count(Canonical))
+    return;
+  Visiting.insert(Canonical);
+
+  DirectAutoDiffCalleeCollector Collector;
+  Collector.TraverseStmt(const_cast<Stmt *>(FD->getBody()));
+  for (const FunctionDecl *Callee : Collector.Callees) {
+    if (isa<CXXMethodDecl>(Callee))
+      continue;
+    const FunctionDecl *Definition = nullptr;
+    if (Callee->hasBody(Definition))
+      orderAnnotatedFunctionDependencies(Definition, Ordered, Visiting,
+                                         Emitted);
+  }
+
+  Visiting.erase(Canonical);
+  if (Emitted.insert(Canonical).second)
+    Ordered.push_back(FD);
+}
+
 } // anonymous namespace
 
 namespace hlsl {
@@ -2394,16 +2495,20 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
   DenseMap<const CXXRecordDecl *, std::string> Subs;
   static const StringRef FwdPath[] = {"user", "ad", "fwd"};
   static const StringRef BwdPath[] = {"user", "ad", "bwd"};
+  SmallVector<const FunctionDecl *, 16> AnnotatedFunctions;
+  SmallPtrSet<const FunctionDecl *, 16> SeenFunctions;
+  collectAnnotatedFreeFunctions(tu, AnnotatedFunctions, SeenFunctions);
 
   bool NeedFwd = false;
   bool NeedBwd = false;
+  for (const FunctionDecl *FD : AnnotatedFunctions) {
+    const auto *AD = FD->getAttr<HLSLAutoDiffAttr>();
+    StringRef Name = FD->getName();
+    NeedFwd |= AD->hasForward() && !ExistingFwd.count(Name);
+    NeedBwd |= AD->hasBackward() && !ExistingBwd.count(Name);
+  }
   for (Decl *D : tu->decls()) {
     if (const auto *FD = dyn_cast<FunctionDecl>(D)) {
-      if (const auto *AD = FD->getAttr<HLSLAutoDiffAttr>()) {
-        StringRef Name = FD->getName();
-        NeedFwd |= AD->hasForward() && !ExistingFwd.count(Name);
-        NeedBwd |= AD->hasBackward() && !ExistingBwd.count(Name);
-      }
       continue;
     }
     // Classes / structs whose methods carry HLSLAutoDiffAttr also trigger
@@ -2455,9 +2560,7 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
     if (D->isImplicit())
       continue;
     printDeclWithSubstitutions(D, Subs, OS, Policy);
-    if (auto *FD = dyn_cast<FunctionDecl>(D)) {
-      if (auto *AD = FD->getAttr<HLSLAutoDiffAttr>())
-        EmitAutoDiffForFunction(FD, AD, ExistingFwd, ExistingBwd, Policy, OS);
+    if (isa<FunctionDecl>(D)) {
       continue;
     }
     if (auto *RD = dyn_cast<CXXRecordDecl>(D)) {
@@ -2475,6 +2578,15 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
       EmitAutoDiffForRecord(RD, UserFwd, UserBwd, Policy, OS);
     }
   }
+  SmallVector<const FunctionDecl *, 16> OrderedFunctions;
+  SmallPtrSet<const FunctionDecl *, 16> VisitingFunctions;
+  SmallPtrSet<const FunctionDecl *, 16> EmittedFunctions;
+  for (const FunctionDecl *FD : AnnotatedFunctions)
+    orderAnnotatedFunctionDependencies(FD, OrderedFunctions, VisitingFunctions,
+                                       EmittedFunctions);
+  for (const FunctionDecl *FD : OrderedFunctions)
+    EmitAutoDiffForFunction(FD, FD->getAttr<HLSLAutoDiffAttr>(), ExistingFwd,
+                            ExistingBwd, Policy, OS);
 }
 
 } // namespace hlsl

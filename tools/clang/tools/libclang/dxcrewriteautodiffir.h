@@ -77,11 +77,12 @@ struct ADBinding {
 };
 
 struct ADStmt {
-  enum class Kind { Declare, Assign, Expression, Return };
+  enum class Kind { Declare, Assign, Expression, PrimalLoop, Return };
 
   Kind K;
   const ADBinding *Binding = nullptr;
   const ADExpr *Value = nullptr;
+  const clang::Stmt *SourceStmt = nullptr;
 };
 
 struct ADFunctionPlan {

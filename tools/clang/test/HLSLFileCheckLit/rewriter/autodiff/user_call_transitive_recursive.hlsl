@@ -15,5 +15,5 @@ float g(float value) {
 // A cycle across two canonical attributed declarations requires a call tape
 // and is rejected before either generated pullback recursively invokes itself.
 
-// CHECK: auto-diff cannot generate backward-mode for 'f': recursive pullback composition is not supported
-// CHECK: auto-diff cannot generate backward-mode for 'g': recursive pullback composition is not supported
+// CHECK-DAG: auto-diff cannot generate backward-mode for 'f': recursive pullback composition is not supported
+// CHECK-DAG: auto-diff cannot generate backward-mode for 'g': recursive pullback composition is not supported
