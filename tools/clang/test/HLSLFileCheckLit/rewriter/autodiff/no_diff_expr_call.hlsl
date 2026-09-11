@@ -12,9 +12,9 @@
 // CHECK: return (uv - Value<float>::CreateValue(floor(uv.value)));
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float frac_no_diff(inout GradientContext<float> context, Variable<float> uv)
+// CHECK: float frac_no_diff(inout GradientContext<float> context, Variable<float> uv, float __dxc_ad_seed)
 // CHECK: VariableExpr<float> uv_expr = makeVariableExpr<float>(uv);
-// CHECK: return compute_gradients(context, subtract<float>(uv_expr, floor(uv.value)));
+// CHECK: return compute_gradients_seeded(context, subtract<float>(uv_expr, floor(uv.value)), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(fwd, bwd)]]

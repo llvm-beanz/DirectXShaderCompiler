@@ -17,8 +17,8 @@
 
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: struct Foo : ::Foo {
-// CHECK: float doublescale(inout GradientContext<float> context, Variable<float> k)
-// CHECK: float onlybwd(inout GradientContext<float> context, Variable<float> a)
+// CHECK: float doublescale(inout GradientContext<float> context, Variable<float> k, float __dxc_ad_seed)
+// CHECK: float onlybwd(inout GradientContext<float> context, Variable<float> a, float __dxc_ad_seed)
 // CHECK: } } } // namespace user::ad::bwd
 
 struct Foo {

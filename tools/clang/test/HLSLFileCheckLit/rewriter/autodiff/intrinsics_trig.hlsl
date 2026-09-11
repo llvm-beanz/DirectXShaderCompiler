@@ -5,7 +5,7 @@
 // Trig intrinsics map to *Expr builders in backward mode.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
 // CHECK: sinExpr<float>(x_expr)
 // CHECK: cosExpr<float>(x_expr)

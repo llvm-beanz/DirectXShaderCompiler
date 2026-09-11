@@ -15,12 +15,12 @@
 // CHECK: return b;
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x, Variable<float> y)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, Variable<float> y, float __dxc_ad_seed)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
 // CHECK: VariableExpr<float> y_expr = makeVariableExpr<float>(y);
 // CHECK-NOT: Variable<float> a
 // CHECK-NOT: Variable<float> b
-// CHECK: return compute_gradients(context, add<float>(multiply<float>(x_expr, y_expr), sinExpr<float>(x_expr)));
+// CHECK: return compute_gradients_seeded(context, add<float>(multiply<float>(x_expr, y_expr), sinExpr<float>(x_expr)), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
 // At x=2 and y=3: f=xy+sin(x), df/dx=y+cos(x), df/dy=x.

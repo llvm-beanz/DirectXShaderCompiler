@@ -26,7 +26,7 @@
 // CHECK: } } } // namespace user::ad::fwd
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': unknown callee 'g' has no auto-diff builder");
 // CHECK: return (float)0;
 // CHECK: } } } // namespace user::ad::bwd

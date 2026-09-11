@@ -34,6 +34,18 @@ using namespace llvm;
 
 namespace {
 
+bool isInactiveParameter(const ParmVarDecl *P) {
+  return P->hasAttr<HLSLNoDiffAttr>();
+}
+
+std::string printType(QualType Type, const PrintingPolicy &Policy) {
+  std::string Result;
+  raw_string_ostream OS(Result);
+  Type.print(OS, Policy);
+  OS.flush();
+  return Result;
+}
+
 // ---------------------------------------------------------------------------
 // Intrinsic classification
 // ---------------------------------------------------------------------------
@@ -304,7 +316,7 @@ const char *GetNonDifferentiableReason(StringRef Name) {
       .Case("CreateResourceFromHeap",
             "'CreateResourceFromHeap' is not differentiable")
       .Case("DispatchMesh",
-            "mesh-shader 'DispatchMesh' is not differentiable")
+        "mesh-shader 'DispatchMesh' is not differentiable")
       .Case("SetMeshOutputCounts",
             "mesh-shader 'SetMeshOutputCounts' is not differentiable")
       // Tessellator helpers.
@@ -502,10 +514,10 @@ public:
         // Backward builders produce expression-template types. Evaluate the
         // completed graph here, returning its primal value and accumulating
         // parameter gradients in the caller-provided context.
-        OS << (M == Bwd ? " compute_gradients(context, " : " ");
+        OS << (M == Bwd ? " compute_gradients_seeded(context, " : " ");
         emitExpr(RS->getRetValue());
         if (M == Bwd)
-          OS << ")";
+          OS << ", __dxc_ad_seed)";
       }
       OS << ";\n";
       return;
@@ -796,7 +808,11 @@ private:
     }
     // In backward mode, parameters are referenced through their _expr
     // VariableExpr wrappers declared at the top of the body.
-    if (isa<ParmVarDecl>(DRE->getDecl())) {
+    if (const auto *P = dyn_cast<ParmVarDecl>(DRE->getDecl())) {
+      if (isInactiveParameter(P)) {
+        OS << Name;
+        return;
+      }
       OS << Name << "_expr";
       return;
     }
@@ -874,10 +890,10 @@ public:
         } else {
           OS << "    return ";
           if (M == AutoDiffEmitter::Bwd)
-            OS << "compute_gradients(context, ";
+            OS << "compute_gradients_seeded(context, ";
           emitExpr(S.Value);
           if (M == AutoDiffEmitter::Bwd)
-            OS << ")";
+            OS << ", __dxc_ad_seed)";
           OS << ";\n";
         }
         break;
@@ -908,8 +924,10 @@ private:
       return;
     case ExprKind::DeclRef:
       OS << E->SourceDecl->getName();
-      if (isa<ParmVarDecl>(E->SourceDecl))
-        OS << ".value";
+      if (const auto *P = dyn_cast<ParmVarDecl>(E->SourceDecl)) {
+        if (!isInactiveParameter(P))
+          OS << ".value";
+      }
       return;
     case ExprKind::LocalRef:
       if (M == AutoDiffEmitter::Bwd) {
@@ -1095,7 +1113,8 @@ private:
 
 // Render the autodiff signature for a function in either mode.
 void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
-                           StringRef ElemType, raw_ostream &OS) {
+                           StringRef ElemType, const PrintingPolicy &Policy,
+                           raw_ostream &OS) {
   if (M == AutoDiffEmitter::Fwd) {
     OS << "Value<" << ElemType << "> " << FD->getName() << "(";
     bool First = true;
@@ -1103,19 +1122,30 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
       if (!First)
         OS << ", ";
       First = false;
-      OS << "Value<" << ElemType << "> " << P->getName();
+      std::string ParamType = printType(P->getType(), Policy);
+      if (isInactiveParameter(P))
+        OS << ParamType;
+      else
+        OS << "Value<" << ParamType << ">";
+      OS << " " << P->getName();
     }
     OS << ")";
     return;
   }
   // Backward mode returns the primal value; derivatives are written to the
   // GradientContext entries associated with the Variable<T> parameters.
-    OS << ElemType << " " << FD->getName() << "(inout GradientContext<"
-      << ElemType << "> context";
+  OS << ElemType << " " << FD->getName() << "(inout GradientContext<"
+     << ElemType << "> context";
   for (const ParmVarDecl *P : FD->parameters()) {
-    OS << ", Variable<" << ElemType << "> " << P->getName();
+    std::string ParamType = printType(P->getType(), Policy);
+    OS << ", ";
+    if (isInactiveParameter(P))
+      OS << ParamType;
+    else
+      OS << "Variable<" << ParamType << ">";
+    OS << " " << P->getName();
   }
-  OS << ")";
+  OS << ", " << ElemType << " __dxc_ad_seed)";
 }
 
 // Emit the auto-diff variant of a single function inside the appropriate
@@ -1124,10 +1154,7 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
                           const PrintingPolicy &Policy, raw_ostream &OS) {
   // Determine the element type from the return type. We support scalar
   // float-like functions for now; other return types produce a TODO.
-  std::string ElemType;
-  raw_string_ostream ES(ElemType);
-  FD->getReturnType().getCanonicalType().print(ES, Policy);
-  ES.flush();
+  std::string ElemType = printType(FD->getReturnType(), Policy);
 
   // Render the body into a temporary buffer first so that, if a
   // non-differentiable construct was encountered, we can discard the body
@@ -1144,10 +1171,29 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     std::string PlanReason;
     bool HasTypedPlan =
         hlsl::autodiff::BuildADFunctionPlan(FD, Plan, PlanReason);
+    bool HasIncompatibleActiveType = false;
     if (M == AutoDiffEmitter::Bwd) {
       for (const ParmVarDecl *P : FD->parameters()) {
-        BodyOS << "    VariableExpr<" << ElemType << "> " << P->getName()
-               << "_expr = makeVariableExpr<" << ElemType << ">("
+        if (isInactiveParameter(P) ||
+            FD->getASTContext().hasSameType(P->getType(), FD->getReturnType()))
+          continue;
+        HasTypedPlan = false;
+        HasIncompatibleActiveType = true;
+        PlanReason = "active parameter '" + P->getName().str() +
+                     "' has type '" + printType(P->getType(), Policy) +
+                     "', but the backward runtime requires active parameter "
+                     "types to match result type '" +
+                     ElemType + "'";
+        break;
+      }
+    }
+    if (M == AutoDiffEmitter::Bwd) {
+      for (const ParmVarDecl *P : FD->parameters()) {
+        if (isInactiveParameter(P))
+          continue;
+        std::string ParamType = printType(P->getType(), Policy);
+        BodyOS << "    VariableExpr<" << ParamType << "> " << P->getName()
+               << "_expr = makeVariableExpr<" << ParamType << ">("
                << P->getName() << ");\n";
       }
     }
@@ -1158,6 +1204,9 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
       ValidBody = !Em.sawNonDifferentiable();
       if (!ValidBody)
         Reason = Em.nonDifferentiableReason().str();
+    } else if (HasIncompatibleActiveType) {
+      ValidBody = false;
+      Reason = PlanReason;
     } else {
       AutoDiffEmitter Em(M, ElemType, BodyOS, Policy, FD->getASTContext());
       for (const Stmt *S : CS->body())
@@ -1172,7 +1221,7 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     Reason = "function has no body";
   }
 
-  emitAutoDiffSignature(FD, M, ElemType, OS);
+  emitAutoDiffSignature(FD, M, ElemType, Policy, OS);
   OS << " {\n";
   if (ValidBody) {
     OS << BodyText;
@@ -1364,8 +1413,9 @@ void EmitAutoDiffForRecord(const CXXRecordDecl *RD,
       if (!MD)
         continue;
       const auto *AD = MD->getAttr<HLSLAutoDiffAttr>();
-      if (!AD)
+      if (!AD) {
         continue;
+      }
       bool WantsThisMode = (Mode == AutoDiffEmitter::Fwd)
                                ? AD->hasForward()
                                : AD->hasBackward();

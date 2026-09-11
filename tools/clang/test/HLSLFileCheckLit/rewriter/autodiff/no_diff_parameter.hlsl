@@ -8,16 +8,16 @@
 // x_expr reference from entering the backward expression graph.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x, Variable<float> y)
-// CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
+// CHECK: float f(inout GradientContext<float> context, float x, Variable<float> y, float __dxc_ad_seed)
+// CHECK-NOT: VariableExpr<float> x_expr
 // CHECK: VariableExpr<float> y_expr = makeVariableExpr<float>(y);
-// CHECK: return compute_gradients(context, multiply<float>(x.value, y_expr));
+// CHECK: return compute_gradients_seeded(context, multiply<float>(x, y_expr), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
-// At x=2 and y=3: f=6, inactive dx=0, and active dy=x=2.
+// At x=2, y=3, and seed=2: f=6 and active dy=seed*x=4. The inactive x
+// has no Variable or gradient slot in the generated ABI.
 // EXEC: rawBufferStore.f32{{.*}}i32 0, i32 0, float 6.000000e+00
-// EXEC: rawBufferStore.f32{{.*}}i32 1, i32 0, float 0.000000e+00
-// EXEC: rawBufferStore.f32{{.*}}i32 2, i32 0, float 2.000000e+00
+// EXEC: rawBufferStore.f32{{.*}}i32 1, i32 0, float 4.000000e+00
 
 [[dxc::autodiff(bwd)]]
 float f([[dxc::no_diff]] float x, float y) {

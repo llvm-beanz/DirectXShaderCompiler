@@ -13,7 +13,7 @@
 // the user at [[no_diff]] / branchless math.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float branchy(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float branchy(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'branchy': data-dependent control flow (if) is not differentiable; use {{\[\[}}dxc::no_diff]] or branchless math");
 // CHECK: } } } // namespace user::ad::bwd
 

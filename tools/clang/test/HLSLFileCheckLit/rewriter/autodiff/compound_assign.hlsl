@@ -8,10 +8,10 @@
 // lowering expands those versions into the final expression graph.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK-NOT: Variable<float> a
 // CHECK-NOT: Assign<float>
-// CHECK: return compute_gradients(context, divide<float>(multiply<float>(subtract<float>(add<float>(x_expr, x_expr), x_expr), x_expr), x_expr));
+// CHECK: return compute_gradients_seeded(context, divide<float>(multiply<float>(subtract<float>(add<float>(x_expr, x_expr), x_expr), x_expr), x_expr), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
 // At x=2, the sequence returns x and has derivative 1.

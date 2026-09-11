@@ -9,9 +9,9 @@
 
 // CHECK: float f(float x)
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
-// CHECK: return compute_gradients(context, add<float>(multiply<float>(x_expr, x_expr), x_expr));
+// CHECK: return compute_gradients_seeded(context, add<float>(multiply<float>(x_expr, x_expr), x_expr), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
 // f(2) = 6 and df/dx = 2x + 1 = 5.

@@ -11,7 +11,7 @@
 // Comparison operators are not differentiable; the function gets a stub.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float use_cmp(inout GradientContext<float> context, Variable<float> x, Variable<float> y)
+// CHECK: float use_cmp(inout GradientContext<float> context, Variable<float> x, Variable<float> y, float __dxc_ad_seed)
 // CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'use_cmp': the ternary ?: operator is not differentiable");
 // CHECK: } } } // namespace user::ad::bwd
 

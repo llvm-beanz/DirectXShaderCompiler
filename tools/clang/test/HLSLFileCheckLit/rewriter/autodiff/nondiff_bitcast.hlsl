@@ -19,7 +19,7 @@
 // CHECK: } } } // namespace user::ad::fwd
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float uses_asint(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float uses_asint(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'uses_asint': bit-cast 'asint' is not differentiable");
 // CHECK: } } } // namespace user::ad::bwd
 

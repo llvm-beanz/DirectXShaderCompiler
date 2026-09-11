@@ -11,9 +11,9 @@
 // CHECK: return ((sin(x) * cos(x)) + exp(x));
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
-// CHECK: return compute_gradients(context, add<float>(multiply<float>(sinExpr<float>(x_expr), cosExpr<float>(x_expr)), expExpr<float>(x_expr)));
+// CHECK: return compute_gradients_seeded(context, add<float>(multiply<float>(sinExpr<float>(x_expr), cosExpr<float>(x_expr)), expExpr<float>(x_expr)), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(fwd, bwd)]]

@@ -16,8 +16,8 @@
 // CHECK: } } } // namespace user::ad::fwd
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x, Variable<float> y)
-// CHECK: return compute_gradients(context, multiply<float>(x_expr, y_expr));
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, Variable<float> y, float __dxc_ad_seed)
+// CHECK: return compute_gradients_seeded(context, multiply<float>(x_expr, y_expr), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
 // At x=2 and y=3: f=xy, df/dx=y, and df/dy=x.

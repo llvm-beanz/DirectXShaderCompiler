@@ -5,7 +5,7 @@
 // Exponential / logarithm / power family.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x, Variable<float> y)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, Variable<float> y, float __dxc_ad_seed)
 // CHECK: expExpr<float>(x_expr)
 // CHECK: exp2Expr<float>(x_expr)
 // CHECK: logExpr<float>(x_expr)

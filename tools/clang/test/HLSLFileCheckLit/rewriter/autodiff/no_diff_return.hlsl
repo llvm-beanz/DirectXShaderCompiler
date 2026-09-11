@@ -20,7 +20,7 @@
 // CHECK: return x * x + x;
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
 // CHECK: return x * x + x;
 // CHECK: } } } // namespace user::ad::bwd

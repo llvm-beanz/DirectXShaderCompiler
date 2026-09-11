@@ -15,8 +15,8 @@
 // CHECK: } } } // namespace user::ad::fwd
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
-// CHECK: return compute_gradients(context, add<float>(sin(x.value), x_expr));
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
+// CHECK: return compute_gradients_seeded(context, add<float>(sin(x.value), x_expr), __dxc_ad_seed);
 // CHECK: } } } // namespace user::ad::bwd
 
 // Both modes return sin(2)+2 and report only the derivative of the active x.

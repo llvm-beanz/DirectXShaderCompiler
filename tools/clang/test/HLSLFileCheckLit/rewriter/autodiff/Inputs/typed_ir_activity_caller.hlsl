@@ -10,6 +10,6 @@ void testMain() {
   ::ad::bwd::GradientContext<float> context =
       (::ad::bwd::GradientContext<float>)0;
   ::ad::bwd::Variable<float> bwdX = ::ad::bwd::variable(context, 2.0f);
-  output[2] = user::ad::bwd::f(context, bwdX);
+  output[2] = user::ad::bwd::f(context, bwdX, 1.0f);
   output[3] = bwdX.gradient(context);
 }

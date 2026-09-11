@@ -14,7 +14,7 @@ template <typename T> struct Value { T v; };
 // namespace.
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: using namespace ::ad::bwd;
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
 // CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
 // CHECK: } } } // namespace user::ad::bwd
 

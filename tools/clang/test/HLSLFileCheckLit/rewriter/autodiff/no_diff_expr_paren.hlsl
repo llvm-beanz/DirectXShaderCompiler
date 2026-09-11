@@ -11,8 +11,8 @@
 // the backward-mode builder chain.
 
 // CHECK: namespace user { namespace ad { namespace bwd {
-// CHECK: float f(inout GradientContext<float> context, Variable<float> x)
-// CHECK: return compute_gradients(context, add<float>(x_expr, (sin(x.value) * cos(x.value))));
+// CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
+// CHECK: return compute_gradients_seeded(context, add<float>(x_expr, (sin(x.value) * cos(x.value))), __dxc_ad_seed);
 // CHECK-NOT: multiply<float>(sinExpr
 // CHECK: } } } // namespace user::ad::bwd
 
