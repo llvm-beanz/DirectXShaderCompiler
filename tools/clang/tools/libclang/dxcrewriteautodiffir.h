@@ -43,9 +43,13 @@ struct ADExpr {
     LocalRef,
     This,
     Member,
+    Swizzle,
+    Subscript,
+    VectorConstruct,
     Cast,
     Unary,
     Binary,
+    Conditional,
     Call,
   };
 
@@ -61,6 +65,7 @@ struct ADExpr {
   clang::UnaryOperatorKind UnaryOpcode = clang::UO_Plus;
   clang::BinaryOperatorKind BinaryOpcode = clang::BO_Add;
   llvm::SmallVector<const ADExpr *, 4> Operands;
+  llvm::SmallVector<unsigned, 4> Components;
 };
 
 struct ADBinding {

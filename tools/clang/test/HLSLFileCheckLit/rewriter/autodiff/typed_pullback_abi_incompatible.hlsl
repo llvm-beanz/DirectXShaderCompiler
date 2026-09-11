@@ -1,13 +1,13 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 
-// The current expression-template runtime uses one GradientContext<ResultType>
-// for the whole graph. An active leaf with another type is rejected explicitly
-// until the runtime can dispatch cotangents to heterogeneous contexts.
+// Direct reverse lowering supports a result type that differs from one active
+// leaf type. Multiple distinct active leaf types still require separate
+// cotangent storage and are rejected explicitly.
 
-// CHECK: float f(inout GradientContext<float> context, Variable<float2> value, float __dxc_ad_seed)
-// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': active parameter 'value' has type 'float2', but the backward runtime requires active parameter types to match result type 'float'");
+// CHECK: float f(inout GradientContext<float2> context, Variable<float2> value, Variable<float> scale, float __dxc_ad_seed)
+// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': the backward runtime currently supports only one active parameter type per function");
 
 [[dxc::autodiff(bwd)]]
-float f(float2 value) {
-  return value.x;
+float f(float2 value, float scale) {
+  return value.x * scale;
 }

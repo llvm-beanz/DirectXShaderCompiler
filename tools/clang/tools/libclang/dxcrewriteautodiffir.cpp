@@ -17,6 +17,7 @@
 #include "clang/AST/Stmt.h"
 #include "llvm/ADT/DenseMap.h"
 
+#include <algorithm>
 #include <cassert>
 
 using namespace clang;
@@ -130,23 +131,61 @@ private:
     if (const auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       const ValueDecl *D = getCanonicalValueDecl(DRE->getDecl());
       auto It = CurrentBindings.find(D);
-      if (It != CurrentBindings.end())
+      if (It != CurrentBindings.end()) {
+        if (!It->second->Value) {
+          fail("read of uninitialized local in typed auto-diff IR");
+          return nullptr;
+        }
         return createLocalRef(E, It->second, ForceInactive);
+      }
 
       ADExpr *Node = createExpr(ADExpr::Kind::DeclRef, E);
       Node->SourceDecl = D;
       Node->Value.SourceDecl = D;
-        const auto *Parameter = dyn_cast<ParmVarDecl>(D);
-        Node->Value.Activity =
+      const auto *Parameter = dyn_cast<ParmVarDecl>(D);
+      Node->Value.Activity =
           !ForceInactive && Parameter && !Parameter->hasAttr<HLSLNoDiffAttr>()
-            ? ADActivity::Active
-            : ADActivity::Inactive;
+              ? ADActivity::Active
+              : ADActivity::Inactive;
       return Node;
     }
 
     if (isa<CXXThisExpr>(E)) {
       ADExpr *Node = createExpr(ADExpr::Kind::This, E);
       Node->Value.Activity = ADActivity::Inactive;
+      return Node;
+    }
+
+    if (const auto *VE = dyn_cast<HLSLVectorElementExpr>(E)) {
+      ADExpr *Node = createExpr(ADExpr::Kind::Swizzle, E);
+      const ADExpr *Base = buildExpr(VE->getBase(), ForceInactive);
+      if (!Base)
+        return nullptr;
+      Node->Operands.push_back(Base);
+      VE->getEncodedElementAccess(Node->Components);
+      Node->Value.Activity =
+          ForceInactive ? ADActivity::Inactive : Base->Value.Activity;
+      return Node;
+    }
+
+    if (const auto *OCE = dyn_cast<CXXOperatorCallExpr>(E)) {
+      if (OCE->getOperator() != OO_Subscript || OCE->getNumArgs() != 2) {
+        fail("unsupported operator call in typed auto-diff IR");
+        return nullptr;
+      }
+      ADExpr *Node = createExpr(ADExpr::Kind::Subscript, E);
+      const ADExpr *Base = buildExpr(OCE->getArg(0), ForceInactive);
+      const ADExpr *Index = buildExpr(OCE->getArg(1), ForceInactive);
+      if (!Base || !Index)
+        return nullptr;
+      if (Index->Value.Activity == ADActivity::Active) {
+        fail("active subscript index in typed auto-diff IR");
+        return nullptr;
+      }
+      Node->Operands.push_back(Base);
+      Node->Operands.push_back(Index);
+      Node->Value.Activity =
+          ForceInactive ? ADActivity::Inactive : Base->Value.Activity;
       return Node;
     }
 
@@ -161,6 +200,24 @@ private:
       // Class state is currently treated as a primal constant. Parameter and
       // local activity still flows through explicit expression operands.
       Node->Value.Activity = ADActivity::Inactive;
+      return Node;
+    }
+
+    if (const auto *FCE = dyn_cast<CXXFunctionalCastExpr>(E)) {
+      const auto *ILE = dyn_cast<InitListExpr>(FCE->getSubExpr());
+      if (!ILE) {
+        fail("functional cast without initializer list in typed auto-diff IR");
+        return nullptr;
+      }
+      ADExpr *Node = createExpr(ADExpr::Kind::VectorConstruct, E);
+      for (unsigned I = 0; I < ILE->getNumInits(); ++I) {
+        const ADExpr *Operand = buildExpr(ILE->getInit(I), ForceInactive);
+        if (!Operand)
+          return nullptr;
+        Node->Operands.push_back(Operand);
+      }
+      Node->Value.Activity = ForceInactive ? ADActivity::Inactive
+                                           : combineActivity(Node->Operands);
       return Node;
     }
 
@@ -195,11 +252,18 @@ private:
     }
 
     if (const auto *BO = dyn_cast<BinaryOperator>(E)) {
+      bool IsComparison = BO->isComparisonOp();
       switch (BO->getOpcode()) {
       case BO_Add:
       case BO_Sub:
       case BO_Mul:
       case BO_Div:
+      case BO_LT:
+      case BO_GT:
+      case BO_LE:
+      case BO_GE:
+      case BO_EQ:
+      case BO_NE:
         break;
       default:
         fail("unsupported binary operator in typed auto-diff IR");
@@ -215,6 +279,10 @@ private:
       Node->Operands.push_back(Right);
       Node->Value.Activity = ForceInactive ? ADActivity::Inactive
                                            : combineActivity(Node->Operands);
+      if (IsComparison && Node->Value.Activity == ADActivity::Active) {
+        fail("active comparison in typed auto-diff IR");
+        return nullptr;
+      }
       return Node;
     }
 
@@ -241,18 +309,25 @@ private:
     return nullptr;
   }
 
-  bool buildStmt(const Stmt *S) {
-    if (isa<AttributedStmt>(S))
-      return fail("attributed statement not represented in typed auto-diff IR");
+  bool buildStmt(const Stmt *S, bool ForceInactive = false) {
+    if (const auto *AS = dyn_cast<AttributedStmt>(S)) {
+      bool IsNoDiff = false;
+      for (const Attr *A : AS->getAttrs())
+        IsNoDiff |= isa<HLSLNoDiffAttr>(A);
+      return buildStmt(AS->getSubStmt(), ForceInactive || IsNoDiff);
+    }
 
     if (const auto *DS = dyn_cast<DeclStmt>(S)) {
       for (const Decl *D : DS->decls()) {
         const auto *VD = dyn_cast<VarDecl>(D);
-        if (!VD || !VD->hasInit())
+        if (!VD)
           return fail("unsupported declaration in typed auto-diff IR");
-        const ADExpr *Value = buildExpr(VD->getInit());
-        if (!Value)
-          return false;
+        const ADExpr *Value = nullptr;
+        if (VD->hasInit()) {
+          Value = buildExpr(VD->getInit(), ForceInactive);
+          if (!Value)
+            return false;
+        }
         const ADBinding *Binding = createBinding(VD, 0, Value);
         CurrentBindings[getCanonicalValueDecl(VD)] = Binding;
         Plan.Statements.push_back({ADStmt::Kind::Declare, Binding, Value});
@@ -261,10 +336,73 @@ private:
     }
 
     if (const auto *RS = dyn_cast<ReturnStmt>(S)) {
-      const ADExpr *Value = buildExpr(RS->getRetValue());
+      const ADExpr *Value = buildExpr(RS->getRetValue(), ForceInactive);
       if (!Value)
         return false;
       Plan.Statements.push_back({ADStmt::Kind::Return, nullptr, Value});
+      return true;
+    }
+
+    if (const auto *IS = dyn_cast<IfStmt>(S)) {
+      if (IS->getConditionVariable())
+        return fail(
+            "if condition variable not represented in typed auto-diff IR");
+      const ADExpr *Condition = buildExpr(IS->getCond(), ForceInactive);
+      if (!Condition)
+        return false;
+      if (Condition->Value.Activity == ADActivity::Active)
+        return fail("active if condition in typed auto-diff IR");
+
+      DenseMap<const ValueDecl *, const ADBinding *> Before = CurrentBindings;
+      size_t StatementCount = Plan.Statements.size();
+
+      CurrentBindings = Before;
+      if (!buildStmt(IS->getThen(), ForceInactive))
+        return false;
+      DenseMap<const ValueDecl *, const ADBinding *> Then = CurrentBindings;
+      Plan.Statements.resize(StatementCount);
+
+      CurrentBindings = Before;
+      if (IS->getElse() && !buildStmt(IS->getElse(), ForceInactive))
+        return false;
+      DenseMap<const ValueDecl *, const ADBinding *> Else = CurrentBindings;
+      Plan.Statements.resize(StatementCount);
+      CurrentBindings = Before;
+
+      for (const auto &Entry : Before) {
+        const ValueDecl *Decl = Entry.first;
+        const ADBinding *OldBinding = Entry.second;
+        const ADBinding *ThenBinding = Then.lookup(Decl);
+        const ADBinding *ElseBinding = Else.lookup(Decl);
+        ThenBinding = ThenBinding ? ThenBinding : OldBinding;
+        ElseBinding = ElseBinding ? ElseBinding : OldBinding;
+        if (ThenBinding == OldBinding && ElseBinding == OldBinding)
+          continue;
+        if (!ThenBinding->Value || !ElseBinding->Value)
+          return fail("inactive if leaves a local uninitialized");
+
+        ADExpr *Merged = createExpr(ADExpr::Kind::Conditional, IS->getCond());
+        Merged->Value.PrimalType = OldBinding->Value->Value.PrimalType;
+        Merged->Operands.push_back(Condition);
+        Merged->Operands.push_back(ThenBinding->Value);
+        Merged->Operands.push_back(ElseBinding->Value);
+        Merged->Value.Activity = combineActivity(
+            ArrayRef<const ADExpr *>(Merged->Operands).slice(1));
+
+        unsigned Version =
+            std::max(ThenBinding->Version, ElseBinding->Version) + 1;
+        const ADBinding *Binding =
+            createBinding(cast<VarDecl>(Decl), Version, Merged);
+        CurrentBindings[Decl] = Binding;
+        Plan.Statements.push_back({ADStmt::Kind::Assign, Binding, Merged});
+      }
+      return true;
+    }
+
+    if (const auto *CS = dyn_cast<CompoundStmt>(S)) {
+      for (const Stmt *Child : CS->body())
+        if (!buildStmt(Child, ForceInactive))
+          return false;
       return true;
     }
 
@@ -281,7 +419,7 @@ private:
     if (It == CurrentBindings.end())
       return fail("assignment target has no local binding");
 
-    const ADExpr *Value = buildExpr(BO->getRHS());
+    const ADExpr *Value = buildExpr(BO->getRHS(), ForceInactive);
     if (!Value)
       return false;
 
@@ -308,6 +446,8 @@ private:
     }
 
     if (IsCompound) {
+      if (!It->second->Value)
+        return fail("compound assignment reads an uninitialized local");
       ADExpr *Combined = createExpr(ADExpr::Kind::Binary, BO);
       Combined->BinaryOpcode = ValueOpcode;
       Combined->Operands.push_back(createLocalRef(BO->getLHS(), It->second,

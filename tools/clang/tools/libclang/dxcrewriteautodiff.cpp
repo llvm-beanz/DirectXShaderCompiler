@@ -20,6 +20,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
+#include "clang/AST/HlslTypes.h"
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/Stmt.h"
@@ -44,6 +45,20 @@ std::string printType(QualType Type, const PrintingPolicy &Policy) {
   Type.print(OS, Policy);
   OS.flush();
   return Result;
+}
+
+unsigned getComponentCount(QualType Type) {
+  if (hlsl::IsHLSLVecType(Type))
+    return hlsl::GetHLSLVecSize(Type);
+  if (const auto *Vector =
+          dyn_cast<VectorType>(Type.getCanonicalType().getTypePtr()))
+    return Vector->getNumElements();
+  return 1;
+}
+
+char getComponentName(unsigned Index) {
+  static const char Names[] = {'x', 'y', 'z', 'w'};
+  return Index < 4 ? Names[Index] : 'x';
 }
 
 // ---------------------------------------------------------------------------
@@ -168,8 +183,10 @@ const char *GetNonDifferentiableReason(StringRef Name) {
       .Case("dot4add_u8packed",
             "integer-valued 'dot4add_u8packed' is not differentiable")
       .Case("dot2add", "'dot2add' is not differentiable")
-      .Case("unpack_s8s32", "integer-valued 'unpack_s8s32' is not differentiable")
-      .Case("unpack_u8u32", "integer-valued 'unpack_u8u32' is not differentiable")
+      .Case("unpack_s8s32",
+            "integer-valued 'unpack_s8s32' is not differentiable")
+      .Case("unpack_u8u32",
+            "integer-valued 'unpack_u8u32' is not differentiable")
       .Case("AddUint64", "'AddUint64' is not differentiable")
       // Side-effecting / control.
       .Case("clip", "side-effecting 'clip' is not differentiable")
@@ -211,12 +228,10 @@ const char *GetNonDifferentiableReason(StringRef Name) {
             "is not differentiable")
       // Derivative-of intrinsics are discontinuous quad-level operations.
       .Case("ddx", "quad-derivative 'ddx' is not differentiable")
-      .Case("ddx_coarse",
-            "quad-derivative 'ddx_coarse' is not differentiable")
+      .Case("ddx_coarse", "quad-derivative 'ddx_coarse' is not differentiable")
       .Case("ddx_fine", "quad-derivative 'ddx_fine' is not differentiable")
       .Case("ddy", "quad-derivative 'ddy' is not differentiable")
-      .Case("ddy_coarse",
-            "quad-derivative 'ddy_coarse' is not differentiable")
+      .Case("ddy_coarse", "quad-derivative 'ddy_coarse' is not differentiable")
       .Case("ddy_fine", "quad-derivative 'ddy_fine' is not differentiable")
       .Case("fwidth", "quad-derivative 'fwidth' is not differentiable")
       .Case("EvaluateAttributeAtSample",
@@ -265,8 +280,7 @@ const char *GetNonDifferentiableReason(StringRef Name) {
             "system-value 'DispatchRaysDimensions' is not differentiable")
       .Case("RayFlags", "system-value 'RayFlags' is not differentiable")
       .Case("RayTMin", "system-value 'RayTMin' is not differentiable")
-      .Case("RayTCurrent",
-            "system-value 'RayTCurrent' is not differentiable")
+      .Case("RayTCurrent", "system-value 'RayTCurrent' is not differentiable")
       .Case("HitKind", "system-value 'HitKind' is not differentiable")
       .Case("InstanceID", "system-value 'InstanceID' is not differentiable")
       .Case("InstanceIndex",
@@ -315,8 +329,7 @@ const char *GetNonDifferentiableReason(StringRef Name) {
             "'CheckAccessFullyMapped' is not differentiable")
       .Case("CreateResourceFromHeap",
             "'CreateResourceFromHeap' is not differentiable")
-      .Case("DispatchMesh",
-        "mesh-shader 'DispatchMesh' is not differentiable")
+      .Case("DispatchMesh", "mesh-shader 'DispatchMesh' is not differentiable")
       .Case("SetMeshOutputCounts",
             "mesh-shader 'SetMeshOutputCounts' is not differentiable")
       // Tessellator helpers.
@@ -342,7 +355,7 @@ const char *GetNonDifferentiableReason(StringRef Name) {
             "tessellator helper is not differentiable")
       .Case("frexp", "'frexp' is not differentiable")
       .Case("sincos", "side-effecting 'sincos' is not differentiable; "
-                       "use sin and cos separately")
+                      "use sin and cos separately")
       // Texture sampling family. Any name beginning with "tex", "Sample",
       // "Load", "Gather", "CalculateLevelOfDetail" is filtered below in
       // IsTextureLikeIntrinsic for completeness; the explicit entries here
@@ -633,15 +646,33 @@ private:
     const char *Fn = nullptr;
     bool Diff = true;
     switch (Op) {
-    case BO_Add: Fn = "add"; break;
-    case BO_Sub: Fn = "subtract"; break;
-    case BO_Mul: Fn = "multiply"; break;
-    case BO_Div: Fn = "divide"; break;
-    case BO_Assign: Fn = "assign"; break;
-    case BO_AddAssign: Fn = "addAssign"; break;
-    case BO_SubAssign: Fn = "subAssign"; break;
-    case BO_MulAssign: Fn = "mulAssign"; break;
-    case BO_DivAssign: Fn = "divAssign"; break;
+    case BO_Add:
+      Fn = "add";
+      break;
+    case BO_Sub:
+      Fn = "subtract";
+      break;
+    case BO_Mul:
+      Fn = "multiply";
+      break;
+    case BO_Div:
+      Fn = "divide";
+      break;
+    case BO_Assign:
+      Fn = "assign";
+      break;
+    case BO_AddAssign:
+      Fn = "addAssign";
+      break;
+    case BO_SubAssign:
+      Fn = "subAssign";
+      break;
+    case BO_MulAssign:
+      Fn = "mulAssign";
+      break;
+    case BO_DivAssign:
+      Fn = "divAssign";
+      break;
     // Comparison operators return bool: not meaningfully differentiable.
     case BO_LT:
     case BO_GT:
@@ -757,7 +788,8 @@ private:
 
   void emitCall(const CallExpr *CE) {
     const FunctionDecl *Callee = CE->getDirectCallee();
-    StringRef Name = Callee ? Callee->getName() : "";
+    std::string NameStorage = Callee ? Callee->getNameAsString() : "";
+    StringRef Name = NameStorage;
 
     // Reject known-non-differentiable intrinsics, plus the texture / linalg
     // intrinsic families recognised by prefix.
@@ -859,7 +891,12 @@ public:
       case hlsl::autodiff::ADStmt::Kind::Declare:
         if (M == AutoDiffEmitter::Fwd) {
           OS << "    Value<" << ElemType << "> "
-             << S.Binding->SourceDecl->getName() << " = ";
+             << S.Binding->SourceDecl->getName();
+          if (!S.Value) {
+            OS << ";\n";
+            break;
+          }
+          OS << " = ";
           if (S.Value->Value.Activity == hlsl::autodiff::ADActivity::Inactive) {
             OS << "Value<" << ElemType << ">::CreateValue(";
             emitPrimalExpr(S.Value);
@@ -951,6 +988,28 @@ private:
       OS << E->SourceDecl->getName();
       return;
     }
+    case ExprKind::Swizzle: {
+      emitPrimalExpr(E->Operands.front());
+      OS << "."
+         << cast<HLSLVectorElementExpr>(E->SourceExpr)->getAccessor().getName();
+      return;
+    }
+    case ExprKind::Subscript:
+      emitPrimalExpr(E->Operands[0]);
+      OS << "[";
+      emitPrimalExpr(E->Operands[1]);
+      OS << "]";
+      return;
+    case ExprKind::VectorConstruct:
+      E->Value.PrimalType.print(OS, Policy);
+      OS << "(";
+      for (unsigned I = 0; I < E->Operands.size(); ++I) {
+        if (I)
+          OS << ", ";
+        emitPrimalExpr(E->Operands[I]);
+      }
+      OS << ")";
+      return;
     case ExprKind::Cast:
       OS << "(";
       E->Value.PrimalType.print(OS, Policy);
@@ -967,6 +1026,15 @@ private:
       emitPrimalExpr(E->Operands[0]);
       OS << " " << BinaryOperator::getOpcodeStr(E->BinaryOpcode) << " ";
       emitPrimalExpr(E->Operands[1]);
+      OS << ")";
+      return;
+    case ExprKind::Conditional:
+      OS << "(";
+      emitPrimalExpr(E->Operands[0]);
+      OS << " ? ";
+      emitPrimalExpr(E->Operands[1]);
+      OS << " : ";
+      emitPrimalExpr(E->Operands[2]);
       OS << ")";
       return;
     case ExprKind::Call:
@@ -1013,6 +1081,13 @@ private:
     case ExprKind::Member:
       emitPrimalExpr(E);
       return;
+    case ExprKind::Swizzle:
+    case ExprKind::Subscript:
+    case ExprKind::VectorConstruct:
+      markNonDifferentiable(
+          "vector construction or swizzle requires direct reverse lowering");
+      emitPrimalExpr(E);
+      return;
     case ExprKind::Cast:
       OS << "(";
       E->Value.PrimalType.print(OS, Policy);
@@ -1034,6 +1109,15 @@ private:
       return;
     case ExprKind::Binary:
       emitBinary(E);
+      return;
+    case ExprKind::Conditional:
+      OS << "(";
+      emitPrimalExpr(E->Operands[0]);
+      OS << " ? ";
+      emitExpr(E->Operands[1]);
+      OS << " : ";
+      emitExpr(E->Operands[2]);
+      OS << ")";
       return;
     case ExprKind::Call:
       emitCall(E);
@@ -1111,10 +1195,279 @@ private:
   }
 };
 
+// Direct reverse lowering handles expression graphs whose result and active
+// leaf types differ. It emits primal HLSL plus explicit cotangent routing,
+// avoiding the homogeneous ValueType constraint of the expression templates.
+class DirectReverseEmitter {
+public:
+  DirectReverseEmitter(StringRef ResultType, raw_ostream &OS,
+                       const PrintingPolicy &Policy)
+      : ResultType(ResultType), OS(OS), Policy(Policy) {}
+
+  bool emitPlan(const hlsl::autodiff::ADFunctionPlan &Plan) {
+    const hlsl::autodiff::ADExpr *Result = nullptr;
+    for (const hlsl::autodiff::ADStmt &S : Plan.Statements)
+      if (S.K == hlsl::autodiff::ADStmt::Kind::Return)
+        Result = S.Value;
+    if (!Result || !supports(Result))
+      return false;
+
+    OS << "    " << ResultType << " __dxc_ad_primal = ";
+    emitPrimal(Result);
+    OS << ";\n";
+    OS << "    context.zeroGradients();\n";
+    emitAdjoint(Result, "__dxc_ad_seed");
+    OS << "    return __dxc_ad_primal;\n";
+    return true;
+  }
+
+private:
+  StringRef ResultType;
+  raw_ostream &OS;
+  const PrintingPolicy &Policy;
+
+  bool supports(const hlsl::autodiff::ADExpr *E) const {
+    using Activity = hlsl::autodiff::ADActivity;
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    if (E->Value.Activity == Activity::Inactive)
+      return true;
+    switch (E->K) {
+    case Kind::DeclRef:
+      return isa<ParmVarDecl>(E->SourceDecl);
+    case Kind::LocalRef:
+      return supports(E->Binding->Value);
+    case Kind::Swizzle:
+      return supports(E->Operands.front());
+    case Kind::Subscript:
+      return E->Operands[1]->Value.Activity == Activity::Inactive &&
+             supports(E->Operands[0]);
+    case Kind::VectorConstruct:
+    case Kind::Unary:
+    case Kind::Binary:
+    case Kind::Conditional:
+      for (const hlsl::autodiff::ADExpr *Operand : E->Operands)
+        if (!supports(Operand))
+          return false;
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  std::string primalText(const hlsl::autodiff::ADExpr *E) {
+    std::string Text;
+    raw_string_ostream Stream(Text);
+    raw_ostream *Saved = &OS;
+    (void)Saved;
+    emitPrimal(E, Stream);
+    Stream.flush();
+    return Text;
+  }
+
+  void emitPrimal(const hlsl::autodiff::ADExpr *E) { emitPrimal(E, OS); }
+
+  void emitPrimal(const hlsl::autodiff::ADExpr *E, raw_ostream &Out) {
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    switch (E->K) {
+    case Kind::Literal:
+      E->SourceExpr->printPretty(Out, nullptr, Policy);
+      return;
+    case Kind::DeclRef:
+      Out << E->SourceDecl->getName();
+      if (const auto *P = dyn_cast<ParmVarDecl>(E->SourceDecl))
+        if (!isInactiveParameter(P))
+          Out << ".value";
+      return;
+    case Kind::LocalRef:
+      emitPrimal(E->Binding->Value, Out);
+      return;
+    case Kind::Swizzle:
+      emitPrimal(E->Operands.front(), Out);
+      Out << "."
+          << cast<HLSLVectorElementExpr>(E->SourceExpr)
+                 ->getAccessor()
+                 .getName();
+      return;
+    case Kind::Subscript:
+      emitPrimal(E->Operands[0], Out);
+      Out << "[";
+      emitPrimal(E->Operands[1], Out);
+      Out << "]";
+      return;
+    case Kind::VectorConstruct:
+      E->Value.PrimalType.print(Out, Policy);
+      Out << "(";
+      for (unsigned I = 0; I < E->Operands.size(); ++I) {
+        if (I)
+          Out << ", ";
+        emitPrimal(E->Operands[I], Out);
+      }
+      Out << ")";
+      return;
+    case Kind::Unary:
+      Out << UnaryOperator::getOpcodeStr(E->UnaryOpcode) << "(";
+      emitPrimal(E->Operands.front(), Out);
+      Out << ")";
+      return;
+    case Kind::Binary:
+      Out << "(";
+      emitPrimal(E->Operands[0], Out);
+      Out << " " << BinaryOperator::getOpcodeStr(E->BinaryOpcode) << " ";
+      emitPrimal(E->Operands[1], Out);
+      Out << ")";
+      return;
+    case Kind::Conditional:
+      Out << "(";
+      emitPrimal(E->Operands[0], Out);
+      Out << " ? ";
+      emitPrimal(E->Operands[1], Out);
+      Out << " : ";
+      emitPrimal(E->Operands[2], Out);
+      Out << ")";
+      return;
+    default:
+      E->SourceExpr->printPretty(Out, nullptr, Policy);
+      return;
+    }
+  }
+
+  std::string component(StringRef Cotangent, unsigned Index,
+                        unsigned Count) const {
+    if (Count == 1)
+      return Cotangent.str();
+    return (Cotangent + "." + Twine(getComponentName(Index))).str();
+  }
+
+  std::string constructCotangent(QualType Type, ArrayRef<std::string> Values) {
+    if (Values.size() == 1)
+      return Values.front();
+    std::string Text = printType(Type, Policy) + "(";
+    for (unsigned I = 0; I < Values.size(); ++I) {
+      if (I)
+        Text += ", ";
+      Text += Values[I];
+    }
+    Text += ")";
+    return Text;
+  }
+
+  std::string zero(QualType Type) {
+    return "(" + printType(Type, Policy) + ")0";
+  }
+
+  void emitAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent) {
+    using Activity = hlsl::autodiff::ADActivity;
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    if (E->Value.Activity == Activity::Inactive)
+      return;
+    switch (E->K) {
+    case Kind::DeclRef:
+      OS << "    context.gradients[" << E->SourceDecl->getName()
+         << ".id] += " << Cotangent << ";\n";
+      return;
+    case Kind::LocalRef:
+      emitAdjoint(E->Binding->Value, Cotangent);
+      return;
+    case Kind::Swizzle: {
+      const hlsl::autodiff::ADExpr *Base = E->Operands.front();
+      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
+      unsigned ResultCount = E->Components.size();
+      SmallVector<std::string, 4> Values;
+      for (unsigned BaseIndex = 0; BaseIndex < BaseCount; ++BaseIndex) {
+        std::string Sum;
+        for (unsigned I = 0; I < ResultCount; ++I) {
+          if (E->Components[I] != BaseIndex)
+            continue;
+          std::string Term = component(Cotangent, I, ResultCount);
+          Sum = Sum.empty() ? Term : "(" + Sum + " + " + Term + ")";
+        }
+        Values.push_back(Sum.empty() ? "0.0f" : Sum);
+      }
+      std::string Routed = constructCotangent(Base->Value.PrimalType, Values);
+      emitAdjoint(Base, Routed);
+      return;
+    }
+    case Kind::Subscript: {
+      const hlsl::autodiff::ADExpr *Base = E->Operands[0];
+      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
+      std::string Index = primalText(E->Operands[1]);
+      SmallVector<std::string, 4> Values;
+      for (unsigned I = 0; I < BaseCount; ++I)
+        Values.push_back("(" + Index + " == " + Twine(I).str() + " ? " +
+                         Cotangent.str() + " : 0.0f)");
+      emitAdjoint(Base, constructCotangent(Base->Value.PrimalType, Values));
+      return;
+    }
+    case Kind::VectorConstruct: {
+      unsigned ResultCount = getComponentCount(E->Value.PrimalType);
+      unsigned Offset = 0;
+      for (const hlsl::autodiff::ADExpr *Operand : E->Operands) {
+        unsigned OperandCount = getComponentCount(Operand->Value.PrimalType);
+        SmallVector<std::string, 4> Values;
+        for (unsigned I = 0; I < OperandCount; ++I)
+          Values.push_back(component(Cotangent, Offset + I, ResultCount));
+        std::string Routed =
+            constructCotangent(Operand->Value.PrimalType, Values);
+        emitAdjoint(Operand, Routed);
+        Offset += OperandCount;
+      }
+      return;
+    }
+    case Kind::Unary:
+      if (E->UnaryOpcode == UO_Minus)
+        emitAdjoint(E->Operands.front(), "-(" + Cotangent.str() + ")");
+      else
+        emitAdjoint(E->Operands.front(), Cotangent);
+      return;
+    case Kind::Binary: {
+      const auto *Left = E->Operands[0];
+      const auto *Right = E->Operands[1];
+      switch (E->BinaryOpcode) {
+      case BO_Add:
+        emitAdjoint(Left, Cotangent);
+        emitAdjoint(Right, Cotangent);
+        return;
+      case BO_Sub:
+        emitAdjoint(Left, Cotangent);
+        emitAdjoint(Right, "-(" + Cotangent.str() + ")");
+        return;
+      case BO_Mul:
+        emitAdjoint(Left,
+                    "(" + Cotangent.str() + " * " + primalText(Right) + ")");
+        emitAdjoint(Right,
+                    "(" + Cotangent.str() + " * " + primalText(Left) + ")");
+        return;
+      case BO_Div:
+        emitAdjoint(Left,
+                    "(" + Cotangent.str() + " / " + primalText(Right) + ")");
+        emitAdjoint(Right, "(-(" + Cotangent.str() + ") * " + primalText(Left) +
+                               " / (" + primalText(Right) + " * " +
+                               primalText(Right) + "))");
+        return;
+      default:
+        return;
+      }
+    }
+    case Kind::Conditional: {
+      std::string Condition = primalText(E->Operands[0]);
+      emitAdjoint(E->Operands[1],
+                  "(" + Condition + " ? " + Cotangent.str() + " : " +
+                      zero(E->Operands[1]->Value.PrimalType) + ")");
+      emitAdjoint(E->Operands[2], "(" + Condition + " ? " +
+                                      zero(E->Operands[2]->Value.PrimalType) +
+                                      " : " + Cotangent.str() + ")");
+      return;
+    }
+    default:
+      return;
+    }
+  }
+};
+
 // Render the autodiff signature for a function in either mode.
 void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
-                           StringRef ElemType, const PrintingPolicy &Policy,
-                           raw_ostream &OS) {
+                           StringRef ElemType, StringRef ContextType,
+                           const PrintingPolicy &Policy, raw_ostream &OS) {
   if (M == AutoDiffEmitter::Fwd) {
     OS << "Value<" << ElemType << "> " << FD->getName() << "(";
     bool First = true;
@@ -1135,7 +1488,7 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   // Backward mode returns the primal value; derivatives are written to the
   // GradientContext entries associated with the Variable<T> parameters.
   OS << ElemType << " " << FD->getName() << "(inout GradientContext<"
-     << ElemType << "> context";
+     << ContextType << "> context";
   for (const ParmVarDecl *P : FD->parameters()) {
     std::string ParamType = printType(P->getType(), Policy);
     OS << ", ";
@@ -1155,6 +1508,22 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   // Determine the element type from the return type. We support scalar
   // float-like functions for now; other return types produce a TODO.
   std::string ElemType = printType(FD->getReturnType(), Policy);
+  QualType ActiveType;
+  bool HasMultipleActiveTypes = false;
+  for (const ParmVarDecl *P : FD->parameters()) {
+    if (isInactiveParameter(P))
+      continue;
+    if (ActiveType.isNull()) {
+      ActiveType = P->getType();
+    } else if (!FD->getASTContext().hasSameType(ActiveType, P->getType())) {
+      HasMultipleActiveTypes = true;
+    }
+  }
+  std::string ContextType =
+      ActiveType.isNull() ? ElemType : printType(ActiveType, Policy);
+  bool NeedsDirectReverse =
+      M == AutoDiffEmitter::Bwd && !ActiveType.isNull() &&
+      !FD->getASTContext().hasSameType(ActiveType, FD->getReturnType());
 
   // Render the body into a temporary buffer first so that, if a
   // non-differentiable construct was encountered, we can discard the body
@@ -1171,21 +1540,14 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     std::string PlanReason;
     bool HasTypedPlan =
         hlsl::autodiff::BuildADFunctionPlan(FD, Plan, PlanReason);
-    bool HasIncompatibleActiveType = false;
-    if (M == AutoDiffEmitter::Bwd) {
-      for (const ParmVarDecl *P : FD->parameters()) {
-        if (isInactiveParameter(P) ||
-            FD->getASTContext().hasSameType(P->getType(), FD->getReturnType()))
-          continue;
-        HasTypedPlan = false;
-        HasIncompatibleActiveType = true;
-        PlanReason = "active parameter '" + P->getName().str() +
-                     "' has type '" + printType(P->getType(), Policy) +
-                     "', but the backward runtime requires active parameter "
-                     "types to match result type '" +
-                     ElemType + "'";
-        break;
-      }
+    bool HasTerminalPlanFailure =
+        !HasTypedPlan &&
+        PlanReason == "active subscript index in typed auto-diff IR";
+    if (M == AutoDiffEmitter::Bwd && HasMultipleActiveTypes) {
+      HasTypedPlan = false;
+      HasTerminalPlanFailure = true;
+      PlanReason = "the backward runtime currently supports only one active "
+                   "parameter type per function";
     }
     if (M == AutoDiffEmitter::Bwd) {
       for (const ParmVarDecl *P : FD->parameters()) {
@@ -1197,14 +1559,21 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
                << P->getName() << ");\n";
       }
     }
-    if (HasTypedPlan) {
+    if (HasTypedPlan && NeedsDirectReverse) {
+      DirectReverseEmitter Em(ElemType, BodyOS, Policy);
+      ValidBody = Em.emitPlan(Plan);
+      BodyOS.flush();
+      if (!ValidBody)
+        Reason = "cross-shape expression is not supported by direct reverse "
+                 "lowering";
+    } else if (HasTypedPlan) {
       TypedAutoDiffEmitter Em(M, ElemType, BodyOS, Policy);
       Em.emitPlan(Plan);
       BodyOS.flush();
       ValidBody = !Em.sawNonDifferentiable();
       if (!ValidBody)
         Reason = Em.nonDifferentiableReason().str();
-    } else if (HasIncompatibleActiveType) {
+    } else if (HasTerminalPlanFailure) {
       ValidBody = false;
       Reason = PlanReason;
     } else {
@@ -1221,7 +1590,7 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     Reason = "function has no body";
   }
 
-  emitAutoDiffSignature(FD, M, ElemType, Policy, OS);
+  emitAutoDiffSignature(FD, M, ElemType, ContextType, Policy, OS);
   OS << " {\n";
   if (ValidBody) {
     OS << BodyText;
@@ -1230,8 +1599,8 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     // Quote the reason for the diagnostic and provide a concrete return so
     // the surrounding code still parses.
     OS << "    _Static_assert(false, \"auto-diff cannot generate "
-       << (M == AutoDiffEmitter::Fwd ? "forward" : "backward")
-       << "-mode for '" << FD->getName() << "': " << Reason << "\");\n";
+       << (M == AutoDiffEmitter::Fwd ? "forward" : "backward") << "-mode for '"
+       << FD->getName() << "': " << Reason << "\");\n";
     if (M == AutoDiffEmitter::Fwd)
       OS << "    return Value<" << ElemType << ">();\n";
     else
@@ -1311,8 +1680,7 @@ const CXXRecordDecl *findUserAdRecord(const DeclContext *DC,
 // to provide hand-written differentials or to incrementally check the
 // generated ones into source control.
 void collectUserAdFunctionNames(const TranslationUnitDecl *TU,
-                                StringSet<> &FwdNames,
-                                StringSet<> &BwdNames) {
+                                StringSet<> &FwdNames, StringSet<> &BwdNames) {
   static const StringRef FwdPath[] = {"user", "ad", "fwd"};
   static const StringRef BwdPath[] = {"user", "ad", "bwd"};
   collectFunctionNamesInNamespace(TU, FwdPath, FwdNames);
@@ -1416,9 +1784,8 @@ void EmitAutoDiffForRecord(const CXXRecordDecl *RD,
       if (!AD) {
         continue;
       }
-      bool WantsThisMode = (Mode == AutoDiffEmitter::Fwd)
-                               ? AD->hasForward()
-                               : AD->hasBackward();
+      bool WantsThisMode =
+          (Mode == AutoDiffEmitter::Fwd) ? AD->hasForward() : AD->hasBackward();
       if (!WantsThisMode)
         continue;
       if (ExistingMethods.count(MD->getName()))
@@ -1464,10 +1831,17 @@ std::string buildMergedWrapperClass(const CXXRecordDecl *UserRD,
     if (B.isVirtual())
       OS << "virtual ";
     switch (B.getAccessSpecifierAsWritten()) {
-    case AS_public: OS << "public "; break;
-    case AS_protected: OS << "protected "; break;
-    case AS_private: OS << "private "; break;
-    case AS_none: break;
+    case AS_public:
+      OS << "public ";
+      break;
+    case AS_protected:
+      OS << "protected ";
+      break;
+    case AS_private:
+      OS << "private ";
+      break;
+    case AS_none:
+      break;
     }
     B.getType().print(OS, Policy);
   }
@@ -1493,8 +1867,8 @@ std::string buildMergedWrapperClass(const CXXRecordDecl *UserRD,
     const auto *AD = MD->getAttr<HLSLAutoDiffAttr>();
     if (!AD)
       continue;
-    bool Wants = (Mode == AutoDiffEmitter::Fwd) ? AD->hasForward()
-                                                : AD->hasBackward();
+    bool Wants =
+        (Mode == AutoDiffEmitter::Fwd) ? AD->hasForward() : AD->hasBackward();
     if (!Wants)
       continue;
     if (Existing.count(MD->getName()))
@@ -1512,8 +1886,7 @@ std::string buildMergedWrapperClass(const CXXRecordDecl *UserRD,
 // so that a record buried inside `user::ad::fwd` is reached; all other
 // decl kinds are forwarded to clang's standard DeclPrinter.
 void printDeclWithSubstitutions(
-    const Decl *D,
-    const DenseMap<const CXXRecordDecl *, std::string> &Subs,
+    const Decl *D, const DenseMap<const CXXRecordDecl *, std::string> &Subs,
     raw_ostream &OS, const PrintingPolicy &Policy) {
   if (D->isImplicit())
     return;
@@ -1609,10 +1982,8 @@ void PrintTranslationUnitWithDifferentials(TranslationUnitDecl *tu,
         const auto *AD = MD->getAttr<HLSLAutoDiffAttr>();
         if (!AD)
           continue;
-        bool MissingFwd =
-            AD->hasForward() && !FwdMethods.count(MD->getName());
-        bool MissingBwd =
-            AD->hasBackward() && !BwdMethods.count(MD->getName());
+        bool MissingFwd = AD->hasForward() && !FwdMethods.count(MD->getName());
+        bool MissingBwd = AD->hasBackward() && !BwdMethods.count(MD->getName());
         NeedFwd |= MissingFwd;
         NeedBwd |= MissingBwd;
         NeedFwdMerge |= MissingFwd && UserFwd;

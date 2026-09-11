@@ -1,28 +1,19 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
-//
-// Note: this test intentionally does not run a `dxc -verify` pass on the
-// rewriter output. The rewriter preserves `[[dxc::no_diff]]` substatements
-// (and forward-mode compound assignment) verbatim, but the surrounding
-// generated function rebinds parameter types to `Value<T>` / `Variable<T>`,
-// so the preserved code mixes scalar `float` operations with user-type
-// values and fails to type-check. This is a pre-existing rewriter
-// limitation documented in agent_thoughts.md and is out of scope for the
-// verify-coverage change.
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: %dxc -T ps_6_9 -HV 2021 -Fo %t.dxil %t.gen.hlsl
 
 // The [[dxc::no_diff]] statement attribute marks a statement that should NOT be
-// translated by the auto-diff rewriter; the wrapped statement is copied
-// verbatim into the generated function. The attribute can be applied to any
-// statement that wraps into an AttributedStmt -- typically a compound block,
-// an expression statement, or a return statement.
+// translated by the auto-diff rewriter. Its expression is evaluated on primal
+// values and contributes zero derivative.
 
 // CHECK: namespace user { namespace ad { namespace fwd {
 // CHECK: Value<float> f(Value<float> x)
-// CHECK: return x * x + x;
+// CHECK: return Value<float>::CreateValue(((x.value * x.value) + x.value));
 // CHECK: } } } // namespace user::ad::fwd
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
-// CHECK: VariableExpr<float> x_expr = makeVariableExpr<float>(x);
-// CHECK: return x * x + x;
+// CHECK: context.zeroGradients();
+// CHECK: return ((x.value * x.value) + x.value);
 // CHECK: } } } // namespace user::ad::bwd
 
 [[dxc::autodiff(fwd, bwd)]]
