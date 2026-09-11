@@ -533,17 +533,17 @@ private:
       Body = *Compound->body_begin();
     }
     const auto *Update = dyn_cast<BinaryOperator>(Body);
-    if (!Update || (Update->getOpcode() != BO_MulAssign &&
+    if (!Update || (Update->getOpcode() != BO_AddAssign &&
+                    Update->getOpcode() != BO_SubAssign &&
+                    Update->getOpcode() != BO_MulAssign &&
                     Update->getOpcode() != BO_DivAssign))
-      return fail("active runtime loop requires *= or /= update");
+      return fail("active runtime loop requires +=, -=, *=, or /= update");
     const auto *TargetRef =
         dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
     const auto *Target =
         TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
     if (!Target || Target->hasAttr<HLSLNoDiffAttr>())
       return fail("active runtime loop target is not an active parameter");
-    if (referencesDecl(Update->getRHS(), getCanonicalValueDecl(Counter)))
-      return fail("active runtime loop factor must be loop-invariant");
 
     const ADExpr *Count = buildExpr(Condition->getRHS());
     const ADExpr *Factor = buildExpr(Update->getRHS());
@@ -570,8 +570,23 @@ private:
 
     ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
     Result->SourceDecl = CanonicalTarget;
-    Result->BinaryOpcode =
-        Update->getOpcode() == BO_MulAssign ? BO_Mul : BO_Div;
+    Result->LoopCounter = Counter;
+    switch (Update->getOpcode()) {
+    case BO_AddAssign:
+      Result->BinaryOpcode = BO_Add;
+      break;
+    case BO_SubAssign:
+      Result->BinaryOpcode = BO_Sub;
+      break;
+    case BO_MulAssign:
+      Result->BinaryOpcode = BO_Mul;
+      break;
+    case BO_DivAssign:
+      Result->BinaryOpcode = BO_Div;
+      break;
+    default:
+      llvm_unreachable("validated active runtime loop update");
+    }
     Result->Operands.push_back(createLocalRef(TargetRef, Before, false));
     Result->Operands.push_back(Count);
     Result->Operands.push_back(Factor);

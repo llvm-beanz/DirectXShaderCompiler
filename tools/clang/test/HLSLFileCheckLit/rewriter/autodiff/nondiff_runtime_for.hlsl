@@ -7,10 +7,11 @@
 // A canonical runtime loop with a loop-invariant derivative replays the primal
 // update and applies that derivative once per iteration in reverse.
 
-// CHECK: for (uint __dxc_ad_loop_0_index = 0; __dxc_ad_loop_0_index < count; ++__dxc_ad_loop_0_index)
+// CHECK: for (uint iteration = 0; iteration < count; ++iteration)
 // CHECK: value.value *= 2.F;
 // CHECK: float __dxc_ad_loop_0_adjoint = __dxc_ad_seed;
-// CHECK: for (uint __dxc_ad_loop_0_reverse = 0; __dxc_ad_loop_0_reverse < count; ++__dxc_ad_loop_0_reverse)
+// CHECK: for (uint iteration = count; iteration > 0;)
+// CHECK: --iteration;
 // CHECK: __dxc_ad_loop_0_adjoint *= 2.F;
 // CHECK: context.gradients[value.id] += __dxc_ad_loop_0_adjoint;
 

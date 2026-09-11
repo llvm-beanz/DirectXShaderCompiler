@@ -1313,12 +1313,27 @@ public:
       } else if (S.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
         unsigned LoopID = NextLoopID++;
         RuntimeLoopIDs[S.Value] = LoopID;
-        OS << "    for (uint __dxc_ad_loop_" << LoopID
-           << "_index = 0; __dxc_ad_loop_" << LoopID << "_index < ";
+        OS << "    for (uint " << S.Value->LoopCounter->getName() << " = 0; "
+           << S.Value->LoopCounter->getName() << " < ";
         emitPrimal(S.Value->Operands[1]);
-        OS << "; ++__dxc_ad_loop_" << LoopID << "_index)\n        "
-           << S.Value->SourceDecl->getName() << ".value "
-           << (S.Value->BinaryOpcode == BO_Mul ? "*= " : "/= ");
+        OS << "; ++" << S.Value->LoopCounter->getName() << ")\n        "
+           << S.Value->SourceDecl->getName() << ".value ";
+        switch (S.Value->BinaryOpcode) {
+        case BO_Add:
+          OS << "+= ";
+          break;
+        case BO_Sub:
+          OS << "-= ";
+          break;
+        case BO_Mul:
+          OS << "*= ";
+          break;
+        case BO_Div:
+          OS << "/= ";
+          break;
+        default:
+          llvm_unreachable("validated active runtime loop operation");
+        }
         emitPrimal(S.Value->Operands[2]);
         OS << ";\n";
       }
@@ -1779,14 +1794,16 @@ private:
       std::string Type = printType(E->Value.PrimalType, Policy);
       OS << "    " << Type << " __dxc_ad_loop_" << LoopID
          << "_adjoint = " << Cotangent << ";\n";
-      OS << "    for (uint __dxc_ad_loop_" << LoopID
-         << "_reverse = 0; __dxc_ad_loop_" << LoopID << "_reverse < ";
-      emitPrimal(E->Operands[1]);
-      OS << "; ++__dxc_ad_loop_" << LoopID << "_reverse)\n        "
-         << "__dxc_ad_loop_" << LoopID << "_adjoint "
-         << (E->BinaryOpcode == BO_Mul ? "*= " : "/= ");
-      emitPrimal(E->Operands[2]);
-      OS << ";\n";
+      if (E->BinaryOpcode == BO_Mul || E->BinaryOpcode == BO_Div) {
+        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
+        emitPrimal(E->Operands[1]);
+        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
+           << "        --" << E->LoopCounter->getName() << ";\n"
+           << "        __dxc_ad_loop_" << LoopID << "_adjoint "
+           << (E->BinaryOpcode == BO_Mul ? "*= " : "/= ");
+        emitPrimal(E->Operands[2]);
+        OS << ";\n    }\n";
+      }
       emitAdjoint(E->Operands[0],
                   "__dxc_ad_loop_" + Twine(LoopID).str() + "_adjoint");
       return;

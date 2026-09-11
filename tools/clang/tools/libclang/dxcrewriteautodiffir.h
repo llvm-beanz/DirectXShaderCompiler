@@ -64,6 +64,7 @@ struct ADExpr {
   const clang::ValueDecl *SourceDecl = nullptr;
   const ADBinding *Binding = nullptr;
   const clang::FunctionDecl *Callee = nullptr;
+  const clang::VarDecl *LoopCounter = nullptr;
   const ADExpr *Receiver = nullptr;
   clang::UnaryOperatorKind UnaryOpcode = clang::UO_Plus;
   clang::BinaryOperatorKind BinaryOpcode = clang::BO_Add;
