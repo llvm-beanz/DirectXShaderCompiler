@@ -1860,9 +1860,21 @@ private:
           emitPrimal(Secondary->Operands[2]);
           OS << ";\n";
         }
-        OS << "        " << SecondaryAdjoint
-           << (Primary->RuntimeLoopSubtractsCoupledPeer ? " -= " : " += ")
-           << PrimaryAdjoint << ";\n    }\n";
+        if (Primary->RuntimeLoopCoupledUsesPrimalTape) {
+          unsigned PrimaryLoopID = RuntimeLoopIDs.lookup(Primary);
+          unsigned SecondaryLoopID = RuntimeLoopIDs.lookup(Secondary);
+          OS << "        " << SecondaryAdjoint << " += __dxc_ad_loop_"
+             << PrimaryLoopID << "_primal_tape[" << E->LoopCounter->getName()
+             << "] * " << PrimaryAdjoint << ";\n";
+          OS << "        " << PrimaryAdjoint << " *= __dxc_ad_loop_"
+             << SecondaryLoopID << "_primal_tape[" << E->LoopCounter->getName()
+             << "];\n";
+        } else {
+          OS << "        " << SecondaryAdjoint
+             << (Primary->RuntimeLoopSubtractsCoupledPeer ? " -= " : " += ")
+             << PrimaryAdjoint << ";\n";
+        }
+        OS << "    }\n";
         emitAdjoint(Primary->Operands[0], PrimaryAdjoint);
         emitAdjoint(Secondary->Operands[0], SecondaryAdjoint);
         return;

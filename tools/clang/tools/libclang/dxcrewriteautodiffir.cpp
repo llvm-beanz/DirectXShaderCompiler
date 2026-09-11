@@ -604,7 +604,8 @@ private:
     const auto *SecondUpdate = dyn_cast<BinaryOperator>(*It);
     if (!FirstUpdate || !SecondUpdate ||
         (FirstUpdate->getOpcode() != BO_AddAssign &&
-         FirstUpdate->getOpcode() != BO_SubAssign) ||
+         FirstUpdate->getOpcode() != BO_SubAssign &&
+         FirstUpdate->getOpcode() != BO_MulAssign) ||
         (SecondUpdate->getOpcode() != BO_AddAssign &&
          SecondUpdate->getOpcode() != BO_SubAssign &&
          SecondUpdate->getOpcode() != BO_MulAssign &&
@@ -633,6 +634,26 @@ private:
     const ADExpr *SecondFactor = buildExpr(SecondUpdate->getRHS());
     if (!SecondFactor || SecondFactor->Value.Activity == ADActivity::Active)
       return false;
+
+    bool UsesPrimalTape = FirstUpdate->getOpcode() == BO_MulAssign;
+    unsigned TapeSize = 0;
+    if (UsesPrimalTape) {
+      const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
+      const auto *BoundCall =
+          Condition
+              ? dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts())
+              : nullptr;
+      if (BoundCall && BoundCall->getDirectCallee() &&
+          BoundCall->getDirectCallee()->getName() == "min")
+        for (const Expr *Argument : BoundCall->arguments())
+          if (const auto *Limit =
+                  dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
+            TapeSize = Limit->getValue().getLimitedValue(1025);
+      if (TapeSize == 0 || TapeSize > 1024)
+        return fail(
+            "active nonlinear coupled runtime loop requires a min(count, N) "
+            "bound with N between 1 and 1024");
+    }
 
     auto BuildInitialBinding = [&](const ParmVarDecl *Target,
                                    const DeclRefExpr *TargetRef) {
@@ -693,9 +714,17 @@ private:
                      SecondFactor);
     FirstResult->RuntimeLoopCoupledPeer = SecondResult;
     FirstResult->RuntimeLoopCoupledPrimary = true;
+    FirstResult->RuntimeLoopCoupledUsesPrimalTape = UsesPrimalTape;
     FirstResult->RuntimeLoopSubtractsCoupledPeer =
         FirstUpdate->getOpcode() == BO_SubAssign;
     SecondResult->RuntimeLoopCoupledPeer = FirstResult;
+    SecondResult->RuntimeLoopCoupledUsesPrimalTape = UsesPrimalTape;
+    if (UsesPrimalTape) {
+      FirstResult->RuntimeLoopUsesPrimalTape = true;
+      FirstResult->RuntimeLoopTapeSize = TapeSize;
+      SecondResult->RuntimeLoopUsesPrimalTape = true;
+      SecondResult->RuntimeLoopTapeSize = TapeSize;
+    }
 
     const ADBinding *FirstAfter =
         createBinding(FirstTarget, FirstBefore->Version + 1, FirstResult);

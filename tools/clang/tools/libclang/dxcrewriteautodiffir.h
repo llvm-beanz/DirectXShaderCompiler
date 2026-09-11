@@ -73,6 +73,7 @@ struct ADExpr {
   bool RuntimeLoopSubtractsLinearCoefficient = false;
   const ADExpr *RuntimeLoopCoupledPeer = nullptr;
   bool RuntimeLoopCoupledPrimary = false;
+  bool RuntimeLoopCoupledUsesPrimalTape = false;
   bool RuntimeLoopSubtractsCoupledPeer = false;
   const ADExpr *Receiver = nullptr;
   clang::UnaryOperatorKind UnaryOpcode = clang::UO_Plus;
