@@ -603,7 +603,8 @@ private:
     const auto *FirstUpdate = dyn_cast<BinaryOperator>(*It++);
     const auto *SecondUpdate = dyn_cast<BinaryOperator>(*It);
     if (!FirstUpdate || !SecondUpdate ||
-        (FirstUpdate->getOpcode() != BO_AddAssign &&
+        (FirstUpdate->getOpcode() != BO_Assign &&
+         FirstUpdate->getOpcode() != BO_AddAssign &&
          FirstUpdate->getOpcode() != BO_SubAssign &&
          FirstUpdate->getOpcode() != BO_MulAssign) ||
         (SecondUpdate->getOpcode() != BO_AddAssign &&
@@ -616,26 +617,56 @@ private:
         dyn_cast<DeclRefExpr>(FirstUpdate->getLHS()->IgnoreParenImpCasts());
     const auto *SecondTargetRef =
         dyn_cast<DeclRefExpr>(SecondUpdate->getLHS()->IgnoreParenImpCasts());
-    const auto *PeerRef =
-        dyn_cast<DeclRefExpr>(FirstUpdate->getRHS()->IgnoreParenImpCasts());
     const auto *FirstTarget =
         FirstTargetRef ? dyn_cast<ParmVarDecl>(FirstTargetRef->getDecl())
                        : nullptr;
     const auto *SecondTarget =
         SecondTargetRef ? dyn_cast<ParmVarDecl>(SecondTargetRef->getDecl())
                         : nullptr;
-    if (!FirstTarget || !SecondTarget || !PeerRef ||
-        PeerRef->getDecl() != SecondTarget || FirstTarget == SecondTarget ||
+    if (!FirstTarget || !SecondTarget || FirstTarget == SecondTarget ||
         FirstTarget->hasAttr<HLSLNoDiffAttr>() ||
         SecondTarget->hasAttr<HLSLNoDiffAttr>() ||
         !Ctx.hasSameType(FirstTarget->getType(), SecondTarget->getType()))
       return false;
 
+    const DeclRefExpr *PeerRef = nullptr;
+    bool AssignmentProduct = false;
+    if (FirstUpdate->getOpcode() == BO_Assign) {
+      const Expr *Core = FirstUpdate->getRHS()->IgnoreParenImpCasts();
+      if (const auto *Outer = dyn_cast<BinaryOperator>(Core)) {
+        if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
+            !referencesActiveValue(Outer->getRHS()))
+          Core = Outer->getLHS()->IgnoreParenImpCasts();
+      }
+      const auto *Product = dyn_cast<BinaryOperator>(Core);
+      if (!Product || Product->getOpcode() != BO_Mul)
+        return false;
+      const auto *Left =
+          dyn_cast<DeclRefExpr>(Product->getLHS()->IgnoreParenImpCasts());
+      const auto *Right =
+          dyn_cast<DeclRefExpr>(Product->getRHS()->IgnoreParenImpCasts());
+      if (Left && Right && Left->getDecl() == FirstTarget &&
+          Right->getDecl() == SecondTarget)
+        PeerRef = Right;
+      else if (Left && Right && Left->getDecl() == SecondTarget &&
+               Right->getDecl() == FirstTarget)
+        PeerRef = Left;
+      else
+        return false;
+      AssignmentProduct = true;
+    } else {
+      PeerRef =
+          dyn_cast<DeclRefExpr>(FirstUpdate->getRHS()->IgnoreParenImpCasts());
+      if (!PeerRef || PeerRef->getDecl() != SecondTarget)
+        return false;
+    }
+
     const ADExpr *SecondFactor = buildExpr(SecondUpdate->getRHS());
     if (!SecondFactor || SecondFactor->Value.Activity == ADActivity::Active)
       return false;
 
-    bool UsesPrimalTape = FirstUpdate->getOpcode() == BO_MulAssign;
+    bool UsesPrimalTape =
+        FirstUpdate->getOpcode() == BO_MulAssign || AssignmentProduct;
     unsigned TapeSize = 0;
     if (UsesPrimalTape) {
       const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
@@ -683,6 +714,9 @@ private:
           Result->SourceDecl = getCanonicalValueDecl(Target);
           Result->LoopCounter = Counter;
           switch (Update->getOpcode()) {
+          case BO_Assign:
+            Result->BinaryOpcode = BO_Assign;
+            break;
           case BO_AddAssign:
             Result->BinaryOpcode = BO_Add;
             break;
@@ -706,7 +740,11 @@ private:
           return Result;
         };
 
-    const ADExpr *Peer = createLocalRef(PeerRef, SecondBefore, false);
+    const ADExpr *Peer = AssignmentProduct
+                             ? buildExpr(FirstUpdate->getRHS())
+                             : createLocalRef(PeerRef, SecondBefore, false);
+    if (!Peer)
+      return false;
     ADExpr *FirstResult = CreateResult(FirstTarget, FirstTargetRef, FirstBefore,
                                        FirstUpdate, Peer);
     ADExpr *SecondResult =
