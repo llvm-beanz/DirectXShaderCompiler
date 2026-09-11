@@ -1313,11 +1313,19 @@ public:
       } else if (S.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
         unsigned LoopID = NextLoopID++;
         RuntimeLoopIDs[S.Value] = LoopID;
+        if (S.Value->RuntimeLoopUsesPrimalTape)
+          OS << "    " << printType(S.Value->Value.PrimalType, Policy)
+             << " __dxc_ad_loop_" << LoopID << "_primal_tape["
+             << S.Value->RuntimeLoopTapeSize << "];\n";
         OS << "    for (uint " << S.Value->LoopCounter->getName() << " = 0; "
            << S.Value->LoopCounter->getName() << " < ";
         emitPrimal(S.Value->Operands[1]);
-        OS << "; ++" << S.Value->LoopCounter->getName() << ")\n        "
-           << S.Value->SourceDecl->getName() << ".value ";
+        OS << "; ++" << S.Value->LoopCounter->getName() << ")";
+        if (S.Value->RuntimeLoopUsesPrimalTape)
+          OS << " {\n        __dxc_ad_loop_" << LoopID << "_primal_tape["
+             << S.Value->LoopCounter->getName()
+             << "] = " << S.Value->SourceDecl->getName() << ".value;\n    ";
+        OS << "\n        " << S.Value->SourceDecl->getName() << ".value ";
         switch (S.Value->BinaryOpcode) {
         case BO_Add:
           OS << "+= ";
@@ -1336,6 +1344,8 @@ public:
         }
         emitPrimal(S.Value->Operands[2]);
         OS << ";\n";
+        if (S.Value->RuntimeLoopUsesPrimalTape)
+          OS << "    }\n";
       }
 
     OS << "    " << ResultType << " __dxc_ad_primal = ";
@@ -1400,7 +1410,8 @@ private:
       return true;
     case Kind::RuntimeLoopResult:
       return E->Operands[1]->Value.Activity == Activity::Inactive &&
-             E->Operands[2]->Value.Activity == Activity::Inactive &&
+             (E->Operands[2]->Value.Activity == Activity::Inactive ||
+              E->RuntimeLoopUsesPrimalTape) &&
              supports(E->Operands[0]);
     case Kind::AggregateConstruct:
     case Kind::Unary:
@@ -1794,7 +1805,16 @@ private:
       std::string Type = printType(E->Value.PrimalType, Policy);
       OS << "    " << Type << " __dxc_ad_loop_" << LoopID
          << "_adjoint = " << Cotangent << ";\n";
-      if (E->BinaryOpcode == BO_Mul || E->BinaryOpcode == BO_Div) {
+      if (E->RuntimeLoopUsesPrimalTape) {
+        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
+        emitPrimal(E->Operands[1]);
+        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
+           << "        --" << E->LoopCounter->getName() << ";\n"
+           << "        __dxc_ad_loop_" << LoopID
+           << "_adjoint *= (2 * __dxc_ad_loop_" << LoopID << "_primal_tape["
+           << E->LoopCounter->getName() << "]);\n"
+           << "    }\n";
+      } else if (E->BinaryOpcode == BO_Mul || E->BinaryOpcode == BO_Div) {
         OS << "    for (uint " << E->LoopCounter->getName() << " = ";
         emitPrimal(E->Operands[1]);
         OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
@@ -2033,7 +2053,9 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
           break;
         }
     bool HasTerminalPlanFailure =
-        !HasTypedPlan && StringRef(PlanReason).startswith("active ");
+        !HasTypedPlan &&
+        (StringRef(PlanReason).startswith("active ") ||
+         StringRef(PlanReason).startswith("nonlinear active runtime loop "));
     if (M == AutoDiffEmitter::Bwd && HasTypedPlan && hasBackwardCallCycle(FD)) {
       HasTypedPlan = false;
       HasTerminalPlanFailure = true;

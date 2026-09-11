@@ -549,9 +549,29 @@ private:
     const ADExpr *Factor = buildExpr(Update->getRHS());
     if (!Count || !Factor)
       return false;
-    if (Count->Value.Activity == ADActivity::Active ||
-        Factor->Value.Activity == ADActivity::Active)
-      return fail("active runtime loop count and factor must be inactive");
+    if (Count->Value.Activity == ADActivity::Active)
+      return fail("active runtime loop count must be inactive");
+
+    bool UsesPrimalTape = false;
+    unsigned TapeSize = 0;
+    if (Factor->Value.Activity == ADActivity::Active) {
+      const auto *FactorRef =
+          dyn_cast<DeclRefExpr>(Update->getRHS()->IgnoreParenImpCasts());
+      UsesPrimalTape = Update->getOpcode() == BO_MulAssign && FactorRef &&
+                       FactorRef->getDecl() == Target;
+      const auto *BoundCall =
+          dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts());
+      if (UsesPrimalTape && BoundCall && BoundCall->getDirectCallee() &&
+          BoundCall->getDirectCallee()->getName() == "min") {
+        for (const Expr *Argument : BoundCall->arguments())
+          if (const auto *Limit =
+                  dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
+            TapeSize = Limit->getValue().getLimitedValue(1025);
+      }
+      if (!UsesPrimalTape || TapeSize == 0 || TapeSize > 1024)
+        return fail("nonlinear active runtime loop requires a min(count, N) "
+                    "bound with N between 1 and 1024");
+    }
 
     const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
     auto It = CurrentBindings.find(CanonicalTarget);
@@ -571,6 +591,8 @@ private:
     ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
     Result->SourceDecl = CanonicalTarget;
     Result->LoopCounter = Counter;
+    Result->RuntimeLoopTapeSize = TapeSize;
+    Result->RuntimeLoopUsesPrimalTape = UsesPrimalTape;
     switch (Update->getOpcode()) {
     case BO_AddAssign:
       Result->BinaryOpcode = BO_Add;
