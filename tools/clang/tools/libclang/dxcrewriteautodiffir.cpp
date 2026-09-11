@@ -499,6 +499,91 @@ private:
     return true;
   }
 
+  bool buildActiveRuntimeFor(const ForStmt *FS) {
+    const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
+    const auto *Counter = Init && Init->isSingleDecl()
+                              ? dyn_cast<VarDecl>(Init->getSingleDecl())
+                              : nullptr;
+    const auto *Initial = Counter && Counter->getInit()
+                              ? dyn_cast<IntegerLiteral>(
+                                    Counter->getInit()->IgnoreParenImpCasts())
+                              : nullptr;
+    const auto *Condition = dyn_cast_or_null<BinaryOperator>(FS->getCond());
+    const auto *ConditionCounter =
+        Condition
+            ? dyn_cast<DeclRefExpr>(Condition->getLHS()->IgnoreParenImpCasts())
+            : nullptr;
+    const auto *Increment = dyn_cast_or_null<UnaryOperator>(FS->getInc());
+    const auto *IncrementCounter =
+        Increment ? dyn_cast<DeclRefExpr>(
+                        Increment->getSubExpr()->IgnoreParenImpCasts())
+                  : nullptr;
+    if (!Counter || !Initial || Initial->getValue() != 0 || !Condition ||
+        Condition->getOpcode() != BO_LT || !ConditionCounter ||
+        ConditionCounter->getDecl() != Counter || !Increment ||
+        (Increment->getOpcode() != UO_PreInc &&
+         Increment->getOpcode() != UO_PostInc) ||
+        !IncrementCounter || IncrementCounter->getDecl() != Counter)
+      return fail("active runtime loop is not canonical");
+
+    const Stmt *Body = FS->getBody();
+    if (const auto *Compound = dyn_cast<CompoundStmt>(Body)) {
+      if (Compound->size() != 1)
+        return fail("active runtime loop requires one update statement");
+      Body = *Compound->body_begin();
+    }
+    const auto *Update = dyn_cast<BinaryOperator>(Body);
+    if (!Update || (Update->getOpcode() != BO_MulAssign &&
+                    Update->getOpcode() != BO_DivAssign))
+      return fail("active runtime loop requires *= or /= update");
+    const auto *TargetRef =
+        dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
+    const auto *Target =
+        TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
+    if (!Target || Target->hasAttr<HLSLNoDiffAttr>())
+      return fail("active runtime loop target is not an active parameter");
+    if (referencesDecl(Update->getRHS(), getCanonicalValueDecl(Counter)))
+      return fail("active runtime loop factor must be loop-invariant");
+
+    const ADExpr *Count = buildExpr(Condition->getRHS());
+    const ADExpr *Factor = buildExpr(Update->getRHS());
+    if (!Count || !Factor)
+      return false;
+    if (Count->Value.Activity == ADActivity::Active ||
+        Factor->Value.Activity == ADActivity::Active)
+      return fail("active runtime loop count and factor must be inactive");
+
+    const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
+    auto It = CurrentBindings.find(CanonicalTarget);
+    const ADBinding *Before = nullptr;
+    if (It == CurrentBindings.end()) {
+      ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRef);
+      Initial->SourceDecl = CanonicalTarget;
+      Initial->Value.SourceDecl = CanonicalTarget;
+      Initial->Value.Activity = ADActivity::Active;
+      Before = createBinding(Target, 0, Initial);
+    } else {
+      Before = It->second;
+    }
+    if (!Before->Value)
+      return fail("active runtime loop reads an uninitialized value");
+
+    ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
+    Result->SourceDecl = CanonicalTarget;
+    Result->BinaryOpcode =
+        Update->getOpcode() == BO_MulAssign ? BO_Mul : BO_Div;
+    Result->Operands.push_back(createLocalRef(TargetRef, Before, false));
+    Result->Operands.push_back(Count);
+    Result->Operands.push_back(Factor);
+    Result->Value.Activity = ADActivity::Active;
+    Result->Value.PrimalType = Target->getType();
+
+    const ADBinding *After = createBinding(Target, Before->Version + 1, Result);
+    CurrentBindings[CanonicalTarget] = After;
+    Plan.Statements.push_back({ADStmt::Kind::ActiveLoop, After, Result, FS});
+    return true;
+  }
+
   bool buildStaticFor(const ForStmt *FS, bool ForceInactive) {
     const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
     if (!Init || !Init->isSingleDecl())
@@ -588,8 +673,10 @@ private:
       const bool HasConstantBound =
           Condition &&
           isa<IntegerLiteral>(Condition->getRHS()->IgnoreParenImpCasts());
-      return HasConstantBound ? buildStaticFor(FS, ForceInactive)
-                              : buildInactiveRuntimeFor(FS);
+      if (HasConstantBound)
+        return buildStaticFor(FS, ForceInactive);
+      return referencesActiveValue(FS->getBody()) ? buildActiveRuntimeFor(FS)
+                                                  : buildInactiveRuntimeFor(FS);
     }
 
     if (const auto *IS = dyn_cast<IfStmt>(S)) {

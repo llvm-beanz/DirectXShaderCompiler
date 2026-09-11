@@ -967,6 +967,10 @@ public:
         S.SourceStmt->printPretty(OS, nullptr, Policy);
         OS << "\n";
         break;
+      case hlsl::autodiff::ADStmt::Kind::ActiveLoop:
+        markNonDifferentiable(
+            "runtime loops mutating active state require backward mode");
+        break;
       case hlsl::autodiff::ADStmt::Kind::Return:
         if (S.Value->Value.Activity == hlsl::autodiff::ADActivity::Inactive) {
           if (M == AutoDiffEmitter::Bwd)
@@ -1296,6 +1300,7 @@ public:
     for (const VarDecl *Local : Plan.PrimalLocals)
       OS << "    " << printType(Local->getType(), Policy) << " "
          << Local->getName() << ";\n";
+    unsigned NextLoopID = 0;
     for (const hlsl::autodiff::ADStmt &S : Plan.Statements)
       if (S.K == hlsl::autodiff::ADStmt::Kind::Expression) {
         OS << "    ";
@@ -1305,6 +1310,17 @@ public:
         OS << "    ";
         S.SourceStmt->printPretty(OS, nullptr, Policy);
         OS << "\n";
+      } else if (S.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
+        unsigned LoopID = NextLoopID++;
+        RuntimeLoopIDs[S.Value] = LoopID;
+        OS << "    for (uint __dxc_ad_loop_" << LoopID
+           << "_index = 0; __dxc_ad_loop_" << LoopID << "_index < ";
+        emitPrimal(S.Value->Operands[1]);
+        OS << "; ++__dxc_ad_loop_" << LoopID << "_index)\n        "
+           << S.Value->SourceDecl->getName() << ".value "
+           << (S.Value->BinaryOpcode == BO_Mul ? "*= " : "/= ");
+        emitPrimal(S.Value->Operands[2]);
+        OS << ";\n";
       }
 
     OS << "    " << ResultType << " __dxc_ad_primal = ";
@@ -1323,6 +1339,7 @@ private:
   const PrintingPolicy &Policy;
   ArrayRef<ActiveContextInfo> Contexts;
   unsigned PullbackCallCount = 0;
+  DenseMap<const hlsl::autodiff::ADExpr *, unsigned> RuntimeLoopIDs;
 
   bool isGeneratedBackwardCall(const hlsl::autodiff::ADExpr *E) const {
     if (!E->Callee)
@@ -1366,6 +1383,10 @@ private:
         if (!supports(Operand))
           return false;
       return true;
+    case Kind::RuntimeLoopResult:
+      return E->Operands[1]->Value.Activity == Activity::Inactive &&
+             E->Operands[2]->Value.Activity == Activity::Inactive &&
+             supports(E->Operands[0]);
     case Kind::AggregateConstruct:
     case Kind::Unary:
     case Kind::Binary:
@@ -1408,6 +1429,9 @@ private:
       return;
     case Kind::PrimalLocal:
       Out << E->SourceDecl->getName();
+      return;
+    case Kind::RuntimeLoopResult:
+      Out << E->SourceDecl->getName() << ".value";
       return;
     case Kind::Member: {
       const auto *Member = cast<MemberExpr>(E->SourceExpr);
@@ -1750,6 +1774,23 @@ private:
     case Kind::Call:
       emitCallAdjoint(E, Cotangent);
       return;
+    case Kind::RuntimeLoopResult: {
+      unsigned LoopID = RuntimeLoopIDs.lookup(E);
+      std::string Type = printType(E->Value.PrimalType, Policy);
+      OS << "    " << Type << " __dxc_ad_loop_" << LoopID
+         << "_adjoint = " << Cotangent << ";\n";
+      OS << "    for (uint __dxc_ad_loop_" << LoopID
+         << "_reverse = 0; __dxc_ad_loop_" << LoopID << "_reverse < ";
+      emitPrimal(E->Operands[1]);
+      OS << "; ++__dxc_ad_loop_" << LoopID << "_reverse)\n        "
+         << "__dxc_ad_loop_" << LoopID << "_adjoint "
+         << (E->BinaryOpcode == BO_Mul ? "*= " : "/= ");
+      emitPrimal(E->Operands[2]);
+      OS << ";\n";
+      emitAdjoint(E->Operands[0],
+                  "__dxc_ad_loop_" + Twine(LoopID).str() + "_adjoint");
+      return;
+    }
     case Kind::Unary:
       if (E->UnaryOpcode == UO_Minus)
         emitAdjoint(E->Operands.front(), "-(" + Cotangent.str() + ")");
@@ -1965,6 +2006,12 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
              (Expr->K == hlsl::autodiff::ADExpr::Kind::Call && Expr->Callee &&
               getAutoDiffAttr(Expr->Callee) &&
               getAutoDiffAttr(Expr->Callee)->hasBackward()))) {
+          NeedsDirectReverse = true;
+          break;
+        }
+    if (M == AutoDiffEmitter::Bwd && HasTypedPlan)
+      for (const hlsl::autodiff::ADStmt &Statement : Plan.Statements)
+        if (Statement.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
           NeedsDirectReverse = true;
           break;
         }

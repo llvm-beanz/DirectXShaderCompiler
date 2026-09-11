@@ -52,6 +52,7 @@ struct ADExpr {
     Binary,
     Conditional,
     Call,
+    RuntimeLoopResult,
   };
 
   ADExpr(Kind K, const clang::Expr *SourceExpr);
@@ -77,7 +78,14 @@ struct ADBinding {
 };
 
 struct ADStmt {
-  enum class Kind { Declare, Assign, Expression, PrimalLoop, Return };
+  enum class Kind {
+    Declare,
+    Assign,
+    Expression,
+    PrimalLoop,
+    ActiveLoop,
+    Return
+  };
 
   Kind K;
   const ADBinding *Binding = nullptr;
