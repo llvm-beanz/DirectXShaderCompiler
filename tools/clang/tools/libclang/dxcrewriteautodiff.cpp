@@ -59,6 +59,16 @@ unsigned getComponentCount(QualType Type) {
   if (const auto *Vector =
           dyn_cast<VectorType>(Type.getCanonicalType().getTypePtr()))
     return Vector->getNumElements();
+  if (const auto *Record = Type->getAs<RecordType>()) {
+    unsigned Count = 0;
+    for (const FieldDecl *Field : Record->getDecl()->fields())
+      Count += getComponentCount(Field->getType());
+    return Count;
+  }
+  if (const auto *Array =
+          dyn_cast<ConstantArrayType>(Type.getCanonicalType().getTypePtr()))
+    return Array->getSize().getLimitedValue() *
+           getComponentCount(Array->getElementType());
   return 1;
 }
 
@@ -66,6 +76,12 @@ char getComponentName(unsigned Index) {
   static const char Names[] = {'x', 'y', 'z', 'w'};
   return Index < 4 ? Names[Index] : 'x';
 }
+
+struct ActiveContextInfo {
+  QualType Type;
+  std::string Name;
+  SmallVector<const ParmVarDecl *, 4> Parameters;
+};
 
 // ---------------------------------------------------------------------------
 // Intrinsic classification
@@ -1018,14 +1034,18 @@ private:
       OS << "]";
       return;
     case ExprKind::AggregateConstruct:
-      E->Value.PrimalType.print(OS, Policy);
-      OS << "(";
+      if (isa<InitListExpr>(E->SourceExpr))
+        OS << "{";
+      else {
+        E->Value.PrimalType.print(OS, Policy);
+        OS << "(";
+      }
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
           OS << ", ";
         emitPrimalExpr(E->Operands[I]);
       }
-      OS << ")";
+      OS << (isa<InitListExpr>(E->SourceExpr) ? "}" : ")");
       return;
     case ExprKind::Cast:
       OS << "(";
@@ -1225,8 +1245,9 @@ private:
 class DirectReverseEmitter {
 public:
   DirectReverseEmitter(StringRef ResultType, raw_ostream &OS,
-                       const PrintingPolicy &Policy)
-      : ResultType(ResultType), OS(OS), Policy(Policy) {}
+                       const PrintingPolicy &Policy,
+                       ArrayRef<ActiveContextInfo> Contexts)
+      : ResultType(ResultType), OS(OS), Policy(Policy), Contexts(Contexts) {}
 
   bool emitPlan(const hlsl::autodiff::ADFunctionPlan &Plan) {
     const hlsl::autodiff::ADExpr *Result = nullptr;
@@ -1239,7 +1260,8 @@ public:
     OS << "    " << ResultType << " __dxc_ad_primal = ";
     emitPrimal(Result);
     OS << ";\n";
-    OS << "    context.zeroGradients();\n";
+    for (const ActiveContextInfo &Context : Contexts)
+      OS << "    " << Context.Name << ".zeroGradients();\n";
     emitAdjoint(Result, "__dxc_ad_seed");
     OS << "    return __dxc_ad_primal;\n";
     return true;
@@ -1249,6 +1271,15 @@ private:
   StringRef ResultType;
   raw_ostream &OS;
   const PrintingPolicy &Policy;
+  ArrayRef<ActiveContextInfo> Contexts;
+
+  StringRef contextName(const ValueDecl *Decl) const {
+    for (const ActiveContextInfo &Context : Contexts)
+      for (const ParmVarDecl *Parameter : Context.Parameters)
+        if (Parameter->getCanonicalDecl() == Decl)
+          return Context.Name;
+    llvm_unreachable("active parameter has no gradient context");
+  }
 
   bool supports(const hlsl::autodiff::ADExpr *E) const {
     using Activity = hlsl::autodiff::ADActivity;
@@ -1321,14 +1352,18 @@ private:
       Out << "]";
       return;
     case Kind::AggregateConstruct:
-      E->Value.PrimalType.print(Out, Policy);
-      Out << "(";
+      if (isa<InitListExpr>(E->SourceExpr))
+        Out << "{";
+      else {
+        E->Value.PrimalType.print(Out, Policy);
+        Out << "(";
+      }
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
           Out << ", ";
         emitPrimal(E->Operands[I], Out);
       }
-      Out << ")";
+      Out << (isa<InitListExpr>(E->SourceExpr) ? "}" : ")");
       return;
     case Kind::Cast:
       Out << "(";
@@ -1387,6 +1422,37 @@ private:
               Twine(Index % Columns) + "]")
           .str();
     }
+    if (hlsl::IsHLSLVecType(Type))
+      return (Cotangent + "." + Twine(getComponentName(Index))).str();
+    if (const auto *Vector =
+            dyn_cast<VectorType>(Type.getCanonicalType().getTypePtr())) {
+      assert(Index < Vector->getNumElements() &&
+             "vector component index out of range");
+      return (Cotangent + "." + Twine(getComponentName(Index))).str();
+    }
+    if (const auto *Record = Type->getAs<RecordType>()) {
+      for (const FieldDecl *Field : Record->getDecl()->fields()) {
+        unsigned FieldCount = getComponentCount(Field->getType());
+        if (Index < FieldCount) {
+          std::string FieldCotangent =
+              (Cotangent + "." + Field->getName()).str();
+          return component(FieldCotangent, Index, Field->getType());
+        }
+        Index -= FieldCount;
+      }
+      llvm_unreachable("record component index out of range");
+    }
+    if (const auto *Array =
+            dyn_cast<ConstantArrayType>(Type.getCanonicalType().getTypePtr())) {
+      unsigned ElementCount = getComponentCount(Array->getElementType());
+      unsigned ArrayIndex = Index / ElementCount;
+      assert(ArrayIndex < Array->getSize().getLimitedValue() &&
+             "array component index out of range");
+      std::string ElementCotangent =
+          (Cotangent + "[" + Twine(ArrayIndex) + "]").str();
+      return component(ElementCotangent, Index % ElementCount,
+                       Array->getElementType());
+    }
     unsigned Count = getComponentCount(Type);
     if (Count == 1)
       return Cotangent.str();
@@ -1410,6 +1476,30 @@ private:
     return "(" + printType(Type, Policy) + ")0";
   }
 
+  void emitAggregateAdjoint(const hlsl::autodiff::ADExpr *E,
+                            StringRef Cotangent, QualType CotangentType,
+                            unsigned &Offset) {
+    using Activity = hlsl::autodiff::ADActivity;
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    for (const hlsl::autodiff::ADExpr *Operand : E->Operands) {
+      unsigned OperandCount = getComponentCount(Operand->Value.PrimalType);
+      if (Operand->Value.Activity == Activity::Inactive) {
+        Offset += OperandCount;
+        continue;
+      }
+      if (Operand->K == Kind::AggregateConstruct) {
+        emitAggregateAdjoint(Operand, Cotangent, CotangentType, Offset);
+        continue;
+      }
+      SmallVector<std::string, 4> Values;
+      for (unsigned I = 0; I < OperandCount; ++I)
+        Values.push_back(component(Cotangent, Offset + I, CotangentType));
+      emitAdjoint(Operand,
+                  constructCotangent(Operand->Value.PrimalType, Values));
+      Offset += OperandCount;
+    }
+  }
+
   void emitAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent) {
     using Activity = hlsl::autodiff::ADActivity;
     using Kind = hlsl::autodiff::ADExpr::Kind;
@@ -1417,8 +1507,8 @@ private:
       return;
     switch (E->K) {
     case Kind::DeclRef:
-      OS << "    context.gradients[" << E->SourceDecl->getName()
-         << ".id] += " << Cotangent << ";\n";
+      OS << "    " << contextName(E->SourceDecl) << ".gradients["
+         << E->SourceDecl->getName() << ".id] += " << Cotangent << ";\n";
       return;
     case Kind::LocalRef:
       emitAdjoint(E->Binding->Value, Cotangent);
@@ -1467,17 +1557,7 @@ private:
     }
     case Kind::AggregateConstruct: {
       unsigned Offset = 0;
-      for (const hlsl::autodiff::ADExpr *Operand : E->Operands) {
-        unsigned OperandCount = getComponentCount(Operand->Value.PrimalType);
-        SmallVector<std::string, 4> Values;
-        for (unsigned I = 0; I < OperandCount; ++I)
-          Values.push_back(
-              component(Cotangent, Offset + I, E->Value.PrimalType));
-        std::string Routed =
-            constructCotangent(Operand->Value.PrimalType, Values);
-        emitAdjoint(Operand, Routed);
-        Offset += OperandCount;
-      }
+      emitAggregateAdjoint(E, Cotangent, E->Value.PrimalType, Offset);
       return;
     }
     case Kind::Cast:
@@ -1539,7 +1619,8 @@ private:
 
 // Render the autodiff signature for a function in either mode.
 void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
-                           StringRef ElemType, StringRef ContextType,
+                           StringRef ElemType,
+                           ArrayRef<ActiveContextInfo> Contexts,
                            const PrintingPolicy &Policy, raw_ostream &OS) {
   if (M == AutoDiffEmitter::Fwd) {
     OS << "Value<" << ElemType << "> " << FD->getName() << "(";
@@ -1560,18 +1641,29 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   }
   // Backward mode returns the primal value; derivatives are written to the
   // GradientContext entries associated with the Variable<T> parameters.
-  OS << ElemType << " " << FD->getName() << "(inout GradientContext<"
-     << ContextType << "> context";
+  OS << ElemType << " " << FD->getName() << "(";
+  bool First = true;
+  for (const ActiveContextInfo &Context : Contexts) {
+    if (!First)
+      OS << ", ";
+    First = false;
+    OS << "inout GradientContext<" << printType(Context.Type, Policy) << "> "
+       << Context.Name;
+  }
   for (const ParmVarDecl *P : FD->parameters()) {
     std::string ParamType = printType(P->getType(), Policy);
-    OS << ", ";
+    if (!First)
+      OS << ", ";
+    First = false;
     if (isInactiveParameter(P))
       OS << ParamType;
     else
       OS << "Variable<" << ParamType << ">";
     OS << " " << P->getName();
   }
-  OS << ", " << ElemType << " __dxc_ad_seed)";
+  if (!First)
+    OS << ", ";
+  OS << ElemType << " __dxc_ad_seed)";
 }
 
 // Emit the auto-diff variant of a single function inside the appropriate
@@ -1581,22 +1673,35 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   // Determine the element type from the return type. We support scalar
   // float-like functions for now; other return types produce a TODO.
   std::string ElemType = printType(FD->getReturnType(), Policy);
-  QualType ActiveType;
-  bool HasMultipleActiveTypes = false;
+  SmallVector<ActiveContextInfo, 4> Contexts;
   for (const ParmVarDecl *P : FD->parameters()) {
     if (isInactiveParameter(P))
       continue;
-    if (ActiveType.isNull()) {
-      ActiveType = P->getType();
-    } else if (!FD->getASTContext().hasSameType(ActiveType, P->getType())) {
-      HasMultipleActiveTypes = true;
+    ActiveContextInfo *MatchingContext = nullptr;
+    for (ActiveContextInfo &Context : Contexts)
+      if (FD->getASTContext().hasSameType(Context.Type, P->getType())) {
+        MatchingContext = &Context;
+        break;
+      }
+    if (!MatchingContext) {
+      Contexts.push_back({P->getType(), "", {}});
+      MatchingContext = &Contexts.back();
     }
+    MatchingContext->Parameters.push_back(P);
   }
-  std::string ContextType =
-      ActiveType.isNull() ? ElemType : printType(ActiveType, Policy);
+  if (Contexts.empty())
+    Contexts.push_back({FD->getReturnType(), "context", {}});
+  else if (Contexts.size() == 1)
+    Contexts.front().Name = "context";
+  else
+    for (ActiveContextInfo &Context : Contexts)
+      Context.Name = Context.Parameters.front()->getName().str() + "_context";
+
+  QualType ActiveType = Contexts.front().Type;
   bool NeedsDirectReverse =
-      M == AutoDiffEmitter::Bwd && !ActiveType.isNull() &&
-      !FD->getASTContext().hasSameType(ActiveType, FD->getReturnType());
+      M == AutoDiffEmitter::Bwd &&
+      (Contexts.size() > 1 ||
+       !FD->getASTContext().hasSameType(ActiveType, FD->getReturnType()));
 
   // Render the body into a temporary buffer first so that, if a
   // non-differentiable construct was encountered, we can discard the body
@@ -1623,12 +1728,6 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
         }
     bool HasTerminalPlanFailure =
         !HasTypedPlan && StringRef(PlanReason).startswith("active ");
-    if (M == AutoDiffEmitter::Bwd && HasMultipleActiveTypes) {
-      HasTypedPlan = false;
-      HasTerminalPlanFailure = true;
-      PlanReason = "the backward runtime currently supports only one active "
-                   "parameter type per function";
-    }
     if (M == AutoDiffEmitter::Bwd) {
       for (const ParmVarDecl *P : FD->parameters()) {
         if (isInactiveParameter(P))
@@ -1640,7 +1739,7 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
       }
     }
     if (HasTypedPlan && NeedsDirectReverse) {
-      DirectReverseEmitter Em(ElemType, BodyOS, Policy);
+      DirectReverseEmitter Em(ElemType, BodyOS, Policy, Contexts);
       ValidBody = Em.emitPlan(Plan);
       BodyOS.flush();
       if (!ValidBody)
@@ -1670,7 +1769,7 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     Reason = "function has no body";
   }
 
-  emitAutoDiffSignature(FD, M, ElemType, ContextType, Policy, OS);
+  emitAutoDiffSignature(FD, M, ElemType, Contexts, Policy, OS);
   OS << " {\n";
   if (ValidBody) {
     OS << BodyText;

@@ -245,6 +245,19 @@ private:
       return Node;
     }
 
+    if (const auto *ILE = dyn_cast<InitListExpr>(E)) {
+      ADExpr *Node = createExpr(ADExpr::Kind::AggregateConstruct, E);
+      for (unsigned I = 0; I < ILE->getNumInits(); ++I) {
+        const ADExpr *Operand = buildExpr(ILE->getInit(I), ForceInactive);
+        if (!Operand)
+          return nullptr;
+        Node->Operands.push_back(Operand);
+      }
+      Node->Value.Activity = ForceInactive ? ADActivity::Inactive
+                                           : combineActivity(Node->Operands);
+      return Node;
+    }
+
     if (const auto *FCE = dyn_cast<CXXFunctionalCastExpr>(E)) {
       const auto *ILE = dyn_cast<InitListExpr>(FCE->getSubExpr());
       if (!ILE) {
