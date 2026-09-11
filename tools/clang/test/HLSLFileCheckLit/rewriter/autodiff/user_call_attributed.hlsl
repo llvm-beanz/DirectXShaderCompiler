@@ -1,4 +1,8 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: cat %t.gen.hlsl %S/Inputs/user_call_attributed_caller.hlsl > %t.run.hlsl
+// RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
+// RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
 // Both `f` and the user function `g` it calls are annotated with
 // [[dxc::autodiff(fwd, bwd)]]. In forward mode, the generated
@@ -6,13 +10,8 @@
 // resolves it to `user::ad::fwd::g`, which the rewriter also emits, so the
 // forward variant composes through the user call correctly.
 //
-// In backward mode the rewriter currently does NOT recognise an attributed
-// user callee as a candidate for the `g(context, x_expr)` rewriting it
-// applies to intrinsics. Instead, `g` falls through the
-// GetBackwardIntrinsicBuilder lookup and produces a non-differentiable
-// stub. This test records that current behaviour so that any future fix
-// (which should emit a real call into `user::ad::bwd::g`) updates the
-// expectation deliberately.
+// Backward mode creates a temporary callee context and variable, seeds g's
+// generated pullback, and routes its argument gradient into f's expression.
 
 // CHECK: namespace user { namespace ad { namespace fwd {
 // CHECK: Value<float> g(Value<float> x)
@@ -31,9 +30,17 @@
 
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
-// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': unknown callee 'g' has no auto-diff builder");
-// CHECK: return (float)0;
+// CHECK: float __dxc_ad_primal = (::g(x.value) + x.value);
+// CHECK: GradientContext<float> __dxc_ad_call_0_context_0 = (GradientContext<float>)0;
+// CHECK: Variable<float> __dxc_ad_call_0_arg_0 = variable(__dxc_ad_call_0_context_0, x.value);
+// CHECK: g(__dxc_ad_call_0_context_0, __dxc_ad_call_0_arg_0, __dxc_ad_seed);
+// CHECK: context.gradients[x.id] += __dxc_ad_call_0_arg_0.gradient(__dxc_ad_call_0_context_0);
+// CHECK: context.gradients[x.id] += __dxc_ad_seed;
 // CHECK: } } } // namespace user::ad::bwd
+
+// For f(x)=x*x+x at x=2 and seed=3: primal=6 and gradient=15.
+// EXEC: rawBufferStore.f32{{.*}}i32 0, i32 0, float 6.000000e+00
+// EXEC: rawBufferStore.f32{{.*}}i32 1, i32 0, float 1.500000e+01
 
 [[dxc::autodiff(fwd, bwd)]]
 float g(float x) { return x * x; }

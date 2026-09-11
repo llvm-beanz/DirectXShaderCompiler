@@ -7,7 +7,7 @@
 // Inactive calls in direct reverse mode must rebuild their arguments from the
 // typed graph; copying source text would leave a reference to erased `scaled`.
 
-// CHECK: float4 __dxc_ad_primal = float4((uv.value.x - floor((uv.value * 2.F).x)), uv.value.y, 0.F, 1.F);
+// CHECK: float4 __dxc_ad_primal = float4((uv.value.x - ::floor((uv.value * 2.F).x)), uv.value.y, 0.F, 1.F);
 // CHECK: context.gradients[uv.id] += float2(__dxc_ad_seed.x, 0.0f);
 // CHECK: context.gradients[uv.id] += float2(0.0f, __dxc_ad_seed.y);
 

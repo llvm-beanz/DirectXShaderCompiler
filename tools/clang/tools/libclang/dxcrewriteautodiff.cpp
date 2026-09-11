@@ -25,6 +25,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/Stmt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -37,6 +38,15 @@ namespace {
 
 bool isInactiveParameter(const ParmVarDecl *P) {
   return P->hasAttr<HLSLNoDiffAttr>();
+}
+
+const HLSLAutoDiffAttr *getAutoDiffAttr(const FunctionDecl *FD) {
+  if (!FD)
+    return nullptr;
+  for (const FunctionDecl *Redecl : FD->redecls())
+    if (const auto *Attr = Redecl->getAttr<HLSLAutoDiffAttr>())
+      return Attr;
+  return nullptr;
 }
 
 std::string printType(QualType Type, const PrintingPolicy &Policy) {
@@ -1207,6 +1217,15 @@ private:
 
   void emitCall(const hlsl::autodiff::ADExpr *E) {
     StringRef Name = E->Callee->getName();
+    if (const auto *Attr = getAutoDiffAttr(E->Callee)) {
+      bool HasRequestedMode =
+          M == AutoDiffEmitter::Fwd ? Attr->hasForward() : Attr->hasBackward();
+      if (!HasRequestedMode)
+        markNonDifferentiable(
+            "callee '" + Name.str() + "' does not request " +
+            (M == AutoDiffEmitter::Fwd ? "forward" : "backward") +
+            "-mode auto-diff");
+    }
     if (const char *R = GetNonDifferentiableReason(Name))
       markNonDifferentiable(R);
     else if (IsTextureLikeIntrinsic(Name))
@@ -1272,6 +1291,14 @@ private:
   raw_ostream &OS;
   const PrintingPolicy &Policy;
   ArrayRef<ActiveContextInfo> Contexts;
+  unsigned PullbackCallCount = 0;
+
+  bool isGeneratedBackwardCall(const hlsl::autodiff::ADExpr *E) const {
+    if (!E->Callee)
+      return false;
+    const auto *Attr = getAutoDiffAttr(E->Callee);
+    return Attr && Attr->hasBackward();
+  }
 
   StringRef contextName(const ValueDecl *Decl) const {
     for (const ActiveContextInfo &Context : Contexts)
@@ -1298,6 +1325,14 @@ private:
              supports(E->Operands[0]);
     case Kind::Cast:
       return supports(E->Operands.front());
+    case Kind::Call:
+      if (!isGeneratedBackwardCall(E) ||
+          (E->Receiver && E->Receiver->Value.Activity == Activity::Active))
+        return false;
+      for (const hlsl::autodiff::ADExpr *Operand : E->Operands)
+        if (!supports(Operand))
+          return false;
+      return true;
     case Kind::AggregateConstruct:
     case Kind::Unary:
     case Kind::Binary:
@@ -1394,9 +1429,17 @@ private:
       return;
     case Kind::Call:
       if (E->Receiver) {
-        emitPrimal(E->Receiver, Out);
-        Out << ".";
-      }
+        if (isa<CXXThisExpr>(E->Receiver->SourceExpr->IgnoreParenImpCasts())) {
+          const auto *Method = cast<CXXMethodDecl>(E->Callee);
+          Out << "::" << Method->getParent()->getName() << "::";
+        } else {
+          emitPrimal(E->Receiver, Out);
+          Out << ".";
+        }
+      } else if (const auto *Method = dyn_cast<CXXMethodDecl>(E->Callee))
+        Out << "::" << Method->getParent()->getName() << "::";
+      else
+        Out << "::";
       Out << E->Callee->getName() << "(";
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
@@ -1500,6 +1543,87 @@ private:
     }
   }
 
+  void emitCallAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent) {
+    unsigned CallID = PullbackCallCount++;
+    SmallVector<ActiveContextInfo, 4> CalleeContexts;
+    SmallVector<unsigned, 4> ArgumentContexts(E->Operands.size(), 0);
+    for (unsigned I = 0; I < E->Operands.size(); ++I) {
+      const ParmVarDecl *Parameter = E->Callee->getParamDecl(I);
+      if (isInactiveParameter(Parameter))
+        continue;
+      ActiveContextInfo *MatchingContext = nullptr;
+      for (ActiveContextInfo &Context : CalleeContexts)
+        if (E->Callee->getASTContext().hasSameType(Context.Type,
+                                                   Parameter->getType())) {
+          MatchingContext = &Context;
+          break;
+        }
+      if (!MatchingContext) {
+        CalleeContexts.push_back({Parameter->getType(), "", {}});
+        MatchingContext = &CalleeContexts.back();
+      }
+      MatchingContext->Parameters.push_back(Parameter);
+      ArgumentContexts[I] = MatchingContext - CalleeContexts.data();
+    }
+
+    for (unsigned I = 0; I < CalleeContexts.size(); ++I) {
+      ActiveContextInfo &Context = CalleeContexts[I];
+      Context.Name =
+          "__dxc_ad_call_" + Twine(CallID).str() + "_context_" + Twine(I).str();
+      std::string Type = printType(Context.Type, Policy);
+      OS << "    GradientContext<" << Type << "> " << Context.Name
+         << " = (GradientContext<" << Type << ">)0;\n";
+    }
+
+    SmallVector<std::string, 4> Variables(E->Operands.size());
+    for (unsigned I = 0; I < E->Operands.size(); ++I) {
+      const ParmVarDecl *Parameter = E->Callee->getParamDecl(I);
+      if (isInactiveParameter(Parameter))
+        continue;
+      Variables[I] =
+          "__dxc_ad_call_" + Twine(CallID).str() + "_arg_" + Twine(I).str();
+      std::string Type = printType(Parameter->getType(), Policy);
+      OS << "    Variable<" << Type << "> " << Variables[I] << " = variable("
+         << CalleeContexts[ArgumentContexts[I]].Name << ", ";
+      emitPrimal(E->Operands[I]);
+      OS << ");\n";
+    }
+
+    OS << "    ";
+    if (E->Receiver) {
+      emitPrimal(E->Receiver);
+      OS << ".";
+    }
+    OS << E->Callee->getName() << "(";
+    bool First = true;
+    for (const ActiveContextInfo &Context : CalleeContexts) {
+      if (!First)
+        OS << ", ";
+      First = false;
+      OS << Context.Name;
+    }
+    for (unsigned I = 0; I < E->Operands.size(); ++I) {
+      if (!First)
+        OS << ", ";
+      First = false;
+      if (isInactiveParameter(E->Callee->getParamDecl(I)))
+        emitPrimal(E->Operands[I]);
+      else
+        OS << Variables[I];
+    }
+    if (!First)
+      OS << ", ";
+    OS << Cotangent << ");\n";
+
+    for (unsigned I = 0; I < E->Operands.size(); ++I) {
+      if (isInactiveParameter(E->Callee->getParamDecl(I)))
+        continue;
+      emitAdjoint(E->Operands[I], Variables[I] + ".gradient(" +
+                                      CalleeContexts[ArgumentContexts[I]].Name +
+                                      ")");
+    }
+  }
+
   void emitAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent) {
     using Activity = hlsl::autodiff::ADActivity;
     using Kind = hlsl::autodiff::ADExpr::Kind;
@@ -1566,6 +1690,9 @@ private:
                       printType(E->Operands.front()->Value.PrimalType, Policy) +
                       ")(" + Cotangent.str() + ")");
       return;
+    case Kind::Call:
+      emitCallAdjoint(E, Cotangent);
+      return;
     case Kind::Unary:
       if (E->UnaryOpcode == UO_Minus)
         emitAdjoint(E->Operands.front(), "-(" + Cotangent.str() + ")");
@@ -1622,6 +1749,9 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
                            StringRef ElemType,
                            ArrayRef<ActiveContextInfo> Contexts,
                            const PrintingPolicy &Policy, raw_ostream &OS) {
+  if (const auto *Method = dyn_cast<CXXMethodDecl>(FD))
+    if (Method->isStatic())
+      OS << "static ";
   if (M == AutoDiffEmitter::Fwd) {
     OS << "Value<" << ElemType << "> " << FD->getName() << "(";
     bool First = true;
@@ -1666,13 +1796,7 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   OS << ElemType << " __dxc_ad_seed)";
 }
 
-// Emit the auto-diff variant of a single function inside the appropriate
-// namespace block. Returns true if anything was written.
-bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
-                          const PrintingPolicy &Policy, raw_ostream &OS) {
-  // Determine the element type from the return type. We support scalar
-  // float-like functions for now; other return types produce a TODO.
-  std::string ElemType = printType(FD->getReturnType(), Policy);
+SmallVector<ActiveContextInfo, 4> buildActiveContexts(const FunctionDecl *FD) {
   SmallVector<ActiveContextInfo, 4> Contexts;
   for (const ParmVarDecl *P : FD->parameters()) {
     if (isInactiveParameter(P))
@@ -1696,6 +1820,17 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
   else
     for (ActiveContextInfo &Context : Contexts)
       Context.Name = Context.Parameters.front()->getName().str() + "_context";
+  return Contexts;
+}
+
+// Emit the auto-diff variant of a single function inside the appropriate
+// namespace block. Returns true if anything was written.
+bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
+                          const PrintingPolicy &Policy, raw_ostream &OS) {
+  // Determine the element type from the return type. We support scalar
+  // float-like functions for now; other return types produce a TODO.
+  std::string ElemType = printType(FD->getReturnType(), Policy);
+  SmallVector<ActiveContextInfo, 4> Contexts = buildActiveContexts(FD);
 
   QualType ActiveType = Contexts.front().Type;
   bool NeedsDirectReverse =
@@ -1721,13 +1856,27 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     if (M == AutoDiffEmitter::Bwd && HasTypedPlan)
       for (const std::unique_ptr<hlsl::autodiff::ADExpr> &Expr :
            Plan.Expressions)
-        if (Expr->K == hlsl::autodiff::ADExpr::Kind::Cast &&
-            Expr->Value.Activity == hlsl::autodiff::ADActivity::Active) {
+        if (Expr->Value.Activity == hlsl::autodiff::ADActivity::Active &&
+            (Expr->K == hlsl::autodiff::ADExpr::Kind::Cast ||
+             (Expr->K == hlsl::autodiff::ADExpr::Kind::Call && Expr->Callee &&
+              getAutoDiffAttr(Expr->Callee) &&
+              getAutoDiffAttr(Expr->Callee)->hasBackward()))) {
           NeedsDirectReverse = true;
           break;
         }
     bool HasTerminalPlanFailure =
         !HasTypedPlan && StringRef(PlanReason).startswith("active ");
+    if (M == AutoDiffEmitter::Bwd && HasTypedPlan)
+      for (const std::unique_ptr<hlsl::autodiff::ADExpr> &Expr :
+           Plan.Expressions)
+        if (Expr->K == hlsl::autodiff::ADExpr::Kind::Call && Expr->Callee &&
+            Expr->Callee->getCanonicalDecl() == FD->getCanonicalDecl() &&
+            Expr->Value.Activity == hlsl::autodiff::ADActivity::Active) {
+          HasTypedPlan = false;
+          HasTerminalPlanFailure = true;
+          PlanReason = "recursive pullback composition is not supported";
+          break;
+        }
     if (M == AutoDiffEmitter::Bwd) {
       for (const ParmVarDecl *P : FD->parameters()) {
         if (isInactiveParameter(P))
@@ -1866,6 +2015,45 @@ void collectUserAdFunctionNames(const TranslationUnitDecl *TU,
   collectFunctionNamesInNamespace(TU, BwdPath, BwdNames);
 }
 
+class DirectAutoDiffCalleeCollector
+    : public RecursiveASTVisitor<DirectAutoDiffCalleeCollector> {
+public:
+  bool VisitCallExpr(CallExpr *Call) {
+    const FunctionDecl *Callee = Call->getDirectCallee();
+    if (!Callee)
+      return true;
+    Callee = Callee->getCanonicalDecl();
+    if (getAutoDiffAttr(Callee) && Seen.insert(Callee).second)
+      Callees.push_back(Callee);
+    return true;
+  }
+
+  SmallVector<const FunctionDecl *, 4> Callees;
+
+private:
+  SmallPtrSet<const FunctionDecl *, 4> Seen;
+};
+
+void emitDirectCalleePrototypes(const FunctionDecl *FD,
+                                AutoDiffEmitter::Mode Mode,
+                                const StringSet<> &Existing,
+                                const PrintingPolicy &Policy, raw_ostream &OS) {
+  DirectAutoDiffCalleeCollector Collector;
+  Collector.TraverseStmt(const_cast<Stmt *>(FD->getBody()));
+  for (const FunctionDecl *Callee : Collector.Callees) {
+    const auto *Attr = getAutoDiffAttr(Callee);
+    bool WantsMode =
+        Mode == AutoDiffEmitter::Fwd ? Attr->hasForward() : Attr->hasBackward();
+    if (!WantsMode || Existing.count(Callee->getName()))
+      continue;
+    SmallVector<ActiveContextInfo, 4> Contexts = buildActiveContexts(Callee);
+    emitAutoDiffSignature(Callee, Mode,
+                          printType(Callee->getReturnType(), Policy), Contexts,
+                          Policy, OS);
+    OS << ";\n";
+  }
+}
+
 // Emit forward and/or backward generated functions for a single annotated
 // function, wrapped in the user::ad::{fwd,bwd}:: namespaces.
 //
@@ -1882,12 +2070,16 @@ void EmitAutoDiffForFunction(const FunctionDecl *FD,
   if (Attr->hasForward() && !ExistingFwd.count(Name)) {
     OS << "\nnamespace user { namespace ad { namespace fwd {\n";
     OS << "using namespace ::ad::fwd;\n";
+    emitDirectCalleePrototypes(FD, AutoDiffEmitter::Fwd, ExistingFwd, Policy,
+                               OS);
     emitAutoDiffFunction(FD, AutoDiffEmitter::Fwd, Policy, OS);
     OS << "} } } // namespace user::ad::fwd\n";
   }
   if (Attr->hasBackward() && !ExistingBwd.count(Name)) {
     OS << "\nnamespace user { namespace ad { namespace bwd {\n";
     OS << "using namespace ::ad::bwd;\n";
+    emitDirectCalleePrototypes(FD, AutoDiffEmitter::Bwd, ExistingBwd, Policy,
+                               OS);
     emitAutoDiffFunction(FD, AutoDiffEmitter::Bwd, Policy, OS);
     OS << "} } } // namespace user::ad::bwd\n";
   }
@@ -2088,7 +2280,9 @@ void printDeclWithSubstitutions(
     }
   }
   D->print(OS, Policy);
-  if (isa<TagDecl>(D) || isa<VarDecl>(D))
+  const auto *Function = dyn_cast<FunctionDecl>(D);
+  if (isa<TagDecl>(D) || isa<VarDecl>(D) ||
+      (Function && !Function->doesThisDeclarationHaveABody()))
     OS << ";";
   OS << "\n";
 }

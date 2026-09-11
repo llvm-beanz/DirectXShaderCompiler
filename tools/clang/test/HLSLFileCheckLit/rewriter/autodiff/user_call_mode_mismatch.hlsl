@@ -6,11 +6,8 @@
 // while backward-mode of `f` still falls into the unknown-callee branch
 // because `g` has no backward overload and is not an intrinsic.
 //
-// The test pins down current behaviour: the rewriter does not inspect the
-// callee's [[dxc::autodiff]] modes when deciding whether a call site is
-// differentiable in backward mode. A future improvement could promote
-// mode-mismatched callees to a clearer diagnostic; this expectation should
-// then be updated to match.
+// The rewriter inspects the callee's canonical redeclaration chain and reports
+// the missing backward mode directly.
 
 // CHECK: namespace user { namespace ad { namespace fwd {
 // CHECK: Value<float> g(Value<float> x)
@@ -28,7 +25,7 @@
 
 // CHECK: namespace user { namespace ad { namespace bwd {
 // CHECK: float f(inout GradientContext<float> context, Variable<float> x, float __dxc_ad_seed)
-// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': unknown callee 'g' has no auto-diff builder");
+// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': callee 'g' does not request backward-mode auto-diff");
 // CHECK: return (float)0;
 // CHECK: } } } // namespace user::ad::bwd
 
