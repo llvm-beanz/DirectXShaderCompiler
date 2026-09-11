@@ -890,7 +890,9 @@ public:
       switch (S.K) {
       case hlsl::autodiff::ADStmt::Kind::Declare:
         if (M == AutoDiffEmitter::Fwd) {
-          OS << "    Value<" << ElemType << "> "
+          std::string LocalType =
+              printType(S.Binding->SourceDecl->getType(), Policy);
+          OS << "    Value<" << LocalType << "> "
              << S.Binding->SourceDecl->getName();
           if (!S.Value) {
             OS << ";\n";
@@ -898,7 +900,7 @@ public:
           }
           OS << " = ";
           if (S.Value->Value.Activity == hlsl::autodiff::ADActivity::Inactive) {
-            OS << "Value<" << ElemType << ">::CreateValue(";
+            OS << "Value<" << LocalType << ">::CreateValue(";
             emitPrimalExpr(S.Value);
             OS << ")";
           } else {
@@ -910,7 +912,12 @@ public:
       case hlsl::autodiff::ADStmt::Kind::Assign:
         if (M == AutoDiffEmitter::Fwd) {
           OS << "    " << S.Binding->SourceDecl->getName() << " = ";
-          emitExpr(S.Value);
+          const auto *Parameter =
+              dyn_cast<ParmVarDecl>(S.Binding->SourceDecl);
+          if (Parameter && isInactiveParameter(Parameter))
+            emitPrimalExpr(S.Value);
+          else
+            emitExpr(S.Value);
           OS << ";\n";
         }
         break;
@@ -970,7 +977,11 @@ private:
       if (M == AutoDiffEmitter::Bwd) {
         emitPrimalExpr(E->Binding->Value);
       } else {
-        OS << E->Binding->SourceDecl->getName() << ".value";
+        const auto *Parameter =
+            dyn_cast<ParmVarDecl>(E->Binding->SourceDecl);
+        OS << E->Binding->SourceDecl->getName();
+        if (!Parameter || !isInactiveParameter(Parameter))
+          OS << ".value";
       }
       return;
     case ExprKind::This:
@@ -1038,6 +1049,10 @@ private:
       OS << ")";
       return;
     case ExprKind::Call:
+      if (E->Receiver) {
+        emitPrimalExpr(E->Receiver);
+        OS << ".";
+      }
       OS << E->Callee->getName() << "(";
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
@@ -1054,8 +1069,11 @@ private:
     using ExprKind = hlsl::autodiff::ADExpr::Kind;
 
     if (E->Value.Activity == Activity::Inactive) {
-      if (M == AutoDiffEmitter::Fwd)
-        OS << "Value<" << ElemType << ">::CreateValue(";
+      if (M == AutoDiffEmitter::Fwd) {
+        OS << "Value<";
+        E->Value.PrimalType.print(OS, Policy);
+        OS << ">::CreateValue(";
+      }
       emitPrimalExpr(E);
       if (M == AutoDiffEmitter::Fwd)
         OS << ")";
@@ -1241,6 +1259,8 @@ private:
     case Kind::Subscript:
       return E->Operands[1]->Value.Activity == Activity::Inactive &&
              supports(E->Operands[0]);
+    case Kind::Cast:
+      return supports(E->Operands.front());
     case Kind::VectorConstruct:
     case Kind::Unary:
     case Kind::Binary:
@@ -1304,6 +1324,12 @@ private:
       }
       Out << ")";
       return;
+    case Kind::Cast:
+      Out << "(";
+      E->Value.PrimalType.print(Out, Policy);
+      Out << ")";
+      emitPrimal(E->Operands.front(), Out);
+      return;
     case Kind::Unary:
       Out << UnaryOperator::getOpcodeStr(E->UnaryOpcode) << "(";
       emitPrimal(E->Operands.front(), Out);
@@ -1323,6 +1349,19 @@ private:
       emitPrimal(E->Operands[1], Out);
       Out << " : ";
       emitPrimal(E->Operands[2], Out);
+      Out << ")";
+      return;
+    case Kind::Call:
+      if (E->Receiver) {
+        emitPrimal(E->Receiver, Out);
+        Out << ".";
+      }
+      Out << E->Callee->getName() << "(";
+      for (unsigned I = 0; I < E->Operands.size(); ++I) {
+        if (I)
+          Out << ", ";
+        emitPrimal(E->Operands[I], Out);
+      }
       Out << ")";
       return;
     default:
@@ -1413,6 +1452,12 @@ private:
       }
       return;
     }
+    case Kind::Cast:
+      emitAdjoint(E->Operands.front(),
+                  "(" +
+                      printType(E->Operands.front()->Value.PrimalType, Policy) +
+                      ")(" + Cotangent.str() + ")");
+      return;
     case Kind::Unary:
       if (E->UnaryOpcode == UO_Minus)
         emitAdjoint(E->Operands.front(), "-(" + Cotangent.str() + ")");
@@ -1540,9 +1585,16 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
     std::string PlanReason;
     bool HasTypedPlan =
         hlsl::autodiff::BuildADFunctionPlan(FD, Plan, PlanReason);
+    if (M == AutoDiffEmitter::Bwd && HasTypedPlan)
+      for (const std::unique_ptr<hlsl::autodiff::ADExpr> &Expr :
+           Plan.Expressions)
+        if (Expr->K == hlsl::autodiff::ADExpr::Kind::Cast &&
+            Expr->Value.Activity == hlsl::autodiff::ADActivity::Active) {
+          NeedsDirectReverse = true;
+          break;
+        }
     bool HasTerminalPlanFailure =
-        !HasTypedPlan &&
-        PlanReason == "active subscript index in typed auto-diff IR";
+        !HasTypedPlan && StringRef(PlanReason).startswith("active ");
     if (M == AutoDiffEmitter::Bwd && HasMultipleActiveTypes) {
       HasTypedPlan = false;
       HasTerminalPlanFailure = true;

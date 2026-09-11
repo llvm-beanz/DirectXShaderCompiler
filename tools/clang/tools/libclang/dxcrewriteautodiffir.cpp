@@ -14,6 +14,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/ExprCXX.h"
+#include "clang/AST/HlslTypes.h"
 #include "clang/AST/Stmt.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -47,6 +48,30 @@ ADActivity combineActivity(ArrayRef<const ADExpr *> Operands) {
     if (Operand->Value.Activity == ADActivity::Active)
       return ADActivity::Active;
   return ADActivity::Inactive;
+}
+
+unsigned getComponentCount(QualType Type) {
+  if (hlsl::IsHLSLVecType(Type))
+    return hlsl::GetHLSLVecSize(Type);
+  if (const auto *Vector =
+          dyn_cast<VectorType>(Type.getCanonicalType().getTypePtr()))
+    return Vector->getNumElements();
+  return 1;
+}
+
+QualType getElementType(QualType Type) {
+  if (hlsl::IsHLSLVecType(Type))
+    return hlsl::GetHLSLVecElementType(Type);
+  if (const auto *Vector =
+          dyn_cast<VectorType>(Type.getCanonicalType().getTypePtr()))
+    return Vector->getElementType();
+  return Type;
+}
+
+bool isDifferentiableFloatingCast(QualType Source, QualType Destination) {
+  return getComponentCount(Source) == getComponentCount(Destination) &&
+         getElementType(Source)->isFloatingType() &&
+         getElementType(Destination)->isFloatingType();
 }
 
 class ADFunctionBuilder {
@@ -168,6 +193,23 @@ private:
       return Node;
     }
 
+    if (const auto *ASE = dyn_cast<ArraySubscriptExpr>(E)) {
+      ADExpr *Node = createExpr(ADExpr::Kind::Subscript, E);
+      const ADExpr *Base = buildExpr(ASE->getBase(), ForceInactive);
+      const ADExpr *Index = buildExpr(ASE->getIdx(), ForceInactive);
+      if (!Base || !Index)
+        return nullptr;
+      if (Index->Value.Activity == ADActivity::Active) {
+        fail("active subscript index in typed auto-diff IR");
+        return nullptr;
+      }
+      Node->Operands.push_back(Base);
+      Node->Operands.push_back(Index);
+      Node->Value.Activity =
+          ForceInactive ? ADActivity::Inactive : Base->Value.Activity;
+      return Node;
+    }
+
     if (const auto *OCE = dyn_cast<CXXOperatorCallExpr>(E)) {
       if (OCE->getOperator() != OO_Subscript || OCE->getNumArgs() != 2) {
         fail("unsupported operator call in typed auto-diff IR");
@@ -222,16 +264,19 @@ private:
     }
 
     if (const auto *CE = dyn_cast<CastExpr>(E)) {
-      if (!ForceInactive) {
-        fail("active cast not represented in typed auto-diff IR");
-        return nullptr;
-      }
       ADExpr *Node = createExpr(ADExpr::Kind::Cast, E);
       const ADExpr *Operand = buildExpr(CE->getSubExpr(), ForceInactive);
       if (!Operand)
         return nullptr;
       Node->Operands.push_back(Operand);
-      Node->Value.Activity = ADActivity::Inactive;
+      Node->Value.Activity =
+          ForceInactive ? ADActivity::Inactive : Operand->Value.Activity;
+      if (Node->Value.Activity == ADActivity::Active &&
+          !isDifferentiableFloatingCast(Operand->Value.PrimalType,
+                                        Node->Value.PrimalType)) {
+        fail("active cast not represented in typed auto-diff IR");
+        return nullptr;
+      }
       return Node;
     }
 
@@ -253,6 +298,7 @@ private:
 
     if (const auto *BO = dyn_cast<BinaryOperator>(E)) {
       bool IsComparison = BO->isComparisonOp();
+      bool RequiresInactiveOperands = false;
       switch (BO->getOpcode()) {
       case BO_Add:
       case BO_Sub:
@@ -264,6 +310,16 @@ private:
       case BO_GE:
       case BO_EQ:
       case BO_NE:
+        break;
+      case BO_Rem:
+      case BO_Shl:
+      case BO_Shr:
+      case BO_And:
+      case BO_Xor:
+      case BO_Or:
+      case BO_LAnd:
+      case BO_LOr:
+        RequiresInactiveOperands = true;
         break;
       default:
         fail("unsupported binary operator in typed auto-diff IR");
@@ -283,6 +339,11 @@ private:
         fail("active comparison in typed auto-diff IR");
         return nullptr;
       }
+      if (RequiresInactiveOperands &&
+          Node->Value.Activity == ADActivity::Active) {
+        fail("active discrete operator in typed auto-diff IR");
+        return nullptr;
+      }
       return Node;
     }
 
@@ -294,6 +355,12 @@ private:
       }
       ADExpr *Node = createExpr(ADExpr::Kind::Call, E);
       Node->Callee = Callee->getCanonicalDecl();
+      if (const auto *MemberCall = dyn_cast<CXXMemberCallExpr>(CE)) {
+        Node->Receiver =
+            buildExpr(MemberCall->getImplicitObjectArgument(), ForceInactive);
+        if (!Node->Receiver)
+          return nullptr;
+      }
       for (const Expr *Argument : CE->arguments()) {
         const ADExpr *Operand = buildExpr(Argument, ForceInactive);
         if (!Operand)
@@ -302,6 +369,9 @@ private:
       }
       Node->Value.Activity = ForceInactive ? ADActivity::Inactive
                                            : combineActivity(Node->Operands);
+      if (!ForceInactive && Node->Receiver &&
+          Node->Receiver->Value.Activity == ADActivity::Active)
+        Node->Value.Activity = ADActivity::Active;
       return Node;
     }
 
@@ -348,8 +418,12 @@ private:
         return fail(
             "if condition variable not represented in typed auto-diff IR");
       const ADExpr *Condition = buildExpr(IS->getCond(), ForceInactive);
-      if (!Condition)
+      if (!Condition) {
+        if (Reason == "active comparison in typed auto-diff IR")
+          Reason = "data-dependent control flow (if) is not differentiable; "
+                   "use [[dxc::no_diff]] or branchless math";
         return false;
+      }
       if (Condition->Value.Activity == ADActivity::Active)
         return fail("active if condition in typed auto-diff IR");
 
@@ -416,8 +490,20 @@ private:
       return fail("assignment target is not a local variable");
     const ValueDecl *Target = getCanonicalValueDecl(LHS->getDecl());
     auto It = CurrentBindings.find(Target);
-    if (It == CurrentBindings.end())
-      return fail("assignment target has no local binding");
+    if (It == CurrentBindings.end()) {
+      const auto *Parameter = dyn_cast<ParmVarDecl>(LHS->getDecl());
+      if (!Parameter)
+        return fail("assignment target has no local binding");
+      ADExpr *InitialValue = createExpr(ADExpr::Kind::DeclRef, LHS);
+      InitialValue->SourceDecl = Target;
+      InitialValue->Value.SourceDecl = Target;
+      InitialValue->Value.Activity =
+          !ForceInactive && !Parameter->hasAttr<HLSLNoDiffAttr>()
+              ? ADActivity::Active
+              : ADActivity::Inactive;
+      CurrentBindings[Target] = createBinding(Parameter, 0, InitialValue);
+      It = CurrentBindings.find(Target);
+    }
 
     const ADExpr *Value = buildExpr(BO->getRHS(), ForceInactive);
     if (!Value)
@@ -425,6 +511,7 @@ private:
 
     BinaryOperatorKind ValueOpcode = BO_Add;
     bool IsCompound = true;
+    bool RequiresInactiveOperands = false;
     switch (BO->getOpcode()) {
     case BO_Assign:
       IsCompound = false;
@@ -441,6 +528,30 @@ private:
     case BO_DivAssign:
       ValueOpcode = BO_Div;
       break;
+    case BO_RemAssign:
+      ValueOpcode = BO_Rem;
+      RequiresInactiveOperands = true;
+      break;
+    case BO_ShlAssign:
+      ValueOpcode = BO_Shl;
+      RequiresInactiveOperands = true;
+      break;
+    case BO_ShrAssign:
+      ValueOpcode = BO_Shr;
+      RequiresInactiveOperands = true;
+      break;
+    case BO_AndAssign:
+      ValueOpcode = BO_And;
+      RequiresInactiveOperands = true;
+      break;
+    case BO_XorAssign:
+      ValueOpcode = BO_Xor;
+      RequiresInactiveOperands = true;
+      break;
+    case BO_OrAssign:
+      ValueOpcode = BO_Or;
+      RequiresInactiveOperands = true;
+      break;
     default:
       return fail("unsupported assignment in typed auto-diff IR");
     }
@@ -454,6 +565,9 @@ private:
                                                   /*ForceInactive=*/false));
       Combined->Operands.push_back(Value);
       Combined->Value.Activity = combineActivity(Combined->Operands);
+      if (RequiresInactiveOperands &&
+          Combined->Value.Activity == ADActivity::Active)
+        return fail("active discrete assignment in typed auto-diff IR");
       Value = Combined;
     }
 
