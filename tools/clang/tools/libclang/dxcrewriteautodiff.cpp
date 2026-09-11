@@ -1813,13 +1813,18 @@ private:
         emitPrimal(E->Operands[1]);
         OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
            << "        --" << E->LoopCounter->getName() << ";\n"
-           << "        __dxc_ad_loop_" << LoopID << "_adjoint *= (2 * ";
+           << "        __dxc_ad_loop_" << LoopID << "_adjoint *= ("
+           << E->RuntimeLoopPolynomialDegree << " * ";
         if (E->RuntimeLoopQuadraticCoefficient) {
           emitPrimal(E->RuntimeLoopQuadraticCoefficient);
           OS << " * ";
         }
         OS << "__dxc_ad_loop_" << LoopID << "_primal_tape["
            << E->LoopCounter->getName() << "]";
+        for (unsigned Power = 2; Power < E->RuntimeLoopPolynomialDegree;
+             ++Power)
+          OS << " * __dxc_ad_loop_" << LoopID << "_primal_tape["
+             << E->LoopCounter->getName() << "]";
         if (E->RuntimeLoopLinearCoefficient) {
           OS << (E->RuntimeLoopSubtractsLinearCoefficient ? " - " : " + ");
           emitPrimal(E->RuntimeLoopLinearCoefficient);

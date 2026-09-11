@@ -499,6 +499,19 @@ private:
     return true;
   }
 
+  unsigned getTargetPower(const Expr *Expression,
+                          const ParmVarDecl *Target) const {
+    Expression = Expression->IgnoreParenImpCasts();
+    if (const auto *Ref = dyn_cast<DeclRefExpr>(Expression))
+      return Ref->getDecl() == Target ? 1 : 0;
+    const auto *Product = dyn_cast<BinaryOperator>(Expression);
+    if (!Product || Product->getOpcode() != BO_Mul)
+      return 0;
+    unsigned Left = getTargetPower(Product->getLHS(), Target);
+    unsigned Right = getTargetPower(Product->getRHS(), Target);
+    return Left && Right ? Left + Right : 0;
+  }
+
   bool buildActiveRuntimeFor(const ForStmt *FS) {
     const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
     const auto *Counter = Init && Init->isSingleDecl()
@@ -558,6 +571,7 @@ private:
     const Expr *QuadraticCoefficientExpr = nullptr;
     const Expr *LinearCoefficientExpr = nullptr;
     bool SubtractsLinearCoefficient = false;
+    unsigned PolynomialDegree = 2;
     if (Factor->Value.Activity == ADActivity::Active) {
       const auto *FactorRef =
           dyn_cast<DeclRefExpr>(Update->getRHS()->IgnoreParenImpCasts());
@@ -568,12 +582,6 @@ private:
             dyn_cast<DeclRefExpr>(Expression->IgnoreParenImpCasts());
         return Ref && Ref->getDecl() == Target;
       };
-      auto IsSelfProduct = [&IsTargetRef](const Expr *Expression) {
-        const auto *Product =
-            dyn_cast<BinaryOperator>(Expression->IgnoreParenImpCasts());
-        return Product && Product->getOpcode() == BO_Mul &&
-               IsTargetRef(Product->getLHS()) && IsTargetRef(Product->getRHS());
-      };
       if (Update->getOpcode() == BO_Assign) {
         const Expr *RHS = Update->getRHS()->IgnoreParenImpCasts();
         const Expr *Core = RHS;
@@ -582,30 +590,35 @@ private:
               !referencesActiveValue(Outer->getRHS()))
             Core = Outer->getLHS()->IgnoreParenImpCasts();
         }
-        auto MatchQuadraticTerm = [&](const Expr *Expression) {
-          if (IsSelfProduct(Expression))
+        auto MatchPolynomialTerm = [&](const Expr *Expression) {
+          unsigned Degree = getTargetPower(Expression, Target);
+          if (Degree >= 2) {
+            PolynomialDegree = Degree;
             return true;
+          }
           const auto *Product =
               dyn_cast<BinaryOperator>(Expression->IgnoreParenImpCasts());
           if (!Product || Product->getOpcode() != BO_Mul)
             return false;
-          if (IsSelfProduct(Product->getLHS()) &&
-              !referencesActiveValue(Product->getRHS())) {
+          Degree = getTargetPower(Product->getLHS(), Target);
+          if (Degree >= 2 && !referencesActiveValue(Product->getRHS())) {
             QuadraticCoefficientExpr = Product->getRHS();
+            PolynomialDegree = Degree;
             return true;
           }
-          if (IsSelfProduct(Product->getRHS()) &&
-              !referencesActiveValue(Product->getLHS())) {
+          Degree = getTargetPower(Product->getRHS(), Target);
+          if (Degree >= 2 && !referencesActiveValue(Product->getLHS())) {
             QuadraticCoefficientExpr = Product->getLHS();
+            PolynomialDegree = Degree;
             return true;
           }
           return false;
         };
-        UsesPrimalTape = MatchQuadraticTerm(Core);
+        UsesPrimalTape = MatchPolynomialTerm(Core);
         if (const auto *Polynomial = dyn_cast<BinaryOperator>(Core)) {
           if ((Polynomial->getOpcode() == BO_Add ||
                Polynomial->getOpcode() == BO_Sub) &&
-              MatchQuadraticTerm(Polynomial->getLHS())) {
+              MatchPolynomialTerm(Polynomial->getLHS())) {
             const auto *Linear = dyn_cast<BinaryOperator>(
                 Polynomial->getRHS()->IgnoreParenImpCasts());
             if (Linear && Linear->getOpcode() == BO_Mul) {
@@ -656,6 +669,7 @@ private:
     Result->LoopCounter = Counter;
     Result->RuntimeLoopTapeSize = TapeSize;
     Result->RuntimeLoopUsesPrimalTape = UsesPrimalTape;
+    Result->RuntimeLoopPolynomialDegree = PolynomialDegree;
     if (QuadraticCoefficientExpr) {
       Result->RuntimeLoopQuadraticCoefficient =
           buildExpr(QuadraticCoefficientExpr, /*ForceInactive=*/true);

@@ -67,6 +67,7 @@ struct ADExpr {
   const clang::VarDecl *LoopCounter = nullptr;
   unsigned RuntimeLoopTapeSize = 0;
   bool RuntimeLoopUsesPrimalTape = false;
+  unsigned RuntimeLoopPolynomialDegree = 2;
   const ADExpr *RuntimeLoopQuadraticCoefficient = nullptr;
   const ADExpr *RuntimeLoopLinearCoefficient = nullptr;
   bool RuntimeLoopSubtractsLinearCoefficient = false;
