@@ -67,6 +67,9 @@ struct ADExpr {
   const clang::VarDecl *LoopCounter = nullptr;
   unsigned RuntimeLoopTapeSize = 0;
   bool RuntimeLoopUsesPrimalTape = false;
+  const ADExpr *RuntimeLoopQuadraticCoefficient = nullptr;
+  const ADExpr *RuntimeLoopLinearCoefficient = nullptr;
+  bool RuntimeLoopSubtractsLinearCoefficient = false;
   const ADExpr *Receiver = nullptr;
   clang::UnaryOperatorKind UnaryOpcode = clang::UO_Plus;
   clang::BinaryOperatorKind BinaryOpcode = clang::BO_Add;

@@ -555,6 +555,9 @@ private:
 
     bool UsesPrimalTape = false;
     unsigned TapeSize = 0;
+    const Expr *QuadraticCoefficientExpr = nullptr;
+    const Expr *LinearCoefficientExpr = nullptr;
+    bool SubtractsLinearCoefficient = false;
     if (Factor->Value.Activity == ADActivity::Active) {
       const auto *FactorRef =
           dyn_cast<DeclRefExpr>(Update->getRHS()->IgnoreParenImpCasts());
@@ -573,12 +576,50 @@ private:
       };
       if (Update->getOpcode() == BO_Assign) {
         const Expr *RHS = Update->getRHS()->IgnoreParenImpCasts();
-        UsesPrimalTape = IsSelfProduct(RHS);
-        if (const auto *Outer = dyn_cast<BinaryOperator>(RHS)) {
+        const Expr *Core = RHS;
+        if (const auto *Outer = dyn_cast<BinaryOperator>(Core)) {
           if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
-              IsSelfProduct(Outer->getLHS()) &&
               !referencesActiveValue(Outer->getRHS()))
-            UsesPrimalTape = true;
+            Core = Outer->getLHS()->IgnoreParenImpCasts();
+        }
+        auto MatchQuadraticTerm = [&](const Expr *Expression) {
+          if (IsSelfProduct(Expression))
+            return true;
+          const auto *Product =
+              dyn_cast<BinaryOperator>(Expression->IgnoreParenImpCasts());
+          if (!Product || Product->getOpcode() != BO_Mul)
+            return false;
+          if (IsSelfProduct(Product->getLHS()) &&
+              !referencesActiveValue(Product->getRHS())) {
+            QuadraticCoefficientExpr = Product->getRHS();
+            return true;
+          }
+          if (IsSelfProduct(Product->getRHS()) &&
+              !referencesActiveValue(Product->getLHS())) {
+            QuadraticCoefficientExpr = Product->getLHS();
+            return true;
+          }
+          return false;
+        };
+        UsesPrimalTape = MatchQuadraticTerm(Core);
+        if (const auto *Polynomial = dyn_cast<BinaryOperator>(Core)) {
+          if ((Polynomial->getOpcode() == BO_Add ||
+               Polynomial->getOpcode() == BO_Sub) &&
+              MatchQuadraticTerm(Polynomial->getLHS())) {
+            const auto *Linear = dyn_cast<BinaryOperator>(
+                Polynomial->getRHS()->IgnoreParenImpCasts());
+            if (Linear && Linear->getOpcode() == BO_Mul) {
+              if (IsTargetRef(Linear->getLHS()) &&
+                  !referencesActiveValue(Linear->getRHS()))
+                LinearCoefficientExpr = Linear->getRHS();
+              else if (IsTargetRef(Linear->getRHS()) &&
+                       !referencesActiveValue(Linear->getLHS()))
+                LinearCoefficientExpr = Linear->getLHS();
+            }
+            SubtractsLinearCoefficient =
+                LinearCoefficientExpr && Polynomial->getOpcode() == BO_Sub;
+          }
+          UsesPrimalTape |= LinearCoefficientExpr != nullptr;
         }
       }
       const auto *BoundCall =
@@ -615,6 +656,19 @@ private:
     Result->LoopCounter = Counter;
     Result->RuntimeLoopTapeSize = TapeSize;
     Result->RuntimeLoopUsesPrimalTape = UsesPrimalTape;
+    if (QuadraticCoefficientExpr) {
+      Result->RuntimeLoopQuadraticCoefficient =
+          buildExpr(QuadraticCoefficientExpr, /*ForceInactive=*/true);
+      if (!Result->RuntimeLoopQuadraticCoefficient)
+        return false;
+    }
+    if (LinearCoefficientExpr) {
+      Result->RuntimeLoopLinearCoefficient =
+          buildExpr(LinearCoefficientExpr, /*ForceInactive=*/true);
+      if (!Result->RuntimeLoopLinearCoefficient)
+        return false;
+    }
+    Result->RuntimeLoopSubtractsLinearCoefficient = SubtractsLinearCoefficient;
     switch (Update->getOpcode()) {
     case BO_Assign:
       Result->BinaryOpcode = BO_Assign;
