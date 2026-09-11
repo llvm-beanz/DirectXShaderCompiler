@@ -533,11 +533,12 @@ private:
       Body = *Compound->body_begin();
     }
     const auto *Update = dyn_cast<BinaryOperator>(Body);
-    if (!Update || (Update->getOpcode() != BO_AddAssign &&
+    if (!Update || (Update->getOpcode() != BO_Assign &&
+                    Update->getOpcode() != BO_AddAssign &&
                     Update->getOpcode() != BO_SubAssign &&
                     Update->getOpcode() != BO_MulAssign &&
                     Update->getOpcode() != BO_DivAssign))
-      return fail("active runtime loop requires +=, -=, *=, or /= update");
+      return fail("active runtime loop requires =, +=, -=, *=, or /= update");
     const auto *TargetRef =
         dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
     const auto *Target =
@@ -559,6 +560,27 @@ private:
           dyn_cast<DeclRefExpr>(Update->getRHS()->IgnoreParenImpCasts());
       UsesPrimalTape = Update->getOpcode() == BO_MulAssign && FactorRef &&
                        FactorRef->getDecl() == Target;
+      auto IsTargetRef = [Target](const Expr *Expression) {
+        const auto *Ref =
+            dyn_cast<DeclRefExpr>(Expression->IgnoreParenImpCasts());
+        return Ref && Ref->getDecl() == Target;
+      };
+      auto IsSelfProduct = [&IsTargetRef](const Expr *Expression) {
+        const auto *Product =
+            dyn_cast<BinaryOperator>(Expression->IgnoreParenImpCasts());
+        return Product && Product->getOpcode() == BO_Mul &&
+               IsTargetRef(Product->getLHS()) && IsTargetRef(Product->getRHS());
+      };
+      if (Update->getOpcode() == BO_Assign) {
+        const Expr *RHS = Update->getRHS()->IgnoreParenImpCasts();
+        UsesPrimalTape = IsSelfProduct(RHS);
+        if (const auto *Outer = dyn_cast<BinaryOperator>(RHS)) {
+          if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
+              IsSelfProduct(Outer->getLHS()) &&
+              !referencesActiveValue(Outer->getRHS()))
+            UsesPrimalTape = true;
+        }
+      }
       const auto *BoundCall =
           dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts());
       if (UsesPrimalTape && BoundCall && BoundCall->getDirectCallee() &&
@@ -594,6 +616,9 @@ private:
     Result->RuntimeLoopTapeSize = TapeSize;
     Result->RuntimeLoopUsesPrimalTape = UsesPrimalTape;
     switch (Update->getOpcode()) {
+    case BO_Assign:
+      Result->BinaryOpcode = BO_Assign;
+      break;
     case BO_AddAssign:
       Result->BinaryOpcode = BO_Add;
       break;

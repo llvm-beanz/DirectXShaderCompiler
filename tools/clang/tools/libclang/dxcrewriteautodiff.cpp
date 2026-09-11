@@ -1327,6 +1327,9 @@ public:
              << "] = " << S.Value->SourceDecl->getName() << ".value;\n    ";
         OS << "\n        " << S.Value->SourceDecl->getName() << ".value ";
         switch (S.Value->BinaryOpcode) {
+        case BO_Assign:
+          OS << "= ";
+          break;
         case BO_Add:
           OS << "+= ";
           break;
