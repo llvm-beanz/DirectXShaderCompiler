@@ -251,7 +251,7 @@ private:
         fail("functional cast without initializer list in typed auto-diff IR");
         return nullptr;
       }
-      ADExpr *Node = createExpr(ADExpr::Kind::VectorConstruct, E);
+      ADExpr *Node = createExpr(ADExpr::Kind::AggregateConstruct, E);
       for (unsigned I = 0; I < ILE->getNumInits(); ++I) {
         const ADExpr *Operand = buildExpr(ILE->getInit(I), ForceInactive);
         if (!Operand)
@@ -379,6 +379,79 @@ private:
     return nullptr;
   }
 
+  bool referencesDecl(const Stmt *S, const ValueDecl *Decl) const {
+    if (!S)
+      return false;
+    if (const auto *DRE = dyn_cast<DeclRefExpr>(S))
+      if (getCanonicalValueDecl(DRE->getDecl()) == Decl)
+        return true;
+    for (const Stmt *Child : S->children())
+      if (referencesDecl(Child, Decl))
+        return true;
+    return false;
+  }
+
+  bool containsDeclaration(const Stmt *S) const {
+    if (!S)
+      return false;
+    if (isa<DeclStmt>(S))
+      return true;
+    for (const Stmt *Child : S->children())
+      if (containsDeclaration(Child))
+        return true;
+    return false;
+  }
+
+  bool buildStaticFor(const ForStmt *FS, bool ForceInactive) {
+    const auto *Init = dyn_cast_or_null<DeclStmt>(FS->getInit());
+    if (!Init || !Init->isSingleDecl())
+      return fail("for loop requires one induction variable");
+    const auto *Counter = dyn_cast<VarDecl>(Init->getSingleDecl());
+    const auto *Initial = Counter && Counter->getInit()
+                              ? dyn_cast<IntegerLiteral>(
+                                    Counter->getInit()->IgnoreParenImpCasts())
+                              : nullptr;
+    const auto *Condition = dyn_cast_or_null<BinaryOperator>(FS->getCond());
+    const auto *ConditionCounter =
+        Condition
+            ? dyn_cast<DeclRefExpr>(Condition->getLHS()->IgnoreParenImpCasts())
+            : nullptr;
+    const auto *Bound = Condition
+                            ? dyn_cast<IntegerLiteral>(
+                                  Condition->getRHS()->IgnoreParenImpCasts())
+                            : nullptr;
+    const auto *Increment = dyn_cast_or_null<UnaryOperator>(FS->getInc());
+    const auto *IncrementCounter =
+        Increment ? dyn_cast<DeclRefExpr>(
+                        Increment->getSubExpr()->IgnoreParenImpCasts())
+                  : nullptr;
+    const ValueDecl *CanonicalCounter = getCanonicalValueDecl(Counter);
+    if (!Initial || !Condition || Condition->getOpcode() != BO_LT || !Bound ||
+        !Increment ||
+        (Increment->getOpcode() != UO_PreInc &&
+         Increment->getOpcode() != UO_PostInc) ||
+        !ConditionCounter || !IncrementCounter ||
+        getCanonicalValueDecl(ConditionCounter->getDecl()) !=
+            CanonicalCounter ||
+        getCanonicalValueDecl(IncrementCounter->getDecl()) != CanonicalCounter)
+      return fail("for loop is not a canonical constant-bound loop");
+
+    uint64_t InitialValue = Initial->getValue().getLimitedValue(65);
+    uint64_t BoundValue = Bound->getValue().getLimitedValue(65);
+    if (InitialValue > BoundValue || BoundValue - InitialValue > 64)
+      return fail("for loop exceeds the static unroll limit");
+    if (referencesDecl(FS->getBody(), CanonicalCounter))
+      return fail("statically unrolled loop body references its induction "
+                  "variable");
+    if (containsDeclaration(FS->getBody()))
+      return fail("statically unrolled loop body contains a declaration");
+
+    for (uint64_t Iteration = InitialValue; Iteration < BoundValue; ++Iteration)
+      if (!buildStmt(FS->getBody(), ForceInactive))
+        return false;
+    return true;
+  }
+
   bool buildStmt(const Stmt *S, bool ForceInactive = false) {
     if (const auto *AS = dyn_cast<AttributedStmt>(S)) {
       bool IsNoDiff = false;
@@ -412,6 +485,9 @@ private:
       Plan.Statements.push_back({ADStmt::Kind::Return, nullptr, Value});
       return true;
     }
+
+    if (const auto *FS = dyn_cast<ForStmt>(S))
+      return buildStaticFor(FS, ForceInactive);
 
     if (const auto *IS = dyn_cast<IfStmt>(S)) {
       if (IS->getConditionVariable())

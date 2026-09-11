@@ -45,7 +45,7 @@ struct ADExpr {
     Member,
     Swizzle,
     Subscript,
-    VectorConstruct,
+    AggregateConstruct,
     Cast,
     Unary,
     Binary,

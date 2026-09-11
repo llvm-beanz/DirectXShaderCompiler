@@ -50,6 +50,12 @@ std::string printType(QualType Type, const PrintingPolicy &Policy) {
 unsigned getComponentCount(QualType Type) {
   if (hlsl::IsHLSLVecType(Type))
     return hlsl::GetHLSLVecSize(Type);
+  if (hlsl::IsHLSLMatType(Type)) {
+    uint32_t Rows = 0;
+    uint32_t Columns = 0;
+    hlsl::GetHLSLMatRowColCount(Type, Rows, Columns);
+    return Rows * Columns;
+  }
   if (const auto *Vector =
           dyn_cast<VectorType>(Type.getCanonicalType().getTypePtr()))
     return Vector->getNumElements();
@@ -1011,7 +1017,7 @@ private:
       emitPrimalExpr(E->Operands[1]);
       OS << "]";
       return;
-    case ExprKind::VectorConstruct:
+    case ExprKind::AggregateConstruct:
       E->Value.PrimalType.print(OS, Policy);
       OS << "(";
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
@@ -1101,7 +1107,7 @@ private:
       return;
     case ExprKind::Swizzle:
     case ExprKind::Subscript:
-    case ExprKind::VectorConstruct:
+    case ExprKind::AggregateConstruct:
       markNonDifferentiable(
           "vector construction or swizzle requires direct reverse lowering");
       emitPrimalExpr(E);
@@ -1261,7 +1267,7 @@ private:
              supports(E->Operands[0]);
     case Kind::Cast:
       return supports(E->Operands.front());
-    case Kind::VectorConstruct:
+    case Kind::AggregateConstruct:
     case Kind::Unary:
     case Kind::Binary:
     case Kind::Conditional:
@@ -1314,7 +1320,7 @@ private:
       emitPrimal(E->Operands[1], Out);
       Out << "]";
       return;
-    case Kind::VectorConstruct:
+    case Kind::AggregateConstruct:
       E->Value.PrimalType.print(Out, Policy);
       Out << "(";
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
@@ -1371,7 +1377,17 @@ private:
   }
 
   std::string component(StringRef Cotangent, unsigned Index,
-                        unsigned Count) const {
+                        QualType Type) const {
+    if (hlsl::IsHLSLMatType(Type)) {
+      uint32_t Rows = 0;
+      uint32_t Columns = 0;
+      hlsl::GetHLSLMatRowColCount(Type, Rows, Columns);
+      assert(Index < Rows * Columns && "matrix component index out of range");
+      return (Cotangent + "[" + Twine(Index / Columns) + "][" +
+              Twine(Index % Columns) + "]")
+          .str();
+    }
+    unsigned Count = getComponentCount(Type);
     if (Count == 1)
       return Cotangent.str();
     return (Cotangent + "." + Twine(getComponentName(Index))).str();
@@ -1417,7 +1433,7 @@ private:
         for (unsigned I = 0; I < ResultCount; ++I) {
           if (E->Components[I] != BaseIndex)
             continue;
-          std::string Term = component(Cotangent, I, ResultCount);
+          std::string Term = component(Cotangent, I, E->Value.PrimalType);
           Sum = Sum.empty() ? Term : "(" + Sum + " + " + Term + ")";
         }
         Values.push_back(Sum.empty() ? "0.0f" : Sum);
@@ -1428,23 +1444,35 @@ private:
     }
     case Kind::Subscript: {
       const hlsl::autodiff::ADExpr *Base = E->Operands[0];
-      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
       std::string Index = primalText(E->Operands[1]);
       SmallVector<std::string, 4> Values;
+      if (hlsl::IsHLSLMatType(Base->Value.PrimalType)) {
+        uint32_t Rows = 0;
+        uint32_t Columns = 0;
+        hlsl::GetHLSLMatRowColCount(Base->Value.PrimalType, Rows, Columns);
+        for (unsigned Row = 0; Row < Rows; ++Row)
+          for (unsigned Column = 0; Column < Columns; ++Column)
+            Values.push_back("(" + Index + " == " + Twine(Row).str() + " ? " +
+                             component(Cotangent, Column, E->Value.PrimalType) +
+                             " : 0.0f)");
+        emitAdjoint(Base, constructCotangent(Base->Value.PrimalType, Values));
+        return;
+      }
+      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
       for (unsigned I = 0; I < BaseCount; ++I)
         Values.push_back("(" + Index + " == " + Twine(I).str() + " ? " +
                          Cotangent.str() + " : 0.0f)");
       emitAdjoint(Base, constructCotangent(Base->Value.PrimalType, Values));
       return;
     }
-    case Kind::VectorConstruct: {
-      unsigned ResultCount = getComponentCount(E->Value.PrimalType);
+    case Kind::AggregateConstruct: {
       unsigned Offset = 0;
       for (const hlsl::autodiff::ADExpr *Operand : E->Operands) {
         unsigned OperandCount = getComponentCount(Operand->Value.PrimalType);
         SmallVector<std::string, 4> Values;
         for (unsigned I = 0; I < OperandCount; ++I)
-          Values.push_back(component(Cotangent, Offset + I, ResultCount));
+          Values.push_back(
+              component(Cotangent, Offset + I, E->Value.PrimalType));
         std::string Routed =
             constructCotangent(Operand->Value.PrimalType, Values);
         emitAdjoint(Operand, Routed);
@@ -1961,7 +1989,7 @@ void printDeclWithSubstitutions(
     }
   }
   D->print(OS, Policy);
-  if (isa<TagDecl>(D))
+  if (isa<TagDecl>(D) || isa<VarDecl>(D))
     OS << ";";
   OS << "\n";
 }
