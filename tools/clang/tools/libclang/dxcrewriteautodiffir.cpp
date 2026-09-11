@@ -635,8 +635,32 @@ private:
         return false;
     }
     const ADExpr *LastFactor = buildExpr(Updates.back()->getRHS());
-    if (!LastFactor || LastFactor->Value.Activity == ADActivity::Active)
+    if (!LastFactor)
       return false;
+    bool LastUsesPrimalTape = false;
+    unsigned TapeSize = 0;
+    if (LastFactor->Value.Activity == ADActivity::Active) {
+      const auto *FactorRef = dyn_cast<DeclRefExpr>(
+          Updates.back()->getRHS()->IgnoreParenImpCasts());
+      if (Updates.back()->getOpcode() != BO_MulAssign || !FactorRef ||
+          FactorRef->getDecl() != Targets.back())
+        return false;
+      const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
+      const auto *BoundCall =
+          Condition
+              ? dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts())
+              : nullptr;
+      if (BoundCall && BoundCall->getDirectCallee() &&
+          BoundCall->getDirectCallee()->getName() == "min")
+        for (const Expr *Argument : BoundCall->arguments())
+          if (const auto *Limit =
+                  dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
+            TapeSize = Limit->getValue().getLimitedValue(1025);
+      if (TapeSize == 0 || TapeSize > 1024)
+        return fail("active nonlinear runtime chain requires a min(count, N) "
+                    "bound with N between 1 and 1024");
+      LastUsesPrimalTape = true;
+    }
 
     SmallVector<const ADBinding *, 4> Before;
     for (unsigned I = 0; I < Targets.size(); ++I) {
@@ -686,6 +710,10 @@ private:
       Result->Operands.push_back(Factor);
       Result->Value.Activity = ADActivity::Active;
       Result->Value.PrimalType = Targets[I]->getType();
+      if (I + 1 == Targets.size() && LastUsesPrimalTape) {
+        Result->RuntimeLoopUsesPrimalTape = true;
+        Result->RuntimeLoopTapeSize = TapeSize;
+      }
       Results.push_back(Result);
     }
     for (unsigned I = 0; I < Results.size(); ++I) {

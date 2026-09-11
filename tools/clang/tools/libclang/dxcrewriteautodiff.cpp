@@ -1432,8 +1432,9 @@ private:
         for (const hlsl::autodiff::ADExpr *Result : E->RuntimeLoopLinearGroup)
           if (!supports(Result->Operands[0]))
             return false;
-        return E->RuntimeLoopLinearGroup.back()->Operands[2]->Value.Activity ==
-               Activity::Inactive;
+        const hlsl::autodiff::ADExpr *Last = E->RuntimeLoopLinearGroup.back();
+        return Last->Operands[2]->Value.Activity == Activity::Inactive ||
+               Last->RuntimeLoopUsesPrimalTape;
       }
       if (E->RuntimeLoopCoupledPeer) {
         const hlsl::autodiff::ADExpr *Primary =
@@ -1856,7 +1857,13 @@ private:
         emitPrimal(E->Operands[1]);
         OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
            << "        --" << E->LoopCounter->getName() << ";\n";
-        if (Last->BinaryOpcode == BO_Mul || Last->BinaryOpcode == BO_Div) {
+        if (Last->RuntimeLoopUsesPrimalTape) {
+          unsigned LastLoopID = RuntimeLoopIDs.lookup(Last);
+          OS << "        " << Adjoints.back() << " *= (2 * __dxc_ad_loop_"
+             << LastLoopID << "_primal_tape[" << E->LoopCounter->getName()
+             << "]);\n";
+        } else if (Last->BinaryOpcode == BO_Mul ||
+                   Last->BinaryOpcode == BO_Div) {
           OS << "        " << Adjoints.back()
              << (Last->BinaryOpcode == BO_Mul ? " *= " : " /= ");
           emitPrimal(Last->Operands[2]);
