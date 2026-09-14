@@ -5,13 +5,15 @@
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
 // An assignment-form interior product preserves its full affine RHS while its
-// product core uses the same taped two-input Jacobian as a compound update.
+// generic local pullback reads both inputs from the structured loop tapes.
 
 // CHECK: __dxc_ad_loop_0_primal_tape[iteration] = x.value;
 // CHECK: x.value = ((x.value * y.value) + bias);
 // CHECK: __dxc_ad_loop_1_primal_tape[iteration] = y.value;
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += __dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_0_state_0_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint *= __dxc_ad_loop_1_primal_tape[iteration];
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_1_primal_tape[iteration]);
+// CHECK: __dxc_ad_loop_0_state_1_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_0_primal_tape[iteration]);
 
 // Starting at (2,3,4), two iterations produce (50,15,16), returning 81.
 // With seed 2, reverse Jacobian replay produces gradients (42,44,28).

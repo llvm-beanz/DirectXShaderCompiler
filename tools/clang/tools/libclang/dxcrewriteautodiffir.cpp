@@ -187,6 +187,40 @@ private:
       collectLoopPullbackInputs(Operand, Inputs);
   }
 
+  void markLoopPullbackPrimalInputs(
+      const ADExpr *Expression,
+      SmallVectorImpl<ADLoopPullbackInput> &Inputs) const {
+    if (Expression->K == ADExpr::Kind::LoopStateRef) {
+      for (ADLoopPullbackInput &Input : Inputs)
+        if (Input.StateIndex == Expression->LoopStateIndex &&
+            Input.Version == Expression->LoopStateVersion) {
+          Input.NeedsPrimal = true;
+          return;
+        }
+      llvm_unreachable("loop pullback primal input was not collected");
+    }
+    if (Expression->Receiver)
+      markLoopPullbackPrimalInputs(Expression->Receiver, Inputs);
+    for (const ADExpr *Operand : Expression->Operands)
+      markLoopPullbackPrimalInputs(Operand, Inputs);
+  }
+
+  void analyzeLoopPullbackPrimalInputs(
+      const ADExpr *Expression,
+      SmallVectorImpl<ADLoopPullbackInput> &Inputs) const {
+    if (Expression->K == ADExpr::Kind::Binary &&
+        Expression->BinaryOpcode == BO_Mul &&
+        Expression->Operands[0]->Value.Activity == ADActivity::Active &&
+        Expression->Operands[1]->Value.Activity == ADActivity::Active) {
+      markLoopPullbackPrimalInputs(Expression->Operands[0], Inputs);
+      markLoopPullbackPrimalInputs(Expression->Operands[1], Inputs);
+    }
+    if (Expression->Receiver)
+      analyzeLoopPullbackPrimalInputs(Expression->Receiver, Inputs);
+    for (const ADExpr *Operand : Expression->Operands)
+      analyzeLoopPullbackPrimalInputs(Operand, Inputs);
+  }
+
   const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
                                    const ADExpr *TripCount,
                                    ArrayRef<const ADExpr *> Results) {
@@ -221,6 +255,7 @@ private:
       Update.ResultVersion = ++Versions[I];
       Update.Pullback.Value = Update.Value;
       collectLoopPullbackInputs(Update.Value, Update.Pullback.Inputs);
+      analyzeLoopPullbackPrimalInputs(Update.Value, Update.Pullback.Inputs);
       Loop->Updates.push_back(Update);
     }
     for (unsigned I = 0; I < Loop->States.size(); ++I)

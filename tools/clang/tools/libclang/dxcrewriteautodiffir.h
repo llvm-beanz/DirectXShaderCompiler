@@ -119,6 +119,7 @@ struct ADLoopState {
 struct ADLoopPullbackInput {
   unsigned StateIndex = 0;
   unsigned Version = 0;
+  bool NeedsPrimal = false;
 };
 
 struct ADLoopPullback {
