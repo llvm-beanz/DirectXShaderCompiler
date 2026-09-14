@@ -124,6 +124,36 @@ private:
     return Result;
   }
 
+  const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
+                                   const ADExpr *TripCount,
+                                   ArrayRef<const ADExpr *> Results) {
+    std::unique_ptr<ADLoopPlan> Loop(new ADLoopPlan());
+    Loop->Source = FS;
+    Loop->Counter = Counter;
+    Loop->TripCount = TripCount;
+    for (unsigned I = 0; I < Results.size(); ++I) {
+      const ADExpr *Result = Results[I];
+      ADLoopState State;
+      State.SourceDecl = cast<VarDecl>(Result->SourceDecl);
+      State.PrimalType = Result->Value.PrimalType;
+      State.InitialValue = Result->Operands[0];
+      State.Result = Result;
+      State.NeedsPrimalTape = Result->RuntimeLoopUsesPrimalTape;
+      Loop->States.push_back(State);
+
+      ADLoopUpdate Update;
+      Update.TargetStateIndex = I;
+      Update.Opcode = Result->BinaryOpcode;
+      Update.Value = Result->Operands[2];
+      Loop->Updates.push_back(Update);
+      if (Result->RuntimeLoopTapeSize > Loop->TapeCapacity)
+        Loop->TapeCapacity = Result->RuntimeLoopTapeSize;
+    }
+    const ADLoopPlan *Result = Loop.get();
+    Plan.Loops.push_back(std::move(Loop));
+    return Result;
+  }
+
   const ADExpr *createLocalRef(const Expr *Source, const ADBinding *Binding,
                                bool ForceInactive) {
     ADExpr *Node = createExpr(ADExpr::Kind::LocalRef, Source);
@@ -590,6 +620,7 @@ private:
     }
     ADStmt Statement{ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS};
     Statement.Values = Results;
+    Statement.Loop = createLoopPlan(FS, Counter, Count, Results);
     Plan.Statements.push_back(std::move(Statement));
     return true;
   }
@@ -924,6 +955,7 @@ private:
     }
     ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS);
     Statement.Values = Results;
+    Statement.Loop = createLoopPlan(FS, Counter, Count, Results);
     Plan.Statements.push_back(std::move(Statement));
     return true;
   }
@@ -1107,6 +1139,7 @@ private:
     ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, FirstResult, FS);
     Statement.Values.push_back(FirstResult);
     Statement.Values.push_back(SecondResult);
+    Statement.Loop = createLoopPlan(FS, Counter, Count, Statement.Values);
     Plan.Statements.push_back(std::move(Statement));
     return true;
   }
@@ -1319,7 +1352,10 @@ private:
 
     const ADBinding *After = createBinding(Target, Before->Version + 1, Result);
     CurrentBindings[CanonicalTarget] = After;
-    Plan.Statements.push_back({ADStmt::Kind::ActiveLoop, After, Result, FS});
+    ADStmt Statement(ADStmt::Kind::ActiveLoop, After, Result, FS);
+    Statement.Values.push_back(Result);
+    Statement.Loop = createLoopPlan(FS, Counter, Count, Statement.Values);
+    Plan.Statements.push_back(std::move(Statement));
     return true;
   }
 

@@ -1311,37 +1311,36 @@ public:
         S.SourceStmt->printPretty(OS, nullptr, Policy);
         OS << "\n";
       } else if (S.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
-        SmallVector<const hlsl::autodiff::ADExpr *, 4> Results = S.Values;
-        if (Results.empty())
-          Results.push_back(S.Value);
+        assert(S.Loop && "active loop has no structured loop plan");
+        const hlsl::autodiff::ADLoopPlan &Loop = *S.Loop;
         SmallVector<unsigned, 4> LoopIDs;
-        bool NeedsBraces = Results.size() > 1;
-        for (const hlsl::autodiff::ADExpr *LoopResult : Results) {
+        bool NeedsBraces = Loop.States.size() > 1;
+        for (const hlsl::autodiff::ADLoopState &State : Loop.States) {
           unsigned LoopID = NextLoopID++;
           LoopIDs.push_back(LoopID);
-          RuntimeLoopIDs[LoopResult] = LoopID;
-          NeedsBraces |= LoopResult->RuntimeLoopUsesPrimalTape;
-          if (LoopResult->RuntimeLoopUsesPrimalTape)
-            OS << "    " << printType(LoopResult->Value.PrimalType, Policy)
+          RuntimeLoopIDs[State.Result] = LoopID;
+          NeedsBraces |= State.NeedsPrimalTape;
+          if (State.NeedsPrimalTape)
+            OS << "    " << printType(State.PrimalType, Policy)
                << " __dxc_ad_loop_" << LoopID << "_primal_tape["
-               << LoopResult->RuntimeLoopTapeSize << "];\n";
+               << Loop.TapeCapacity << "];\n";
         }
-        const hlsl::autodiff::ADExpr *FirstResult = Results.front();
-        OS << "    for (uint " << FirstResult->LoopCounter->getName()
-           << " = 0; " << FirstResult->LoopCounter->getName() << " < ";
-        emitPrimal(FirstResult->Operands[1]);
-        OS << "; ++" << FirstResult->LoopCounter->getName() << ")";
+        OS << "    for (uint " << Loop.Counter->getName() << " = 0; "
+           << Loop.Counter->getName() << " < ";
+        emitPrimal(Loop.TripCount);
+        OS << "; ++" << Loop.Counter->getName() << ")";
         OS << (NeedsBraces ? " {\n" : "\n");
-        for (unsigned I = 0; I < Results.size(); ++I) {
-          const hlsl::autodiff::ADExpr *LoopResult = Results[I];
-          unsigned LoopID = LoopIDs[I];
-          if (LoopResult->RuntimeLoopUsesPrimalTape)
+        for (const hlsl::autodiff::ADLoopUpdate &Update : Loop.Updates) {
+          const hlsl::autodiff::ADLoopState &State =
+              Loop.States[Update.TargetStateIndex];
+          unsigned LoopID = LoopIDs[Update.TargetStateIndex];
+          if (State.NeedsPrimalTape)
             OS << "        __dxc_ad_loop_" << LoopID << "_primal_tape["
-               << LoopResult->LoopCounter->getName()
-               << "] = " << LoopResult->SourceDecl->getName() << ".value;\n";
+               << Loop.Counter->getName()
+               << "] = " << State.SourceDecl->getName() << ".value;\n";
           OS << (NeedsBraces ? "        " : "        ")
-             << LoopResult->SourceDecl->getName() << ".value ";
-          switch (LoopResult->BinaryOpcode) {
+             << State.SourceDecl->getName() << ".value ";
+          switch (Update.Opcode) {
           case BO_Assign:
             OS << "= ";
             break;
@@ -1360,7 +1359,7 @@ public:
           default:
             llvm_unreachable("validated active runtime loop operation");
           }
-          emitPrimal(LoopResult->Operands[2]);
+          emitPrimal(Update.Value);
           OS << ";\n";
         }
         if (NeedsBraces)

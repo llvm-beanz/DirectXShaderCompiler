@@ -104,6 +104,29 @@ struct ADBinding {
   const ADExpr *Value = nullptr;
 };
 
+struct ADLoopState {
+  const clang::VarDecl *SourceDecl = nullptr;
+  clang::QualType PrimalType;
+  const ADExpr *InitialValue = nullptr;
+  const ADExpr *Result = nullptr;
+  bool NeedsPrimalTape = false;
+};
+
+struct ADLoopUpdate {
+  unsigned TargetStateIndex = 0;
+  clang::BinaryOperatorKind Opcode = clang::BO_Assign;
+  const ADExpr *Value = nullptr;
+};
+
+struct ADLoopPlan {
+  const clang::ForStmt *Source = nullptr;
+  const clang::VarDecl *Counter = nullptr;
+  const ADExpr *TripCount = nullptr;
+  unsigned TapeCapacity = 0;
+  llvm::SmallVector<ADLoopState, 4> States;
+  llvm::SmallVector<ADLoopUpdate, 4> Updates;
+};
+
 struct ADStmt {
   enum class Kind {
     Declare,
@@ -124,6 +147,7 @@ struct ADStmt {
   const ADExpr *Value = nullptr;
   const clang::Stmt *SourceStmt = nullptr;
   llvm::SmallVector<const ADExpr *, 4> Values;
+  const ADLoopPlan *Loop = nullptr;
 };
 
 struct ADFunctionPlan {
@@ -131,6 +155,7 @@ struct ADFunctionPlan {
   clang::QualType ResultType;
   std::vector<std::unique_ptr<ADExpr>> Expressions;
   std::vector<std::unique_ptr<ADBinding>> Bindings;
+  std::vector<std::unique_ptr<ADLoopPlan>> Loops;
   std::vector<ADStmt> Statements;
   llvm::SmallVector<const clang::VarDecl *, 4> PrimalLocals;
 };
