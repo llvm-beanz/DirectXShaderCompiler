@@ -632,6 +632,10 @@ private:
                                                            nullptr);
     SmallVector<bool, 4> ProductSubtractsLinearCoefficient(Updates.size(),
                                                            false);
+    SmallVector<const Expr *, 4> ProductPeerLinearCoefficients(Updates.size(),
+                                                               nullptr);
+    SmallVector<bool, 4> ProductSubtractsPeerLinearCoefficient(Updates.size(),
+                                                               false);
     bool NeedsAnyPrimalTape = false;
     for (unsigned I = 0; I + 1 < Updates.size(); ++I) {
       const Expr *FactorExpr = Updates[I]->getRHS()->IgnoreParenImpCasts();
@@ -641,29 +645,39 @@ private:
               !referencesActiveValue(Outer->getRHS()))
             FactorExpr = Outer->getLHS()->IgnoreParenImpCasts();
         }
-        if (const auto *Polynomial = dyn_cast<BinaryOperator>(FactorExpr)) {
-          if (Polynomial->getOpcode() == BO_Add ||
-              Polynomial->getOpcode() == BO_Sub) {
-            const auto *Linear = dyn_cast<BinaryOperator>(
-                Polynomial->getRHS()->IgnoreParenImpCasts());
-            if (Linear && Linear->getOpcode() == BO_Mul) {
-              const auto *Left = dyn_cast<DeclRefExpr>(
-                  Linear->getLHS()->IgnoreParenImpCasts());
-              const auto *Right = dyn_cast<DeclRefExpr>(
-                  Linear->getRHS()->IgnoreParenImpCasts());
-              if (Left && Left->getDecl() == Targets[I] &&
-                  !referencesActiveValue(Linear->getRHS()))
-                ProductLinearCoefficients[I] = Linear->getRHS();
-              else if (Right && Right->getDecl() == Targets[I] &&
-                       !referencesActiveValue(Linear->getLHS()))
-                ProductLinearCoefficients[I] = Linear->getLHS();
-              if (ProductLinearCoefficients[I]) {
-                ProductSubtractsLinearCoefficient[I] =
-                    Polynomial->getOpcode() == BO_Sub;
-                FactorExpr = Polynomial->getLHS()->IgnoreParenImpCasts();
-              }
-            }
+        while (const auto *Polynomial = dyn_cast<BinaryOperator>(FactorExpr)) {
+          if (Polynomial->getOpcode() != BO_Add &&
+              Polynomial->getOpcode() != BO_Sub)
+            break;
+          const auto *Linear = dyn_cast<BinaryOperator>(
+              Polynomial->getRHS()->IgnoreParenImpCasts());
+          if (!Linear || Linear->getOpcode() != BO_Mul)
+            break;
+          const auto *Left =
+              dyn_cast<DeclRefExpr>(Linear->getLHS()->IgnoreParenImpCasts());
+          const auto *Right =
+              dyn_cast<DeclRefExpr>(Linear->getRHS()->IgnoreParenImpCasts());
+          const Expr *Coefficient = nullptr;
+          const ValueDecl *LinearTarget = nullptr;
+          if (Left && !referencesActiveValue(Linear->getRHS())) {
+            LinearTarget = Left->getDecl();
+            Coefficient = Linear->getRHS();
+          } else if (Right && !referencesActiveValue(Linear->getLHS())) {
+            LinearTarget = Right->getDecl();
+            Coefficient = Linear->getLHS();
           }
+          bool Subtracts = Polynomial->getOpcode() == BO_Sub;
+          if (LinearTarget == Targets[I] && !ProductLinearCoefficients[I]) {
+            ProductLinearCoefficients[I] = Coefficient;
+            ProductSubtractsLinearCoefficient[I] = Subtracts;
+          } else if (LinearTarget == Targets[I + 1] &&
+                     !ProductPeerLinearCoefficients[I]) {
+            ProductPeerLinearCoefficients[I] = Coefficient;
+            ProductSubtractsPeerLinearCoefficient[I] = Subtracts;
+          } else {
+            break;
+          }
+          FactorExpr = Polynomial->getLHS()->IgnoreParenImpCasts();
         }
         bool SawTarget = false;
         bool SawPeer = false;
@@ -815,6 +829,14 @@ private:
           return false;
         Result->RuntimeLoopSubtractsLinearCoefficient =
             ProductSubtractsLinearCoefficient[I];
+      }
+      if (ProductPeerLinearCoefficients[I]) {
+        Result->RuntimeLoopPeerLinearCoefficient =
+            buildExpr(ProductPeerLinearCoefficients[I], /*ForceInactive=*/true);
+        if (!Result->RuntimeLoopPeerLinearCoefficient)
+          return false;
+        Result->RuntimeLoopSubtractsPeerLinearCoefficient =
+            ProductSubtractsPeerLinearCoefficient[I];
       }
       if (NeedsPrimalTape[I]) {
         Result->RuntimeLoopUsesPrimalTape = true;

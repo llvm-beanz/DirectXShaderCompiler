@@ -1877,13 +1877,21 @@ private:
             unsigned PeerLoopID =
                 RuntimeLoopIDs.lookup(E->RuntimeLoopLinearGroup[I]);
             OS << "        " << Adjoints[I] << " += ";
+            if (Update->RuntimeLoopPeerLinearCoefficient)
+              OS << "(";
             if (Update->RuntimeLoopProductCoefficient) {
               emitPrimal(Update->RuntimeLoopProductCoefficient);
               OS << " * ";
             }
             OS << "__dxc_ad_loop_" << UpdateLoopID << "_primal_tape["
-               << E->LoopCounter->getName() << "] * " << Adjoints[I - 1]
-               << ";\n";
+               << E->LoopCounter->getName() << "]";
+            if (Update->RuntimeLoopPeerLinearCoefficient) {
+              OS << (Update->RuntimeLoopSubtractsPeerLinearCoefficient ? " - "
+                                                                       : " + ");
+              emitPrimal(Update->RuntimeLoopPeerLinearCoefficient);
+              OS << ")";
+            }
+            OS << " * " << Adjoints[I - 1] << ";\n";
             OS << "        " << Adjoints[I - 1] << " *= ";
             bool HasTargetSum = Update->RuntimeLoopProductCoefficient ||
                                 Update->RuntimeLoopLinearCoefficient;

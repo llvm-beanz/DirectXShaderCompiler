@@ -79,6 +79,8 @@ struct ADExpr {
   unsigned RuntimeLoopLinearGroupIndex = 0;
   bool RuntimeLoopProductUpdate = false;
   const ADExpr *RuntimeLoopProductCoefficient = nullptr;
+  const ADExpr *RuntimeLoopPeerLinearCoefficient = nullptr;
+  bool RuntimeLoopSubtractsPeerLinearCoefficient = false;
   const ADExpr *Receiver = nullptr;
   clang::UnaryOperatorKind UnaryOpcode = clang::UO_Plus;
   clang::BinaryOperatorKind BinaryOpcode = clang::BO_Add;
