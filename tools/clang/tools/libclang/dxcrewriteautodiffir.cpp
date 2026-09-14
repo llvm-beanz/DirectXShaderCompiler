@@ -124,6 +124,51 @@ private:
     return Result;
   }
 
+  const ADExpr *createLoopUpdateExpr(
+      const ADExpr *Expression,
+      const DenseMap<const ValueDecl *, unsigned> &StateIndices,
+      ArrayRef<unsigned> Versions) {
+    if ((Expression->K == ADExpr::Kind::DeclRef ||
+         Expression->K == ADExpr::Kind::LocalRef) &&
+        Expression->SourceDecl) {
+      auto It =
+          StateIndices.find(getCanonicalValueDecl(Expression->SourceDecl));
+      if (It != StateIndices.end()) {
+        ADExpr *StateRef =
+            createExpr(ADExpr::Kind::LoopStateRef, Expression->SourceExpr);
+        StateRef->Value = Expression->Value;
+        StateRef->SourceDecl = Expression->SourceDecl;
+        StateRef->LoopStateIndex = It->second;
+        StateRef->LoopStateVersion = Versions[It->second];
+        return StateRef;
+      }
+    }
+
+    bool Changed = false;
+    SmallVector<const ADExpr *, 4> Operands;
+    for (const ADExpr *Operand : Expression->Operands) {
+      const ADExpr *Rewritten =
+          createLoopUpdateExpr(Operand, StateIndices, Versions);
+      Operands.push_back(Rewritten);
+      Changed |= Rewritten != Operand;
+    }
+    const ADExpr *Receiver = Expression->Receiver;
+    if (Receiver) {
+      const ADExpr *Rewritten =
+          createLoopUpdateExpr(Receiver, StateIndices, Versions);
+      Changed |= Rewritten != Receiver;
+      Receiver = Rewritten;
+    }
+    if (!Changed)
+      return Expression;
+
+    ADExpr *Rewritten = createExpr(Expression->K, Expression->SourceExpr);
+    *Rewritten = *Expression;
+    Rewritten->Operands = Operands;
+    Rewritten->Receiver = Receiver;
+    return Rewritten;
+  }
+
   const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
                                    const ADExpr *TripCount,
                                    ArrayRef<const ADExpr *> Results) {
@@ -131,6 +176,7 @@ private:
     Loop->Source = FS;
     Loop->Counter = Counter;
     Loop->TripCount = TripCount;
+    DenseMap<const ValueDecl *, unsigned> StateIndices;
     for (unsigned I = 0; I < Results.size(); ++I) {
       const ADExpr *Result = Results[I];
       ADLoopState State;
@@ -140,15 +186,25 @@ private:
       State.Result = Result;
       State.NeedsPrimalTape = Result->RuntimeLoopUsesPrimalTape;
       Loop->States.push_back(State);
-
-      ADLoopUpdate Update;
-      Update.TargetStateIndex = I;
-      Update.Opcode = Result->BinaryOpcode;
-      Update.Value = Result->Operands[2];
-      Loop->Updates.push_back(Update);
+      StateIndices[getCanonicalValueDecl(State.SourceDecl)] = I;
       if (Result->RuntimeLoopTapeSize > Loop->TapeCapacity)
         Loop->TapeCapacity = Result->RuntimeLoopTapeSize;
     }
+
+    SmallVector<unsigned, 4> Versions(Results.size(), 0);
+    for (unsigned I = 0; I < Results.size(); ++I) {
+      const ADExpr *Result = Results[I];
+      ADLoopUpdate Update;
+      Update.TargetStateIndex = I;
+      Update.InputVersion = Versions[I];
+      Update.Opcode = Result->BinaryOpcode;
+      Update.Value =
+          createLoopUpdateExpr(Result->Operands[2], StateIndices, Versions);
+      Update.ResultVersion = ++Versions[I];
+      Loop->Updates.push_back(Update);
+    }
+    for (unsigned I = 0; I < Loop->States.size(); ++I)
+      Loop->States[I].FinalVersion = Versions[I];
     const ADLoopPlan *Result = Loop.get();
     Plan.Loops.push_back(std::move(Loop));
     return Result;

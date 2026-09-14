@@ -1409,6 +1409,8 @@ private:
       return isa<ParmVarDecl>(E->SourceDecl);
     case Kind::LocalRef:
       return supports(E->Binding->Value);
+    case Kind::LoopStateRef:
+      return true;
     case Kind::PrimalLocal:
       return true;
     case Kind::Swizzle:
@@ -1488,6 +1490,9 @@ private:
       return;
     case Kind::LocalRef:
       emitPrimal(E->Binding->Value, Out);
+      return;
+    case Kind::LoopStateRef:
+      Out << E->SourceDecl->getName() << ".value";
       return;
     case Kind::PrimalLocal:
       Out << E->SourceDecl->getName();

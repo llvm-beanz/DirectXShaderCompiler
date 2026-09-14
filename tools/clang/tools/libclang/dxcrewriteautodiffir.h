@@ -51,6 +51,7 @@ struct ADExpr {
     Literal,
     DeclRef,
     LocalRef,
+    LoopStateRef,
     PrimalLocal,
     This,
     Member,
@@ -75,6 +76,8 @@ struct ADExpr {
   const ADBinding *Binding = nullptr;
   const clang::FunctionDecl *Callee = nullptr;
   const clang::VarDecl *LoopCounter = nullptr;
+  unsigned LoopStateIndex = 0;
+  unsigned LoopStateVersion = 0;
   unsigned RuntimeLoopTapeSize = 0;
   bool RuntimeLoopUsesPrimalTape = false;
   unsigned RuntimeLoopPolynomialDegree = 2;
@@ -110,10 +113,13 @@ struct ADLoopState {
   const ADExpr *InitialValue = nullptr;
   const ADExpr *Result = nullptr;
   bool NeedsPrimalTape = false;
+  unsigned FinalVersion = 0;
 };
 
 struct ADLoopUpdate {
   unsigned TargetStateIndex = 0;
+  unsigned InputVersion = 0;
+  unsigned ResultVersion = 0;
   clang::BinaryOperatorKind Opcode = clang::BO_Assign;
   const ADExpr *Value = nullptr;
 };
