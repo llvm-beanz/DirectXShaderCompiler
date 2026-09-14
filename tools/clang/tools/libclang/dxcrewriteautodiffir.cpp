@@ -713,17 +713,21 @@ private:
                       ? dyn_cast<DeclRefExpr>(
                             Call->getArg(0)->IgnoreParenImpCasts())
                       : nullptr;
-              if (Callee &&
-                  (Callee->getName() == "sin" || Callee->getName() == "cos") &&
+              StringRef Name = Callee ? Callee->getName() : StringRef();
+              if ((Name == "sin" || Name == "cos" || Name == "exp" ||
+                   Name == "log" || Name == "sqrt") &&
                   Argument && Argument->getDecl() == Targets[I] &&
                   TargetPower == 0 &&
                   TargetFunction ==
                       ADExpr::RuntimeLoopMonomial::TargetFunction::Power) {
                 TargetPower = 1;
-                TargetFunction =
-                    Callee->getName() == "sin"
-                        ? ADExpr::RuntimeLoopMonomial::TargetFunction::Sin
-                        : ADExpr::RuntimeLoopMonomial::TargetFunction::Cos;
+                using Function = ADExpr::RuntimeLoopMonomial::TargetFunction;
+                TargetFunction = StringSwitch<Function>(Name)
+                                     .Case("sin", Function::Sin)
+                                     .Case("cos", Function::Cos)
+                                     .Case("exp", Function::Exp)
+                                     .Case("log", Function::Log)
+                                     .Case("sqrt", Function::Sqrt);
                 return true;
               }
             }

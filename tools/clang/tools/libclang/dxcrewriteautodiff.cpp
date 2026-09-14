@@ -1893,22 +1893,55 @@ private:
               }
               using TargetFunction =
                   hlsl::autodiff::ADExpr::RuntimeLoopMonomial::TargetFunction;
-              if (Monomial.Function == TargetFunction::Sin ||
-                  Monomial.Function == TargetFunction::Cos) {
+              if (Monomial.Function != TargetFunction::Power) {
                 if (WithRespectToPeer && Monomial.PeerPower > 1)
                   OS << Monomial.PeerPower << " * ";
-                if (!WithRespectToPeer &&
-                    Monomial.Function == TargetFunction::Cos)
-                  OS << "-";
-                StringRef Function =
-                    WithRespectToPeer
-                        ? (Monomial.Function == TargetFunction::Sin ? "sin"
-                                                                    : "cos")
-                        : (Monomial.Function == TargetFunction::Sin ? "cos"
-                                                                    : "sin");
-                OS << Function << "("
-                   << "__dxc_ad_loop_" << UpdateLoopID << "_primal_tape["
-                   << E->LoopCounter->getName() << "])";
+                std::string Target =
+                    "__dxc_ad_loop_" + Twine(UpdateLoopID).str() +
+                    "_primal_tape[" + E->LoopCounter->getName().str() + "]";
+                if (WithRespectToPeer) {
+                  StringRef Function;
+                  switch (Monomial.Function) {
+                  case TargetFunction::Sin:
+                    Function = "sin";
+                    break;
+                  case TargetFunction::Cos:
+                    Function = "cos";
+                    break;
+                  case TargetFunction::Exp:
+                    Function = "exp";
+                    break;
+                  case TargetFunction::Log:
+                    Function = "log";
+                    break;
+                  case TargetFunction::Sqrt:
+                    Function = "sqrt";
+                    break;
+                  case TargetFunction::Power:
+                    llvm_unreachable("handled polynomial target function");
+                  }
+                  OS << Function << "(" << Target << ")";
+                } else {
+                  switch (Monomial.Function) {
+                  case TargetFunction::Sin:
+                    OS << "cos(" << Target << ")";
+                    break;
+                  case TargetFunction::Cos:
+                    OS << "-sin(" << Target << ")";
+                    break;
+                  case TargetFunction::Exp:
+                    OS << "exp(" << Target << ")";
+                    break;
+                  case TargetFunction::Log:
+                    OS << "(1.0f / " << Target << ")";
+                    break;
+                  case TargetFunction::Sqrt:
+                    OS << "(0.5f / sqrt(" << Target << "))";
+                    break;
+                  case TargetFunction::Power:
+                    llvm_unreachable("handled polynomial target function");
+                  }
+                }
                 unsigned RemainingPeerPower =
                     Monomial.PeerPower - (WithRespectToPeer ? 1 : 0);
                 if (RemainingPeerPower) {
