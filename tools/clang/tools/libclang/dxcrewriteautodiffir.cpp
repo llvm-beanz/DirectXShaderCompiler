@@ -627,6 +627,7 @@ private:
 
     SmallVector<bool, 4> NeedsPrimalTape(Updates.size(), false);
     SmallVector<bool, 4> IsProductUpdate(Updates.size(), false);
+    SmallVector<const Expr *, 4> ProductCoefficients(Updates.size(), nullptr);
     bool NeedsAnyPrimalTape = false;
     for (unsigned I = 0; I + 1 < Updates.size(); ++I) {
       const Expr *FactorExpr = Updates[I]->getRHS()->IgnoreParenImpCasts();
@@ -636,22 +637,40 @@ private:
               !referencesActiveValue(Outer->getRHS()))
             FactorExpr = Outer->getLHS()->IgnoreParenImpCasts();
         }
-        const auto *Product = dyn_cast<BinaryOperator>(FactorExpr);
-        const auto *Left = Product
-                               ? dyn_cast<DeclRefExpr>(
-                                     Product->getLHS()->IgnoreParenImpCasts())
-                               : nullptr;
-        const auto *Right = Product
-                                ? dyn_cast<DeclRefExpr>(
-                                      Product->getRHS()->IgnoreParenImpCasts())
-                                : nullptr;
-        if (!Product || Product->getOpcode() != BO_Mul || !Left || !Right ||
-            !((Left->getDecl() == Targets[I] &&
-               Right->getDecl() == Targets[I + 1]) ||
-              (Left->getDecl() == Targets[I + 1] &&
-               Right->getDecl() == Targets[I])))
+        bool SawTarget = false;
+        bool SawPeer = false;
+        const Expr *Coefficient = nullptr;
+        auto MatchProduct = [&](const auto &Self,
+                                const Expr *Expression) -> bool {
+          Expression = Expression->IgnoreParenImpCasts();
+          if (const auto *Ref = dyn_cast<DeclRefExpr>(Expression)) {
+            if (Ref->getDecl() == Targets[I]) {
+              if (SawTarget)
+                return false;
+              SawTarget = true;
+              return true;
+            }
+            if (Ref->getDecl() == Targets[I + 1]) {
+              if (SawPeer)
+                return false;
+              SawPeer = true;
+              return true;
+            }
+          }
+          if (!referencesActiveValue(Expression)) {
+            if (Coefficient)
+              return false;
+            Coefficient = Expression;
+            return true;
+          }
+          const auto *Product = dyn_cast<BinaryOperator>(Expression);
+          return Product && Product->getOpcode() == BO_Mul &&
+                 Self(Self, Product->getLHS()) && Self(Self, Product->getRHS());
+        };
+        if (!MatchProduct(MatchProduct, FactorExpr) || !SawTarget || !SawPeer)
           return false;
         IsProductUpdate[I] = true;
+        ProductCoefficients[I] = Coefficient;
       } else {
         if (Updates[I]->getOpcode() != BO_AddAssign &&
             Updates[I]->getOpcode() != BO_SubAssign &&
@@ -755,6 +774,12 @@ private:
       Result->Value.Activity = ADActivity::Active;
       Result->Value.PrimalType = Targets[I]->getType();
       Result->RuntimeLoopProductUpdate = IsProductUpdate[I];
+      if (ProductCoefficients[I]) {
+        Result->RuntimeLoopProductCoefficient =
+            buildExpr(ProductCoefficients[I], /*ForceInactive=*/true);
+        if (!Result->RuntimeLoopProductCoefficient)
+          return false;
+      }
       if (NeedsPrimalTape[I]) {
         Result->RuntimeLoopUsesPrimalTape = true;
         Result->RuntimeLoopTapeSize = TapeSize;

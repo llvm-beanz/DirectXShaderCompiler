@@ -1876,12 +1876,25 @@ private:
             unsigned UpdateLoopID = RuntimeLoopIDs.lookup(Update);
             unsigned PeerLoopID =
                 RuntimeLoopIDs.lookup(E->RuntimeLoopLinearGroup[I]);
-            OS << "        " << Adjoints[I] << " += __dxc_ad_loop_"
-               << UpdateLoopID << "_primal_tape[" << E->LoopCounter->getName()
-               << "] * " << Adjoints[I - 1] << ";\n";
-            OS << "        " << Adjoints[I - 1] << " *= __dxc_ad_loop_"
-               << PeerLoopID << "_primal_tape[" << E->LoopCounter->getName()
-               << "];\n";
+            OS << "        " << Adjoints[I] << " += ";
+            if (Update->RuntimeLoopProductCoefficient) {
+              emitPrimal(Update->RuntimeLoopProductCoefficient);
+              OS << " * ";
+            }
+            OS << "__dxc_ad_loop_" << UpdateLoopID << "_primal_tape["
+               << E->LoopCounter->getName() << "] * " << Adjoints[I - 1]
+               << ";\n";
+            OS << "        " << Adjoints[I - 1] << " *= ";
+            if (Update->RuntimeLoopProductCoefficient) {
+              OS << "(";
+              emitPrimal(Update->RuntimeLoopProductCoefficient);
+              OS << " * ";
+            }
+            OS << "__dxc_ad_loop_" << PeerLoopID << "_primal_tape["
+               << E->LoopCounter->getName() << "]";
+            if (Update->RuntimeLoopProductCoefficient)
+              OS << ")";
+            OS << ";\n";
           } else {
             OS << "        " << Adjoints[I]
                << (Update->BinaryOpcode == BO_Sub ? " -= " : " += ")
