@@ -1876,6 +1876,14 @@ private:
             unsigned UpdateLoopID = RuntimeLoopIDs.lookup(Update);
             unsigned PeerLoopID =
                 RuntimeLoopIDs.lookup(E->RuntimeLoopLinearGroup[I]);
+            auto EmitPower = [&](unsigned TapeLoopID, unsigned Power) {
+              for (unsigned Term = 0; Term < Power; ++Term) {
+                if (Term)
+                  OS << " * ";
+                OS << "__dxc_ad_loop_" << TapeLoopID << "_primal_tape["
+                   << E->LoopCounter->getName() << "]";
+              }
+            };
             OS << "        " << Adjoints[I] << " += ";
             if (Update->RuntimeLoopPeerLinearCoefficient)
               OS << "(";
@@ -1883,8 +1891,13 @@ private:
               emitPrimal(Update->RuntimeLoopProductCoefficient);
               OS << " * ";
             }
-            OS << "__dxc_ad_loop_" << UpdateLoopID << "_primal_tape["
-               << E->LoopCounter->getName() << "]";
+            if (Update->RuntimeLoopProductPeerPower > 1)
+              OS << Update->RuntimeLoopProductPeerPower << " * ";
+            EmitPower(UpdateLoopID, Update->RuntimeLoopProductTargetPower);
+            if (Update->RuntimeLoopProductPeerPower > 1) {
+              OS << " * ";
+              EmitPower(PeerLoopID, Update->RuntimeLoopProductPeerPower - 1);
+            }
             if (Update->RuntimeLoopPeerLinearCoefficient) {
               OS << (Update->RuntimeLoopSubtractsPeerLinearCoefficient ? " - "
                                                                        : " + ");
@@ -1901,8 +1914,14 @@ private:
               emitPrimal(Update->RuntimeLoopProductCoefficient);
               OS << " * ";
             }
-            OS << "__dxc_ad_loop_" << PeerLoopID << "_primal_tape["
-               << E->LoopCounter->getName() << "]";
+            if (Update->RuntimeLoopProductTargetPower > 1)
+              OS << Update->RuntimeLoopProductTargetPower << " * ";
+            if (Update->RuntimeLoopProductTargetPower > 1) {
+              EmitPower(UpdateLoopID,
+                        Update->RuntimeLoopProductTargetPower - 1);
+              OS << " * ";
+            }
+            EmitPower(PeerLoopID, Update->RuntimeLoopProductPeerPower);
             if (Update->RuntimeLoopLinearCoefficient) {
               OS << (Update->RuntimeLoopSubtractsLinearCoefficient ? " - "
                                                                    : " + ");

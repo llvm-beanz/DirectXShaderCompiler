@@ -78,6 +78,8 @@ struct ADExpr {
   llvm::SmallVector<const ADExpr *, 4> RuntimeLoopLinearGroup;
   unsigned RuntimeLoopLinearGroupIndex = 0;
   bool RuntimeLoopProductUpdate = false;
+  unsigned RuntimeLoopProductTargetPower = 1;
+  unsigned RuntimeLoopProductPeerPower = 1;
   const ADExpr *RuntimeLoopProductCoefficient = nullptr;
   const ADExpr *RuntimeLoopPeerLinearCoefficient = nullptr;
   bool RuntimeLoopSubtractsPeerLinearCoefficient = false;

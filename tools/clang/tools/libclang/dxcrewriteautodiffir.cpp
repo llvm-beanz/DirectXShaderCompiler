@@ -627,6 +627,8 @@ private:
 
     SmallVector<bool, 4> NeedsPrimalTape(Updates.size(), false);
     SmallVector<bool, 4> IsProductUpdate(Updates.size(), false);
+    SmallVector<unsigned, 4> ProductTargetPowers(Updates.size(), 1);
+    SmallVector<unsigned, 4> ProductPeerPowers(Updates.size(), 1);
     SmallVector<const Expr *, 4> ProductCoefficients(Updates.size(), nullptr);
     SmallVector<const Expr *, 4> ProductLinearCoefficients(Updates.size(),
                                                            nullptr);
@@ -679,23 +681,19 @@ private:
           }
           FactorExpr = Polynomial->getLHS()->IgnoreParenImpCasts();
         }
-        bool SawTarget = false;
-        bool SawPeer = false;
+        unsigned TargetPower = 0;
+        unsigned PeerPower = 0;
         const Expr *Coefficient = nullptr;
         auto MatchProduct = [&](const auto &Self,
                                 const Expr *Expression) -> bool {
           Expression = Expression->IgnoreParenImpCasts();
           if (const auto *Ref = dyn_cast<DeclRefExpr>(Expression)) {
             if (Ref->getDecl() == Targets[I]) {
-              if (SawTarget)
-                return false;
-              SawTarget = true;
+              ++TargetPower;
               return true;
             }
             if (Ref->getDecl() == Targets[I + 1]) {
-              if (SawPeer)
-                return false;
-              SawPeer = true;
+              ++PeerPower;
               return true;
             }
           }
@@ -709,9 +707,12 @@ private:
           return Product && Product->getOpcode() == BO_Mul &&
                  Self(Self, Product->getLHS()) && Self(Self, Product->getRHS());
         };
-        if (!MatchProduct(MatchProduct, FactorExpr) || !SawTarget || !SawPeer)
+        if (!MatchProduct(MatchProduct, FactorExpr) || TargetPower == 0 ||
+            PeerPower == 0)
           return false;
         IsProductUpdate[I] = true;
+        ProductTargetPowers[I] = TargetPower;
+        ProductPeerPowers[I] = PeerPower;
         ProductCoefficients[I] = Coefficient;
       } else {
         if (Updates[I]->getOpcode() != BO_AddAssign &&
@@ -816,6 +817,8 @@ private:
       Result->Value.Activity = ADActivity::Active;
       Result->Value.PrimalType = Targets[I]->getType();
       Result->RuntimeLoopProductUpdate = IsProductUpdate[I];
+      Result->RuntimeLoopProductTargetPower = ProductTargetPowers[I];
+      Result->RuntimeLoopProductPeerPower = ProductPeerPowers[I];
       if (ProductCoefficients[I]) {
         Result->RuntimeLoopProductCoefficient =
             buildExpr(ProductCoefficients[I], /*ForceInactive=*/true);
