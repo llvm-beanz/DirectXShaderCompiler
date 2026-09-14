@@ -604,7 +604,8 @@ private:
     SmallPtrSet<const ValueDecl *, 4> SeenTargets;
     for (const Stmt *Child : Body->body()) {
       const auto *Update = dyn_cast<BinaryOperator>(Child);
-      if (!Update || (Update->getOpcode() != BO_AddAssign &&
+      if (!Update || (Update->getOpcode() != BO_Assign &&
+                      Update->getOpcode() != BO_AddAssign &&
                       Update->getOpcode() != BO_SubAssign &&
                       Update->getOpcode() != BO_MulAssign &&
                       Update->getOpcode() != BO_DivAssign))
@@ -625,17 +626,43 @@ private:
     }
 
     SmallVector<bool, 4> NeedsPrimalTape(Updates.size(), false);
+    SmallVector<bool, 4> IsProductUpdate(Updates.size(), false);
     bool NeedsAnyPrimalTape = false;
     for (unsigned I = 0; I + 1 < Updates.size(); ++I) {
-      if (Updates[I]->getOpcode() != BO_AddAssign &&
-          Updates[I]->getOpcode() != BO_SubAssign &&
-          Updates[I]->getOpcode() != BO_MulAssign)
-        return false;
-      const auto *Peer =
-          dyn_cast<DeclRefExpr>(Updates[I]->getRHS()->IgnoreParenImpCasts());
-      if (!Peer || Peer->getDecl() != Targets[I + 1])
-        return false;
-      if (Updates[I]->getOpcode() == BO_MulAssign) {
+      const Expr *FactorExpr = Updates[I]->getRHS()->IgnoreParenImpCasts();
+      if (Updates[I]->getOpcode() == BO_Assign) {
+        if (const auto *Outer = dyn_cast<BinaryOperator>(FactorExpr)) {
+          if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
+              !referencesActiveValue(Outer->getRHS()))
+            FactorExpr = Outer->getLHS()->IgnoreParenImpCasts();
+        }
+        const auto *Product = dyn_cast<BinaryOperator>(FactorExpr);
+        const auto *Left = Product
+                               ? dyn_cast<DeclRefExpr>(
+                                     Product->getLHS()->IgnoreParenImpCasts())
+                               : nullptr;
+        const auto *Right = Product
+                                ? dyn_cast<DeclRefExpr>(
+                                      Product->getRHS()->IgnoreParenImpCasts())
+                                : nullptr;
+        if (!Product || Product->getOpcode() != BO_Mul || !Left || !Right ||
+            !((Left->getDecl() == Targets[I] &&
+               Right->getDecl() == Targets[I + 1]) ||
+              (Left->getDecl() == Targets[I + 1] &&
+               Right->getDecl() == Targets[I])))
+          return false;
+        IsProductUpdate[I] = true;
+      } else {
+        if (Updates[I]->getOpcode() != BO_AddAssign &&
+            Updates[I]->getOpcode() != BO_SubAssign &&
+            Updates[I]->getOpcode() != BO_MulAssign)
+          return false;
+        const auto *Peer = dyn_cast<DeclRefExpr>(FactorExpr);
+        if (!Peer || Peer->getDecl() != Targets[I + 1])
+          return false;
+        IsProductUpdate[I] = Updates[I]->getOpcode() == BO_MulAssign;
+      }
+      if (IsProductUpdate[I]) {
         NeedsPrimalTape[I] = true;
         NeedsPrimalTape[I + 1] = true;
         NeedsAnyPrimalTape = true;
@@ -694,6 +721,9 @@ private:
       Result->SourceDecl = getCanonicalValueDecl(Targets[I]);
       Result->LoopCounter = Counter;
       switch (Updates[I]->getOpcode()) {
+      case BO_Assign:
+        Result->BinaryOpcode = BO_Assign;
+        break;
       case BO_AddAssign:
         Result->BinaryOpcode = BO_Add;
         break;
@@ -709,16 +739,22 @@ private:
       default:
         llvm_unreachable("validated linear runtime chain update");
       }
-      const ADExpr *Factor =
-          I + 1 < Targets.size()
-              ? createLocalRef(Updates[I]->getRHS(), Before[I + 1], false)
-              : LastFactor;
+      const ADExpr *Factor = nullptr;
+      if (I + 1 == Targets.size())
+        Factor = LastFactor;
+      else if (Updates[I]->getOpcode() == BO_Assign)
+        Factor = buildExpr(Updates[I]->getRHS());
+      else
+        Factor = createLocalRef(Updates[I]->getRHS(), Before[I + 1], false);
+      if (!Factor)
+        return false;
       Result->Operands.push_back(
           createLocalRef(TargetRefs[I], Before[I], false));
       Result->Operands.push_back(Count);
       Result->Operands.push_back(Factor);
       Result->Value.Activity = ADActivity::Active;
       Result->Value.PrimalType = Targets[I]->getType();
+      Result->RuntimeLoopProductUpdate = IsProductUpdate[I];
       if (NeedsPrimalTape[I]) {
         Result->RuntimeLoopUsesPrimalTape = true;
         Result->RuntimeLoopTapeSize = TapeSize;

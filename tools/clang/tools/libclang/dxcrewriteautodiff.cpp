@@ -1872,7 +1872,7 @@ private:
         for (unsigned I = E->RuntimeLoopLinearGroup.size() - 1; I > 0; --I) {
           const hlsl::autodiff::ADExpr *Update =
               E->RuntimeLoopLinearGroup[I - 1];
-          if (Update->BinaryOpcode == BO_Mul) {
+          if (Update->RuntimeLoopProductUpdate) {
             unsigned UpdateLoopID = RuntimeLoopIDs.lookup(Update);
             unsigned PeerLoopID =
                 RuntimeLoopIDs.lookup(E->RuntimeLoopLinearGroup[I]);

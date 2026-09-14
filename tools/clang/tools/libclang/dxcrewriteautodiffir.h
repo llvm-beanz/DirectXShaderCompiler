@@ -77,6 +77,7 @@ struct ADExpr {
   bool RuntimeLoopSubtractsCoupledPeer = false;
   llvm::SmallVector<const ADExpr *, 4> RuntimeLoopLinearGroup;
   unsigned RuntimeLoopLinearGroupIndex = 0;
+  bool RuntimeLoopProductUpdate = false;
   const ADExpr *Receiver = nullptr;
   clang::UnaryOperatorKind UnaryOpcode = clang::UO_Plus;
   clang::BinaryOperatorKind BinaryOpcode = clang::BO_Add;
