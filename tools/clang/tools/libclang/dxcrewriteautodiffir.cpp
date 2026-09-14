@@ -169,6 +169,24 @@ private:
     return Rewritten;
   }
 
+  void collectLoopPullbackInputs(
+      const ADExpr *Expression,
+      SmallVectorImpl<ADLoopPullbackInput> &Inputs) const {
+    if (Expression->K == ADExpr::Kind::LoopStateRef) {
+      for (const ADLoopPullbackInput &Input : Inputs)
+        if (Input.StateIndex == Expression->LoopStateIndex &&
+            Input.Version == Expression->LoopStateVersion)
+          return;
+      Inputs.push_back(
+          {Expression->LoopStateIndex, Expression->LoopStateVersion});
+      return;
+    }
+    if (Expression->Receiver)
+      collectLoopPullbackInputs(Expression->Receiver, Inputs);
+    for (const ADExpr *Operand : Expression->Operands)
+      collectLoopPullbackInputs(Operand, Inputs);
+  }
+
   const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
                                    const ADExpr *TripCount,
                                    ArrayRef<const ADExpr *> Results) {
@@ -201,6 +219,8 @@ private:
       Update.Value =
           createLoopUpdateExpr(Result->Operands[2], StateIndices, Versions);
       Update.ResultVersion = ++Versions[I];
+      Update.Pullback.Value = Update.Value;
+      collectLoopPullbackInputs(Update.Value, Update.Pullback.Inputs);
       Loop->Updates.push_back(Update);
     }
     for (unsigned I = 0; I < Loop->States.size(); ++I)

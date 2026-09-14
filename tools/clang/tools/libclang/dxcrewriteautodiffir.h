@@ -116,12 +116,23 @@ struct ADLoopState {
   unsigned FinalVersion = 0;
 };
 
+struct ADLoopPullbackInput {
+  unsigned StateIndex = 0;
+  unsigned Version = 0;
+};
+
+struct ADLoopPullback {
+  const ADExpr *Value = nullptr;
+  llvm::SmallVector<ADLoopPullbackInput, 4> Inputs;
+};
+
 struct ADLoopUpdate {
   unsigned TargetStateIndex = 0;
   unsigned InputVersion = 0;
   unsigned ResultVersion = 0;
   clang::BinaryOperatorKind Opcode = clang::BO_Assign;
   const ADExpr *Value = nullptr;
+  ADLoopPullback Pullback;
 };
 
 struct ADLoopPlan {

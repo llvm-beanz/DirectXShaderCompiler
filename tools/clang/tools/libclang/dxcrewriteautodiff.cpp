@@ -1319,6 +1319,7 @@ public:
           unsigned LoopID = NextLoopID++;
           LoopIDs.push_back(LoopID);
           RuntimeLoopIDs[State.Result] = LoopID;
+          RuntimeLoopPlans[State.Result] = &Loop;
           NeedsBraces |= State.NeedsPrimalTape;
           if (State.NeedsPrimalTape)
             OS << "    " << printType(State.PrimalType, Policy)
@@ -1383,6 +1384,68 @@ private:
   ArrayRef<ActiveContextInfo> Contexts;
   unsigned PullbackCallCount = 0;
   DenseMap<const hlsl::autodiff::ADExpr *, unsigned> RuntimeLoopIDs;
+  DenseMap<const hlsl::autodiff::ADExpr *, const hlsl::autodiff::ADLoopPlan *>
+      RuntimeLoopPlans;
+
+  bool supportsGenericLoopPullback(const hlsl::autodiff::ADExpr *E) const {
+    using Activity = hlsl::autodiff::ADActivity;
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    if (E->Value.Activity == Activity::Inactive)
+      return true;
+    switch (E->K) {
+    case Kind::LoopStateRef:
+      return true;
+    case Kind::Unary:
+    case Kind::Cast:
+      return supportsGenericLoopPullback(E->Operands.front());
+    case Kind::Binary:
+      switch (E->BinaryOpcode) {
+      case BO_Add:
+      case BO_Sub:
+        return supportsGenericLoopPullback(E->Operands[0]) &&
+               supportsGenericLoopPullback(E->Operands[1]);
+      case BO_Mul:
+        return (E->Operands[0]->Value.Activity == Activity::Inactive &&
+                supportsGenericLoopPullback(E->Operands[1])) ||
+               (E->Operands[1]->Value.Activity == Activity::Inactive &&
+                supportsGenericLoopPullback(E->Operands[0]));
+      case BO_Div:
+        return E->Operands[1]->Value.Activity == Activity::Inactive &&
+               supportsGenericLoopPullback(E->Operands[0]);
+      default:
+        return false;
+      }
+    default:
+      return false;
+    }
+  }
+
+  bool
+  supportsGenericLoopPullback(const hlsl::autodiff::ADLoopPlan &Loop) const {
+    if (Loop.States.size() < 3)
+      return false;
+    for (const hlsl::autodiff::ADLoopState &State : Loop.States)
+      if (State.NeedsPrimalTape)
+        return false;
+    for (const hlsl::autodiff::ADLoopUpdate &Update : Loop.Updates) {
+      switch (Update.Opcode) {
+      case BO_Add:
+      case BO_Sub:
+        if (!supportsGenericLoopPullback(Update.Pullback.Value))
+          return false;
+        break;
+      case BO_Mul:
+      case BO_Div:
+        if (Update.Value->Value.Activity !=
+            hlsl::autodiff::ADActivity::Inactive)
+          return false;
+        break;
+      default:
+        return false;
+      }
+    }
+    return true;
+  }
 
   bool isGeneratedBackwardCall(const hlsl::autodiff::ADExpr *E) const {
     if (!E->Callee)
@@ -1772,6 +1835,69 @@ private:
     }
   }
 
+  void emitGenericLoopPullback(const hlsl::autodiff::ADExpr *E,
+                               StringRef Cotangent,
+                               ArrayRef<std::string> StateAdjoints) {
+    using Activity = hlsl::autodiff::ADActivity;
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    if (E->Value.Activity == Activity::Inactive)
+      return;
+    switch (E->K) {
+    case Kind::LoopStateRef:
+      OS << "        " << StateAdjoints[E->LoopStateIndex]
+         << " += " << Cotangent << ";\n";
+      return;
+    case Kind::Unary:
+      emitGenericLoopPullback(E->Operands.front(),
+                              E->UnaryOpcode == UO_Minus
+                                  ? "-(" + Cotangent.str() + ")"
+                                  : Cotangent.str(),
+                              StateAdjoints);
+      return;
+    case Kind::Cast:
+      emitGenericLoopPullback(
+          E->Operands.front(),
+          "(" + printType(E->Operands.front()->Value.PrimalType, Policy) +
+              ")(" + Cotangent.str() + ")",
+          StateAdjoints);
+      return;
+    case Kind::Binary:
+      switch (E->BinaryOpcode) {
+      case BO_Add:
+        emitGenericLoopPullback(E->Operands[0], Cotangent, StateAdjoints);
+        emitGenericLoopPullback(E->Operands[1], Cotangent, StateAdjoints);
+        return;
+      case BO_Sub:
+        emitGenericLoopPullback(E->Operands[0], Cotangent, StateAdjoints);
+        emitGenericLoopPullback(E->Operands[1], "-(" + Cotangent.str() + ")",
+                                StateAdjoints);
+        return;
+      case BO_Mul:
+        if (E->Operands[0]->Value.Activity == Activity::Inactive)
+          emitGenericLoopPullback(E->Operands[1],
+                                  "(" + Cotangent.str() + " * " +
+                                      primalText(E->Operands[0]) + ")",
+                                  StateAdjoints);
+        else
+          emitGenericLoopPullback(E->Operands[0],
+                                  "(" + Cotangent.str() + " * " +
+                                      primalText(E->Operands[1]) + ")",
+                                  StateAdjoints);
+        return;
+      case BO_Div:
+        emitGenericLoopPullback(E->Operands[0],
+                                "(" + Cotangent.str() + " / " +
+                                    primalText(E->Operands[1]) + ")",
+                                StateAdjoints);
+        return;
+      default:
+        llvm_unreachable("validated generic loop pullback expression");
+      }
+    default:
+      llvm_unreachable("validated generic loop pullback node");
+    }
+  }
+
   void emitAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent) {
     using Activity = hlsl::autodiff::ADActivity;
     using Kind = hlsl::autodiff::ADExpr::Kind;
@@ -1844,6 +1970,55 @@ private:
     case Kind::RuntimeLoopResult: {
       unsigned LoopID = RuntimeLoopIDs.lookup(E);
       std::string Type = printType(E->Value.PrimalType, Policy);
+      auto LoopIt = RuntimeLoopPlans.find(E);
+      if (LoopIt != RuntimeLoopPlans.end() &&
+          supportsGenericLoopPullback(*LoopIt->second)) {
+        const hlsl::autodiff::ADLoopPlan &Loop = *LoopIt->second;
+        SmallVector<std::string, 4> Adjoints;
+        for (unsigned I = 0; I < Loop.States.size(); ++I) {
+          std::string Adjoint = "__dxc_ad_loop_" + Twine(LoopID).str() +
+                                "_state_" + Twine(I).str() + "_adjoint";
+          Adjoints.push_back(Adjoint);
+          OS << "    " << Type << " " << Adjoint << " = "
+             << (Loop.States[I].Result == E ? Cotangent.str()
+                                            : zero(E->Value.PrimalType))
+             << ";\n";
+        }
+        OS << "    for (uint " << Loop.Counter->getName() << " = ";
+        emitPrimal(Loop.TripCount);
+        OS << "; " << Loop.Counter->getName() << " > 0;) {\n"
+           << "        --" << Loop.Counter->getName() << ";\n";
+        for (unsigned I = Loop.Updates.size(); I > 0; --I) {
+          const hlsl::autodiff::ADLoopUpdate &Update = Loop.Updates[I - 1];
+          StringRef TargetAdjoint = Adjoints[Update.TargetStateIndex];
+          switch (Update.Opcode) {
+          case BO_Add:
+            emitGenericLoopPullback(Update.Pullback.Value, TargetAdjoint,
+                                    Adjoints);
+            break;
+          case BO_Sub:
+            emitGenericLoopPullback(Update.Pullback.Value,
+                                    "-(" + TargetAdjoint.str() + ")", Adjoints);
+            break;
+          case BO_Mul:
+            OS << "        " << TargetAdjoint << " *= ";
+            emitPrimal(Update.Value);
+            OS << ";\n";
+            break;
+          case BO_Div:
+            OS << "        " << TargetAdjoint << " /= ";
+            emitPrimal(Update.Value);
+            OS << ";\n";
+            break;
+          default:
+            llvm_unreachable("validated generic loop update");
+          }
+        }
+        OS << "    }\n";
+        for (unsigned I = 0; I < Loop.States.size(); ++I)
+          emitAdjoint(Loop.States[I].InitialValue, Adjoints[I]);
+        return;
+      }
       if (!E->RuntimeLoopLinearGroup.empty()) {
         SmallVector<std::string, 4> Adjoints;
         for (unsigned I = 0; I < E->RuntimeLoopLinearGroup.size(); ++I) {
