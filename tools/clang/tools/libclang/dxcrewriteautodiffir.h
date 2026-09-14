@@ -38,10 +38,13 @@ struct ADValueInfo {
 
 struct ADExpr {
   struct RuntimeLoopMonomial {
+    enum class TargetFunction { Power, Sin, Cos };
+
     unsigned TargetPower = 0;
     unsigned PeerPower = 0;
     const ADExpr *Coefficient = nullptr;
     bool Subtracts = false;
+    TargetFunction Function = TargetFunction::Power;
   };
 
   enum class Kind {

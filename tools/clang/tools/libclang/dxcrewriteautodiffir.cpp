@@ -632,6 +632,7 @@ private:
       unsigned PeerPower;
       const Expr *Coefficient;
       bool Subtracts;
+      ADExpr::RuntimeLoopMonomial::TargetFunction Function;
     };
     SmallVector<SmallVector<ParsedMonomial, 4>, 4> ProductMonomials(
         Updates.size());
@@ -687,17 +688,42 @@ private:
           FactorExpr = Polynomial->getLHS()->IgnoreParenImpCasts();
         }
         auto MatchMonomial = [&](const Expr *Expression, unsigned &TargetPower,
-                                 unsigned &PeerPower,
-                                 const Expr *&Coefficient) {
+                                 unsigned &PeerPower, const Expr *&Coefficient,
+                                 ADExpr::RuntimeLoopMonomial::TargetFunction
+                                     &TargetFunction) {
           auto MatchFactor = [&](const auto &Self, const Expr *Factor) -> bool {
             Factor = Factor->IgnoreParenImpCasts();
             if (const auto *Ref = dyn_cast<DeclRefExpr>(Factor)) {
               if (Ref->getDecl() == Targets[I]) {
+                if (TargetFunction !=
+                    ADExpr::RuntimeLoopMonomial::TargetFunction::Power)
+                  return false;
                 ++TargetPower;
                 return true;
               }
               if (Ref->getDecl() == Targets[I + 1]) {
                 ++PeerPower;
+                return true;
+              }
+            }
+            if (const auto *Call = dyn_cast<CallExpr>(Factor)) {
+              const FunctionDecl *Callee = Call->getDirectCallee();
+              const auto *Argument =
+                  Call->getNumArgs() == 1
+                      ? dyn_cast<DeclRefExpr>(
+                            Call->getArg(0)->IgnoreParenImpCasts())
+                      : nullptr;
+              if (Callee &&
+                  (Callee->getName() == "sin" || Callee->getName() == "cos") &&
+                  Argument && Argument->getDecl() == Targets[I] &&
+                  TargetPower == 0 &&
+                  TargetFunction ==
+                      ADExpr::RuntimeLoopMonomial::TargetFunction::Power) {
+                TargetPower = 1;
+                TargetFunction =
+                    Callee->getName() == "sin"
+                        ? ADExpr::RuntimeLoopMonomial::TargetFunction::Sin
+                        : ADExpr::RuntimeLoopMonomial::TargetFunction::Cos;
                 return true;
               }
             }
@@ -728,10 +754,13 @@ private:
           unsigned TargetPower = 0;
           unsigned PeerPower = 0;
           const Expr *Coefficient = nullptr;
-          if (!MatchMonomial(Expression, TargetPower, PeerPower, Coefficient))
+          auto TargetFunction =
+              ADExpr::RuntimeLoopMonomial::TargetFunction::Power;
+          if (!MatchMonomial(Expression, TargetPower, PeerPower, Coefficient,
+                             TargetFunction))
             return false;
           ProductMonomials[I].push_back(
-              {TargetPower, PeerPower, Coefficient, Subtracts});
+              {TargetPower, PeerPower, Coefficient, Subtracts, TargetFunction});
           return true;
         };
         if (!CollectMonomials(CollectMonomials, FactorExpr,
@@ -748,7 +777,9 @@ private:
           return false;
         IsProductUpdate[I] = Updates[I]->getOpcode() == BO_MulAssign;
         if (IsProductUpdate[I])
-          ProductMonomials[I].push_back({1, 1, nullptr, false});
+          ProductMonomials[I].push_back(
+              {1, 1, nullptr, false,
+               ADExpr::RuntimeLoopMonomial::TargetFunction::Power});
       }
       if (IsProductUpdate[I]) {
         NeedsPrimalTape[I] = true;
@@ -848,6 +879,7 @@ private:
         Monomial.TargetPower = Parsed.TargetPower;
         Monomial.PeerPower = Parsed.PeerPower;
         Monomial.Subtracts = Parsed.Subtracts;
+        Monomial.Function = Parsed.Function;
         if (Parsed.Coefficient) {
           Monomial.Coefficient =
               buildExpr(Parsed.Coefficient, /*ForceInactive=*/true);

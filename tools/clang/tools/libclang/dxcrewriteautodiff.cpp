@@ -1884,29 +1884,54 @@ private:
                    << E->LoopCounter->getName() << "]";
               }
             };
-            auto EmitMonomialPartial =
-                [&](unsigned TargetPower, unsigned PeerPower,
-                    const hlsl::autodiff::ADExpr *Coefficient,
-                    bool WithRespectToPeer) {
-                  if (Coefficient) {
-                    emitPrimal(Coefficient);
-                    OS << " * ";
-                  }
-                  unsigned DerivativePower =
-                      WithRespectToPeer ? PeerPower : TargetPower;
-                  if (DerivativePower > 1)
-                    OS << DerivativePower << " * ";
-                  unsigned RemainingTargetPower =
-                      TargetPower - (WithRespectToPeer ? 0 : 1);
-                  unsigned RemainingPeerPower =
-                      PeerPower - (WithRespectToPeer ? 1 : 0);
-                  if (RemainingTargetPower)
-                    EmitPower(UpdateLoopID, RemainingTargetPower);
-                  if (RemainingTargetPower && RemainingPeerPower)
-                    OS << " * ";
-                  if (RemainingPeerPower)
-                    EmitPower(PeerLoopID, RemainingPeerPower);
-                };
+            auto EmitMonomialPartial = [&](const hlsl::autodiff::ADExpr::
+                                               RuntimeLoopMonomial &Monomial,
+                                           bool WithRespectToPeer) {
+              if (Monomial.Coefficient) {
+                emitPrimal(Monomial.Coefficient);
+                OS << " * ";
+              }
+              using TargetFunction =
+                  hlsl::autodiff::ADExpr::RuntimeLoopMonomial::TargetFunction;
+              if (Monomial.Function == TargetFunction::Sin ||
+                  Monomial.Function == TargetFunction::Cos) {
+                if (WithRespectToPeer && Monomial.PeerPower > 1)
+                  OS << Monomial.PeerPower << " * ";
+                if (!WithRespectToPeer &&
+                    Monomial.Function == TargetFunction::Cos)
+                  OS << "-";
+                StringRef Function =
+                    WithRespectToPeer
+                        ? (Monomial.Function == TargetFunction::Sin ? "sin"
+                                                                    : "cos")
+                        : (Monomial.Function == TargetFunction::Sin ? "cos"
+                                                                    : "sin");
+                OS << Function << "("
+                   << "__dxc_ad_loop_" << UpdateLoopID << "_primal_tape["
+                   << E->LoopCounter->getName() << "])";
+                unsigned RemainingPeerPower =
+                    Monomial.PeerPower - (WithRespectToPeer ? 1 : 0);
+                if (RemainingPeerPower) {
+                  OS << " * ";
+                  EmitPower(PeerLoopID, RemainingPeerPower);
+                }
+                return;
+              }
+              unsigned DerivativePower =
+                  WithRespectToPeer ? Monomial.PeerPower : Monomial.TargetPower;
+              if (DerivativePower > 1)
+                OS << DerivativePower << " * ";
+              unsigned RemainingTargetPower =
+                  Monomial.TargetPower - (WithRespectToPeer ? 0 : 1);
+              unsigned RemainingPeerPower =
+                  Monomial.PeerPower - (WithRespectToPeer ? 1 : 0);
+              if (RemainingTargetPower)
+                EmitPower(UpdateLoopID, RemainingTargetPower);
+              if (RemainingTargetPower && RemainingPeerPower)
+                OS << " * ";
+              if (RemainingPeerPower)
+                EmitPower(PeerLoopID, RemainingPeerPower);
+            };
             auto EmitPolynomialPartial = [&](bool WithRespectToPeer) {
               for (unsigned TermIndex = 0;
                    TermIndex < Update->RuntimeLoopMonomials.size();
@@ -1914,8 +1939,7 @@ private:
                 const auto &Monomial = Update->RuntimeLoopMonomials[TermIndex];
                 if (TermIndex)
                   OS << (Monomial.Subtracts ? " - " : " + ");
-                EmitMonomialPartial(Monomial.TargetPower, Monomial.PeerPower,
-                                    Monomial.Coefficient, WithRespectToPeer);
+                EmitMonomialPartial(Monomial, WithRespectToPeer);
               }
             };
             bool HasMultipleProducts = Update->RuntimeLoopMonomials.size() > 1;
