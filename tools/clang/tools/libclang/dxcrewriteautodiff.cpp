@@ -1884,44 +1884,72 @@ private:
                    << E->LoopCounter->getName() << "]";
               }
             };
+            auto EmitMonomialPartial =
+                [&](unsigned TargetPower, unsigned PeerPower,
+                    const hlsl::autodiff::ADExpr *Coefficient,
+                    bool WithRespectToPeer) {
+                  if (Coefficient) {
+                    emitPrimal(Coefficient);
+                    OS << " * ";
+                  }
+                  unsigned DerivativePower =
+                      WithRespectToPeer ? PeerPower : TargetPower;
+                  if (DerivativePower > 1)
+                    OS << DerivativePower << " * ";
+                  unsigned RemainingTargetPower =
+                      TargetPower - (WithRespectToPeer ? 0 : 1);
+                  unsigned RemainingPeerPower =
+                      PeerPower - (WithRespectToPeer ? 1 : 0);
+                  if (RemainingTargetPower)
+                    EmitPower(UpdateLoopID, RemainingTargetPower);
+                  if (RemainingTargetPower && RemainingPeerPower)
+                    OS << " * ";
+                  if (RemainingPeerPower)
+                    EmitPower(PeerLoopID, RemainingPeerPower);
+                };
+            bool HasSecondProduct =
+                Update->RuntimeLoopSecondProductTargetPower > 0;
             OS << "        " << Adjoints[I] << " += ";
-            if (Update->RuntimeLoopPeerLinearCoefficient)
+            bool HasPeerSum =
+                HasSecondProduct || Update->RuntimeLoopPeerLinearCoefficient;
+            if (HasPeerSum)
               OS << "(";
-            if (Update->RuntimeLoopProductCoefficient) {
-              emitPrimal(Update->RuntimeLoopProductCoefficient);
-              OS << " * ";
-            }
-            if (Update->RuntimeLoopProductPeerPower > 1)
-              OS << Update->RuntimeLoopProductPeerPower << " * ";
-            EmitPower(UpdateLoopID, Update->RuntimeLoopProductTargetPower);
-            if (Update->RuntimeLoopProductPeerPower > 1) {
-              OS << " * ";
-              EmitPower(PeerLoopID, Update->RuntimeLoopProductPeerPower - 1);
+            EmitMonomialPartial(Update->RuntimeLoopProductTargetPower,
+                                Update->RuntimeLoopProductPeerPower,
+                                Update->RuntimeLoopProductCoefficient,
+                                /*WithRespectToPeer=*/true);
+            if (HasSecondProduct) {
+              OS << (Update->RuntimeLoopSubtractsSecondProduct ? " - " : " + ");
+              EmitMonomialPartial(Update->RuntimeLoopSecondProductTargetPower,
+                                  Update->RuntimeLoopSecondProductPeerPower,
+                                  Update->RuntimeLoopSecondProductCoefficient,
+                                  /*WithRespectToPeer=*/true);
             }
             if (Update->RuntimeLoopPeerLinearCoefficient) {
               OS << (Update->RuntimeLoopSubtractsPeerLinearCoefficient ? " - "
                                                                        : " + ");
               emitPrimal(Update->RuntimeLoopPeerLinearCoefficient);
-              OS << ")";
             }
+            if (HasPeerSum)
+              OS << ")";
             OS << " * " << Adjoints[I - 1] << ";\n";
             OS << "        " << Adjoints[I - 1] << " *= ";
             bool HasTargetSum = Update->RuntimeLoopProductCoefficient ||
+                                HasSecondProduct ||
                                 Update->RuntimeLoopLinearCoefficient;
             if (HasTargetSum)
               OS << "(";
-            if (Update->RuntimeLoopProductCoefficient) {
-              emitPrimal(Update->RuntimeLoopProductCoefficient);
-              OS << " * ";
+            EmitMonomialPartial(Update->RuntimeLoopProductTargetPower,
+                                Update->RuntimeLoopProductPeerPower,
+                                Update->RuntimeLoopProductCoefficient,
+                                /*WithRespectToPeer=*/false);
+            if (HasSecondProduct) {
+              OS << (Update->RuntimeLoopSubtractsSecondProduct ? " - " : " + ");
+              EmitMonomialPartial(Update->RuntimeLoopSecondProductTargetPower,
+                                  Update->RuntimeLoopSecondProductPeerPower,
+                                  Update->RuntimeLoopSecondProductCoefficient,
+                                  /*WithRespectToPeer=*/false);
             }
-            if (Update->RuntimeLoopProductTargetPower > 1)
-              OS << Update->RuntimeLoopProductTargetPower << " * ";
-            if (Update->RuntimeLoopProductTargetPower > 1) {
-              EmitPower(UpdateLoopID,
-                        Update->RuntimeLoopProductTargetPower - 1);
-              OS << " * ";
-            }
-            EmitPower(PeerLoopID, Update->RuntimeLoopProductPeerPower);
             if (Update->RuntimeLoopLinearCoefficient) {
               OS << (Update->RuntimeLoopSubtractsLinearCoefficient ? " - "
                                                                    : " + ");

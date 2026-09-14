@@ -81,6 +81,10 @@ struct ADExpr {
   unsigned RuntimeLoopProductTargetPower = 1;
   unsigned RuntimeLoopProductPeerPower = 1;
   const ADExpr *RuntimeLoopProductCoefficient = nullptr;
+  unsigned RuntimeLoopSecondProductTargetPower = 0;
+  unsigned RuntimeLoopSecondProductPeerPower = 0;
+  const ADExpr *RuntimeLoopSecondProductCoefficient = nullptr;
+  bool RuntimeLoopSubtractsSecondProduct = false;
   const ADExpr *RuntimeLoopPeerLinearCoefficient = nullptr;
   bool RuntimeLoopSubtractsPeerLinearCoefficient = false;
   const ADExpr *Receiver = nullptr;

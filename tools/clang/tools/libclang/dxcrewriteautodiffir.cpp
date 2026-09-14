@@ -630,6 +630,11 @@ private:
     SmallVector<unsigned, 4> ProductTargetPowers(Updates.size(), 1);
     SmallVector<unsigned, 4> ProductPeerPowers(Updates.size(), 1);
     SmallVector<const Expr *, 4> ProductCoefficients(Updates.size(), nullptr);
+    SmallVector<unsigned, 4> SecondProductTargetPowers(Updates.size(), 0);
+    SmallVector<unsigned, 4> SecondProductPeerPowers(Updates.size(), 0);
+    SmallVector<const Expr *, 4> SecondProductCoefficients(Updates.size(),
+                                                           nullptr);
+    SmallVector<bool, 4> SubtractsSecondProduct(Updates.size(), false);
     SmallVector<const Expr *, 4> ProductLinearCoefficients(Updates.size(),
                                                            nullptr);
     SmallVector<bool, 4> ProductSubtractsLinearCoefficient(Updates.size(),
@@ -681,39 +686,66 @@ private:
           }
           FactorExpr = Polynomial->getLHS()->IgnoreParenImpCasts();
         }
+        auto MatchMonomial = [&](const Expr *Expression, unsigned &TargetPower,
+                                 unsigned &PeerPower,
+                                 const Expr *&Coefficient) {
+          auto MatchFactor = [&](const auto &Self, const Expr *Factor) -> bool {
+            Factor = Factor->IgnoreParenImpCasts();
+            if (const auto *Ref = dyn_cast<DeclRefExpr>(Factor)) {
+              if (Ref->getDecl() == Targets[I]) {
+                ++TargetPower;
+                return true;
+              }
+              if (Ref->getDecl() == Targets[I + 1]) {
+                ++PeerPower;
+                return true;
+              }
+            }
+            if (!referencesActiveValue(Factor)) {
+              if (Coefficient)
+                return false;
+              Coefficient = Factor;
+              return true;
+            }
+            const auto *Product = dyn_cast<BinaryOperator>(Factor);
+            return Product && Product->getOpcode() == BO_Mul &&
+                   Self(Self, Product->getLHS()) &&
+                   Self(Self, Product->getRHS());
+          };
+          return MatchFactor(MatchFactor, Expression) && TargetPower > 0 &&
+                 PeerPower > 0;
+        };
+        const Expr *FirstMonomial = FactorExpr;
+        const Expr *SecondMonomial = nullptr;
+        bool SubtractsSecond = false;
+        if (const auto *Sum = dyn_cast<BinaryOperator>(FactorExpr)) {
+          if ((Sum->getOpcode() == BO_Add || Sum->getOpcode() == BO_Sub) &&
+              referencesActiveValue(Sum->getRHS())) {
+            FirstMonomial = Sum->getLHS();
+            SecondMonomial = Sum->getRHS();
+            SubtractsSecond = Sum->getOpcode() == BO_Sub;
+          }
+        }
         unsigned TargetPower = 0;
         unsigned PeerPower = 0;
         const Expr *Coefficient = nullptr;
-        auto MatchProduct = [&](const auto &Self,
-                                const Expr *Expression) -> bool {
-          Expression = Expression->IgnoreParenImpCasts();
-          if (const auto *Ref = dyn_cast<DeclRefExpr>(Expression)) {
-            if (Ref->getDecl() == Targets[I]) {
-              ++TargetPower;
-              return true;
-            }
-            if (Ref->getDecl() == Targets[I + 1]) {
-              ++PeerPower;
-              return true;
-            }
-          }
-          if (!referencesActiveValue(Expression)) {
-            if (Coefficient)
-              return false;
-            Coefficient = Expression;
-            return true;
-          }
-          const auto *Product = dyn_cast<BinaryOperator>(Expression);
-          return Product && Product->getOpcode() == BO_Mul &&
-                 Self(Self, Product->getLHS()) && Self(Self, Product->getRHS());
-        };
-        if (!MatchProduct(MatchProduct, FactorExpr) || TargetPower == 0 ||
-            PeerPower == 0)
+        if (!MatchMonomial(FirstMonomial, TargetPower, PeerPower, Coefficient))
+          return false;
+        unsigned SecondTargetPower = 0;
+        unsigned SecondPeerPower = 0;
+        const Expr *SecondCoefficient = nullptr;
+        if (SecondMonomial &&
+            !MatchMonomial(SecondMonomial, SecondTargetPower, SecondPeerPower,
+                           SecondCoefficient))
           return false;
         IsProductUpdate[I] = true;
         ProductTargetPowers[I] = TargetPower;
         ProductPeerPowers[I] = PeerPower;
         ProductCoefficients[I] = Coefficient;
+        SecondProductTargetPowers[I] = SecondTargetPower;
+        SecondProductPeerPowers[I] = SecondPeerPower;
+        SecondProductCoefficients[I] = SecondCoefficient;
+        SubtractsSecondProduct[I] = SubtractsSecond;
       } else {
         if (Updates[I]->getOpcode() != BO_AddAssign &&
             Updates[I]->getOpcode() != BO_SubAssign &&
@@ -825,6 +857,16 @@ private:
         if (!Result->RuntimeLoopProductCoefficient)
           return false;
       }
+      Result->RuntimeLoopSecondProductTargetPower =
+          SecondProductTargetPowers[I];
+      Result->RuntimeLoopSecondProductPeerPower = SecondProductPeerPowers[I];
+      if (SecondProductCoefficients[I]) {
+        Result->RuntimeLoopSecondProductCoefficient =
+            buildExpr(SecondProductCoefficients[I], /*ForceInactive=*/true);
+        if (!Result->RuntimeLoopSecondProductCoefficient)
+          return false;
+      }
+      Result->RuntimeLoopSubtractsSecondProduct = SubtractsSecondProduct[I];
       if (ProductLinearCoefficients[I]) {
         Result->RuntimeLoopLinearCoefficient =
             buildExpr(ProductLinearCoefficients[I], /*ForceInactive=*/true);
