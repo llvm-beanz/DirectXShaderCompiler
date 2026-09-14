@@ -1907,24 +1907,24 @@ private:
                   if (RemainingPeerPower)
                     EmitPower(PeerLoopID, RemainingPeerPower);
                 };
-            bool HasSecondProduct =
-                Update->RuntimeLoopSecondProductTargetPower > 0;
+            auto EmitPolynomialPartial = [&](bool WithRespectToPeer) {
+              for (unsigned TermIndex = 0;
+                   TermIndex < Update->RuntimeLoopMonomials.size();
+                   ++TermIndex) {
+                const auto &Monomial = Update->RuntimeLoopMonomials[TermIndex];
+                if (TermIndex)
+                  OS << (Monomial.Subtracts ? " - " : " + ");
+                EmitMonomialPartial(Monomial.TargetPower, Monomial.PeerPower,
+                                    Monomial.Coefficient, WithRespectToPeer);
+              }
+            };
+            bool HasMultipleProducts = Update->RuntimeLoopMonomials.size() > 1;
             OS << "        " << Adjoints[I] << " += ";
             bool HasPeerSum =
-                HasSecondProduct || Update->RuntimeLoopPeerLinearCoefficient;
+                HasMultipleProducts || Update->RuntimeLoopPeerLinearCoefficient;
             if (HasPeerSum)
               OS << "(";
-            EmitMonomialPartial(Update->RuntimeLoopProductTargetPower,
-                                Update->RuntimeLoopProductPeerPower,
-                                Update->RuntimeLoopProductCoefficient,
-                                /*WithRespectToPeer=*/true);
-            if (HasSecondProduct) {
-              OS << (Update->RuntimeLoopSubtractsSecondProduct ? " - " : " + ");
-              EmitMonomialPartial(Update->RuntimeLoopSecondProductTargetPower,
-                                  Update->RuntimeLoopSecondProductPeerPower,
-                                  Update->RuntimeLoopSecondProductCoefficient,
-                                  /*WithRespectToPeer=*/true);
-            }
+            EmitPolynomialPartial(/*WithRespectToPeer=*/true);
             if (Update->RuntimeLoopPeerLinearCoefficient) {
               OS << (Update->RuntimeLoopSubtractsPeerLinearCoefficient ? " - "
                                                                        : " + ");
@@ -1934,22 +1934,12 @@ private:
               OS << ")";
             OS << " * " << Adjoints[I - 1] << ";\n";
             OS << "        " << Adjoints[I - 1] << " *= ";
-            bool HasTargetSum = Update->RuntimeLoopProductCoefficient ||
-                                HasSecondProduct ||
-                                Update->RuntimeLoopLinearCoefficient;
+            bool HasTargetSum =
+                Update->RuntimeLoopMonomials.front().Coefficient ||
+                HasMultipleProducts || Update->RuntimeLoopLinearCoefficient;
             if (HasTargetSum)
               OS << "(";
-            EmitMonomialPartial(Update->RuntimeLoopProductTargetPower,
-                                Update->RuntimeLoopProductPeerPower,
-                                Update->RuntimeLoopProductCoefficient,
-                                /*WithRespectToPeer=*/false);
-            if (HasSecondProduct) {
-              OS << (Update->RuntimeLoopSubtractsSecondProduct ? " - " : " + ");
-              EmitMonomialPartial(Update->RuntimeLoopSecondProductTargetPower,
-                                  Update->RuntimeLoopSecondProductPeerPower,
-                                  Update->RuntimeLoopSecondProductCoefficient,
-                                  /*WithRespectToPeer=*/false);
-            }
+            EmitPolynomialPartial(/*WithRespectToPeer=*/false);
             if (Update->RuntimeLoopLinearCoefficient) {
               OS << (Update->RuntimeLoopSubtractsLinearCoefficient ? " - "
                                                                    : " + ");

@@ -627,14 +627,14 @@ private:
 
     SmallVector<bool, 4> NeedsPrimalTape(Updates.size(), false);
     SmallVector<bool, 4> IsProductUpdate(Updates.size(), false);
-    SmallVector<unsigned, 4> ProductTargetPowers(Updates.size(), 1);
-    SmallVector<unsigned, 4> ProductPeerPowers(Updates.size(), 1);
-    SmallVector<const Expr *, 4> ProductCoefficients(Updates.size(), nullptr);
-    SmallVector<unsigned, 4> SecondProductTargetPowers(Updates.size(), 0);
-    SmallVector<unsigned, 4> SecondProductPeerPowers(Updates.size(), 0);
-    SmallVector<const Expr *, 4> SecondProductCoefficients(Updates.size(),
-                                                           nullptr);
-    SmallVector<bool, 4> SubtractsSecondProduct(Updates.size(), false);
+    struct ParsedMonomial {
+      unsigned TargetPower;
+      unsigned PeerPower;
+      const Expr *Coefficient;
+      bool Subtracts;
+    };
+    SmallVector<SmallVector<ParsedMonomial, 4>, 4> ProductMonomials(
+        Updates.size());
     SmallVector<const Expr *, 4> ProductLinearCoefficients(Updates.size(),
                                                            nullptr);
     SmallVector<bool, 4> ProductSubtractsLinearCoefficient(Updates.size(),
@@ -715,37 +715,29 @@ private:
           return MatchFactor(MatchFactor, Expression) && TargetPower > 0 &&
                  PeerPower > 0;
         };
-        const Expr *FirstMonomial = FactorExpr;
-        const Expr *SecondMonomial = nullptr;
-        bool SubtractsSecond = false;
-        if (const auto *Sum = dyn_cast<BinaryOperator>(FactorExpr)) {
-          if ((Sum->getOpcode() == BO_Add || Sum->getOpcode() == BO_Sub) &&
-              referencesActiveValue(Sum->getRHS())) {
-            FirstMonomial = Sum->getLHS();
-            SecondMonomial = Sum->getRHS();
-            SubtractsSecond = Sum->getOpcode() == BO_Sub;
+        auto CollectMonomials = [&](const auto &Self, const Expr *Expression,
+                                    bool Subtracts) -> bool {
+          Expression = Expression->IgnoreParenImpCasts();
+          if (const auto *Sum = dyn_cast<BinaryOperator>(Expression)) {
+            if ((Sum->getOpcode() == BO_Add || Sum->getOpcode() == BO_Sub) &&
+                referencesActiveValue(Sum->getRHS()))
+              return Self(Self, Sum->getLHS(), Subtracts) &&
+                     Self(Self, Sum->getRHS(),
+                          Subtracts != (Sum->getOpcode() == BO_Sub));
           }
-        }
-        unsigned TargetPower = 0;
-        unsigned PeerPower = 0;
-        const Expr *Coefficient = nullptr;
-        if (!MatchMonomial(FirstMonomial, TargetPower, PeerPower, Coefficient))
-          return false;
-        unsigned SecondTargetPower = 0;
-        unsigned SecondPeerPower = 0;
-        const Expr *SecondCoefficient = nullptr;
-        if (SecondMonomial &&
-            !MatchMonomial(SecondMonomial, SecondTargetPower, SecondPeerPower,
-                           SecondCoefficient))
+          unsigned TargetPower = 0;
+          unsigned PeerPower = 0;
+          const Expr *Coefficient = nullptr;
+          if (!MatchMonomial(Expression, TargetPower, PeerPower, Coefficient))
+            return false;
+          ProductMonomials[I].push_back(
+              {TargetPower, PeerPower, Coefficient, Subtracts});
+          return true;
+        };
+        if (!CollectMonomials(CollectMonomials, FactorExpr,
+                              /*Subtracts=*/false))
           return false;
         IsProductUpdate[I] = true;
-        ProductTargetPowers[I] = TargetPower;
-        ProductPeerPowers[I] = PeerPower;
-        ProductCoefficients[I] = Coefficient;
-        SecondProductTargetPowers[I] = SecondTargetPower;
-        SecondProductPeerPowers[I] = SecondPeerPower;
-        SecondProductCoefficients[I] = SecondCoefficient;
-        SubtractsSecondProduct[I] = SubtractsSecond;
       } else {
         if (Updates[I]->getOpcode() != BO_AddAssign &&
             Updates[I]->getOpcode() != BO_SubAssign &&
@@ -755,6 +747,8 @@ private:
         if (!Peer || Peer->getDecl() != Targets[I + 1])
           return false;
         IsProductUpdate[I] = Updates[I]->getOpcode() == BO_MulAssign;
+        if (IsProductUpdate[I])
+          ProductMonomials[I].push_back({1, 1, nullptr, false});
       }
       if (IsProductUpdate[I]) {
         NeedsPrimalTape[I] = true;
@@ -849,24 +843,19 @@ private:
       Result->Value.Activity = ADActivity::Active;
       Result->Value.PrimalType = Targets[I]->getType();
       Result->RuntimeLoopProductUpdate = IsProductUpdate[I];
-      Result->RuntimeLoopProductTargetPower = ProductTargetPowers[I];
-      Result->RuntimeLoopProductPeerPower = ProductPeerPowers[I];
-      if (ProductCoefficients[I]) {
-        Result->RuntimeLoopProductCoefficient =
-            buildExpr(ProductCoefficients[I], /*ForceInactive=*/true);
-        if (!Result->RuntimeLoopProductCoefficient)
-          return false;
+      for (const ParsedMonomial &Parsed : ProductMonomials[I]) {
+        ADExpr::RuntimeLoopMonomial Monomial;
+        Monomial.TargetPower = Parsed.TargetPower;
+        Monomial.PeerPower = Parsed.PeerPower;
+        Monomial.Subtracts = Parsed.Subtracts;
+        if (Parsed.Coefficient) {
+          Monomial.Coefficient =
+              buildExpr(Parsed.Coefficient, /*ForceInactive=*/true);
+          if (!Monomial.Coefficient)
+            return false;
+        }
+        Result->RuntimeLoopMonomials.push_back(Monomial);
       }
-      Result->RuntimeLoopSecondProductTargetPower =
-          SecondProductTargetPowers[I];
-      Result->RuntimeLoopSecondProductPeerPower = SecondProductPeerPowers[I];
-      if (SecondProductCoefficients[I]) {
-        Result->RuntimeLoopSecondProductCoefficient =
-            buildExpr(SecondProductCoefficients[I], /*ForceInactive=*/true);
-        if (!Result->RuntimeLoopSecondProductCoefficient)
-          return false;
-      }
-      Result->RuntimeLoopSubtractsSecondProduct = SubtractsSecondProduct[I];
       if (ProductLinearCoefficients[I]) {
         Result->RuntimeLoopLinearCoefficient =
             buildExpr(ProductLinearCoefficients[I], /*ForceInactive=*/true);

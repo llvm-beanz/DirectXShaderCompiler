@@ -37,6 +37,13 @@ struct ADValueInfo {
 };
 
 struct ADExpr {
+  struct RuntimeLoopMonomial {
+    unsigned TargetPower = 0;
+    unsigned PeerPower = 0;
+    const ADExpr *Coefficient = nullptr;
+    bool Subtracts = false;
+  };
+
   enum class Kind {
     Literal,
     DeclRef,
@@ -78,13 +85,7 @@ struct ADExpr {
   llvm::SmallVector<const ADExpr *, 4> RuntimeLoopLinearGroup;
   unsigned RuntimeLoopLinearGroupIndex = 0;
   bool RuntimeLoopProductUpdate = false;
-  unsigned RuntimeLoopProductTargetPower = 1;
-  unsigned RuntimeLoopProductPeerPower = 1;
-  const ADExpr *RuntimeLoopProductCoefficient = nullptr;
-  unsigned RuntimeLoopSecondProductTargetPower = 0;
-  unsigned RuntimeLoopSecondProductPeerPower = 0;
-  const ADExpr *RuntimeLoopSecondProductCoefficient = nullptr;
-  bool RuntimeLoopSubtractsSecondProduct = false;
+  llvm::SmallVector<RuntimeLoopMonomial, 4> RuntimeLoopMonomials;
   const ADExpr *RuntimeLoopPeerLinearCoefficient = nullptr;
   bool RuntimeLoopSubtractsPeerLinearCoefficient = false;
   const ADExpr *Receiver = nullptr;
