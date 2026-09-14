@@ -1885,14 +1885,22 @@ private:
                << E->LoopCounter->getName() << "] * " << Adjoints[I - 1]
                << ";\n";
             OS << "        " << Adjoints[I - 1] << " *= ";
-            if (Update->RuntimeLoopProductCoefficient) {
+            bool HasTargetSum = Update->RuntimeLoopProductCoefficient ||
+                                Update->RuntimeLoopLinearCoefficient;
+            if (HasTargetSum)
               OS << "(";
+            if (Update->RuntimeLoopProductCoefficient) {
               emitPrimal(Update->RuntimeLoopProductCoefficient);
               OS << " * ";
             }
             OS << "__dxc_ad_loop_" << PeerLoopID << "_primal_tape["
                << E->LoopCounter->getName() << "]";
-            if (Update->RuntimeLoopProductCoefficient)
+            if (Update->RuntimeLoopLinearCoefficient) {
+              OS << (Update->RuntimeLoopSubtractsLinearCoefficient ? " - "
+                                                                   : " + ");
+              emitPrimal(Update->RuntimeLoopLinearCoefficient);
+            }
+            if (HasTargetSum)
               OS << ")";
             OS << ";\n";
           } else {
