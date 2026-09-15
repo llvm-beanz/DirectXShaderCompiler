@@ -792,42 +792,6 @@ private:
     if (!UsesUpdatedState)
       return false;
 
-    auto IsStateRef = [&](const Expr *Expression) {
-      const auto *Ref =
-          dyn_cast<DeclRefExpr>(Expression->IgnoreParenImpCasts());
-      return Ref && SeenTargets.count(getCanonicalValueDecl(Ref->getDecl()));
-    };
-    for (const BinaryOperator *Update : Updates) {
-      const Expr *RHS = Update->getRHS()->IgnoreParenImpCasts();
-      switch (Update->getOpcode()) {
-      case BO_Assign:
-        if (const auto *Outer = dyn_cast<BinaryOperator>(RHS))
-          if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
-              !referencesActiveValue(Outer->getRHS()))
-            RHS = Outer->getLHS()->IgnoreParenImpCasts();
-        if (const auto *Product = dyn_cast<BinaryOperator>(RHS)) {
-          if (Product->getOpcode() != BO_Mul ||
-              !IsStateRef(Product->getLHS()) || !IsStateRef(Product->getRHS()))
-            return false;
-        } else {
-          return false;
-        }
-        break;
-      case BO_AddAssign:
-      case BO_SubAssign:
-        if (!IsStateRef(RHS))
-          return false;
-        break;
-      case BO_MulAssign:
-      case BO_DivAssign:
-        if (referencesActiveValue(RHS))
-          return false;
-        break;
-      default:
-        llvm_unreachable("validated generic runtime update");
-      }
-    }
-
     unsigned TapeSize = 0;
     const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
     const auto *BoundCall =
@@ -867,6 +831,97 @@ private:
       if (!Factor)
         return false;
       Factors.push_back(Factor);
+    }
+
+    auto SupportsUpdateExpr = [&](const auto &Self,
+                                  const ADExpr *Expression) -> bool {
+      if (Expression->Value.Activity == ADActivity::Inactive)
+        return true;
+      switch (Expression->K) {
+      case ADExpr::Kind::DeclRef:
+      case ADExpr::Kind::LocalRef:
+        return Expression->SourceDecl &&
+               SeenTargets.count(getCanonicalValueDecl(Expression->SourceDecl));
+      case ADExpr::Kind::Unary:
+      case ADExpr::Kind::Cast:
+        return Self(Self, Expression->Operands.front());
+      case ADExpr::Kind::Binary:
+        switch (Expression->BinaryOpcode) {
+        case BO_Add:
+        case BO_Sub:
+        case BO_Mul:
+          return Self(Self, Expression->Operands[0]) &&
+                 Self(Self, Expression->Operands[1]);
+        case BO_Div:
+          return Expression->Operands[1]->Value.Activity ==
+                     ADActivity::Inactive &&
+                 Self(Self, Expression->Operands[0]);
+        default:
+          return false;
+        }
+      default:
+        return false;
+      }
+    };
+    auto IsStateValue = [&](const ADExpr *Expression) {
+      return Expression->Value.Activity == ADActivity::Active &&
+             (Expression->K == ADExpr::Kind::DeclRef ||
+              Expression->K == ADExpr::Kind::LocalRef) &&
+             Expression->SourceDecl &&
+             SeenTargets.count(getCanonicalValueDecl(Expression->SourceDecl));
+    };
+    auto SupportsProductOperand = [&](const auto &Self,
+                                      const ADExpr *Expression) -> bool {
+      if (IsStateValue(Expression))
+        return true;
+      switch (Expression->K) {
+      case ADExpr::Kind::Unary:
+      case ADExpr::Kind::Cast:
+        return Self(Self, Expression->Operands.front());
+      case ADExpr::Kind::Binary:
+        return (Expression->BinaryOpcode == BO_Add ||
+                Expression->BinaryOpcode == BO_Sub) &&
+               SupportsUpdateExpr(SupportsUpdateExpr,
+                                  Expression->Operands[0]) &&
+               SupportsUpdateExpr(SupportsUpdateExpr, Expression->Operands[1]);
+      default:
+        return false;
+      }
+    };
+    for (unsigned I = 0; I < Updates.size(); ++I) {
+      if (!SupportsUpdateExpr(SupportsUpdateExpr, Factors[I]))
+        return false;
+      const ADExpr *Factor = Factors[I];
+      switch (Updates[I]->getOpcode()) {
+      case BO_Assign:
+        if (Factor->K == ADExpr::Kind::Binary &&
+            (Factor->BinaryOpcode == BO_Add ||
+             Factor->BinaryOpcode == BO_Sub) &&
+            Factor->Operands[1]->Value.Activity == ADActivity::Inactive)
+          Factor = Factor->Operands[0];
+        if (Factor->K != ADExpr::Kind::Binary ||
+            Factor->BinaryOpcode != BO_Mul ||
+            Factor->Operands[0]->Value.Activity != ADActivity::Active ||
+            Factor->Operands[1]->Value.Activity != ADActivity::Active ||
+            !SupportsProductOperand(SupportsProductOperand,
+                                    Factor->Operands[0]) ||
+            !SupportsProductOperand(SupportsProductOperand,
+                                    Factor->Operands[1]))
+          return false;
+        break;
+      case BO_AddAssign:
+      case BO_SubAssign:
+        if (!IsStateValue(Factor))
+          return false;
+        break;
+      case BO_MulAssign:
+      case BO_DivAssign:
+        if (Factor->Value.Activity == ADActivity::Active)
+          return false;
+        break;
+      default:
+        return false;
+      }
     }
 
     SmallVector<const ADExpr *, 4> Results;

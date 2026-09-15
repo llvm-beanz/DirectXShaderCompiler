@@ -1433,18 +1433,36 @@ private:
     }
   }
 
-  bool isDirectActiveLoopProduct(const hlsl::autodiff::ADExpr *E) const {
+  bool
+  supportsGenericLoopProductOperand(const hlsl::autodiff::ADExpr *E) const {
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    switch (E->K) {
+    case Kind::LoopStateRef:
+      return true;
+    case Kind::Unary:
+    case Kind::Cast:
+      return supportsGenericLoopProductOperand(E->Operands.front());
+    case Kind::Binary:
+      return (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
+             supportsGenericLoopPullback(E->Operands[0]) &&
+             supportsGenericLoopPullback(E->Operands[1]);
+    default:
+      return false;
+    }
+  }
+
+  bool supportsGenericLoopAssignment(const hlsl::autodiff::ADExpr *E) const {
     using Activity = hlsl::autodiff::ADActivity;
     using Kind = hlsl::autodiff::ADExpr::Kind;
     if (E->K == Kind::Binary &&
-        (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub)) {
-      if (E->Operands[1]->Value.Activity == Activity::Inactive)
-        return isDirectActiveLoopProduct(E->Operands[0]);
-      return false;
-    }
+        (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
+        E->Operands[1]->Value.Activity == Activity::Inactive)
+      E = E->Operands[0];
     return E->K == Kind::Binary && E->BinaryOpcode == BO_Mul &&
-           E->Operands[0]->K == Kind::LoopStateRef &&
-           E->Operands[1]->K == Kind::LoopStateRef;
+           E->Operands[0]->Value.Activity == Activity::Active &&
+           E->Operands[1]->Value.Activity == Activity::Active &&
+           supportsGenericLoopProductOperand(E->Operands[0]) &&
+           supportsGenericLoopProductOperand(E->Operands[1]);
   }
 
   bool
@@ -1454,7 +1472,7 @@ private:
     for (const hlsl::autodiff::ADLoopUpdate &Update : Loop.Updates) {
       switch (Update.Opcode) {
       case BO_Assign:
-        if (!isDirectActiveLoopProduct(Update.Pullback.Value))
+        if (!supportsGenericLoopAssignment(Update.Pullback.Value))
           return false;
         LLVM_FALLTHROUGH;
       case BO_Add:
@@ -1880,15 +1898,39 @@ private:
 
   std::string genericLoopPrimalText(const hlsl::autodiff::ADExpr *E,
                                     const hlsl::autodiff::ADLoopPlan &Loop) {
-    if (E->K != hlsl::autodiff::ADExpr::Kind::LoopStateRef)
+    using Activity = hlsl::autodiff::ADActivity;
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    if (E->Value.Activity == Activity::Inactive)
       return primalText(E);
-    const hlsl::autodiff::ADLoopState &State = Loop.States[E->LoopStateIndex];
-    unsigned LoopID = RuntimeLoopIDs.lookup(State.Result);
-    std::string Version = E->LoopStateVersion == 0
-                              ? ""
-                              : "_version_" + Twine(E->LoopStateVersion).str();
-    return "__dxc_ad_loop_" + Twine(LoopID).str() + Version + "_primal_tape[" +
-           Loop.Counter->getName().str() + "]";
+    switch (E->K) {
+    case Kind::LoopStateRef: {
+      const hlsl::autodiff::ADLoopState &State = Loop.States[E->LoopStateIndex];
+      unsigned LoopID = RuntimeLoopIDs.lookup(State.Result);
+      std::string Version =
+          E->LoopStateVersion == 0
+              ? ""
+              : "_version_" + Twine(E->LoopStateVersion).str();
+      return "__dxc_ad_loop_" + Twine(LoopID).str() + Version +
+             "_primal_tape[" + Loop.Counter->getName().str() + "]";
+    }
+    case Kind::Unary:
+      return UnaryOperator::getOpcodeStr(E->UnaryOpcode).str() + "(" +
+             genericLoopPrimalText(E->Operands.front(), Loop) + ")";
+    case Kind::Cast: {
+      std::string Type;
+      raw_string_ostream Stream(Type);
+      E->Value.PrimalType.print(Stream, Policy);
+      Stream.flush();
+      return "(" + Type + ")" +
+             genericLoopPrimalText(E->Operands.front(), Loop);
+    }
+    case Kind::Binary:
+      return "(" + genericLoopPrimalText(E->Operands[0], Loop) + " " +
+             BinaryOperator::getOpcodeStr(E->BinaryOpcode).str() + " " +
+             genericLoopPrimalText(E->Operands[1], Loop) + ")";
+    default:
+      return primalText(E);
+    }
   }
 
   void emitGenericLoopPullback(const hlsl::autodiff::ADExpr *E,
