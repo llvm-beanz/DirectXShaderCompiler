@@ -1,17 +1,17 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 // RUN: %dxr -generate-differentials %s > %t.gen.hlsl
-// RUN: cat %t.gen.hlsl %S/Inputs/active_runtime_for_generic_swizzle_caller.hlsl > %t.run.hlsl
+// RUN: cat %t.gen.hlsl %S/Inputs/active_runtime_for_generic_construct_caller.hlsl > %t.run.hlsl
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// A swizzle assignment reads an intra-iteration state version and routes its
-// cotangent back through the selected lanes in reverse update order.
+// A vector constructor splits its cotangent in constructor order before the
+// scalar swizzles route those lanes back to the updated loop state.
 
 // CHECK: x.value += y.value;
-// CHECK: y.value = x.value.yx;
+// CHECK: y.value = float2(x.value.y, x.value.x);
 // CHECK: float2 __dxc_ad_loop_0_update_1_adjoint = __dxc_ad_loop_0_state_1_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint += float2(__dxc_ad_loop_0_update_1_adjoint.y, __dxc_ad_loop_0_update_1_adjoint.x);
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += float2(0.0f, __dxc_ad_loop_0_update_1_adjoint.x);
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += float2(__dxc_ad_loop_0_update_1_adjoint.y, 0.0f);
 
 // One iteration returns (20,22). Seed (2,3) produces x and y gradients (5,5)
 // and z gradient (4,6).
@@ -29,23 +29,7 @@ float2 f(float2 x, float2 y, float2 z, [[dxc::no_diff]] uint count,
          [[dxc::no_diff]] float factor) {
   for (uint iteration = 0; iteration < min(count, 8); ++iteration) {
     x += y;
-    y = x.yx;
-    z *= factor;
-  }
-  return x + y + z;
-}
-
-// CHECK-LABEL: float2 product_f(inout GradientContext<float2>
-// CHECK: float2 __dxc_ad_loop_0_version_1_primal_tape[8];
-// CHECK: y.value = (x.value.yx * z.value);
-// CHECK: __dxc_ad_loop_0_version_1_primal_tape[iteration].yx
-[[dxc::autodiff(bwd)]]
-float2 product_f(float2 x, float2 y, float2 z,
-                 [[dxc::no_diff]] uint count,
-                 [[dxc::no_diff]] float factor) {
-  for (uint iteration = 0; iteration < min(count, 8); ++iteration) {
-    x += y;
-    y = x.yx * z;
+    y = float2(x.y, x.x);
     z *= factor;
   }
   return x + y + z;

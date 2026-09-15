@@ -848,6 +848,11 @@ private:
       case ADExpr::Kind::LocalRef:
         return Expression->SourceDecl &&
                SeenTargets.count(getCanonicalValueDecl(Expression->SourceDecl));
+      case ADExpr::Kind::AggregateConstruct:
+        for (const ADExpr *Operand : Expression->Operands)
+          if (!Self(Self, Operand))
+            return false;
+        return true;
       case ADExpr::Kind::Swizzle:
       case ADExpr::Kind::Unary:
       case ADExpr::Kind::Cast:
@@ -914,7 +919,8 @@ private:
              Factor->BinaryOpcode == BO_Sub) &&
             Factor->Operands[1]->Value.Activity == ADActivity::Inactive)
           Factor = Factor->Operands[0];
-        if (Factor->K == ADExpr::Kind::Call ||
+        if (Factor->K == ADExpr::Kind::AggregateConstruct ||
+            Factor->K == ADExpr::Kind::Call ||
             Factor->K == ADExpr::Kind::Swizzle)
           break;
         if (Factor->K != ADExpr::Kind::Binary ||

@@ -1414,6 +1414,11 @@ private:
     switch (E->K) {
     case Kind::LoopStateRef:
       return true;
+    case Kind::AggregateConstruct:
+      for (const hlsl::autodiff::ADExpr *Operand : E->Operands)
+        if (!supportsGenericLoopPullback(Operand))
+          return false;
+      return true;
     case Kind::Swizzle:
     case Kind::Unary:
     case Kind::Cast:
@@ -1471,7 +1476,8 @@ private:
         (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
         E->Operands[1]->Value.Activity == Activity::Inactive)
       E = E->Operands[0];
-    if (E->K == Kind::Swizzle || isGenericLoopIntrinsic(E))
+    if (E->K == Kind::AggregateConstruct || E->K == Kind::Swizzle ||
+        isGenericLoopIntrinsic(E))
       return true;
     return E->K == Kind::Binary && E->BinaryOpcode == BO_Mul &&
            E->Operands[0]->Value.Activity == Activity::Active &&
@@ -1934,6 +1940,19 @@ private:
                  ->getAccessor()
                  .getName()
                  .str();
+    case Kind::AggregateConstruct: {
+      std::string Text;
+      if (isa<InitListExpr>(E->SourceExpr))
+        Text = "{";
+      else
+        Text = printType(E->Value.PrimalType, Policy) + "(";
+      for (unsigned I = 0; I < E->Operands.size(); ++I) {
+        if (I)
+          Text += ", ";
+        Text += genericLoopPrimalText(E->Operands[I], Loop);
+      }
+      return Text + (isa<InitListExpr>(E->SourceExpr) ? "}" : ")");
+    }
     case Kind::Unary:
       return UnaryOperator::getOpcodeStr(E->UnaryOpcode).str() + "(" +
              genericLoopPrimalText(E->Operands.front(), Loop) + ")";
@@ -1987,6 +2006,34 @@ private:
       emitGenericLoopPullback(
           Base, constructCotangent(Base->Value.PrimalType, Values),
           StateAdjoints, Loop);
+      return;
+    }
+    case Kind::AggregateConstruct: {
+      unsigned Offset = 0;
+      auto EmitAggregatePullback =
+          [&](const auto &Self,
+              const hlsl::autodiff::ADExpr *Aggregate) -> void {
+        for (const hlsl::autodiff::ADExpr *Operand : Aggregate->Operands) {
+          unsigned OperandCount = getComponentCount(Operand->Value.PrimalType);
+          if (Operand->Value.Activity == Activity::Inactive) {
+            Offset += OperandCount;
+            continue;
+          }
+          if (Operand->K == Kind::AggregateConstruct) {
+            Self(Self, Operand);
+            continue;
+          }
+          SmallVector<std::string, 4> Values;
+          for (unsigned I = 0; I < OperandCount; ++I)
+            Values.push_back(
+                component(Cotangent, Offset + I, E->Value.PrimalType));
+          emitGenericLoopPullback(
+              Operand, constructCotangent(Operand->Value.PrimalType, Values),
+              StateAdjoints, Loop);
+          Offset += OperandCount;
+        }
+      };
+      EmitAggregatePullback(EmitAggregatePullback, E);
       return;
     }
     case Kind::Unary:
