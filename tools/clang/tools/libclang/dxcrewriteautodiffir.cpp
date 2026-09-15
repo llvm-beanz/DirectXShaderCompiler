@@ -848,6 +848,7 @@ private:
       case ADExpr::Kind::LocalRef:
         return Expression->SourceDecl &&
                SeenTargets.count(getCanonicalValueDecl(Expression->SourceDecl));
+      case ADExpr::Kind::Swizzle:
       case ADExpr::Kind::Unary:
       case ADExpr::Kind::Cast:
         return Self(Self, Expression->Operands.front());
@@ -888,6 +889,7 @@ private:
       if (IsStateValue(Expression))
         return true;
       switch (Expression->K) {
+      case ADExpr::Kind::Swizzle:
       case ADExpr::Kind::Unary:
       case ADExpr::Kind::Cast:
         return Self(Self, Expression->Operands.front());
@@ -912,7 +914,8 @@ private:
              Factor->BinaryOpcode == BO_Sub) &&
             Factor->Operands[1]->Value.Activity == ADActivity::Inactive)
           Factor = Factor->Operands[0];
-        if (Factor->K == ADExpr::Kind::Call)
+        if (Factor->K == ADExpr::Kind::Call ||
+            Factor->K == ADExpr::Kind::Swizzle)
           break;
         if (Factor->K != ADExpr::Kind::Binary ||
             Factor->BinaryOpcode != BO_Mul ||

@@ -1414,6 +1414,7 @@ private:
     switch (E->K) {
     case Kind::LoopStateRef:
       return true;
+    case Kind::Swizzle:
     case Kind::Unary:
     case Kind::Cast:
       return supportsGenericLoopPullback(E->Operands.front());
@@ -1450,6 +1451,7 @@ private:
     switch (E->K) {
     case Kind::LoopStateRef:
       return true;
+    case Kind::Swizzle:
     case Kind::Unary:
     case Kind::Cast:
       return supportsGenericLoopProductOperand(E->Operands.front());
@@ -1469,7 +1471,7 @@ private:
         (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
         E->Operands[1]->Value.Activity == Activity::Inactive)
       E = E->Operands[0];
-    if (isGenericLoopIntrinsic(E))
+    if (E->K == Kind::Swizzle || isGenericLoopIntrinsic(E))
       return true;
     return E->K == Kind::Binary && E->BinaryOpcode == BO_Mul &&
            E->Operands[0]->Value.Activity == Activity::Active &&
@@ -1926,6 +1928,12 @@ private:
       return "__dxc_ad_loop_" + Twine(LoopID).str() + Version +
              "_primal_tape[" + Loop.Counter->getName().str() + "]";
     }
+    case Kind::Swizzle:
+      return genericLoopPrimalText(E->Operands.front(), Loop) + "." +
+             cast<HLSLVectorElementExpr>(E->SourceExpr)
+                 ->getAccessor()
+                 .getName()
+                 .str();
     case Kind::Unary:
       return UnaryOperator::getOpcodeStr(E->UnaryOpcode).str() + "(" +
              genericLoopPrimalText(E->Operands.front(), Loop) + ")";
@@ -1962,6 +1970,25 @@ private:
       OS << "        " << StateAdjoints[E->LoopStateIndex]
          << " += " << Cotangent << ";\n";
       return;
+    case Kind::Swizzle: {
+      const hlsl::autodiff::ADExpr *Base = E->Operands.front();
+      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
+      SmallVector<std::string, 4> Values;
+      for (unsigned BaseIndex = 0; BaseIndex < BaseCount; ++BaseIndex) {
+        std::string Sum;
+        for (unsigned I = 0; I < E->Components.size(); ++I) {
+          if (E->Components[I] != BaseIndex)
+            continue;
+          std::string Term = component(Cotangent, I, E->Value.PrimalType);
+          Sum = Sum.empty() ? Term : "(" + Sum + " + " + Term + ")";
+        }
+        Values.push_back(Sum.empty() ? "0.0f" : Sum);
+      }
+      emitGenericLoopPullback(
+          Base, constructCotangent(Base->Value.PrimalType, Values),
+          StateAdjoints, Loop);
+      return;
+    }
     case Kind::Unary:
       emitGenericLoopPullback(E->Operands.front(),
                               E->UnaryOpcode == UO_Minus
