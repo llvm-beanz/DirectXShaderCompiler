@@ -256,6 +256,20 @@ private:
       Update.Pullback.Value = Update.Value;
       collectLoopPullbackInputs(Update.Value, Update.Pullback.Inputs);
       analyzeLoopPullbackPrimalInputs(Update.Value, Update.Pullback.Inputs);
+      for (const ADLoopPullbackInput &Input : Update.Pullback.Inputs) {
+        if (!Input.NeedsPrimal)
+          continue;
+        if (Input.Version == 0) {
+          Loop->States[Input.StateIndex].NeedsPrimalTape = true;
+          continue;
+        }
+        bool HasSlot = false;
+        for (const ADLoopTapeSlot &Slot : Loop->TapeSlots)
+          HasSlot |= Slot.StateIndex == Input.StateIndex &&
+                     Slot.Version == Input.Version;
+        if (!HasSlot)
+          Loop->TapeSlots.push_back({Input.StateIndex, Input.Version});
+      }
       Loop->Updates.push_back(Update);
     }
     for (unsigned I = 0; I < Loop->States.size(); ++I)
@@ -730,6 +744,171 @@ private:
       Results.push_back(Result);
     }
     ADStmt Statement{ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS};
+    Statement.Values = Results;
+    Statement.Loop = createLoopPlan(FS, Counter, Count, Results);
+    Plan.Statements.push_back(std::move(Statement));
+    return true;
+  }
+
+  bool buildGenericVersionedRuntimeFor(const ForStmt *FS,
+                                       const VarDecl *Counter,
+                                       const ADExpr *Count,
+                                       const CompoundStmt *Body) {
+    if (Body->size() < 3)
+      return false;
+
+    SmallVector<const BinaryOperator *, 4> Updates;
+    SmallVector<const ParmVarDecl *, 4> Targets;
+    SmallVector<const DeclRefExpr *, 4> TargetRefs;
+    SmallPtrSet<const ValueDecl *, 4> SeenTargets;
+    for (const Stmt *Child : Body->body()) {
+      const auto *Update = dyn_cast<BinaryOperator>(Child);
+      if (!Update || (Update->getOpcode() != BO_Assign &&
+                      Update->getOpcode() != BO_AddAssign &&
+                      Update->getOpcode() != BO_SubAssign &&
+                      Update->getOpcode() != BO_MulAssign &&
+                      Update->getOpcode() != BO_DivAssign))
+        return false;
+      const auto *TargetRef =
+          dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
+      const auto *Target =
+          TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
+      if (!Target || Target->hasAttr<HLSLNoDiffAttr>() ||
+          !SeenTargets.insert(getCanonicalValueDecl(Target)).second)
+        return false;
+      if (!Targets.empty() &&
+          !Ctx.hasSameType(Targets.front()->getType(), Target->getType()))
+        return false;
+      Updates.push_back(Update);
+      Targets.push_back(Target);
+      TargetRefs.push_back(TargetRef);
+    }
+
+    bool UsesUpdatedState = false;
+    for (unsigned I = 0; I < Updates.size(); ++I)
+      for (unsigned Previous = 0; Previous < I; ++Previous)
+        UsesUpdatedState |= referencesDecl(
+            Updates[I]->getRHS(), getCanonicalValueDecl(Targets[Previous]));
+    if (!UsesUpdatedState)
+      return false;
+
+    auto IsStateRef = [&](const Expr *Expression) {
+      const auto *Ref =
+          dyn_cast<DeclRefExpr>(Expression->IgnoreParenImpCasts());
+      return Ref && SeenTargets.count(getCanonicalValueDecl(Ref->getDecl()));
+    };
+    for (const BinaryOperator *Update : Updates) {
+      const Expr *RHS = Update->getRHS()->IgnoreParenImpCasts();
+      switch (Update->getOpcode()) {
+      case BO_Assign:
+        if (const auto *Outer = dyn_cast<BinaryOperator>(RHS))
+          if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
+              !referencesActiveValue(Outer->getRHS()))
+            RHS = Outer->getLHS()->IgnoreParenImpCasts();
+        if (const auto *Product = dyn_cast<BinaryOperator>(RHS)) {
+          if (Product->getOpcode() != BO_Mul ||
+              !IsStateRef(Product->getLHS()) || !IsStateRef(Product->getRHS()))
+            return false;
+        } else {
+          return false;
+        }
+        break;
+      case BO_AddAssign:
+      case BO_SubAssign:
+        if (!IsStateRef(RHS))
+          return false;
+        break;
+      case BO_MulAssign:
+      case BO_DivAssign:
+        if (referencesActiveValue(RHS))
+          return false;
+        break;
+      default:
+        llvm_unreachable("validated generic runtime update");
+      }
+    }
+
+    unsigned TapeSize = 0;
+    const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
+    const auto *BoundCall =
+        Condition
+            ? dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts())
+            : nullptr;
+    if (BoundCall && BoundCall->getDirectCallee() &&
+        BoundCall->getDirectCallee()->getName() == "min")
+      for (const Expr *Argument : BoundCall->arguments())
+        if (const auto *Limit =
+                dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
+          TapeSize = Limit->getValue().getLimitedValue(1025);
+    if (TapeSize == 0 || TapeSize > 1024)
+      return fail("active generic runtime loop requires a min(count, N) bound "
+                  "with N between 1 and 1024");
+
+    SmallVector<const ADBinding *, 4> Before;
+    for (unsigned I = 0; I < Targets.size(); ++I) {
+      const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Targets[I]);
+      auto BindingIt = CurrentBindings.find(CanonicalTarget);
+      if (BindingIt != CurrentBindings.end()) {
+        if (!BindingIt->second->Value)
+          return fail("generic runtime loop reads an uninitialized value");
+        Before.push_back(BindingIt->second);
+        continue;
+      }
+      ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRefs[I]);
+      Initial->SourceDecl = CanonicalTarget;
+      Initial->Value.SourceDecl = CanonicalTarget;
+      Initial->Value.Activity = ADActivity::Active;
+      Before.push_back(createBinding(Targets[I], 0, Initial));
+    }
+
+    SmallVector<const ADExpr *, 4> Factors;
+    for (const BinaryOperator *Update : Updates) {
+      const ADExpr *Factor = buildExpr(Update->getRHS());
+      if (!Factor)
+        return false;
+      Factors.push_back(Factor);
+    }
+
+    SmallVector<const ADExpr *, 4> Results;
+    for (unsigned I = 0; I < Targets.size(); ++I) {
+      ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Updates[I]);
+      Result->SourceDecl = getCanonicalValueDecl(Targets[I]);
+      Result->LoopCounter = Counter;
+      switch (Updates[I]->getOpcode()) {
+      case BO_Assign:
+        Result->BinaryOpcode = BO_Assign;
+        break;
+      case BO_AddAssign:
+        Result->BinaryOpcode = BO_Add;
+        break;
+      case BO_SubAssign:
+        Result->BinaryOpcode = BO_Sub;
+        break;
+      case BO_MulAssign:
+        Result->BinaryOpcode = BO_Mul;
+        break;
+      case BO_DivAssign:
+        Result->BinaryOpcode = BO_Div;
+        break;
+      default:
+        llvm_unreachable("validated generic runtime update");
+      }
+      Result->Operands.push_back(
+          createLocalRef(TargetRefs[I], Before[I], false));
+      Result->Operands.push_back(Count);
+      Result->Operands.push_back(Factors[I]);
+      Result->Value.Activity = ADActivity::Active;
+      Result->Value.PrimalType = Targets[I]->getType();
+      Result->RuntimeLoopUsesPrimalTape = true;
+      Result->RuntimeLoopTapeSize = TapeSize;
+      Results.push_back(Result);
+    }
+    for (unsigned I = 0; I < Results.size(); ++I) {
+      const ADBinding *After =
+          createBinding(Targets[I], Before[I]->Version + 1, Results[I]);
+      CurrentBindings[getCanonicalValueDecl(Targets[I])] = After;
+    }
+    ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS);
     Statement.Values = Results;
     Statement.Loop = createLoopPlan(FS, Counter, Count, Results);
     Plan.Statements.push_back(std::move(Statement));
@@ -1290,6 +1469,8 @@ private:
           return false;
         if (Count->Value.Activity == ADActivity::Active)
           return fail("active runtime loop count must be inactive");
+        if (buildGenericVersionedRuntimeFor(FS, Counter, Count, Compound))
+          return true;
         if (buildActiveRuntimeChain(FS, Counter, Count, Compound))
           return true;
         if (buildCoupledActiveRuntimeFor(FS, Counter, Count, Compound))

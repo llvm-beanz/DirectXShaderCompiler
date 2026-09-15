@@ -1314,7 +1314,7 @@ public:
         assert(S.Loop && "active loop has no structured loop plan");
         const hlsl::autodiff::ADLoopPlan &Loop = *S.Loop;
         SmallVector<unsigned, 4> LoopIDs;
-        bool NeedsBraces = Loop.States.size() > 1;
+        bool NeedsBraces = Loop.States.size() > 1 || !Loop.TapeSlots.empty();
         for (const hlsl::autodiff::ADLoopState &State : Loop.States) {
           unsigned LoopID = NextLoopID++;
           LoopIDs.push_back(LoopID);
@@ -1326,6 +1326,11 @@ public:
                << " __dxc_ad_loop_" << LoopID << "_primal_tape["
                << Loop.TapeCapacity << "];\n";
         }
+        for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
+          OS << "    "
+             << printType(Loop.States[Slot.StateIndex].PrimalType, Policy)
+             << " __dxc_ad_loop_" << LoopIDs[Slot.StateIndex] << "_version_"
+             << Slot.Version << "_primal_tape[" << Loop.TapeCapacity << "];\n";
         OS << "    for (uint " << Loop.Counter->getName() << " = 0; "
            << Loop.Counter->getName() << " < ";
         emitPrimal(Loop.TripCount);
@@ -1362,6 +1367,12 @@ public:
           }
           emitPrimal(Update.Value);
           OS << ";\n";
+          for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
+            if (Slot.StateIndex == Update.TargetStateIndex &&
+                Slot.Version == Update.ResultVersion)
+              OS << "        __dxc_ad_loop_" << LoopID << "_version_"
+                 << Slot.Version << "_primal_tape[" << Loop.Counter->getName()
+                 << "] = " << State.SourceDecl->getName() << ".value;\n";
         }
         if (NeedsBraces)
           OS << "    }\n";
@@ -1462,10 +1473,19 @@ private:
       }
       for (const hlsl::autodiff::ADLoopPullbackInput &Input :
            Update.Pullback.Inputs)
-        if (Input.NeedsPrimal &&
-            (Input.Version != 0 ||
-             !Loop.States[Input.StateIndex].NeedsPrimalTape))
-          return false;
+        if (Input.NeedsPrimal) {
+          if (Input.Version == 0) {
+            if (!Loop.States[Input.StateIndex].NeedsPrimalTape)
+              return false;
+            continue;
+          }
+          bool HasSlot = false;
+          for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
+            HasSlot |= Slot.StateIndex == Input.StateIndex &&
+                       Slot.Version == Input.Version;
+          if (!HasSlot)
+            return false;
+        }
     }
     return true;
   }
@@ -1862,11 +1882,12 @@ private:
                                     const hlsl::autodiff::ADLoopPlan &Loop) {
     if (E->K != hlsl::autodiff::ADExpr::Kind::LoopStateRef)
       return primalText(E);
-    assert(E->LoopStateVersion == 0 &&
-           "generic loop tape only stores iteration inputs");
     const hlsl::autodiff::ADLoopState &State = Loop.States[E->LoopStateIndex];
     unsigned LoopID = RuntimeLoopIDs.lookup(State.Result);
-    return "__dxc_ad_loop_" + Twine(LoopID).str() + "_primal_tape[" +
+    std::string Version = E->LoopStateVersion == 0
+                              ? ""
+                              : "_version_" + Twine(E->LoopStateVersion).str();
+    return "__dxc_ad_loop_" + Twine(LoopID).str() + Version + "_primal_tape[" +
            Loop.Counter->getName().str() + "]";
   }
 

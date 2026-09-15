@@ -127,6 +127,11 @@ struct ADLoopPullback {
   llvm::SmallVector<ADLoopPullbackInput, 4> Inputs;
 };
 
+struct ADLoopTapeSlot {
+  unsigned StateIndex = 0;
+  unsigned Version = 0;
+};
+
 struct ADLoopUpdate {
   unsigned TargetStateIndex = 0;
   unsigned InputVersion = 0;
@@ -143,6 +148,7 @@ struct ADLoopPlan {
   unsigned TapeCapacity = 0;
   llvm::SmallVector<ADLoopState, 4> States;
   llvm::SmallVector<ADLoopUpdate, 4> Updates;
+  llvm::SmallVector<ADLoopTapeSlot, 4> TapeSlots;
 };
 
 struct ADStmt {
