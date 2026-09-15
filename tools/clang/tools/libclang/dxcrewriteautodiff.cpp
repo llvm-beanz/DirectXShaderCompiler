@@ -1419,6 +1419,10 @@ private:
         if (!supportsGenericLoopPullback(Operand))
           return false;
       return true;
+    case Kind::Subscript:
+      return hlsl::IsHLSLVecType(E->Operands[0]->Value.PrimalType) &&
+             E->Operands[1]->Value.Activity == Activity::Inactive &&
+             supportsGenericLoopPullback(E->Operands[0]);
     case Kind::Swizzle:
     case Kind::Unary:
     case Kind::Cast:
@@ -1456,6 +1460,11 @@ private:
     switch (E->K) {
     case Kind::LoopStateRef:
       return true;
+    case Kind::Subscript:
+      return hlsl::IsHLSLVecType(E->Operands[0]->Value.PrimalType) &&
+             E->Operands[1]->Value.Activity ==
+                 hlsl::autodiff::ADActivity::Inactive &&
+             supportsGenericLoopProductOperand(E->Operands[0]);
     case Kind::Swizzle:
     case Kind::Unary:
     case Kind::Cast:
@@ -1953,6 +1962,9 @@ private:
       }
       return Text + (isa<InitListExpr>(E->SourceExpr) ? "}" : ")");
     }
+    case Kind::Subscript:
+      return genericLoopPrimalText(E->Operands[0], Loop) + "[" +
+             primalText(E->Operands[1]) + "]";
     case Kind::Unary:
       return UnaryOperator::getOpcodeStr(E->UnaryOpcode).str() + "(" +
              genericLoopPrimalText(E->Operands.front(), Loop) + ")";
@@ -2034,6 +2046,19 @@ private:
         }
       };
       EmitAggregatePullback(EmitAggregatePullback, E);
+      return;
+    }
+    case Kind::Subscript: {
+      const hlsl::autodiff::ADExpr *Base = E->Operands[0];
+      std::string Index = primalText(E->Operands[1]);
+      SmallVector<std::string, 4> Values;
+      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
+      for (unsigned I = 0; I < BaseCount; ++I)
+        Values.push_back("(" + Index + " == " + Twine(I).str() + " ? " +
+                         Cotangent.str() + " : 0.0f)");
+      emitGenericLoopPullback(
+          Base, constructCotangent(Base->Value.PrimalType, Values),
+          StateAdjoints, Loop);
       return;
     }
     case Kind::Unary:

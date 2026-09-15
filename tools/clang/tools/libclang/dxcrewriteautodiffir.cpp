@@ -853,6 +853,11 @@ private:
           if (!Self(Self, Operand))
             return false;
         return true;
+      case ADExpr::Kind::Subscript:
+        return hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType) &&
+               Expression->Operands[1]->Value.Activity ==
+                   ADActivity::Inactive &&
+               Self(Self, Expression->Operands[0]);
       case ADExpr::Kind::Swizzle:
       case ADExpr::Kind::Unary:
       case ADExpr::Kind::Cast:
@@ -894,6 +899,11 @@ private:
       if (IsStateValue(Expression))
         return true;
       switch (Expression->K) {
+      case ADExpr::Kind::Subscript:
+        return hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType) &&
+               Expression->Operands[1]->Value.Activity ==
+                   ADActivity::Inactive &&
+               Self(Self, Expression->Operands[0]);
       case ADExpr::Kind::Swizzle:
       case ADExpr::Kind::Unary:
       case ADExpr::Kind::Cast:
