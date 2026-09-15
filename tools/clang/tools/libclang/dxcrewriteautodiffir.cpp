@@ -208,6 +208,12 @@ private:
   void analyzeLoopPullbackPrimalInputs(
       const ADExpr *Expression,
       SmallVectorImpl<ADLoopPullbackInput> &Inputs) const {
+    if (Expression->K == ADExpr::Kind::Call && Expression->Callee &&
+        Expression->Operands.size() == 1 &&
+        StringSwitch<bool>(Expression->Callee->getName())
+            .Cases("sin", "cos", "exp", "log", "sqrt", true)
+            .Default(false))
+      markLoopPullbackPrimalInputs(Expression->Operands.front(), Inputs);
     if (Expression->K == ADExpr::Kind::Binary &&
         Expression->BinaryOpcode == BO_Mul &&
         Expression->Operands[0]->Value.Activity == ADActivity::Active &&
@@ -845,6 +851,13 @@ private:
       case ADExpr::Kind::Unary:
       case ADExpr::Kind::Cast:
         return Self(Self, Expression->Operands.front());
+      case ADExpr::Kind::Call:
+        return !Expression->Receiver && Expression->Callee &&
+               Expression->Operands.size() == 1 &&
+               StringSwitch<bool>(Expression->Callee->getName())
+                   .Cases("sin", "cos", "exp", "log", "sqrt", true)
+                   .Default(false) &&
+               Self(Self, Expression->Operands.front());
       case ADExpr::Kind::Binary:
         switch (Expression->BinaryOpcode) {
         case BO_Add:
@@ -899,6 +912,8 @@ private:
              Factor->BinaryOpcode == BO_Sub) &&
             Factor->Operands[1]->Value.Activity == ADActivity::Inactive)
           Factor = Factor->Operands[0];
+        if (Factor->K == ADExpr::Kind::Call)
+          break;
         if (Factor->K != ADExpr::Kind::Binary ||
             Factor->BinaryOpcode != BO_Mul ||
             Factor->Operands[0]->Value.Activity != ADActivity::Active ||

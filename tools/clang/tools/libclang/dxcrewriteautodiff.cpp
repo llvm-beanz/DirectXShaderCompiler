@@ -1398,6 +1398,14 @@ private:
   DenseMap<const hlsl::autodiff::ADExpr *, const hlsl::autodiff::ADLoopPlan *>
       RuntimeLoopPlans;
 
+  bool isGenericLoopIntrinsic(const hlsl::autodiff::ADExpr *E) const {
+    return E->K == hlsl::autodiff::ADExpr::Kind::Call && !E->Receiver &&
+           E->Callee && E->Operands.size() == 1 &&
+           StringSwitch<bool>(E->Callee->getName())
+               .Cases("sin", "cos", "exp", "log", "sqrt", true)
+               .Default(false);
+  }
+
   bool supportsGenericLoopPullback(const hlsl::autodiff::ADExpr *E) const {
     using Activity = hlsl::autodiff::ADActivity;
     using Kind = hlsl::autodiff::ADExpr::Kind;
@@ -1409,6 +1417,9 @@ private:
     case Kind::Unary:
     case Kind::Cast:
       return supportsGenericLoopPullback(E->Operands.front());
+    case Kind::Call:
+      return isGenericLoopIntrinsic(E) &&
+             supportsGenericLoopPullback(E->Operands.front());
     case Kind::Binary:
       switch (E->BinaryOpcode) {
       case BO_Add:
@@ -1458,6 +1469,8 @@ private:
         (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
         E->Operands[1]->Value.Activity == Activity::Inactive)
       E = E->Operands[0];
+    if (isGenericLoopIntrinsic(E))
+      return true;
     return E->K == Kind::Binary && E->BinaryOpcode == BO_Mul &&
            E->Operands[0]->Value.Activity == Activity::Active &&
            E->Operands[1]->Value.Activity == Activity::Active &&
@@ -1924,6 +1937,9 @@ private:
       return "(" + Type + ")" +
              genericLoopPrimalText(E->Operands.front(), Loop);
     }
+    case Kind::Call:
+      return "::" + E->Callee->getName().str() + "(" +
+             genericLoopPrimalText(E->Operands.front(), Loop) + ")";
     case Kind::Binary:
       return "(" + genericLoopPrimalText(E->Operands[0], Loop) + " " +
              BinaryOperator::getOpcodeStr(E->BinaryOpcode).str() + " " +
@@ -1960,6 +1976,26 @@ private:
               ")(" + Cotangent.str() + ")",
           StateAdjoints, Loop);
       return;
+    case Kind::Call: {
+      std::string Primal = genericLoopPrimalText(E->Operands.front(), Loop);
+      std::string Pullback;
+      StringRef Name = E->Callee->getName();
+      if (Name == "sin")
+        Pullback = "(" + Cotangent.str() + " * cos(" + Primal + "))";
+      else if (Name == "cos")
+        Pullback = "-(" + Cotangent.str() + " * sin(" + Primal + "))";
+      else if (Name == "exp")
+        Pullback = "(" + Cotangent.str() + " * exp(" + Primal + "))";
+      else if (Name == "log")
+        Pullback = "(" + Cotangent.str() + " / " + Primal + ")";
+      else if (Name == "sqrt")
+        Pullback = "(" + Cotangent.str() + " * (0.5f / sqrt(" + Primal + ")))";
+      else
+        llvm_unreachable("validated generic loop intrinsic");
+      emitGenericLoopPullback(E->Operands.front(), Pullback, StateAdjoints,
+                              Loop);
+      return;
+    }
     case Kind::Binary:
       switch (E->BinaryOpcode) {
       case BO_Add:
