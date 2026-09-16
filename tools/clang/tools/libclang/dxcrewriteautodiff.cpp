@@ -1448,8 +1448,8 @@ private:
                (supportsGenericLoopPullback(E->Operands[0]) &&
                 supportsGenericLoopPullback(E->Operands[1]));
       case BO_Div:
-        return E->Operands[1]->Value.Activity == Activity::Inactive &&
-               supportsGenericLoopPullback(E->Operands[0]);
+        return supportsGenericLoopPullback(E->Operands[0]) &&
+               supportsGenericLoopPullback(E->Operands[1]);
       default:
         return false;
       }
@@ -1497,6 +1497,8 @@ private:
     if (E->K == Kind::AggregateConstruct || E->K == Kind::Conditional ||
         E->K == Kind::Swizzle || isGenericLoopIntrinsic(E))
       return true;
+    if (E->K == Kind::Binary && E->BinaryOpcode == BO_Div)
+      return supportsGenericLoopPullback(E);
     return E->K == Kind::Binary && E->BinaryOpcode == BO_Mul &&
            E->Operands[0]->Value.Activity == Activity::Active &&
            E->Operands[1]->Value.Activity == Activity::Active &&
@@ -2158,10 +2160,25 @@ private:
         }
         return;
       case BO_Div:
-        emitGenericLoopPullback(E->Operands[0],
-                                "(" + Cotangent.str() + " / " +
-                                    primalText(E->Operands[1]) + ")",
-                                StateAdjoints, Loop);
+        if (E->Operands[1]->Value.Activity == Activity::Inactive) {
+          emitGenericLoopPullback(E->Operands[0],
+                                  "(" + Cotangent.str() + " / " +
+                                      primalText(E->Operands[1]) + ")",
+                                  StateAdjoints, Loop);
+          return;
+        }
+        {
+          std::string Numerator = genericLoopPrimalText(E->Operands[0], Loop);
+          std::string Denominator = genericLoopPrimalText(E->Operands[1], Loop);
+          emitGenericLoopPullback(
+              E->Operands[0], "(" + Cotangent.str() + " / " + Denominator + ")",
+              StateAdjoints, Loop);
+          emitGenericLoopPullback(E->Operands[1],
+                                  "(-(" + Cotangent.str() + ") * " + Numerator +
+                                      " / (" + Denominator + " * " +
+                                      Denominator + "))",
+                                  StateAdjoints, Loop);
+        }
         return;
       default:
         llvm_unreachable("validated generic loop pullback expression");

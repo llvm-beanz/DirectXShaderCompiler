@@ -221,6 +221,12 @@ private:
       markLoopPullbackPrimalInputs(Expression->Operands[0], Inputs);
       markLoopPullbackPrimalInputs(Expression->Operands[1], Inputs);
     }
+    if (Expression->K == ADExpr::Kind::Binary &&
+        Expression->BinaryOpcode == BO_Div &&
+        Expression->Operands[1]->Value.Activity == ADActivity::Active) {
+      markLoopPullbackPrimalInputs(Expression->Operands[0], Inputs);
+      markLoopPullbackPrimalInputs(Expression->Operands[1], Inputs);
+    }
     if (Expression->Receiver)
       analyzeLoopPullbackPrimalInputs(Expression->Receiver, Inputs);
     for (const ADExpr *Operand : Expression->Operands)
@@ -904,9 +910,8 @@ private:
           return Self(Self, Expression->Operands[0]) &&
                  Self(Self, Expression->Operands[1]);
         case BO_Div:
-          return Expression->Operands[1]->Value.Activity ==
-                     ADActivity::Inactive &&
-                 Self(Self, Expression->Operands[0]);
+          return Self(Self, Expression->Operands[0]) &&
+                 Self(Self, Expression->Operands[1]);
         default:
           return false;
         }
@@ -966,6 +971,8 @@ private:
             Factor->K == ADExpr::Kind::Call ||
             Factor->K == ADExpr::Kind::Conditional ||
             Factor->K == ADExpr::Kind::Swizzle)
+          break;
+        if (Factor->K == ADExpr::Kind::Binary && Factor->BinaryOpcode == BO_Div)
           break;
         if (Factor->K != ADExpr::Kind::Binary ||
             Factor->BinaryOpcode != BO_Mul ||
