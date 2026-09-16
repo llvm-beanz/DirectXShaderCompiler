@@ -1423,6 +1423,10 @@ private:
       return hlsl::IsHLSLVecType(E->Operands[0]->Value.PrimalType) &&
              E->Operands[1]->Value.Activity == Activity::Inactive &&
              supportsGenericLoopPullback(E->Operands[0]);
+    case Kind::Conditional:
+      return E->Operands[0]->Value.Activity == Activity::Inactive &&
+             supportsGenericLoopPullback(E->Operands[1]) &&
+             supportsGenericLoopPullback(E->Operands[2]);
     case Kind::Swizzle:
     case Kind::Unary:
     case Kind::Cast:
@@ -1465,6 +1469,11 @@ private:
              E->Operands[1]->Value.Activity ==
                  hlsl::autodiff::ADActivity::Inactive &&
              supportsGenericLoopProductOperand(E->Operands[0]);
+    case Kind::Conditional:
+      return E->Operands[0]->Value.Activity ==
+                 hlsl::autodiff::ADActivity::Inactive &&
+             supportsGenericLoopPullback(E->Operands[1]) &&
+             supportsGenericLoopPullback(E->Operands[2]);
     case Kind::Swizzle:
     case Kind::Unary:
     case Kind::Cast:
@@ -1485,8 +1494,8 @@ private:
         (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
         E->Operands[1]->Value.Activity == Activity::Inactive)
       E = E->Operands[0];
-    if (E->K == Kind::AggregateConstruct || E->K == Kind::Swizzle ||
-        isGenericLoopIntrinsic(E))
+    if (E->K == Kind::AggregateConstruct || E->K == Kind::Conditional ||
+        E->K == Kind::Swizzle || isGenericLoopIntrinsic(E))
       return true;
     return E->K == Kind::Binary && E->BinaryOpcode == BO_Mul &&
            E->Operands[0]->Value.Activity == Activity::Active &&
@@ -1965,6 +1974,10 @@ private:
     case Kind::Subscript:
       return genericLoopPrimalText(E->Operands[0], Loop) + "[" +
              primalText(E->Operands[1]) + "]";
+    case Kind::Conditional:
+      return "(" + primalText(E->Operands[0]) + " ? " +
+             genericLoopPrimalText(E->Operands[1], Loop) + " : " +
+             genericLoopPrimalText(E->Operands[2], Loop) + ")";
     case Kind::Unary:
       return UnaryOperator::getOpcodeStr(E->UnaryOpcode).str() + "(" +
              genericLoopPrimalText(E->Operands.front(), Loop) + ")";
@@ -2059,6 +2072,20 @@ private:
       emitGenericLoopPullback(
           Base, constructCotangent(Base->Value.PrimalType, Values),
           StateAdjoints, Loop);
+      return;
+    }
+    case Kind::Conditional: {
+      std::string Condition = primalText(E->Operands[0]);
+      emitGenericLoopPullback(E->Operands[1],
+                              "(" + Condition + " ? " + Cotangent.str() +
+                                  " : " +
+                                  zero(E->Operands[1]->Value.PrimalType) + ")",
+                              StateAdjoints, Loop);
+      emitGenericLoopPullback(E->Operands[2],
+                              "(" + Condition + " ? " +
+                                  zero(E->Operands[2]->Value.PrimalType) +
+                                  " : " + Cotangent.str() + ")",
+                              StateAdjoints, Loop);
       return;
     }
     case Kind::Unary:

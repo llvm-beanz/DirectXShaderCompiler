@@ -481,6 +481,28 @@ private:
       return Node;
     }
 
+    if (const auto *CO = dyn_cast<ConditionalOperator>(E)) {
+      if (!ForceInactive && referencesActiveValue(CO->getCond())) {
+        fail("the ternary ?: operator is not differentiable");
+        return nullptr;
+      }
+      ADExpr *Node = createExpr(ADExpr::Kind::Conditional, E);
+      const ADExpr *Condition = buildExpr(CO->getCond(), ForceInactive);
+      const ADExpr *TrueValue = buildExpr(CO->getTrueExpr(), ForceInactive);
+      const ADExpr *FalseValue = buildExpr(CO->getFalseExpr(), ForceInactive);
+      if (!Condition || !TrueValue || !FalseValue)
+        return nullptr;
+      Node->Operands.push_back(Condition);
+      Node->Operands.push_back(TrueValue);
+      Node->Operands.push_back(FalseValue);
+      Node->Value.Activity =
+          ForceInactive
+              ? ADActivity::Inactive
+              : combineActivity(
+                    ArrayRef<const ADExpr *>(Node->Operands).slice(1));
+      return Node;
+    }
+
     if (const auto *BO = dyn_cast<BinaryOperator>(E)) {
       bool IsComparison = BO->isComparisonOp();
       bool RequiresInactiveOperands = false;
@@ -858,6 +880,11 @@ private:
                Expression->Operands[1]->Value.Activity ==
                    ADActivity::Inactive &&
                Self(Self, Expression->Operands[0]);
+      case ADExpr::Kind::Conditional:
+        return Expression->Operands[0]->Value.Activity ==
+                   ADActivity::Inactive &&
+               Self(Self, Expression->Operands[1]) &&
+               Self(Self, Expression->Operands[2]);
       case ADExpr::Kind::Swizzle:
       case ADExpr::Kind::Unary:
       case ADExpr::Kind::Cast:
@@ -899,6 +926,12 @@ private:
       if (IsStateValue(Expression))
         return true;
       switch (Expression->K) {
+      case ADExpr::Kind::Conditional:
+        return Expression->Operands[0]->Value.Activity ==
+                   ADActivity::Inactive &&
+               SupportsUpdateExpr(SupportsUpdateExpr,
+                                  Expression->Operands[1]) &&
+               SupportsUpdateExpr(SupportsUpdateExpr, Expression->Operands[2]);
       case ADExpr::Kind::Subscript:
         return hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType) &&
                Expression->Operands[1]->Value.Activity ==
@@ -931,6 +964,7 @@ private:
           Factor = Factor->Operands[0];
         if (Factor->K == ADExpr::Kind::AggregateConstruct ||
             Factor->K == ADExpr::Kind::Call ||
+            Factor->K == ADExpr::Kind::Conditional ||
             Factor->K == ADExpr::Kind::Swizzle)
           break;
         if (Factor->K != ADExpr::Kind::Binary ||
