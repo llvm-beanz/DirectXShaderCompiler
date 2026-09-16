@@ -1522,9 +1522,14 @@ private:
           return false;
         break;
       case BO_Mul:
-      case BO_Div:
         if (Update.Value->Value.Activity !=
             hlsl::autodiff::ADActivity::Inactive)
+          return false;
+        break;
+      case BO_Div:
+        if (Update.Value->Value.Activity !=
+                hlsl::autodiff::ADActivity::Inactive &&
+            !supportsGenericLoopPullback(Update.Pullback.Value))
           return false;
         break;
       default:
@@ -2308,9 +2313,24 @@ private:
             OS << ";\n";
             break;
           case BO_Div:
-            OS << "        " << TargetAdjoint << " /= ";
-            emitPrimal(Update.Value);
-            OS << ";\n";
+            if (Update.Value->Value.Activity ==
+                hlsl::autodiff::ADActivity::Inactive) {
+              OS << "        " << TargetAdjoint << " /= ";
+              emitPrimal(Update.Value);
+              OS << ";\n";
+              break;
+            }
+            {
+              std::string Incoming = "__dxc_ad_loop_" + Twine(LoopID).str() +
+                                     "_update_" + Twine(I - 1).str() +
+                                     "_adjoint";
+              OS << "        " << Type << " " << Incoming << " = "
+                 << TargetAdjoint << ";\n"
+                 << "        " << TargetAdjoint << " = "
+                 << zero(E->Value.PrimalType) << ";\n";
+              emitGenericLoopPullback(Update.Pullback.Value, Incoming, Adjoints,
+                                      Loop);
+            }
             break;
           default:
             llvm_unreachable("validated generic loop update");

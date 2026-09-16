@@ -264,10 +264,21 @@ private:
       Update.Opcode = Result->BinaryOpcode;
       Update.Value =
           createLoopUpdateExpr(Result->Operands[2], StateIndices, Versions);
-      Update.ResultVersion = ++Versions[I];
       Update.Pullback.Value = Update.Value;
-      collectLoopPullbackInputs(Update.Value, Update.Pullback.Inputs);
-      analyzeLoopPullbackPrimalInputs(Update.Value, Update.Pullback.Inputs);
+      if (Update.Opcode == BO_Div &&
+          Update.Value->Value.Activity == ADActivity::Active) {
+        ADExpr *Quotient = createExpr(ADExpr::Kind::Binary, Result->SourceExpr);
+        Quotient->BinaryOpcode = BO_Div;
+        Quotient->Operands.push_back(
+            createLoopUpdateExpr(Result->Operands[0], StateIndices, Versions));
+        Quotient->Operands.push_back(Update.Value);
+        Quotient->Value = Result->Value;
+        Update.Pullback.Value = Quotient;
+      }
+      Update.ResultVersion = ++Versions[I];
+      collectLoopPullbackInputs(Update.Pullback.Value, Update.Pullback.Inputs);
+      analyzeLoopPullbackPrimalInputs(Update.Pullback.Value,
+                                      Update.Pullback.Inputs);
       for (const ADLoopPullbackInput &Input : Update.Pullback.Inputs) {
         if (!Input.NeedsPrimal)
           continue;
@@ -990,9 +1001,10 @@ private:
           return false;
         break;
       case BO_MulAssign:
-      case BO_DivAssign:
         if (Factor->Value.Activity == ADActivity::Active)
           return false;
+        break;
+      case BO_DivAssign:
         break;
       default:
         return false;
