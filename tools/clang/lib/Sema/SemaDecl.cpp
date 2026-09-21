@@ -9120,6 +9120,28 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init,
     return;
   }
 
+  // HLSL Change Begin - disallow initializers on members of cbuffers in HLSL
+  // 202x and later.
+  if (getLangOpts().HLSL) {
+    DeclContext *DCtx = VDecl->getLexicalDeclContext();
+    bool ImplicitCBuffer = DCtx == Context.getTranslationUnitDecl() &&
+                           (VDecl->getType().isConstQualified() &&
+                            VDecl->getStorageClass() == SC_Static);
+    if (ImplicitCBuffer || isa<HLSLBufferDecl>(DCtx)) {
+      bool IsCBuffer =
+          ImplicitCBuffer ? true : cast<HLSLBufferDecl>(DCtx)->isCBuffer();
+      if (getLangOpts().HLSLVersion >= hlsl::LangStd::v202x) {
+        Diag(VDecl->getLocation(), diag::err_hlsl_cbuffer_initializer_ignored)
+            << IsCBuffer;
+        VDecl->setInvalidDecl();
+        return;
+      }
+      Diag(VDecl->getLocation(), diag::warn_hlsl_cbuffer_initializer_ignored)
+          << IsCBuffer;
+    }
+  }
+  // HLSL Chagne End
+
   if (!VDecl->getType()->isDependentType()) {
     // A definition must end up with a complete type, which means it must be
     // complete with the restriction that an array type might be completed by

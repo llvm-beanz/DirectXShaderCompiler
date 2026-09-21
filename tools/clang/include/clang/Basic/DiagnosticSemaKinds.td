@@ -7682,6 +7682,10 @@ def warn_hlsl_builtin_constant_unavailable: Warning<
 def warn_hlsl_builtin_type_unavailable: Warning<
   "potential misuse of built-in type %0 in shader model %1; introduced"
   " in shader model %2">, DefaultError, InGroup<HLSLAvailability>;
+def warn_hlsl_cbuffer_initializer_ignored: Warning<
+  "initializer on member of a %select{cbuffer|tbuffer}0 is ignored">, InGroup<HLSLEffectsSyntax>;
+def err_hlsl_cbuffer_initializer_ignored: Error<
+  "initializer on member of a %select{cbuffer|tbuffer}0 is illegal">;
 def warn_hlsl_builtin_constant_removed
     : Warning<"built-in constant %0 is unavailable in shader model %1; it was "
               "removed"
