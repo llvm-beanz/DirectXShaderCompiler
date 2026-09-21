@@ -1319,6 +1319,9 @@ public:
       } else if (S.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
         assert(S.Loop && "active loop has no structured loop plan");
         const hlsl::autodiff::ADLoopPlan &Loop = *S.Loop;
+        assert(Loop.Storage !=
+                   hlsl::autodiff::ADLoopStorageKind::DynamicRequired &&
+               "dynamic loop tape reached local-array emission");
         SmallVector<unsigned, 4> LoopIDs;
         bool NeedsBraces = Loop.States.size() > 1 || !Loop.TapeSlots.empty();
         for (const hlsl::autodiff::ADLoopState &State : Loop.States) {
@@ -1327,16 +1330,22 @@ public:
           RuntimeLoopIDs[State.Result] = LoopID;
           RuntimeLoopPlans[State.Result] = &Loop;
           NeedsBraces |= State.NeedsPrimalTape;
-          if (State.NeedsPrimalTape)
+          if (Loop.Storage == hlsl::autodiff::ADLoopStorageKind::Recompute)
+            OS << "    " << printType(State.PrimalType, Policy)
+               << " __dxc_ad_loop_" << LoopID << "_initial = "
+               << State.SourceDecl->getName() << ".value;\n";
+          else if (State.NeedsPrimalTape)
             OS << "    " << printType(State.PrimalType, Policy)
                << " __dxc_ad_loop_" << LoopID << "_primal_tape["
                << Loop.TapeCapacity << "];\n";
         }
-        for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
-          OS << "    "
-             << printType(Loop.States[Slot.StateIndex].PrimalType, Policy)
-             << " __dxc_ad_loop_" << LoopIDs[Slot.StateIndex] << "_version_"
-             << Slot.Version << "_primal_tape[" << Loop.TapeCapacity << "];\n";
+        if (Loop.Storage == hlsl::autodiff::ADLoopStorageKind::Static)
+          for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
+            OS << "    "
+               << printType(Loop.States[Slot.StateIndex].PrimalType, Policy)
+               << " __dxc_ad_loop_" << LoopIDs[Slot.StateIndex] << "_version_"
+               << Slot.Version << "_primal_tape[" << Loop.TapeCapacity
+               << "];\n";
         OS << "    for (uint " << Loop.Counter->getName() << " = 0; "
            << Loop.Counter->getName() << " < ";
         emitPrimal(Loop.TripCount);
@@ -1346,7 +1355,8 @@ public:
           const hlsl::autodiff::ADLoopState &State =
               Loop.States[Update.TargetStateIndex];
           unsigned LoopID = LoopIDs[Update.TargetStateIndex];
-          if (State.NeedsPrimalTape)
+            if (Loop.Storage == hlsl::autodiff::ADLoopStorageKind::Static &&
+              State.NeedsPrimalTape)
             OS << "        __dxc_ad_loop_" << LoopID << "_primal_tape["
                << Loop.Counter->getName()
                << "] = " << State.SourceDecl->getName() << ".value;\n";
@@ -1373,12 +1383,14 @@ public:
           }
           emitPrimal(Update.Value);
           OS << ";\n";
-          for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
-            if (Slot.StateIndex == Update.TargetStateIndex &&
-                Slot.Version == Update.ResultVersion)
-              OS << "        __dxc_ad_loop_" << LoopID << "_version_"
-                 << Slot.Version << "_primal_tape[" << Loop.Counter->getName()
-                 << "] = " << State.SourceDecl->getName() << ".value;\n";
+          if (Loop.Storage == hlsl::autodiff::ADLoopStorageKind::Static)
+            for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
+              if (Slot.StateIndex == Update.TargetStateIndex &&
+                  Slot.Version == Update.ResultVersion)
+                OS << "        __dxc_ad_loop_" << LoopID << "_version_"
+                   << Slot.Version << "_primal_tape["
+                   << Loop.Counter->getName() << "] = "
+                   << State.SourceDecl->getName() << ".value;\n";
         }
         if (NeedsBraces)
           OS << "    }\n";
@@ -1468,8 +1480,14 @@ private:
     emitPrimal(E, Out, nullptr);
   }
 
+  struct LoopPrimalContext {
+    enum class Mode { StaticTape, ReplayState, ReplayVersion };
+    const hlsl::autodiff::ADLoopPlan *Loop = nullptr;
+    Mode M = Mode::StaticTape;
+  };
+
   void emitPrimal(const hlsl::autodiff::ADExpr *E, raw_ostream &Out,
-                  const hlsl::autodiff::ADLoopPlan *Loop) {
+                  const LoopPrimalContext *LoopContext) {
     using Kind = hlsl::autodiff::ADExpr::Kind;
     switch (E->K) {
     case Kind::Literal:
@@ -1482,20 +1500,28 @@ private:
           Out << ".value";
       return;
     case Kind::LocalRef:
-      emitPrimal(E->Binding->Value, Out, Loop);
+      emitPrimal(E->Binding->Value, Out, LoopContext);
       return;
     case Kind::LoopStateRef: {
-      if (!Loop) {
+      if (!LoopContext) {
         Out << E->SourceDecl->getName() << ".value";
         return;
       }
+      const hlsl::autodiff::ADLoopPlan &Loop = *LoopContext->Loop;
       const hlsl::autodiff::ADLoopState &State =
-          Loop->States[E->LoopStateIndex];
+          Loop.States[E->LoopStateIndex];
       unsigned LoopID = RuntimeLoopIDs.lookup(State.Result);
       Out << "__dxc_ad_loop_" << LoopID;
-      if (E->LoopStateVersion)
+      if (LoopContext->M == LoopPrimalContext::Mode::ReplayState) {
+        Out << "_replay";
+        return;
+      }
+      if (LoopContext->M == LoopPrimalContext::Mode::ReplayVersion)
+        Out << "_version_" << E->LoopStateVersion << "_replay";
+      else if (E->LoopStateVersion)
         Out << "_version_" << E->LoopStateVersion;
-      Out << "_primal_tape[" << Loop->Counter->getName() << "]";
+      if (LoopContext->M == LoopPrimalContext::Mode::StaticTape)
+        Out << "_primal_tape[" << Loop.Counter->getName() << "]";
       return;
     }
     case Kind::PrimalLocal:
@@ -1506,21 +1532,21 @@ private:
       return;
     case Kind::Member: {
       const auto *Member = cast<MemberExpr>(E->SourceExpr);
-      emitPrimal(E->Operands.front(), Out, Loop);
+      emitPrimal(E->Operands.front(), Out, LoopContext);
       Out << (Member->isArrow() ? "->" : ".") << E->SourceDecl->getName();
       return;
     }
     case Kind::Swizzle:
-      emitPrimal(E->Operands.front(), Out, Loop);
+      emitPrimal(E->Operands.front(), Out, LoopContext);
       Out << "."
           << cast<HLSLVectorElementExpr>(E->SourceExpr)
                  ->getAccessor()
                  .getName();
       return;
     case Kind::Subscript:
-      emitPrimal(E->Operands[0], Out, Loop);
+      emitPrimal(E->Operands[0], Out, LoopContext);
       Out << "[";
-      emitPrimal(E->Operands[1], Out, Loop);
+      emitPrimal(E->Operands[1], Out, LoopContext);
       Out << "]";
       return;
     case Kind::AggregateConstruct:
@@ -1533,7 +1559,7 @@ private:
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
           Out << ", ";
-        emitPrimal(E->Operands[I], Out, Loop);
+        emitPrimal(E->Operands[I], Out, LoopContext);
       }
       Out << (isa<InitListExpr>(E->SourceExpr) ? "}" : ")");
       return;
@@ -1541,27 +1567,27 @@ private:
       Out << "(";
       E->Value.PrimalType.print(Out, Policy);
       Out << ")";
-      emitPrimal(E->Operands.front(), Out, Loop);
+      emitPrimal(E->Operands.front(), Out, LoopContext);
       return;
     case Kind::Unary:
       Out << UnaryOperator::getOpcodeStr(E->UnaryOpcode) << "(";
-      emitPrimal(E->Operands.front(), Out, Loop);
+      emitPrimal(E->Operands.front(), Out, LoopContext);
       Out << ")";
       return;
     case Kind::Binary:
       Out << "(";
-      emitPrimal(E->Operands[0], Out, Loop);
+      emitPrimal(E->Operands[0], Out, LoopContext);
       Out << " " << BinaryOperator::getOpcodeStr(E->BinaryOpcode) << " ";
-      emitPrimal(E->Operands[1], Out, Loop);
+      emitPrimal(E->Operands[1], Out, LoopContext);
       Out << ")";
       return;
     case Kind::Conditional:
       Out << "(";
-      emitPrimal(E->Operands[0], Out, Loop);
+      emitPrimal(E->Operands[0], Out, LoopContext);
       Out << " ? ";
-      emitPrimal(E->Operands[1], Out, Loop);
+      emitPrimal(E->Operands[1], Out, LoopContext);
       Out << " : ";
-      emitPrimal(E->Operands[2], Out, Loop);
+      emitPrimal(E->Operands[2], Out, LoopContext);
       Out << ")";
       return;
     case Kind::Call:
@@ -1570,7 +1596,7 @@ private:
           const auto *Method = cast<CXXMethodDecl>(E->Callee);
           Out << "::" << Method->getParent()->getName() << "::";
         } else {
-          emitPrimal(E->Receiver, Out, Loop);
+          emitPrimal(E->Receiver, Out, LoopContext);
           Out << ".";
         }
       } else if (const auto *Method = dyn_cast<CXXMethodDecl>(E->Callee))
@@ -1584,7 +1610,7 @@ private:
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
           Out << ", ";
-        emitPrimal(E->Operands[I], Out, Loop);
+        emitPrimal(E->Operands[I], Out, LoopContext);
       }
       Out << ")";
       return;
@@ -1910,10 +1936,13 @@ private:
   }
 
   std::string genericLoopPrimalText(const hlsl::autodiff::ADExpr *E,
-                                    const hlsl::autodiff::ADLoopPlan &Loop) {
+                                    const hlsl::autodiff::ADLoopPlan &Loop,
+                                    LoopPrimalContext::Mode Mode =
+                                        LoopPrimalContext::Mode::StaticTape) {
     std::string Text;
     raw_string_ostream Stream(Text);
-    emitPrimal(E, Stream, &Loop);
+    LoopPrimalContext Context{&Loop, Mode};
+    emitPrimal(E, Stream, &Context);
     Stream.flush();
     return Text;
   }
@@ -1921,7 +1950,9 @@ private:
   void emitGenericLoopPullback(const hlsl::autodiff::ADExpr *E,
                                StringRef Cotangent,
                                ArrayRef<std::string> StateAdjoints,
-                               const hlsl::autodiff::ADLoopPlan &Loop) {
+                   const hlsl::autodiff::ADLoopPlan &Loop,
+                   LoopPrimalContext::Mode PrimalMode =
+                     LoopPrimalContext::Mode::StaticTape) {
     using Activity = hlsl::autodiff::ADActivity;
     using Kind = hlsl::autodiff::ADExpr::Kind;
     if (E->Value.Activity == Activity::Inactive)
@@ -1933,10 +1964,11 @@ private:
     }
     auto EmitAdjoint = [&](const hlsl::autodiff::ADExpr *Operand,
                            const std::string &OperandCotangent) {
-      emitGenericLoopPullback(Operand, OperandCotangent, StateAdjoints, Loop);
+      emitGenericLoopPullback(Operand, OperandCotangent, StateAdjoints, Loop,
+                              PrimalMode);
     };
     auto PrimalText = [&](const hlsl::autodiff::ADExpr *Operand) {
-      return genericLoopPrimalText(Operand, Loop);
+      return genericLoopPrimalText(Operand, Loop, PrimalMode);
     };
     if (hlsl::autodiff::getADPullbackRule(E).Rule ==
         hlsl::autodiff::ADPullbackRule::ComposedCall) {
@@ -1996,6 +2028,68 @@ private:
         emitPrimal(Loop.TripCount);
         OS << "; " << Loop.Counter->getName() << " > 0;) {\n"
            << "        --" << Loop.Counter->getName() << ";\n";
+        if (Loop.Storage == hlsl::autodiff::ADLoopStorageKind::Recompute) {
+          for (const hlsl::autodiff::ADLoopState &State : Loop.States) {
+            unsigned StateLoopID = RuntimeLoopIDs.lookup(State.Result);
+            OS << "        " << printType(State.PrimalType, Policy)
+               << " __dxc_ad_loop_" << StateLoopID << "_replay = "
+               << "__dxc_ad_loop_" << StateLoopID << "_initial;\n";
+          }
+          std::string ReplayCounter =
+              "__dxc_ad_loop_" + Twine(LoopID).str() + "_replay_index";
+          OS << "        for (uint " << ReplayCounter << " = 0; "
+             << ReplayCounter << " < " << Loop.Counter->getName() << "; ++"
+             << ReplayCounter << ") {\n";
+          for (const hlsl::autodiff::ADLoopUpdate &Update : Loop.Updates) {
+            const hlsl::autodiff::ADLoopState &State =
+                Loop.States[Update.TargetStateIndex];
+            unsigned StateLoopID = RuntimeLoopIDs.lookup(State.Result);
+            OS << "            __dxc_ad_loop_" << StateLoopID << "_replay ";
+            switch (Update.Opcode) {
+            case BO_Assign:
+              OS << "= ";
+              break;
+            case BO_Add:
+              OS << "+= ";
+              break;
+            case BO_Sub:
+              OS << "-= ";
+              break;
+            case BO_Mul:
+              OS << "*= ";
+              break;
+            case BO_Div:
+              OS << "/= ";
+              break;
+            default:
+              llvm_unreachable("validated active runtime loop operation");
+            }
+            OS << genericLoopPrimalText(
+                      Update.Value, Loop,
+                      LoopPrimalContext::Mode::ReplayState)
+               << ";\n";
+          }
+          OS << "        }\n";
+          for (const hlsl::autodiff::ADLoopState &State : Loop.States) {
+            unsigned StateLoopID = RuntimeLoopIDs.lookup(State.Result);
+            OS << "        " << printType(State.PrimalType, Policy)
+               << " __dxc_ad_loop_" << StateLoopID
+               << "_version_0_replay = __dxc_ad_loop_" << StateLoopID
+               << "_replay;\n";
+          }
+          for (const hlsl::autodiff::ADLoopUpdate &Update : Loop.Updates) {
+            const hlsl::autodiff::ADLoopState &State =
+                Loop.States[Update.TargetStateIndex];
+            unsigned StateLoopID = RuntimeLoopIDs.lookup(State.Result);
+            OS << "        " << printType(State.PrimalType, Policy)
+               << " __dxc_ad_loop_" << StateLoopID << "_version_"
+               << Update.ResultVersion << "_replay = "
+               << genericLoopPrimalText(
+                      Update.Pullback.Value, Loop,
+                      LoopPrimalContext::Mode::ReplayVersion)
+               << ";\n";
+          }
+        }
         for (unsigned I = Loop.Updates.size(); I > 0; --I) {
           const hlsl::autodiff::ADLoopUpdate &Update = Loop.Updates[I - 1];
           StringRef TargetAdjoint = Adjoints[Update.TargetStateIndex];
@@ -2005,8 +2099,11 @@ private:
              << ";\n"
              << "        " << TargetAdjoint << " = "
              << zero(E->Value.PrimalType) << ";\n";
-          emitGenericLoopPullback(Update.Pullback.Value, Incoming, Adjoints,
-                                  Loop);
+            emitGenericLoopPullback(
+              Update.Pullback.Value, Incoming, Adjoints, Loop,
+              Loop.Storage == hlsl::autodiff::ADLoopStorageKind::Recompute
+                ? LoopPrimalContext::Mode::ReplayVersion
+                : LoopPrimalContext::Mode::StaticTape);
         }
         OS << "    }\n";
         for (unsigned I = 0; I < Loop.States.size(); ++I)

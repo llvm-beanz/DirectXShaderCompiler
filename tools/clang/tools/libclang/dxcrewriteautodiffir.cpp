@@ -529,6 +529,23 @@ private:
     llvm_unreachable("unknown typed pullback rule");
   }
 
+  bool canRecomputeLoopExpression(const ADExpr *Expression) const {
+    if (Expression->K == ADExpr::Kind::Call) {
+      ADPullbackRule Rule = getADPullbackRule(Expression).Rule;
+      if (Rule != ADPullbackRule::Sin && Rule != ADPullbackRule::Cos &&
+          Rule != ADPullbackRule::Exp && Rule != ADPullbackRule::Log &&
+          Rule != ADPullbackRule::Sqrt)
+        return false;
+    }
+    if (Expression->Receiver &&
+        !canRecomputeLoopExpression(Expression->Receiver))
+      return false;
+    for (const ADExpr *Operand : Expression->Operands)
+      if (!canRecomputeLoopExpression(Operand))
+        return false;
+    return true;
+  }
+
   const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
                                    const ADExpr *TripCount,
                                    ArrayRef<const ADExpr *> Results,
@@ -537,7 +554,6 @@ private:
     Loop->Source = FS;
     Loop->Counter = Counter;
     Loop->TripCount = TripCount;
-    Loop->TapeCapacity = TapeCapacity;
     DenseMap<const ValueDecl *, unsigned> StateIndices;
     for (unsigned I = 0; I < Results.size(); ++I) {
       const ADExpr *Result = Results[I];
@@ -595,6 +611,21 @@ private:
     }
     for (unsigned I = 0; I < Loop->States.size(); ++I)
       Loop->States[I].FinalVersion = Versions[I];
+    bool NeedsTape = !Loop->TapeSlots.empty();
+    for (const ADLoopState &State : Loop->States)
+      NeedsTape |= State.NeedsPrimalTape;
+    if (NeedsTape) {
+      if (TapeCapacity >= 1 && TapeCapacity <= 1024) {
+        Loop->Storage = ADLoopStorageKind::Static;
+        Loop->TapeCapacity = TapeCapacity;
+      } else if (llvm::all_of(Loop->Updates, [&](const ADLoopUpdate &Update) {
+                   return canRecomputeLoopExpression(Update.Pullback.Value);
+                 })) {
+        Loop->Storage = ADLoopStorageKind::Recompute;
+      } else {
+        Loop->Storage = ADLoopStorageKind::DynamicRequired;
+      }
+    }
     const ADLoopPlan *Result = Loop.get();
     Plan.Loops.push_back(std::move(Loop));
     return Result;
@@ -1090,10 +1121,7 @@ private:
       createLoopPlan(FS, Counter, Count, Statement.Values, TapeSize);
     if (!Statement.Loop)
       return false;
-    bool NeedsTape = !Statement.Loop->TapeSlots.empty();
-    for (const ADLoopState &State : Statement.Loop->States)
-      NeedsTape |= State.NeedsPrimalTape;
-    if (NeedsTape && (TapeSize == 0 || TapeSize > 1024))
+    if (Statement.Loop->Storage == ADLoopStorageKind::DynamicRequired)
       return fail("active runtime loop pullback requires a min(count, N) "
                   "bound with N between 1 and 1024");
     Plan.Statements.push_back(std::move(Statement));

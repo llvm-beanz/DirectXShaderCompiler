@@ -1,9 +1,9 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
 
-// Linear terms on both product operands still require bounded primal tapes for
-// the changing product partials.
+// Changing primal trajectories are reconstructed from initial checkpoints.
 
-// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': active runtime loop pullback requires a min(count, N) bound with N between 1 and 1024");
+// CHECK: _initial =
+// CHECK: _replay_index = 0;
 
 [[dxc::autodiff(bwd)]]
 float f(float x, float y, float z, [[dxc::no_diff]] uint count,

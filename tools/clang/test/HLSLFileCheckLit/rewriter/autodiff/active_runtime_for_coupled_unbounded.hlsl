@@ -1,8 +1,18 @@
 // RUN: %dxr -generate-differentials %s | FileCheck %s
+// RUN: %dxr -generate-differentials %s > %t.gen.hlsl
+// RUN: cat %t.gen.hlsl %S/Inputs/active_runtime_for_coupled_caller.hlsl > %t.run.hlsl
+// RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
+// RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// Both changing primal trajectories require bounded storage.
+// Changing primal trajectories are reconstructed from initial checkpoints.
 
-// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': active runtime loop pullback requires a min(count, N) bound with N between 1 and 1024");
+// CHECK: _initial =
+// CHECK: _replay_index = 0;
+
+// Two iterations map (1,2) to (6,4). Seed 2 yields gradients (12,12).
+// EXEC: rawBufferStore.f32{{.*}}i32 0, i32 0, float 1.000000e+01
+// EXEC: rawBufferStore.f32{{.*}}i32 1, i32 0, float 1.200000e+01
+// EXEC: rawBufferStore.f32{{.*}}i32 2, i32 0, float 1.200000e+01
 
 [[dxc::autodiff(bwd)]]
 float f(float x, float y, [[dxc::no_diff]] uint count) {

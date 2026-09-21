@@ -144,10 +144,13 @@ struct ADLoopUpdate {
   ADLoopPullback Pullback;
 };
 
+enum class ADLoopStorageKind { None, Static, Recompute, DynamicRequired };
+
 struct ADLoopPlan {
   const clang::ForStmt *Source = nullptr;
   const clang::VarDecl *Counter = nullptr;
   const ADExpr *TripCount = nullptr;
+  ADLoopStorageKind Storage = ADLoopStorageKind::None;
   unsigned TapeCapacity = 0;
   llvm::SmallVector<ADLoopState, 4> States;
   llvm::SmallVector<ADLoopUpdate, 4> Updates;
