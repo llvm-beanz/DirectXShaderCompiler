@@ -4,12 +4,13 @@
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// Independent target and peer linear terms contribute to their corresponding
-// partial derivatives around a scaled product edge.
+// Independent linear terms replay through the same generic expression DAG.
 
 // CHECK: x.value = (((((scale * x.value) * y.value) + (targetSlope * x.value)) + (peerSlope * y.value)) + bias);
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += (scale * __dxc_ad_loop_0_primal_tape[iteration] + peerSlope) * __dxc_ad_loop_0_state_0_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint *= (scale * __dxc_ad_loop_1_primal_tape[iteration] + targetSlope);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_1_adjoint += (__dxc_ad_loop_0_update_0_adjoint * (scale * __dxc_ad_loop_0_primal_tape[iteration]));
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * targetSlope);
 
 // Starting at (2,3,4), two iterations produce (25.75,15,16), returning 56.75.
 // With seed 2, reverse Jacobian replay produces (16,18.25,20.25).

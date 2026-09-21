@@ -10,9 +10,15 @@
 // CHECK: x.value -= y.value;
 // CHECK: y.value += z.value;
 // CHECK: z.value *= factor;
-// CHECK: __dxc_ad_loop_0_state_2_adjoint *= factor;
-// CHECK: __dxc_ad_loop_0_state_2_adjoint += __dxc_ad_loop_0_state_1_adjoint;
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += -(__dxc_ad_loop_0_state_0_adjoint);
+// CHECK: float __dxc_ad_loop_0_update_2_adjoint = __dxc_ad_loop_0_state_2_adjoint;
+// CHECK: __dxc_ad_loop_0_state_2_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_2_adjoint += (__dxc_ad_loop_0_update_2_adjoint * factor);
+// CHECK: float __dxc_ad_loop_0_update_1_adjoint = __dxc_ad_loop_0_state_1_adjoint;
+// CHECK: __dxc_ad_loop_0_state_1_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_2_adjoint += __dxc_ad_loop_0_update_1_adjoint;
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_1_adjoint += -(__dxc_ad_loop_0_update_0_adjoint);
 
 // Starting at (8,3,1), two iterations produce (1,6,4), returning 11.
 // With seed 2, generic reverse replay produces gradients (2,-2,12).

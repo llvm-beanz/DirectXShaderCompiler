@@ -11,7 +11,10 @@
 // CHECK: __dxc_ad_loop_0_primal_tape[iteration] = value.value;
 // CHECK: value.value *= value.value;
 // CHECK: --iteration;
-// CHECK: __dxc_ad_loop_0_adjoint *= (2 * __dxc_ad_loop_0_primal_tape[iteration]);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_0_primal_tape[iteration]);
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_0_primal_tape[iteration]);
 
 // With value=2 and two iterations, primal=16 and df/dvalue=32. Seed 3 gives 96.
 // EXEC: rawBufferStore.f32{{.*}}i32 0, i32 0, float 1.600000e+01

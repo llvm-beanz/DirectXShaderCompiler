@@ -6,9 +6,9 @@
 
 // CHECK: for (uint iteration = 0; iteration < count; ++iteration)
 // CHECK: value.value += (float)(iteration + 1);
-// CHECK: float __dxc_ad_loop_0_adjoint = __dxc_ad_seed;
+// CHECK: float __dxc_ad_loop_0_state_0_adjoint = __dxc_ad_seed;
 // CHECK-NOT: _reverse
-// CHECK: context.gradients[value.id] += __dxc_ad_loop_0_adjoint;
+// CHECK: context.gradients[value.id] += __dxc_ad_loop_0_state_0_adjoint;
 
 [[dxc::autodiff(bwd)]]
 float f(float value, [[dxc::no_diff]] uint count) {

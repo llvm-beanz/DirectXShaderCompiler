@@ -4,10 +4,12 @@
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// Cubic recurrences reconstruct 3*x*x plus the inactive linear coefficient.
+// Cubic recurrences replay through the generic expression DAG.
 
 // CHECK: value.value = (((value.value * value.value) * value.value) + (slope * value.value));
-// CHECK: __dxc_ad_loop_0_adjoint *= (3 * __dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_0_primal_tape[iteration] + slope);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * (__dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_0_primal_tape[iteration]));
 
 // Starting at 1 with slope 1 gives 2 then 10. Local derivatives are 4 and 13,
 // so seed 2 produces gradient 104.

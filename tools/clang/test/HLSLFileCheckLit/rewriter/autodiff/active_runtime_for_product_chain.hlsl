@@ -13,10 +13,11 @@
 // CHECK: x.value *= y.value;
 // CHECK: __dxc_ad_loop_1_primal_tape[iteration] = y.value;
 // CHECK: z.value *= factor;
-// CHECK: __dxc_ad_loop_0_state_2_adjoint *= factor;
-// CHECK: __dxc_ad_loop_0_state_2_adjoint += __dxc_ad_loop_0_state_1_adjoint;
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += __dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_0_state_0_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint *= __dxc_ad_loop_1_primal_tape[iteration];
+// CHECK: float __dxc_ad_loop_0_update_2_adjoint = __dxc_ad_loop_0_state_2_adjoint;
+// CHECK: __dxc_ad_loop_0_state_2_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_2_adjoint += (__dxc_ad_loop_0_update_2_adjoint * factor);
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_1_primal_tape[iteration]);
+// CHECK: __dxc_ad_loop_0_state_1_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_0_primal_tape[iteration]);
 
 // Starting at (2,3,4), two iterations produce (42,15,16), returning 73.
 // With seed 2, reverse Jacobian replay produces gradients (42,42,26).

@@ -11,7 +11,7 @@
 // CHECK: y.value = x.value.yx;
 // CHECK: float2 __dxc_ad_loop_0_update_1_adjoint = __dxc_ad_loop_0_state_1_adjoint;
 // CHECK: __dxc_ad_loop_0_state_0_adjoint += float2(__dxc_ad_loop_0_update_1_adjoint.y, __dxc_ad_loop_0_update_1_adjoint.x);
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_1_adjoint += __dxc_ad_loop_0_update_0_adjoint;
 
 // One iteration returns (20,22). Seed (2,3) produces x and y gradients (5,5)
 // and z gradient (4,6).

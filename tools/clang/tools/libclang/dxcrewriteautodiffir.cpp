@@ -169,68 +169,86 @@ private:
     return Rewritten;
   }
 
-  void collectLoopPullbackInputs(
+  bool analyzeGenericLoopPullback(
       const ADExpr *Expression,
-      SmallVectorImpl<ADLoopPullbackInput> &Inputs) const {
-    if (Expression->K == ADExpr::Kind::LoopStateRef) {
-      for (const ADLoopPullbackInput &Input : Inputs)
-        if (Input.StateIndex == Expression->LoopStateIndex &&
-            Input.Version == Expression->LoopStateVersion)
-          return;
-      Inputs.push_back(
-          {Expression->LoopStateIndex, Expression->LoopStateVersion});
-      return;
-    }
-    if (Expression->Receiver)
-      collectLoopPullbackInputs(Expression->Receiver, Inputs);
-    for (const ADExpr *Operand : Expression->Operands)
-      collectLoopPullbackInputs(Operand, Inputs);
-  }
-
-  void markLoopPullbackPrimalInputs(
-      const ADExpr *Expression,
-      SmallVectorImpl<ADLoopPullbackInput> &Inputs) const {
-    if (Expression->K == ADExpr::Kind::LoopStateRef) {
-      for (ADLoopPullbackInput &Input : Inputs)
+      SmallVectorImpl<ADLoopPullbackInput> *Inputs = nullptr,
+      const SmallPtrSetImpl<const ValueDecl *> *StateDecls = nullptr,
+      bool NeedsPrimal = false) const {
+    if (Expression->Value.Activity == ADActivity::Inactive)
+      return true;
+    switch (Expression->K) {
+    case ADExpr::Kind::DeclRef:
+    case ADExpr::Kind::LocalRef:
+      return StateDecls && Expression->SourceDecl &&
+             StateDecls->count(getCanonicalValueDecl(Expression->SourceDecl));
+    case ADExpr::Kind::LoopStateRef: {
+      if (!Inputs)
+        return true;
+      for (ADLoopPullbackInput &Input : *Inputs)
         if (Input.StateIndex == Expression->LoopStateIndex &&
             Input.Version == Expression->LoopStateVersion) {
-          Input.NeedsPrimal = true;
-          return;
+          Input.NeedsPrimal |= NeedsPrimal;
+          return true;
         }
-      llvm_unreachable("loop pullback primal input was not collected");
+      Inputs->push_back({Expression->LoopStateIndex,
+                         Expression->LoopStateVersion, NeedsPrimal});
+      return true;
     }
-    if (Expression->Receiver)
-      markLoopPullbackPrimalInputs(Expression->Receiver, Inputs);
-    for (const ADExpr *Operand : Expression->Operands)
-      markLoopPullbackPrimalInputs(Operand, Inputs);
-  }
-
-  void analyzeLoopPullbackPrimalInputs(
-      const ADExpr *Expression,
-      SmallVectorImpl<ADLoopPullbackInput> &Inputs) const {
-    if (Expression->K == ADExpr::Kind::Call && Expression->Callee &&
-        Expression->Operands.size() == 1 &&
-        StringSwitch<bool>(Expression->Callee->getName())
-            .Cases("sin", "cos", "exp", "log", "sqrt", true)
-            .Default(false))
-      markLoopPullbackPrimalInputs(Expression->Operands.front(), Inputs);
-    if (Expression->K == ADExpr::Kind::Binary &&
-        Expression->BinaryOpcode == BO_Mul &&
-        Expression->Operands[0]->Value.Activity == ADActivity::Active &&
-        Expression->Operands[1]->Value.Activity == ADActivity::Active) {
-      markLoopPullbackPrimalInputs(Expression->Operands[0], Inputs);
-      markLoopPullbackPrimalInputs(Expression->Operands[1], Inputs);
+    case ADExpr::Kind::AggregateConstruct:
+      for (const ADExpr *Operand : Expression->Operands)
+        if (!analyzeGenericLoopPullback(Operand, Inputs, StateDecls,
+                                        NeedsPrimal))
+          return false;
+      return true;
+    case ADExpr::Kind::Subscript:
+      return hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType) &&
+             Expression->Operands[1]->Value.Activity == ADActivity::Inactive &&
+             analyzeGenericLoopPullback(Expression->Operands[0], Inputs,
+                                        StateDecls, NeedsPrimal);
+    case ADExpr::Kind::Conditional:
+      return Expression->Operands[0]->Value.Activity == ADActivity::Inactive &&
+             analyzeGenericLoopPullback(Expression->Operands[1], Inputs,
+                                        StateDecls, NeedsPrimal) &&
+             analyzeGenericLoopPullback(Expression->Operands[2], Inputs,
+                                        StateDecls, NeedsPrimal);
+    case ADExpr::Kind::Swizzle:
+    case ADExpr::Kind::Unary:
+    case ADExpr::Kind::Cast:
+      return analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
+                                        StateDecls, NeedsPrimal);
+    case ADExpr::Kind::Call:
+      return !Expression->Receiver && Expression->Callee &&
+             Expression->Operands.size() == 1 &&
+             StringSwitch<bool>(Expression->Callee->getName())
+                 .Cases("sin", "cos", "exp", "log", "sqrt", true)
+                 .Default(false) &&
+             analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
+                                        StateDecls, true);
+    case ADExpr::Kind::Binary: {
+      switch (Expression->BinaryOpcode) {
+      case BO_Add:
+      case BO_Sub:
+        break;
+      case BO_Mul:
+        if (Expression->Operands[0]->Value.Activity == ADActivity::Active &&
+            Expression->Operands[1]->Value.Activity == ADActivity::Active)
+          NeedsPrimal = true;
+        break;
+      case BO_Div:
+        if (Expression->Operands[1]->Value.Activity == ADActivity::Active)
+          NeedsPrimal = true;
+        break;
+      default:
+        return false;
+      }
+      return analyzeGenericLoopPullback(Expression->Operands[0], Inputs,
+                                        StateDecls, NeedsPrimal) &&
+             analyzeGenericLoopPullback(Expression->Operands[1], Inputs,
+                                        StateDecls, NeedsPrimal);
     }
-    if (Expression->K == ADExpr::Kind::Binary &&
-        Expression->BinaryOpcode == BO_Div &&
-        Expression->Operands[1]->Value.Activity == ADActivity::Active) {
-      markLoopPullbackPrimalInputs(Expression->Operands[0], Inputs);
-      markLoopPullbackPrimalInputs(Expression->Operands[1], Inputs);
+    default:
+      return false;
     }
-    if (Expression->Receiver)
-      analyzeLoopPullbackPrimalInputs(Expression->Receiver, Inputs);
-    for (const ADExpr *Operand : Expression->Operands)
-      analyzeLoopPullbackPrimalInputs(Operand, Inputs);
   }
 
   const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
@@ -255,6 +273,7 @@ private:
         Loop->TapeCapacity = Result->RuntimeLoopTapeSize;
     }
 
+    bool SupportsGenericPullbacks = true;
     SmallVector<unsigned, 4> Versions(Results.size(), 0);
     for (unsigned I = 0; I < Results.size(); ++I) {
       const ADExpr *Result = Results[I];
@@ -265,20 +284,19 @@ private:
       Update.Value =
           createLoopUpdateExpr(Result->Operands[2], StateIndices, Versions);
       Update.Pullback.Value = Update.Value;
-      if (Update.Opcode == BO_Div &&
-          Update.Value->Value.Activity == ADActivity::Active) {
-        ADExpr *Quotient = createExpr(ADExpr::Kind::Binary, Result->SourceExpr);
-        Quotient->BinaryOpcode = BO_Div;
-        Quotient->Operands.push_back(
+      if (Update.Opcode != BO_Assign) {
+        ADExpr *FullUpdate =
+            createExpr(ADExpr::Kind::Binary, Result->SourceExpr);
+        FullUpdate->BinaryOpcode = Update.Opcode;
+        FullUpdate->Operands.push_back(
             createLoopUpdateExpr(Result->Operands[0], StateIndices, Versions));
-        Quotient->Operands.push_back(Update.Value);
-        Quotient->Value = Result->Value;
-        Update.Pullback.Value = Quotient;
+        FullUpdate->Operands.push_back(Update.Value);
+        FullUpdate->Value = Result->Value;
+        Update.Pullback.Value = FullUpdate;
       }
       Update.ResultVersion = ++Versions[I];
-      collectLoopPullbackInputs(Update.Pullback.Value, Update.Pullback.Inputs);
-      analyzeLoopPullbackPrimalInputs(Update.Pullback.Value,
-                                      Update.Pullback.Inputs);
+      SupportsGenericPullbacks &= analyzeGenericLoopPullback(
+          Update.Pullback.Value, &Update.Pullback.Inputs);
       for (const ADLoopPullbackInput &Input : Update.Pullback.Inputs) {
         if (!Input.NeedsPrimal)
           continue;
@@ -297,6 +315,7 @@ private:
     }
     for (unsigned I = 0; I < Loop->States.size(); ++I)
       Loop->States[I].FinalVersion = Versions[I];
+    Loop->UsesGenericPullbacks = SupportsGenericPullbacks;
     const ADLoopPlan *Result = Loop.get();
     Plan.Loops.push_back(std::move(Loop));
     return Result;
@@ -878,138 +897,9 @@ private:
       Factors.push_back(Factor);
     }
 
-    auto SupportsUpdateExpr = [&](const auto &Self,
-                                  const ADExpr *Expression) -> bool {
-      if (Expression->Value.Activity == ADActivity::Inactive)
-        return true;
-      switch (Expression->K) {
-      case ADExpr::Kind::DeclRef:
-      case ADExpr::Kind::LocalRef:
-        return Expression->SourceDecl &&
-               SeenTargets.count(getCanonicalValueDecl(Expression->SourceDecl));
-      case ADExpr::Kind::AggregateConstruct:
-        for (const ADExpr *Operand : Expression->Operands)
-          if (!Self(Self, Operand))
-            return false;
-        return true;
-      case ADExpr::Kind::Subscript:
-        return hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType) &&
-               Expression->Operands[1]->Value.Activity ==
-                   ADActivity::Inactive &&
-               Self(Self, Expression->Operands[0]);
-      case ADExpr::Kind::Conditional:
-        return Expression->Operands[0]->Value.Activity ==
-                   ADActivity::Inactive &&
-               Self(Self, Expression->Operands[1]) &&
-               Self(Self, Expression->Operands[2]);
-      case ADExpr::Kind::Swizzle:
-      case ADExpr::Kind::Unary:
-      case ADExpr::Kind::Cast:
-        return Self(Self, Expression->Operands.front());
-      case ADExpr::Kind::Call:
-        return !Expression->Receiver && Expression->Callee &&
-               Expression->Operands.size() == 1 &&
-               StringSwitch<bool>(Expression->Callee->getName())
-                   .Cases("sin", "cos", "exp", "log", "sqrt", true)
-                   .Default(false) &&
-               Self(Self, Expression->Operands.front());
-      case ADExpr::Kind::Binary:
-        switch (Expression->BinaryOpcode) {
-        case BO_Add:
-        case BO_Sub:
-        case BO_Mul:
-          return Self(Self, Expression->Operands[0]) &&
-                 Self(Self, Expression->Operands[1]);
-        case BO_Div:
-          return Self(Self, Expression->Operands[0]) &&
-                 Self(Self, Expression->Operands[1]);
-        default:
-          return false;
-        }
-      default:
+    for (const ADExpr *Factor : Factors)
+      if (!analyzeGenericLoopPullback(Factor, nullptr, &SeenTargets))
         return false;
-      }
-    };
-    auto IsStateValue = [&](const ADExpr *Expression) {
-      return Expression->Value.Activity == ADActivity::Active &&
-             (Expression->K == ADExpr::Kind::DeclRef ||
-              Expression->K == ADExpr::Kind::LocalRef) &&
-             Expression->SourceDecl &&
-             SeenTargets.count(getCanonicalValueDecl(Expression->SourceDecl));
-    };
-    auto SupportsProductOperand = [&](const auto &Self,
-                                      const ADExpr *Expression) -> bool {
-      if (IsStateValue(Expression))
-        return true;
-      switch (Expression->K) {
-      case ADExpr::Kind::Conditional:
-        return Expression->Operands[0]->Value.Activity ==
-                   ADActivity::Inactive &&
-               SupportsUpdateExpr(SupportsUpdateExpr,
-                                  Expression->Operands[1]) &&
-               SupportsUpdateExpr(SupportsUpdateExpr, Expression->Operands[2]);
-      case ADExpr::Kind::Subscript:
-        return hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType) &&
-               Expression->Operands[1]->Value.Activity ==
-                   ADActivity::Inactive &&
-               Self(Self, Expression->Operands[0]);
-      case ADExpr::Kind::Swizzle:
-      case ADExpr::Kind::Unary:
-      case ADExpr::Kind::Cast:
-        return Self(Self, Expression->Operands.front());
-      case ADExpr::Kind::Binary:
-        return (Expression->BinaryOpcode == BO_Add ||
-                Expression->BinaryOpcode == BO_Sub) &&
-               SupportsUpdateExpr(SupportsUpdateExpr,
-                                  Expression->Operands[0]) &&
-               SupportsUpdateExpr(SupportsUpdateExpr, Expression->Operands[1]);
-      default:
-        return false;
-      }
-    };
-    for (unsigned I = 0; I < Updates.size(); ++I) {
-      if (!SupportsUpdateExpr(SupportsUpdateExpr, Factors[I]))
-        return false;
-      const ADExpr *Factor = Factors[I];
-      switch (Updates[I]->getOpcode()) {
-      case BO_Assign:
-        if (Factor->K == ADExpr::Kind::Binary &&
-            (Factor->BinaryOpcode == BO_Add ||
-             Factor->BinaryOpcode == BO_Sub) &&
-            Factor->Operands[1]->Value.Activity == ADActivity::Inactive)
-          Factor = Factor->Operands[0];
-        if (Factor->K == ADExpr::Kind::AggregateConstruct ||
-            Factor->K == ADExpr::Kind::Call ||
-            Factor->K == ADExpr::Kind::Conditional ||
-            Factor->K == ADExpr::Kind::Swizzle)
-          break;
-        if (Factor->K == ADExpr::Kind::Binary && Factor->BinaryOpcode == BO_Div)
-          break;
-        if (Factor->K != ADExpr::Kind::Binary ||
-            Factor->BinaryOpcode != BO_Mul ||
-            Factor->Operands[0]->Value.Activity != ADActivity::Active ||
-            Factor->Operands[1]->Value.Activity != ADActivity::Active ||
-            !SupportsProductOperand(SupportsProductOperand,
-                                    Factor->Operands[0]) ||
-            !SupportsProductOperand(SupportsProductOperand,
-                                    Factor->Operands[1]))
-          return false;
-        break;
-      case BO_AddAssign:
-      case BO_SubAssign:
-        if (!IsStateValue(Factor))
-          return false;
-        break;
-      case BO_MulAssign:
-        if (Factor->Value.Activity == ADActivity::Active)
-          return false;
-        break;
-      case BO_DivAssign:
-        break;
-      default:
-        return false;
-      }
-    }
 
     SmallVector<const ADExpr *, 4> Results;
     for (unsigned I = 0; I < Targets.size(); ++I) {

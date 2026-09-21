@@ -10,10 +10,10 @@
 // CHECK: for (uint iteration = 0; iteration < count; ++iteration) {
 // CHECK: x.value *= factor;
 // CHECK: y.value += 3.F;
-// CHECK: float __dxc_ad_loop_0_adjoint = __dxc_ad_seed;
-// CHECK: context.gradients[x.id] += __dxc_ad_loop_0_adjoint;
-// CHECK: float __dxc_ad_loop_1_adjoint = __dxc_ad_seed;
-// CHECK: context.gradients[y.id] += __dxc_ad_loop_1_adjoint;
+// CHECK: float __dxc_ad_loop_0_state_0_adjoint = __dxc_ad_seed;
+// CHECK: context.gradients[x.id] += __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: float __dxc_ad_loop_1_state_1_adjoint = __dxc_ad_seed;
+// CHECK: context.gradients[y.id] += __dxc_ad_loop_1_state_1_adjoint;
 
 // Two iterations map x=1 to 4 and y=5 to 11, so primal=15. Seed 2 produces
 // dx=8 and dy=2.

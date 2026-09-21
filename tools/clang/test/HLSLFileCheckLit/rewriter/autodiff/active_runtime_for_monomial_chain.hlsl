@@ -4,12 +4,12 @@
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// Repeated active factors are represented as mixed-monomial powers and their
-// partial derivatives are reconstructed from the two primal tapes.
+// Repeated active factors replay recursively through the typed expression DAG.
 
 // CHECK: x.value = (((x.value * x.value) * y.value) * y.value);
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += 2 * __dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_1_primal_tape[iteration] * __dxc_ad_loop_0_state_0_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint *= 2 * __dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_1_primal_tape[iteration] * __dxc_ad_loop_1_primal_tape[iteration];
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_1_adjoint += (__dxc_ad_loop_0_update_0_adjoint * ((__dxc_ad_loop_0_primal_tape[iteration] * __dxc_ad_loop_0_primal_tape[iteration]) * __dxc_ad_loop_1_primal_tape[iteration]));
 
 // Starting at (1,1,1), two iterations produce (4,4,4), returning 12.
 // With seed 2, reverse Jacobian replay produces gradients (32,42,22).

@@ -9,11 +9,11 @@
 
 // CHECK: for (uint iteration = 0; iteration < count; ++iteration)
 // CHECK: value.value *= 2.F;
-// CHECK: float __dxc_ad_loop_0_adjoint = __dxc_ad_seed;
+// CHECK: float __dxc_ad_loop_0_state_0_adjoint = __dxc_ad_seed;
 // CHECK: for (uint iteration = count; iteration > 0;)
 // CHECK: --iteration;
-// CHECK: __dxc_ad_loop_0_adjoint *= 2.F;
-// CHECK: context.gradients[value.id] += __dxc_ad_loop_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * 2.F);
+// CHECK: context.gradients[value.id] += __dxc_ad_loop_0_state_0_adjoint;
 
 // At value=2 and count=3, primal=16. Seed 3 scales 2^3 to gradient 24.
 // EXEC: rawBufferStore.f32{{.*}}i32 0, i32 0, float 1.600000e+01

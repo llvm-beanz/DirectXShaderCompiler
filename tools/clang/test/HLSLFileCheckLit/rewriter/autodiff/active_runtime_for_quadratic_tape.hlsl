@@ -4,11 +4,12 @@
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// General inactive quadratic and linear coefficients contribute to the local
-// derivative reconstructed from taped primal values.
+// General quadratic and linear terms replay through the generic expression DAG.
 
 // CHECK: value.value = (((quadratic * (value.value * value.value)) + (slope * value.value)) + bias);
-// CHECK: __dxc_ad_loop_0_adjoint *= (2 * quadratic * __dxc_ad_loop_0_primal_tape[iteration] + slope);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * slope);
 
 // For a=2, b=3, c=1 and x=1: x1=6, x2=91. Local derivatives are 7 and 27,
 // so seed 2 produces gradient 2*7*27=378.

@@ -4,16 +4,16 @@
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// Exponential, logarithmic, and square-root target factors reconstruct their
-// analytic derivatives from taped pre-update values.
+// Generic local pullbacks reconstruct intrinsic derivatives from taped
+// pre-update values.
 
 // CHECK: x.value = (::exp(x.value) * y.value);
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += exp(__dxc_ad_loop_0_primal_tape[iteration]) * __dxc_ad_loop_0_state_0_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint *= exp(__dxc_ad_loop_0_primal_tape[iteration]) * __dxc_ad_loop_1_primal_tape[iteration];
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
 
 // CHECK: x.value = ((::log(x.value) * y.value) + (::sqrt(x.value) * y.value));
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += (log(__dxc_ad_loop_0_primal_tape[iteration]) + sqrt(__dxc_ad_loop_0_primal_tape[iteration])) * __dxc_ad_loop_0_state_0_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint *= ((1.0f / __dxc_ad_loop_0_primal_tape[iteration]) * __dxc_ad_loop_1_primal_tape[iteration] + (0.5f / sqrt(__dxc_ad_loop_0_primal_tape[iteration])) * __dxc_ad_loop_1_primal_tape[iteration]);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
 
 // Both cases return 13. Seed 2 gives exp gradients (4,4,6) and
 // log-plus-sqrt gradients (6,4,6).

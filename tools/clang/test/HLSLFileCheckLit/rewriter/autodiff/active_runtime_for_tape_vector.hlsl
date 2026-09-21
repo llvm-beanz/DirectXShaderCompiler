@@ -7,7 +7,9 @@
 // Vector self-products tape and reverse component-wise.
 
 // CHECK: float2 __dxc_ad_loop_0_primal_tape[4];
-// CHECK: __dxc_ad_loop_0_adjoint *= (2 * __dxc_ad_loop_0_primal_tape[iteration]);
+// CHECK: float2 __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float2)0;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_0_primal_tape[iteration]);
 
 // One iteration maps (2,3) to (4,9). Seed (2,3) times derivative (4,6)
 // produces gradient (8,18).

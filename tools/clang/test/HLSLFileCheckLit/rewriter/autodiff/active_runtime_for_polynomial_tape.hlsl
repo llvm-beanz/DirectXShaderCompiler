@@ -4,11 +4,12 @@
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// A bounded quadratic recurrence tapes its carried primal and recomputes the
-// local derivative 2*x + scale at each reverse step.
+// A bounded quadratic recurrence replays through the generic expression DAG.
 
 // CHECK: value.value = (((value.value * value.value) + (scale * value.value)) + bias);
-// CHECK: __dxc_ad_loop_0_adjoint *= (2 * __dxc_ad_loop_0_primal_tape[iteration] + scale);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * scale);
 
 // Starting at 1 with scale 2 and bias 1 gives 4 then 25. Local derivatives
 // are 4 and 10, so seed 3 produces gradient 120.

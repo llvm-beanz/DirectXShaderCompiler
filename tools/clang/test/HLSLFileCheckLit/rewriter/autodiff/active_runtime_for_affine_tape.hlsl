@@ -9,7 +9,9 @@
 
 // CHECK: __dxc_ad_loop_0_primal_tape[iteration] = value.value;
 // CHECK: value.value = ((value.value * value.value) + bias);
-// CHECK: __dxc_ad_loop_0_adjoint *= (2 * __dxc_ad_loop_0_primal_tape[iteration]);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * __dxc_ad_loop_0_primal_tape[iteration]);
 
 // Starting at 1 with bias 1 gives 2 then 5. The derivative is
 // (2*1)*(2*2)=8, so seed 3 produces gradient 24.

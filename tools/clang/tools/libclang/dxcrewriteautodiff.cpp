@@ -1398,162 +1398,6 @@ private:
   DenseMap<const hlsl::autodiff::ADExpr *, const hlsl::autodiff::ADLoopPlan *>
       RuntimeLoopPlans;
 
-  bool isGenericLoopIntrinsic(const hlsl::autodiff::ADExpr *E) const {
-    return E->K == hlsl::autodiff::ADExpr::Kind::Call && !E->Receiver &&
-           E->Callee && E->Operands.size() == 1 &&
-           StringSwitch<bool>(E->Callee->getName())
-               .Cases("sin", "cos", "exp", "log", "sqrt", true)
-               .Default(false);
-  }
-
-  bool supportsGenericLoopPullback(const hlsl::autodiff::ADExpr *E) const {
-    using Activity = hlsl::autodiff::ADActivity;
-    using Kind = hlsl::autodiff::ADExpr::Kind;
-    if (E->Value.Activity == Activity::Inactive)
-      return true;
-    switch (E->K) {
-    case Kind::LoopStateRef:
-      return true;
-    case Kind::AggregateConstruct:
-      for (const hlsl::autodiff::ADExpr *Operand : E->Operands)
-        if (!supportsGenericLoopPullback(Operand))
-          return false;
-      return true;
-    case Kind::Subscript:
-      return hlsl::IsHLSLVecType(E->Operands[0]->Value.PrimalType) &&
-             E->Operands[1]->Value.Activity == Activity::Inactive &&
-             supportsGenericLoopPullback(E->Operands[0]);
-    case Kind::Conditional:
-      return E->Operands[0]->Value.Activity == Activity::Inactive &&
-             supportsGenericLoopPullback(E->Operands[1]) &&
-             supportsGenericLoopPullback(E->Operands[2]);
-    case Kind::Swizzle:
-    case Kind::Unary:
-    case Kind::Cast:
-      return supportsGenericLoopPullback(E->Operands.front());
-    case Kind::Call:
-      return isGenericLoopIntrinsic(E) &&
-             supportsGenericLoopPullback(E->Operands.front());
-    case Kind::Binary:
-      switch (E->BinaryOpcode) {
-      case BO_Add:
-      case BO_Sub:
-        return supportsGenericLoopPullback(E->Operands[0]) &&
-               supportsGenericLoopPullback(E->Operands[1]);
-      case BO_Mul:
-        return (E->Operands[0]->Value.Activity == Activity::Inactive &&
-                supportsGenericLoopPullback(E->Operands[1])) ||
-               (E->Operands[1]->Value.Activity == Activity::Inactive &&
-                supportsGenericLoopPullback(E->Operands[0])) ||
-               (supportsGenericLoopPullback(E->Operands[0]) &&
-                supportsGenericLoopPullback(E->Operands[1]));
-      case BO_Div:
-        return supportsGenericLoopPullback(E->Operands[0]) &&
-               supportsGenericLoopPullback(E->Operands[1]);
-      default:
-        return false;
-      }
-    default:
-      return false;
-    }
-  }
-
-  bool
-  supportsGenericLoopProductOperand(const hlsl::autodiff::ADExpr *E) const {
-    using Kind = hlsl::autodiff::ADExpr::Kind;
-    switch (E->K) {
-    case Kind::LoopStateRef:
-      return true;
-    case Kind::Subscript:
-      return hlsl::IsHLSLVecType(E->Operands[0]->Value.PrimalType) &&
-             E->Operands[1]->Value.Activity ==
-                 hlsl::autodiff::ADActivity::Inactive &&
-             supportsGenericLoopProductOperand(E->Operands[0]);
-    case Kind::Conditional:
-      return E->Operands[0]->Value.Activity ==
-                 hlsl::autodiff::ADActivity::Inactive &&
-             supportsGenericLoopPullback(E->Operands[1]) &&
-             supportsGenericLoopPullback(E->Operands[2]);
-    case Kind::Swizzle:
-    case Kind::Unary:
-    case Kind::Cast:
-      return supportsGenericLoopProductOperand(E->Operands.front());
-    case Kind::Binary:
-      return (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
-             supportsGenericLoopPullback(E->Operands[0]) &&
-             supportsGenericLoopPullback(E->Operands[1]);
-    default:
-      return false;
-    }
-  }
-
-  bool supportsGenericLoopAssignment(const hlsl::autodiff::ADExpr *E) const {
-    using Activity = hlsl::autodiff::ADActivity;
-    using Kind = hlsl::autodiff::ADExpr::Kind;
-    if (E->K == Kind::Binary &&
-        (E->BinaryOpcode == BO_Add || E->BinaryOpcode == BO_Sub) &&
-        E->Operands[1]->Value.Activity == Activity::Inactive)
-      E = E->Operands[0];
-    if (E->K == Kind::AggregateConstruct || E->K == Kind::Conditional ||
-        E->K == Kind::Swizzle || isGenericLoopIntrinsic(E))
-      return true;
-    if (E->K == Kind::Binary && E->BinaryOpcode == BO_Div)
-      return supportsGenericLoopPullback(E);
-    return E->K == Kind::Binary && E->BinaryOpcode == BO_Mul &&
-           E->Operands[0]->Value.Activity == Activity::Active &&
-           E->Operands[1]->Value.Activity == Activity::Active &&
-           supportsGenericLoopProductOperand(E->Operands[0]) &&
-           supportsGenericLoopProductOperand(E->Operands[1]);
-  }
-
-  bool
-  supportsGenericLoopPullback(const hlsl::autodiff::ADLoopPlan &Loop) const {
-    if (Loop.States.size() < 3)
-      return false;
-    for (const hlsl::autodiff::ADLoopUpdate &Update : Loop.Updates) {
-      switch (Update.Opcode) {
-      case BO_Assign:
-        if (!supportsGenericLoopAssignment(Update.Pullback.Value))
-          return false;
-        LLVM_FALLTHROUGH;
-      case BO_Add:
-      case BO_Sub:
-        if (!supportsGenericLoopPullback(Update.Pullback.Value))
-          return false;
-        break;
-      case BO_Mul:
-        if (Update.Value->Value.Activity !=
-            hlsl::autodiff::ADActivity::Inactive)
-          return false;
-        break;
-      case BO_Div:
-        if (Update.Value->Value.Activity !=
-                hlsl::autodiff::ADActivity::Inactive &&
-            !supportsGenericLoopPullback(Update.Pullback.Value))
-          return false;
-        break;
-      default:
-        return false;
-      }
-      for (const hlsl::autodiff::ADLoopPullbackInput &Input :
-           Update.Pullback.Inputs)
-        if (Input.NeedsPrimal) {
-          if (Input.Version == 0) {
-            if (!Loop.States[Input.StateIndex].NeedsPrimalTape)
-              return false;
-            continue;
-          }
-          bool HasSlot = false;
-          for (const hlsl::autodiff::ADLoopTapeSlot &Slot : Loop.TapeSlots)
-            HasSlot |= Slot.StateIndex == Input.StateIndex &&
-                       Slot.Version == Input.Version;
-          if (!HasSlot)
-            return false;
-        }
-    }
-    return true;
-  }
-
   bool isGeneratedBackwardCall(const hlsl::autodiff::ADExpr *E) const {
     if (!E->Callee)
       return false;
@@ -2267,7 +2111,7 @@ private:
       std::string Type = printType(E->Value.PrimalType, Policy);
       auto LoopIt = RuntimeLoopPlans.find(E);
       if (LoopIt != RuntimeLoopPlans.end() &&
-          supportsGenericLoopPullback(*LoopIt->second)) {
+          LoopIt->second->UsesGenericPullbacks) {
         const hlsl::autodiff::ADLoopPlan &Loop = *LoopIt->second;
         SmallVector<std::string, 4> Adjoints;
         for (unsigned I = 0; I < Loop.States.size(); ++I) {
@@ -2286,55 +2130,14 @@ private:
         for (unsigned I = Loop.Updates.size(); I > 0; --I) {
           const hlsl::autodiff::ADLoopUpdate &Update = Loop.Updates[I - 1];
           StringRef TargetAdjoint = Adjoints[Update.TargetStateIndex];
-          switch (Update.Opcode) {
-          case BO_Assign: {
-            std::string Incoming = "__dxc_ad_loop_" + Twine(LoopID).str() +
-                                   "_update_" + Twine(I - 1).str() + "_adjoint";
-            OS << "        " << Type << " " << Incoming << " = "
-               << TargetAdjoint << ";\n"
-               << "        " << TargetAdjoint << " = "
-               << zero(E->Value.PrimalType) << ";\n";
-            emitGenericLoopPullback(Update.Pullback.Value, Incoming, Adjoints,
-                                    Loop);
-            break;
-          }
-          case BO_Add:
-            emitGenericLoopPullback(Update.Pullback.Value, TargetAdjoint,
-                                    Adjoints, Loop);
-            break;
-          case BO_Sub:
-            emitGenericLoopPullback(Update.Pullback.Value,
-                                    "-(" + TargetAdjoint.str() + ")", Adjoints,
-                                    Loop);
-            break;
-          case BO_Mul:
-            OS << "        " << TargetAdjoint << " *= ";
-            emitPrimal(Update.Value);
-            OS << ";\n";
-            break;
-          case BO_Div:
-            if (Update.Value->Value.Activity ==
-                hlsl::autodiff::ADActivity::Inactive) {
-              OS << "        " << TargetAdjoint << " /= ";
-              emitPrimal(Update.Value);
-              OS << ";\n";
-              break;
-            }
-            {
-              std::string Incoming = "__dxc_ad_loop_" + Twine(LoopID).str() +
-                                     "_update_" + Twine(I - 1).str() +
-                                     "_adjoint";
-              OS << "        " << Type << " " << Incoming << " = "
-                 << TargetAdjoint << ";\n"
-                 << "        " << TargetAdjoint << " = "
-                 << zero(E->Value.PrimalType) << ";\n";
-              emitGenericLoopPullback(Update.Pullback.Value, Incoming, Adjoints,
-                                      Loop);
-            }
-            break;
-          default:
-            llvm_unreachable("validated generic loop update");
-          }
+          std::string Incoming = "__dxc_ad_loop_" + Twine(LoopID).str() +
+                                 "_update_" + Twine(I - 1).str() + "_adjoint";
+          OS << "        " << Type << " " << Incoming << " = " << TargetAdjoint
+             << ";\n"
+             << "        " << TargetAdjoint << " = "
+             << zero(E->Value.PrimalType) << ";\n";
+          emitGenericLoopPullback(Update.Pullback.Value, Incoming, Adjoints,
+                                  Loop);
         }
         OS << "    }\n";
         for (unsigned I = 0; I < Loop.States.size(); ++I)

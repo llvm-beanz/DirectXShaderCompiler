@@ -4,12 +4,11 @@
 // RUN: %dxc -T cs_6_9 -E testMain -HV 2021 -Fo %t.dxil %t.run.hlsl
 // RUN: %dxc -dumpbin %t.dxil | FileCheck %s --check-prefix=EXEC
 
-// Sine and cosine target factors preserve their primal calls and reconstruct
-// analytic derivatives from the taped pre-update target.
+// Sine and cosine target factors replay through the generic local pullback.
 
 // CHECK: x.value = ((::sin(x.value) * y.value) + (::cos(x.value) * y.value));
-// CHECK: __dxc_ad_loop_0_state_1_adjoint += (sin(__dxc_ad_loop_0_primal_tape[iteration]) + cos(__dxc_ad_loop_0_primal_tape[iteration])) * __dxc_ad_loop_0_state_0_adjoint;
-// CHECK: __dxc_ad_loop_0_state_0_adjoint *= (cos(__dxc_ad_loop_0_primal_tape[iteration]) * __dxc_ad_loop_1_primal_tape[iteration] + -sin(__dxc_ad_loop_0_primal_tape[iteration]) * __dxc_ad_loop_1_primal_tape[iteration]);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint = (float)0;
 
 // Starting at (0,2,3), one iteration produces (2,5,6), returning 13.
 // With seed 2, reverse Jacobian replay produces gradients (4,4,6).

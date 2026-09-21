@@ -146,6 +146,7 @@ struct ADLoopPlan {
   const clang::VarDecl *Counter = nullptr;
   const ADExpr *TripCount = nullptr;
   unsigned TapeCapacity = 0;
+  bool UsesGenericPullbacks = false;
   llvm::SmallVector<ADLoopState, 4> States;
   llvm::SmallVector<ADLoopUpdate, 4> Updates;
   llvm::SmallVector<ADLoopTapeSlot, 4> TapeSlots;

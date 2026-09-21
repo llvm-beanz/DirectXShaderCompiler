@@ -11,7 +11,8 @@
 // CHECK: value.value *= (float)(iteration + 1);
 // CHECK: for (uint iteration = count; iteration > 0;)
 // CHECK: --iteration;
-// CHECK: __dxc_ad_loop_0_adjoint *= (float)(iteration + 1);
+// CHECK: float __dxc_ad_loop_0_update_0_adjoint = __dxc_ad_loop_0_state_0_adjoint;
+// CHECK: __dxc_ad_loop_0_state_0_adjoint += (__dxc_ad_loop_0_update_0_adjoint * (float)(iteration + 1));
 
 // At value=2 and count=3, factors are 1,2,3: primal=12. Seed 4 produces
 // gradient 4*1*2*3=24.
