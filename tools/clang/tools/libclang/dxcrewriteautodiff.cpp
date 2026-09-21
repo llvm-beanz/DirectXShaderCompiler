@@ -1404,13 +1404,6 @@ private:
   DenseMap<const hlsl::autodiff::ADExpr *, const hlsl::autodiff::ADLoopPlan *>
       RuntimeLoopPlans;
 
-  bool isGeneratedBackwardCall(const hlsl::autodiff::ADExpr *E) const {
-    if (!E->Callee)
-      return false;
-    const auto *Attr = getAutoDiffAttr(E->Callee);
-    return Attr && Attr->hasBackward();
-  }
-
   StringRef contextName(const ValueDecl *Decl) const {
     for (const ActiveContextInfo &Context : Contexts)
       for (const ParmVarDecl *Parameter : Context.Parameters)
@@ -1433,21 +1426,6 @@ private:
       return true;
     case Kind::PrimalLocal:
       return true;
-    case Kind::Swizzle:
-      return supports(E->Operands.front());
-    case Kind::Subscript:
-      return E->Operands[1]->Value.Activity == Activity::Inactive &&
-             supports(E->Operands[0]);
-    case Kind::Cast:
-      return supports(E->Operands.front());
-    case Kind::Call:
-      if (!isGeneratedBackwardCall(E) ||
-          (E->Receiver && E->Receiver->Value.Activity == Activity::Active))
-        return false;
-      for (const hlsl::autodiff::ADExpr *Operand : E->Operands)
-        if (!supports(Operand))
-          return false;
-      return true;
     case Kind::RuntimeLoopResult: {
       auto LoopIt = RuntimeLoopPlans.find(E);
       if (LoopIt == RuntimeLoopPlans.end())
@@ -1457,24 +1435,28 @@ private:
           return false;
       return true;
     }
-    case Kind::AggregateConstruct:
-    case Kind::Unary:
-    case Kind::Binary:
-    case Kind::Conditional:
-      for (const hlsl::autodiff::ADExpr *Operand : E->Operands)
-        if (!supports(Operand))
-          return false;
-      return true;
     default:
-      return false;
+      break;
     }
+    hlsl::autodiff::ADPullbackRuleInfo Rule =
+        hlsl::autodiff::getADPullbackRule(E);
+    if (Rule.Rule == hlsl::autodiff::ADPullbackRule::Unsupported)
+      return false;
+    if (Rule.Rule == hlsl::autodiff::ADPullbackRule::Subscript &&
+        E->Operands[1]->Value.Activity == Activity::Active)
+      return false;
+    if (Rule.Rule == hlsl::autodiff::ADPullbackRule::Conditional &&
+        E->Operands[0]->Value.Activity == Activity::Active)
+      return false;
+    for (const hlsl::autodiff::ADExpr *Operand : E->Operands)
+      if (!supports(Operand))
+        return false;
+    return true;
   }
 
   std::string primalText(const hlsl::autodiff::ADExpr *E) {
     std::string Text;
     raw_string_ostream Stream(Text);
-    raw_ostream *Saved = &OS;
-    (void)Saved;
     emitPrimal(E, Stream);
     Stream.flush();
     return Text;
@@ -1483,6 +1465,11 @@ private:
   void emitPrimal(const hlsl::autodiff::ADExpr *E) { emitPrimal(E, OS); }
 
   void emitPrimal(const hlsl::autodiff::ADExpr *E, raw_ostream &Out) {
+    emitPrimal(E, Out, nullptr);
+  }
+
+  void emitPrimal(const hlsl::autodiff::ADExpr *E, raw_ostream &Out,
+                  const hlsl::autodiff::ADLoopPlan *Loop) {
     using Kind = hlsl::autodiff::ADExpr::Kind;
     switch (E->K) {
     case Kind::Literal:
@@ -1495,11 +1482,22 @@ private:
           Out << ".value";
       return;
     case Kind::LocalRef:
-      emitPrimal(E->Binding->Value, Out);
+      emitPrimal(E->Binding->Value, Out, Loop);
       return;
-    case Kind::LoopStateRef:
-      Out << E->SourceDecl->getName() << ".value";
+    case Kind::LoopStateRef: {
+      if (!Loop) {
+        Out << E->SourceDecl->getName() << ".value";
+        return;
+      }
+      const hlsl::autodiff::ADLoopState &State =
+          Loop->States[E->LoopStateIndex];
+      unsigned LoopID = RuntimeLoopIDs.lookup(State.Result);
+      Out << "__dxc_ad_loop_" << LoopID;
+      if (E->LoopStateVersion)
+        Out << "_version_" << E->LoopStateVersion;
+      Out << "_primal_tape[" << Loop->Counter->getName() << "]";
       return;
+    }
     case Kind::PrimalLocal:
       Out << E->SourceDecl->getName();
       return;
@@ -1508,21 +1506,21 @@ private:
       return;
     case Kind::Member: {
       const auto *Member = cast<MemberExpr>(E->SourceExpr);
-      emitPrimal(E->Operands.front(), Out);
+      emitPrimal(E->Operands.front(), Out, Loop);
       Out << (Member->isArrow() ? "->" : ".") << E->SourceDecl->getName();
       return;
     }
     case Kind::Swizzle:
-      emitPrimal(E->Operands.front(), Out);
+      emitPrimal(E->Operands.front(), Out, Loop);
       Out << "."
           << cast<HLSLVectorElementExpr>(E->SourceExpr)
                  ->getAccessor()
                  .getName();
       return;
     case Kind::Subscript:
-      emitPrimal(E->Operands[0], Out);
+      emitPrimal(E->Operands[0], Out, Loop);
       Out << "[";
-      emitPrimal(E->Operands[1], Out);
+      emitPrimal(E->Operands[1], Out, Loop);
       Out << "]";
       return;
     case Kind::AggregateConstruct:
@@ -1535,7 +1533,7 @@ private:
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
           Out << ", ";
-        emitPrimal(E->Operands[I], Out);
+        emitPrimal(E->Operands[I], Out, Loop);
       }
       Out << (isa<InitListExpr>(E->SourceExpr) ? "}" : ")");
       return;
@@ -1543,27 +1541,27 @@ private:
       Out << "(";
       E->Value.PrimalType.print(Out, Policy);
       Out << ")";
-      emitPrimal(E->Operands.front(), Out);
+      emitPrimal(E->Operands.front(), Out, Loop);
       return;
     case Kind::Unary:
       Out << UnaryOperator::getOpcodeStr(E->UnaryOpcode) << "(";
-      emitPrimal(E->Operands.front(), Out);
+      emitPrimal(E->Operands.front(), Out, Loop);
       Out << ")";
       return;
     case Kind::Binary:
       Out << "(";
-      emitPrimal(E->Operands[0], Out);
+      emitPrimal(E->Operands[0], Out, Loop);
       Out << " " << BinaryOperator::getOpcodeStr(E->BinaryOpcode) << " ";
-      emitPrimal(E->Operands[1], Out);
+      emitPrimal(E->Operands[1], Out, Loop);
       Out << ")";
       return;
     case Kind::Conditional:
       Out << "(";
-      emitPrimal(E->Operands[0], Out);
+      emitPrimal(E->Operands[0], Out, Loop);
       Out << " ? ";
-      emitPrimal(E->Operands[1], Out);
+      emitPrimal(E->Operands[1], Out, Loop);
       Out << " : ";
-      emitPrimal(E->Operands[2], Out);
+      emitPrimal(E->Operands[2], Out, Loop);
       Out << ")";
       return;
     case Kind::Call:
@@ -1572,7 +1570,7 @@ private:
           const auto *Method = cast<CXXMethodDecl>(E->Callee);
           Out << "::" << Method->getParent()->getName() << "::";
         } else {
-          emitPrimal(E->Receiver, Out);
+          emitPrimal(E->Receiver, Out, Loop);
           Out << ".";
         }
       } else if (const auto *Method = dyn_cast<CXXMethodDecl>(E->Callee))
@@ -1586,7 +1584,7 @@ private:
       for (unsigned I = 0; I < E->Operands.size(); ++I) {
         if (I)
           Out << ", ";
-        emitPrimal(E->Operands[I], Out);
+        emitPrimal(E->Operands[I], Out, Loop);
       }
       Out << ")";
       return;
@@ -1661,31 +1659,10 @@ private:
     return "(" + printType(Type, Policy) + ")0";
   }
 
-  void emitAggregateAdjoint(const hlsl::autodiff::ADExpr *E,
-                            StringRef Cotangent, QualType CotangentType,
-                            unsigned &Offset) {
-    using Activity = hlsl::autodiff::ADActivity;
-    using Kind = hlsl::autodiff::ADExpr::Kind;
-    for (const hlsl::autodiff::ADExpr *Operand : E->Operands) {
-      unsigned OperandCount = getComponentCount(Operand->Value.PrimalType);
-      if (Operand->Value.Activity == Activity::Inactive) {
-        Offset += OperandCount;
-        continue;
-      }
-      if (Operand->K == Kind::AggregateConstruct) {
-        emitAggregateAdjoint(Operand, Cotangent, CotangentType, Offset);
-        continue;
-      }
-      SmallVector<std::string, 4> Values;
-      for (unsigned I = 0; I < OperandCount; ++I)
-        Values.push_back(component(Cotangent, Offset + I, CotangentType));
-      emitAdjoint(Operand,
-                  constructCotangent(Operand->Value.PrimalType, Values));
-      Offset += OperandCount;
-    }
-  }
-
-  void emitCallAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent) {
+  template <typename EmitAdjointFn, typename PrimalTextFn>
+  void emitCallAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent,
+                       StringRef Indent, EmitAdjointFn EmitAdjoint,
+                       PrimalTextFn PrimalText) {
     unsigned CallID = PullbackCallCount++;
     SmallVector<ActiveContextInfo, 4> CalleeContexts;
     SmallVector<unsigned, 4> ArgumentContexts(E->Operands.size(), 0);
@@ -1713,7 +1690,7 @@ private:
       Context.Name =
           "__dxc_ad_call_" + Twine(CallID).str() + "_context_" + Twine(I).str();
       std::string Type = printType(Context.Type, Policy);
-      OS << "    GradientContext<" << Type << "> " << Context.Name
+        OS << Indent << "GradientContext<" << Type << "> " << Context.Name
          << " = (GradientContext<" << Type << ">)0;\n";
     }
 
@@ -1725,16 +1702,14 @@ private:
       Variables[I] =
           "__dxc_ad_call_" + Twine(CallID).str() + "_arg_" + Twine(I).str();
       std::string Type = printType(Parameter->getType(), Policy);
-      OS << "    Variable<" << Type << "> " << Variables[I] << " = variable("
-         << CalleeContexts[ArgumentContexts[I]].Name << ", ";
-      emitPrimal(E->Operands[I]);
-      OS << ");\n";
+      OS << Indent << "Variable<" << Type << "> " << Variables[I]
+         << " = variable(" << CalleeContexts[ArgumentContexts[I]].Name << ", "
+         << PrimalText(E->Operands[I]) << ");\n";
     }
 
-    OS << "    ";
+    OS << Indent;
     if (E->Receiver) {
-      emitPrimal(E->Receiver);
-      OS << ".";
+      OS << PrimalText(E->Receiver) << ".";
     } else if (!isa<CXXMethodDecl>(E->Callee)) {
       SmallVector<StringRef, 4> ReversedNamespaces;
       for (const DeclContext *DC = E->Callee->getDeclContext(); DC;
@@ -1761,7 +1736,7 @@ private:
         OS << ", ";
       First = false;
       if (isInactiveParameter(E->Callee->getParamDecl(I)))
-        emitPrimal(E->Operands[I]);
+        OS << PrimalText(E->Operands[I]);
       else
         OS << Variables[I];
     }
@@ -1772,92 +1747,22 @@ private:
     for (unsigned I = 0; I < E->Operands.size(); ++I) {
       if (isInactiveParameter(E->Callee->getParamDecl(I)))
         continue;
-      emitAdjoint(E->Operands[I], Variables[I] + ".gradient(" +
+      EmitAdjoint(E->Operands[I], Variables[I] + ".gradient(" +
                                       CalleeContexts[ArgumentContexts[I]].Name +
                                       ")");
     }
   }
 
-  std::string genericLoopPrimalText(const hlsl::autodiff::ADExpr *E,
-                                    const hlsl::autodiff::ADLoopPlan &Loop) {
+  template <typename EmitAdjointFn, typename PrimalTextFn>
+  bool emitTypedPullback(const hlsl::autodiff::ADExpr *E, StringRef Cotangent,
+                         EmitAdjointFn EmitAdjoint,
+                         PrimalTextFn PrimalText) {
     using Activity = hlsl::autodiff::ADActivity;
     using Kind = hlsl::autodiff::ADExpr::Kind;
-    if (E->Value.Activity == Activity::Inactive)
-      return primalText(E);
-    switch (E->K) {
-    case Kind::LoopStateRef: {
-      const hlsl::autodiff::ADLoopState &State = Loop.States[E->LoopStateIndex];
-      unsigned LoopID = RuntimeLoopIDs.lookup(State.Result);
-      std::string Version =
-          E->LoopStateVersion == 0
-              ? ""
-              : "_version_" + Twine(E->LoopStateVersion).str();
-      return "__dxc_ad_loop_" + Twine(LoopID).str() + Version +
-             "_primal_tape[" + Loop.Counter->getName().str() + "]";
-    }
-    case Kind::Swizzle:
-      return genericLoopPrimalText(E->Operands.front(), Loop) + "." +
-             cast<HLSLVectorElementExpr>(E->SourceExpr)
-                 ->getAccessor()
-                 .getName()
-                 .str();
-    case Kind::AggregateConstruct: {
-      std::string Text;
-      if (isa<InitListExpr>(E->SourceExpr))
-        Text = "{";
-      else
-        Text = printType(E->Value.PrimalType, Policy) + "(";
-      for (unsigned I = 0; I < E->Operands.size(); ++I) {
-        if (I)
-          Text += ", ";
-        Text += genericLoopPrimalText(E->Operands[I], Loop);
-      }
-      return Text + (isa<InitListExpr>(E->SourceExpr) ? "}" : ")");
-    }
-    case Kind::Subscript:
-      return genericLoopPrimalText(E->Operands[0], Loop) + "[" +
-             primalText(E->Operands[1]) + "]";
-    case Kind::Conditional:
-      return "(" + primalText(E->Operands[0]) + " ? " +
-             genericLoopPrimalText(E->Operands[1], Loop) + " : " +
-             genericLoopPrimalText(E->Operands[2], Loop) + ")";
-    case Kind::Unary:
-      return UnaryOperator::getOpcodeStr(E->UnaryOpcode).str() + "(" +
-             genericLoopPrimalText(E->Operands.front(), Loop) + ")";
-    case Kind::Cast: {
-      std::string Type;
-      raw_string_ostream Stream(Type);
-      E->Value.PrimalType.print(Stream, Policy);
-      Stream.flush();
-      return "(" + Type + ")" +
-             genericLoopPrimalText(E->Operands.front(), Loop);
-    }
-    case Kind::Call:
-      return "::" + E->Callee->getName().str() + "(" +
-             genericLoopPrimalText(E->Operands.front(), Loop) + ")";
-    case Kind::Binary:
-      return "(" + genericLoopPrimalText(E->Operands[0], Loop) + " " +
-             BinaryOperator::getOpcodeStr(E->BinaryOpcode).str() + " " +
-             genericLoopPrimalText(E->Operands[1], Loop) + ")";
-    default:
-      return primalText(E);
-    }
-  }
-
-  void emitGenericLoopPullback(const hlsl::autodiff::ADExpr *E,
-                               StringRef Cotangent,
-                               ArrayRef<std::string> StateAdjoints,
-                               const hlsl::autodiff::ADLoopPlan &Loop) {
-    using Activity = hlsl::autodiff::ADActivity;
-    using Kind = hlsl::autodiff::ADExpr::Kind;
-    if (E->Value.Activity == Activity::Inactive)
-      return;
-    switch (E->K) {
-    case Kind::LoopStateRef:
-      OS << "        " << StateAdjoints[E->LoopStateIndex]
-         << " += " << Cotangent << ";\n";
-      return;
-    case Kind::Swizzle: {
+    using Rule = hlsl::autodiff::ADPullbackRule;
+    Rule PullbackRule = hlsl::autodiff::getADPullbackRule(E).Rule;
+    switch (PullbackRule) {
+    case Rule::Swizzle: {
       const hlsl::autodiff::ADExpr *Base = E->Operands.front();
       unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
       SmallVector<std::string, 4> Values;
@@ -1871,16 +1776,37 @@ private:
         }
         Values.push_back(Sum.empty() ? "0.0f" : Sum);
       }
-      emitGenericLoopPullback(
-          Base, constructCotangent(Base->Value.PrimalType, Values),
-          StateAdjoints, Loop);
-      return;
+      EmitAdjoint(Base, constructCotangent(Base->Value.PrimalType, Values));
+      return true;
     }
-    case Kind::AggregateConstruct: {
+    case Rule::Subscript: {
+      const hlsl::autodiff::ADExpr *Base = E->Operands[0];
+      std::string Index = PrimalText(E->Operands[1]);
+      SmallVector<std::string, 4> Values;
+      if (hlsl::IsHLSLMatType(Base->Value.PrimalType)) {
+        uint32_t Rows = 0;
+        uint32_t Columns = 0;
+        hlsl::GetHLSLMatRowColCount(Base->Value.PrimalType, Rows, Columns);
+        for (unsigned Row = 0; Row < Rows; ++Row)
+          for (unsigned Column = 0; Column < Columns; ++Column)
+            Values.push_back("(" + Index + " == " + Twine(Row).str() +
+                             " ? " +
+                             component(Cotangent, Column,
+                                       E->Value.PrimalType) +
+                             " : 0.0f)");
+      } else {
+        unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
+        for (unsigned I = 0; I < BaseCount; ++I)
+          Values.push_back("(" + Index + " == " + Twine(I).str() + " ? " +
+                           Cotangent.str() + " : 0.0f)");
+      }
+      EmitAdjoint(Base, constructCotangent(Base->Value.PrimalType, Values));
+      return true;
+    }
+    case Rule::AggregateConstruct: {
       unsigned Offset = 0;
-      auto EmitAggregatePullback =
-          [&](const auto &Self,
-              const hlsl::autodiff::ADExpr *Aggregate) -> void {
+      auto EmitAggregate = [&](const auto &Self,
+                               const hlsl::autodiff::ADExpr *Aggregate) -> void {
         for (const hlsl::autodiff::ADExpr *Operand : Aggregate->Operands) {
           unsigned OperandCount = getComponentCount(Operand->Value.PrimalType);
           if (Operand->Value.Activity == Activity::Inactive) {
@@ -1895,138 +1821,131 @@ private:
           for (unsigned I = 0; I < OperandCount; ++I)
             Values.push_back(
                 component(Cotangent, Offset + I, E->Value.PrimalType));
-          emitGenericLoopPullback(
-              Operand, constructCotangent(Operand->Value.PrimalType, Values),
-              StateAdjoints, Loop);
+          EmitAdjoint(
+              Operand, constructCotangent(Operand->Value.PrimalType, Values));
           Offset += OperandCount;
         }
       };
-      EmitAggregatePullback(EmitAggregatePullback, E);
+      EmitAggregate(EmitAggregate, E);
+      return true;
+    }
+    case Rule::Cast:
+      EmitAdjoint(E->Operands.front(),
+                  "(" +
+                      printType(E->Operands.front()->Value.PrimalType, Policy) +
+                      ")(" + Cotangent.str() + ")");
+      return true;
+    case Rule::Positive:
+      EmitAdjoint(E->Operands.front(), Cotangent.str());
+      return true;
+    case Rule::Negative:
+      EmitAdjoint(E->Operands.front(), "-(" + Cotangent.str() + ")");
+      return true;
+    case Rule::Add:
+      EmitAdjoint(E->Operands[0], Cotangent.str());
+      EmitAdjoint(E->Operands[1], Cotangent.str());
+      return true;
+    case Rule::Subtract:
+      EmitAdjoint(E->Operands[0], Cotangent.str());
+      EmitAdjoint(E->Operands[1], "-(" + Cotangent.str() + ")");
+      return true;
+    case Rule::Multiply:
+      EmitAdjoint(E->Operands[0], "(" + Cotangent.str() + " * " +
+                                      PrimalText(E->Operands[1]) + ")");
+      EmitAdjoint(E->Operands[1], "(" + Cotangent.str() + " * " +
+                                      PrimalText(E->Operands[0]) + ")");
+      return true;
+    case Rule::Divide: {
+      std::string Numerator = PrimalText(E->Operands[0]);
+      std::string Denominator = PrimalText(E->Operands[1]);
+      EmitAdjoint(E->Operands[0],
+                  "(" + Cotangent.str() + " / " + Denominator + ")");
+      EmitAdjoint(E->Operands[1],
+                  "(-(" + Cotangent.str() + ") * " + Numerator + " / (" +
+                      Denominator + " * " + Denominator + "))");
+      return true;
+    }
+    case Rule::Conditional: {
+      std::string Condition = PrimalText(E->Operands[0]);
+      EmitAdjoint(E->Operands[1],
+                  "(" + Condition + " ? " + Cotangent.str() + " : " +
+                      zero(E->Operands[1]->Value.PrimalType) + ")");
+      EmitAdjoint(E->Operands[2],
+                  "(" + Condition + " ? " +
+                      zero(E->Operands[2]->Value.PrimalType) + " : " +
+                      Cotangent.str() + ")");
+      return true;
+    }
+    case Rule::Sin:
+      EmitAdjoint(E->Operands.front(),
+                  "(" + Cotangent.str() + " * cos(" +
+                      PrimalText(E->Operands.front()) + "))");
+      return true;
+    case Rule::Cos:
+      EmitAdjoint(E->Operands.front(),
+                  "-(" + Cotangent.str() + " * sin(" +
+                      PrimalText(E->Operands.front()) + "))");
+      return true;
+    case Rule::Exp:
+      EmitAdjoint(E->Operands.front(),
+                  "(" + Cotangent.str() + " * exp(" +
+                      PrimalText(E->Operands.front()) + "))");
+      return true;
+    case Rule::Log:
+      EmitAdjoint(E->Operands.front(),
+                  "(" + Cotangent.str() + " / " +
+                      PrimalText(E->Operands.front()) + ")");
+      return true;
+    case Rule::Sqrt:
+      EmitAdjoint(E->Operands.front(),
+                  "(" + Cotangent.str() + " * (0.5f / sqrt(" +
+                      PrimalText(E->Operands.front()) + ")))");
+      return true;
+    case Rule::Unsupported:
+    case Rule::Leaf:
+    case Rule::ComposedCall:
+      return false;
+    }
+    llvm_unreachable("unknown typed pullback rule");
+  }
+
+  std::string genericLoopPrimalText(const hlsl::autodiff::ADExpr *E,
+                                    const hlsl::autodiff::ADLoopPlan &Loop) {
+    std::string Text;
+    raw_string_ostream Stream(Text);
+    emitPrimal(E, Stream, &Loop);
+    Stream.flush();
+    return Text;
+  }
+
+  void emitGenericLoopPullback(const hlsl::autodiff::ADExpr *E,
+                               StringRef Cotangent,
+                               ArrayRef<std::string> StateAdjoints,
+                               const hlsl::autodiff::ADLoopPlan &Loop) {
+    using Activity = hlsl::autodiff::ADActivity;
+    using Kind = hlsl::autodiff::ADExpr::Kind;
+    if (E->Value.Activity == Activity::Inactive)
+      return;
+    if (E->K == Kind::LoopStateRef) {
+      OS << "        " << StateAdjoints[E->LoopStateIndex]
+         << " += " << Cotangent << ";\n";
       return;
     }
-    case Kind::Subscript: {
-      const hlsl::autodiff::ADExpr *Base = E->Operands[0];
-      std::string Index = primalText(E->Operands[1]);
-      SmallVector<std::string, 4> Values;
-      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
-      for (unsigned I = 0; I < BaseCount; ++I)
-        Values.push_back("(" + Index + " == " + Twine(I).str() + " ? " +
-                         Cotangent.str() + " : 0.0f)");
-      emitGenericLoopPullback(
-          Base, constructCotangent(Base->Value.PrimalType, Values),
-          StateAdjoints, Loop);
+    auto EmitAdjoint = [&](const hlsl::autodiff::ADExpr *Operand,
+                           const std::string &OperandCotangent) {
+      emitGenericLoopPullback(Operand, OperandCotangent, StateAdjoints, Loop);
+    };
+    auto PrimalText = [&](const hlsl::autodiff::ADExpr *Operand) {
+      return genericLoopPrimalText(Operand, Loop);
+    };
+    if (hlsl::autodiff::getADPullbackRule(E).Rule ==
+        hlsl::autodiff::ADPullbackRule::ComposedCall) {
+      emitCallAdjoint(E, Cotangent, "        ", EmitAdjoint, PrimalText);
       return;
     }
-    case Kind::Conditional: {
-      std::string Condition = primalText(E->Operands[0]);
-      emitGenericLoopPullback(E->Operands[1],
-                              "(" + Condition + " ? " + Cotangent.str() +
-                                  " : " +
-                                  zero(E->Operands[1]->Value.PrimalType) + ")",
-                              StateAdjoints, Loop);
-      emitGenericLoopPullback(E->Operands[2],
-                              "(" + Condition + " ? " +
-                                  zero(E->Operands[2]->Value.PrimalType) +
-                                  " : " + Cotangent.str() + ")",
-                              StateAdjoints, Loop);
+    if (emitTypedPullback(E, Cotangent, EmitAdjoint, PrimalText))
       return;
-    }
-    case Kind::Unary:
-      emitGenericLoopPullback(E->Operands.front(),
-                              E->UnaryOpcode == UO_Minus
-                                  ? "-(" + Cotangent.str() + ")"
-                                  : Cotangent.str(),
-                              StateAdjoints, Loop);
-      return;
-    case Kind::Cast:
-      emitGenericLoopPullback(
-          E->Operands.front(),
-          "(" + printType(E->Operands.front()->Value.PrimalType, Policy) +
-              ")(" + Cotangent.str() + ")",
-          StateAdjoints, Loop);
-      return;
-    case Kind::Call: {
-      std::string Primal = genericLoopPrimalText(E->Operands.front(), Loop);
-      std::string Pullback;
-      StringRef Name = E->Callee->getName();
-      if (Name == "sin")
-        Pullback = "(" + Cotangent.str() + " * cos(" + Primal + "))";
-      else if (Name == "cos")
-        Pullback = "-(" + Cotangent.str() + " * sin(" + Primal + "))";
-      else if (Name == "exp")
-        Pullback = "(" + Cotangent.str() + " * exp(" + Primal + "))";
-      else if (Name == "log")
-        Pullback = "(" + Cotangent.str() + " / " + Primal + ")";
-      else if (Name == "sqrt")
-        Pullback = "(" + Cotangent.str() + " * (0.5f / sqrt(" + Primal + ")))";
-      else
-        llvm_unreachable("validated generic loop intrinsic");
-      emitGenericLoopPullback(E->Operands.front(), Pullback, StateAdjoints,
-                              Loop);
-      return;
-    }
-    case Kind::Binary:
-      switch (E->BinaryOpcode) {
-      case BO_Add:
-        emitGenericLoopPullback(E->Operands[0], Cotangent, StateAdjoints, Loop);
-        emitGenericLoopPullback(E->Operands[1], Cotangent, StateAdjoints, Loop);
-        return;
-      case BO_Sub:
-        emitGenericLoopPullback(E->Operands[0], Cotangent, StateAdjoints, Loop);
-        emitGenericLoopPullback(E->Operands[1], "-(" + Cotangent.str() + ")",
-                                StateAdjoints, Loop);
-        return;
-      case BO_Mul:
-        if (E->Operands[0]->Value.Activity == Activity::Inactive)
-          emitGenericLoopPullback(E->Operands[1],
-                                  "(" + Cotangent.str() + " * " +
-                                      primalText(E->Operands[0]) + ")",
-                                  StateAdjoints, Loop);
-        else if (E->Operands[1]->Value.Activity == Activity::Inactive)
-          emitGenericLoopPullback(E->Operands[0],
-                                  "(" + Cotangent.str() + " * " +
-                                      primalText(E->Operands[1]) + ")",
-                                  StateAdjoints, Loop);
-        else {
-          emitGenericLoopPullback(
-              E->Operands[0],
-              "(" + Cotangent.str() + " * " +
-                  genericLoopPrimalText(E->Operands[1], Loop) + ")",
-              StateAdjoints, Loop);
-          emitGenericLoopPullback(
-              E->Operands[1],
-              "(" + Cotangent.str() + " * " +
-                  genericLoopPrimalText(E->Operands[0], Loop) + ")",
-              StateAdjoints, Loop);
-        }
-        return;
-      case BO_Div:
-        if (E->Operands[1]->Value.Activity == Activity::Inactive) {
-          emitGenericLoopPullback(E->Operands[0],
-                                  "(" + Cotangent.str() + " / " +
-                                      primalText(E->Operands[1]) + ")",
-                                  StateAdjoints, Loop);
-          return;
-        }
-        {
-          std::string Numerator = genericLoopPrimalText(E->Operands[0], Loop);
-          std::string Denominator = genericLoopPrimalText(E->Operands[1], Loop);
-          emitGenericLoopPullback(
-              E->Operands[0], "(" + Cotangent.str() + " / " + Denominator + ")",
-              StateAdjoints, Loop);
-          emitGenericLoopPullback(E->Operands[1],
-                                  "(-(" + Cotangent.str() + ") * " + Numerator +
-                                      " / (" + Denominator + " * " +
-                                      Denominator + "))",
-                                  StateAdjoints, Loop);
-        }
-        return;
-      default:
-        llvm_unreachable("validated generic loop pullback expression");
-      }
-    default:
-      llvm_unreachable("validated generic loop pullback node");
-    }
+    llvm_unreachable("validated generic loop pullback node");
   }
 
   void emitAdjoint(const hlsl::autodiff::ADExpr *E, StringRef Cotangent) {
@@ -2042,67 +1961,26 @@ private:
     case Kind::LocalRef:
       emitAdjoint(E->Binding->Value, Cotangent);
       return;
-    case Kind::Swizzle: {
-      const hlsl::autodiff::ADExpr *Base = E->Operands.front();
-      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
-      unsigned ResultCount = E->Components.size();
-      SmallVector<std::string, 4> Values;
-      for (unsigned BaseIndex = 0; BaseIndex < BaseCount; ++BaseIndex) {
-        std::string Sum;
-        for (unsigned I = 0; I < ResultCount; ++I) {
-          if (E->Components[I] != BaseIndex)
-            continue;
-          std::string Term = component(Cotangent, I, E->Value.PrimalType);
-          Sum = Sum.empty() ? Term : "(" + Sum + " + " + Term + ")";
-        }
-        Values.push_back(Sum.empty() ? "0.0f" : Sum);
-      }
-      std::string Routed = constructCotangent(Base->Value.PrimalType, Values);
-      emitAdjoint(Base, Routed);
-      return;
-    }
-    case Kind::Subscript: {
-      const hlsl::autodiff::ADExpr *Base = E->Operands[0];
-      std::string Index = primalText(E->Operands[1]);
-      SmallVector<std::string, 4> Values;
-      if (hlsl::IsHLSLMatType(Base->Value.PrimalType)) {
-        uint32_t Rows = 0;
-        uint32_t Columns = 0;
-        hlsl::GetHLSLMatRowColCount(Base->Value.PrimalType, Rows, Columns);
-        for (unsigned Row = 0; Row < Rows; ++Row)
-          for (unsigned Column = 0; Column < Columns; ++Column)
-            Values.push_back("(" + Index + " == " + Twine(Row).str() + " ? " +
-                             component(Cotangent, Column, E->Value.PrimalType) +
-                             " : 0.0f)");
-        emitAdjoint(Base, constructCotangent(Base->Value.PrimalType, Values));
+    case Kind::Call:
+      if (hlsl::autodiff::getADPullbackRule(E).Rule ==
+          hlsl::autodiff::ADPullbackRule::ComposedCall) {
+        emitCallAdjoint(
+            E, Cotangent, "    ",
+            [&](const hlsl::autodiff::ADExpr *Operand,
+                const std::string &OperandCotangent) {
+              emitAdjoint(Operand, OperandCotangent);
+            },
+            [&](const hlsl::autodiff::ADExpr *Operand) {
+              return primalText(Operand);
+            });
         return;
       }
-      unsigned BaseCount = getComponentCount(Base->Value.PrimalType);
-      for (unsigned I = 0; I < BaseCount; ++I)
-        Values.push_back("(" + Index + " == " + Twine(I).str() + " ? " +
-                         Cotangent.str() + " : 0.0f)");
-      emitAdjoint(Base, constructCotangent(Base->Value.PrimalType, Values));
-      return;
-    }
-    case Kind::AggregateConstruct: {
-      unsigned Offset = 0;
-      emitAggregateAdjoint(E, Cotangent, E->Value.PrimalType, Offset);
-      return;
-    }
-    case Kind::Cast:
-      emitAdjoint(E->Operands.front(),
-                  "(" +
-                      printType(E->Operands.front()->Value.PrimalType, Policy) +
-                      ")(" + Cotangent.str() + ")");
-      return;
-    case Kind::Call:
-      emitCallAdjoint(E, Cotangent);
-      return;
+      break;
     case Kind::RuntimeLoopResult: {
       unsigned LoopID = RuntimeLoopIDs.lookup(E);
       std::string Type = printType(E->Value.PrimalType, Policy);
       auto LoopIt = RuntimeLoopPlans.find(E);
-        if (LoopIt != RuntimeLoopPlans.end()) {
+      if (LoopIt != RuntimeLoopPlans.end()) {
         const hlsl::autodiff::ADLoopPlan &Loop = *LoopIt->second;
         SmallVector<std::string, 4> Adjoints;
         for (unsigned I = 0; I < Loop.States.size(); ++I) {
@@ -2137,54 +2015,17 @@ private:
       }
       llvm_unreachable("validated runtime loop has no generic pullback");
     }
-    case Kind::Unary:
-      if (E->UnaryOpcode == UO_Minus)
-        emitAdjoint(E->Operands.front(), "-(" + Cotangent.str() + ")");
-      else
-        emitAdjoint(E->Operands.front(), Cotangent);
-      return;
-    case Kind::Binary: {
-      const auto *Left = E->Operands[0];
-      const auto *Right = E->Operands[1];
-      switch (E->BinaryOpcode) {
-      case BO_Add:
-        emitAdjoint(Left, Cotangent);
-        emitAdjoint(Right, Cotangent);
-        return;
-      case BO_Sub:
-        emitAdjoint(Left, Cotangent);
-        emitAdjoint(Right, "-(" + Cotangent.str() + ")");
-        return;
-      case BO_Mul:
-        emitAdjoint(Left,
-                    "(" + Cotangent.str() + " * " + primalText(Right) + ")");
-        emitAdjoint(Right,
-                    "(" + Cotangent.str() + " * " + primalText(Left) + ")");
-        return;
-      case BO_Div:
-        emitAdjoint(Left,
-                    "(" + Cotangent.str() + " / " + primalText(Right) + ")");
-        emitAdjoint(Right, "(-(" + Cotangent.str() + ") * " + primalText(Left) +
-                               " / (" + primalText(Right) + " * " +
-                               primalText(Right) + "))");
-        return;
-      default:
-        return;
-      }
-    }
-    case Kind::Conditional: {
-      std::string Condition = primalText(E->Operands[0]);
-      emitAdjoint(E->Operands[1],
-                  "(" + Condition + " ? " + Cotangent.str() + " : " +
-                      zero(E->Operands[1]->Value.PrimalType) + ")");
-      emitAdjoint(E->Operands[2], "(" + Condition + " ? " +
-                                      zero(E->Operands[2]->Value.PrimalType) +
-                                      " : " + Cotangent.str() + ")");
-      return;
-    }
     default:
-      return;
+      break;
     }
+    auto EmitAdjoint = [&](const hlsl::autodiff::ADExpr *Operand,
+                           const std::string &OperandCotangent) {
+      emitAdjoint(Operand, OperandCotangent);
+    };
+    auto PrimalText = [&](const hlsl::autodiff::ADExpr *Operand) {
+      return primalText(Operand);
+    };
+    (void)emitTypedPullback(E, Cotangent, EmitAdjoint, PrimalText);
   }
 };
 

@@ -16,6 +16,7 @@
 #include "clang/AST/Expr.h"
 #include "llvm/ADT/SmallVector.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -73,6 +74,35 @@ struct ADExpr {
   llvm::SmallVector<const ADExpr *, 4> Operands;
   llvm::SmallVector<unsigned, 4> Components;
 };
+
+enum class ADPullbackRule {
+  Unsupported,
+  Leaf,
+  Swizzle,
+  Subscript,
+  AggregateConstruct,
+  Cast,
+  Positive,
+  Negative,
+  Add,
+  Subtract,
+  Multiply,
+  Divide,
+  Conditional,
+  Sin,
+  Cos,
+  Exp,
+  Log,
+  Sqrt,
+  ComposedCall,
+};
+
+struct ADPullbackRuleInfo {
+  ADPullbackRule Rule = ADPullbackRule::Unsupported;
+  uint64_t PrimalOperandMask = 0;
+};
+
+ADPullbackRuleInfo getADPullbackRule(const ADExpr *Expression);
 
 struct ADBinding {
   const clang::VarDecl *SourceDecl = nullptr;

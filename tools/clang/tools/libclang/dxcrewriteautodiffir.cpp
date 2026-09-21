@@ -37,6 +37,84 @@ ADExpr::ADExpr(Kind K, const Expr *SourceExpr)
                                                : ADValueCategory::RValue;
 }
 
+ADPullbackRuleInfo getADPullbackRule(const ADExpr *Expression) {
+  switch (Expression->K) {
+  case ADExpr::Kind::DeclRef:
+  case ADExpr::Kind::LocalRef:
+  case ADExpr::Kind::LoopStateRef:
+    return {ADPullbackRule::Leaf, 0};
+  case ADExpr::Kind::Swizzle:
+    return {ADPullbackRule::Swizzle, 0};
+  case ADExpr::Kind::Subscript:
+    return {ADPullbackRule::Subscript, 0};
+  case ADExpr::Kind::AggregateConstruct:
+    return {ADPullbackRule::AggregateConstruct, 0};
+  case ADExpr::Kind::Cast:
+    return {ADPullbackRule::Cast, 0};
+  case ADExpr::Kind::Unary:
+    if (Expression->UnaryOpcode == UO_Plus)
+      return {ADPullbackRule::Positive, 0};
+    if (Expression->UnaryOpcode == UO_Minus)
+      return {ADPullbackRule::Negative, 0};
+    return {};
+  case ADExpr::Kind::Binary:
+    switch (Expression->BinaryOpcode) {
+    case BO_Add:
+      return {ADPullbackRule::Add, 0};
+    case BO_Sub:
+      return {ADPullbackRule::Subtract, 0};
+    case BO_Mul:
+      return {ADPullbackRule::Multiply,
+              Expression->Operands[0]->Value.Activity == ADActivity::Active &&
+                      Expression->Operands[1]->Value.Activity ==
+                          ADActivity::Active
+                  ? 3u
+                  : 0u};
+    case BO_Div:
+      return {ADPullbackRule::Divide,
+              Expression->Operands[1]->Value.Activity == ADActivity::Active
+                  ? 3u
+                  : 0u};
+    default:
+      return {};
+    }
+  case ADExpr::Kind::Conditional:
+    return {ADPullbackRule::Conditional, 0};
+  case ADExpr::Kind::Call: {
+    if (!Expression->Callee)
+      return {};
+    if (!Expression->Receiver && Expression->Operands.size() == 1) {
+      ADPullbackRule Intrinsic =
+          StringSwitch<ADPullbackRule>(Expression->Callee->getName())
+              .Case("sin", ADPullbackRule::Sin)
+              .Case("cos", ADPullbackRule::Cos)
+              .Case("exp", ADPullbackRule::Exp)
+              .Case("log", ADPullbackRule::Log)
+              .Case("sqrt", ADPullbackRule::Sqrt)
+              .Default(ADPullbackRule::Unsupported);
+      if (Intrinsic != ADPullbackRule::Unsupported)
+        return {Intrinsic, 1};
+    }
+    if (Expression->Receiver &&
+        Expression->Receiver->Value.Activity == ADActivity::Active)
+      return {};
+    bool HasBackward = false;
+    for (const FunctionDecl *Redecl : Expression->Callee->redecls())
+      if (const auto *Attr = Redecl->getAttr<HLSLAutoDiffAttr>())
+        HasBackward |= Attr->hasBackward();
+    if (!HasBackward || Expression->Operands.size() > 64)
+      return {};
+    uint64_t PrimalOperandMask = 0;
+    for (unsigned I = 0; I < Expression->Operands.size(); ++I)
+      if (Expression->Operands[I]->Value.Activity == ADActivity::Active)
+        PrimalOperandMask |= uint64_t(1) << I;
+    return {ADPullbackRule::ComposedCall, PrimalOperandMask};
+  }
+  default:
+    return {};
+  }
+}
+
 namespace {
 
 const ValueDecl *getCanonicalValueDecl(const ValueDecl *D) {
@@ -351,37 +429,38 @@ private:
       bool NeedsPrimal = false) const {
     if (Expression->Value.Activity == ADActivity::Inactive)
       return {};
-    switch (Expression->K) {
-    case ADExpr::Kind::DeclRef:
-    case ADExpr::Kind::LocalRef:
+    ADPullbackRuleInfo Rule = getADPullbackRule(Expression);
+    switch (Rule.Rule) {
+    case ADPullbackRule::Leaf:
+      if (Expression->K == ADExpr::Kind::LoopStateRef) {
+        if (!Inputs)
+          return {};
+        for (ADLoopPullbackInput &Input : *Inputs)
+          if (Input.StateIndex == Expression->LoopStateIndex &&
+              Input.Version == Expression->LoopStateVersion) {
+            Input.NeedsPrimal |= NeedsPrimal;
+            return {};
+          }
+        Inputs->push_back({Expression->LoopStateIndex,
+                           Expression->LoopStateVersion, NeedsPrimal});
+        return {};
+      }
       if (StateDecls && Expression->SourceDecl &&
           StateDecls->count(getCanonicalValueDecl(Expression->SourceDecl)))
         return {};
       return rejectLoopPullback(
           LoopPullbackAnalysis::Rejection::ActiveValueOutsideLoopState,
           Expression);
-    case ADExpr::Kind::LoopStateRef: {
-      if (!Inputs)
-        return {};
-      for (ADLoopPullbackInput &Input : *Inputs)
-        if (Input.StateIndex == Expression->LoopStateIndex &&
-            Input.Version == Expression->LoopStateVersion) {
-          Input.NeedsPrimal |= NeedsPrimal;
-          return {};
-        }
-      Inputs->push_back({Expression->LoopStateIndex,
-                         Expression->LoopStateVersion, NeedsPrimal});
-      return {};
-    }
-    case ADExpr::Kind::AggregateConstruct:
-      for (const ADExpr *Operand : Expression->Operands) {
+    case ADPullbackRule::AggregateConstruct:
+      for (unsigned I = 0; I < Expression->Operands.size(); ++I) {
         LoopPullbackAnalysis Analysis = analyzeGenericLoopPullback(
-            Operand, Inputs, StateDecls, NeedsPrimal);
+            Expression->Operands[I], Inputs, StateDecls,
+            NeedsPrimal || (Rule.PrimalOperandMask & (1u << I)));
         if (!Analysis)
           return Analysis;
       }
       return {};
-    case ADExpr::Kind::Subscript:
+    case ADPullbackRule::Subscript:
       if (!hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType))
         return rejectLoopPullback(
             LoopPullbackAnalysis::Rejection::NonVectorSubscript, Expression);
@@ -390,7 +469,7 @@ private:
             LoopPullbackAnalysis::Rejection::ActiveSubscriptIndex, Expression);
       return analyzeGenericLoopPullback(Expression->Operands[0], Inputs,
                                         StateDecls, NeedsPrimal);
-    case ADExpr::Kind::Conditional: {
+    case ADPullbackRule::Conditional: {
       if (Expression->Operands[0]->Value.Activity == ADActivity::Active)
         return rejectLoopPullback(
             LoopPullbackAnalysis::Rejection::ActiveCondition, Expression);
@@ -401,51 +480,53 @@ private:
       return analyzeGenericLoopPullback(Expression->Operands[2], Inputs,
                                         StateDecls, NeedsPrimal);
     }
-    case ADExpr::Kind::Swizzle:
-    case ADExpr::Kind::Unary:
-    case ADExpr::Kind::Cast:
+    case ADPullbackRule::Swizzle:
+    case ADPullbackRule::Cast:
+    case ADPullbackRule::Positive:
+    case ADPullbackRule::Negative:
       return analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
                                         StateDecls, NeedsPrimal);
-    case ADExpr::Kind::Call:
-      if (Expression->Receiver || !Expression->Callee ||
-        Expression->Operands.size() != 1 ||
-        !StringSwitch<bool>(Expression->Callee->getName())
-           .Cases("sin", "cos", "exp", "log", "sqrt", true)
-           .Default(false))
-      return rejectLoopPullback(
-        LoopPullbackAnalysis::Rejection::UnsupportedCall, Expression);
+    case ADPullbackRule::Sin:
+    case ADPullbackRule::Cos:
+    case ADPullbackRule::Exp:
+    case ADPullbackRule::Log:
+    case ADPullbackRule::Sqrt:
       return analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
-                      StateDecls, true);
-    case ADExpr::Kind::Binary: {
-      switch (Expression->BinaryOpcode) {
-      case BO_Add:
-      case BO_Sub:
-        break;
-      case BO_Mul:
-        if (Expression->Operands[0]->Value.Activity == ADActivity::Active &&
-            Expression->Operands[1]->Value.Activity == ADActivity::Active)
-          NeedsPrimal = true;
-        break;
-      case BO_Div:
-        if (Expression->Operands[1]->Value.Activity == ADActivity::Active)
-          NeedsPrimal = true;
-        break;
-      default:
+                                        StateDecls, true);
+    case ADPullbackRule::ComposedCall:
+      for (unsigned I = 0; I < Expression->Operands.size(); ++I) {
+        LoopPullbackAnalysis Analysis = analyzeGenericLoopPullback(
+            Expression->Operands[I], Inputs, StateDecls,
+            NeedsPrimal || (Rule.PrimalOperandMask & (uint64_t(1) << I)));
+        if (!Analysis)
+          return Analysis;
+      }
+      return {};
+    case ADPullbackRule::Add:
+    case ADPullbackRule::Subtract:
+    case ADPullbackRule::Multiply:
+    case ADPullbackRule::Divide: {
+      LoopPullbackAnalysis LeftAnalysis = analyzeGenericLoopPullback(
+          Expression->Operands[0], Inputs, StateDecls,
+          NeedsPrimal || (Rule.PrimalOperandMask & 1));
+      if (!LeftAnalysis)
+        return LeftAnalysis;
+      return analyzeGenericLoopPullback(
+          Expression->Operands[1], Inputs, StateDecls,
+          NeedsPrimal || (Rule.PrimalOperandMask & 2));
+    }
+    case ADPullbackRule::Unsupported:
+      if (Expression->K == ADExpr::Kind::Call)
+        return rejectLoopPullback(
+            LoopPullbackAnalysis::Rejection::UnsupportedCall, Expression);
+      if (Expression->K == ADExpr::Kind::Binary)
         return rejectLoopPullback(
             LoopPullbackAnalysis::Rejection::UnsupportedBinaryOperator,
             Expression);
-      }
-      LoopPullbackAnalysis LeftAnalysis = analyzeGenericLoopPullback(
-          Expression->Operands[0], Inputs, StateDecls, NeedsPrimal);
-      if (!LeftAnalysis)
-        return LeftAnalysis;
-      return analyzeGenericLoopPullback(Expression->Operands[1], Inputs,
-                                        StateDecls, NeedsPrimal);
-    }
-    default:
       return rejectLoopPullback(
           LoopPullbackAnalysis::Rejection::UnsupportedExpression, Expression);
     }
+    llvm_unreachable("unknown typed pullback rule");
   }
 
   const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
