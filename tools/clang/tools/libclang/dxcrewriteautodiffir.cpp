@@ -182,6 +182,123 @@ private:
     llvm_unreachable("unknown loop pullback rejection");
   }
 
+  struct LoopBodyAnalysis {
+    enum class Rejection {
+      None,
+      ControlFlow,
+      SideEffectingStatement,
+      UnsupportedStatement,
+      UnsupportedUpdate,
+      IndirectTarget,
+      InactiveTarget,
+      RepeatedTarget,
+      IncompatibleStateTypes,
+    };
+
+    Rejection RejectedBy = Rejection::None;
+    const Stmt *Statement = nullptr;
+    const ParmVarDecl *Target = nullptr;
+
+    explicit operator bool() const { return RejectedBy == Rejection::None; }
+  };
+
+  static LoopBodyAnalysis rejectLoopBody(
+      LoopBodyAnalysis::Rejection Rejection, const Stmt *Statement,
+      const ParmVarDecl *Target = nullptr) {
+    return {Rejection, Statement, Target};
+  }
+
+  std::string
+  describeLoopBodyRejection(const LoopBodyAnalysis &Analysis) const {
+    using Rejection = LoopBodyAnalysis::Rejection;
+    switch (Analysis.RejectedBy) {
+    case Rejection::None:
+      llvm_unreachable("supported loop body has no rejection");
+    case Rejection::ControlFlow:
+      return "active runtime loop body does not support control flow";
+    case Rejection::SideEffectingStatement:
+      return "active runtime loop body does not support side-effecting "
+             "statements";
+    case Rejection::UnsupportedStatement:
+      return "active runtime loop body contains an unsupported statement";
+    case Rejection::UnsupportedUpdate:
+      return "active runtime loop requires =, +=, -=, *=, or /= updates";
+    case Rejection::IndirectTarget:
+      return "active runtime loop update target must be a direct active "
+             "parameter";
+    case Rejection::InactiveTarget:
+      return "active runtime loop cannot update an inactive parameter";
+    case Rejection::RepeatedTarget:
+      return "active runtime loop body updates parameter '" +
+             Analysis.Target->getName().str() + "' more than once";
+    case Rejection::IncompatibleStateTypes:
+      return "active runtime loop state values must have the same type";
+    }
+    llvm_unreachable("unknown loop body rejection");
+  }
+
+  LoopBodyAnalysis analyzeActiveRuntimeLoopBody(
+      const Stmt *Body,
+      SmallVectorImpl<const BinaryOperator *> &Updates,
+      SmallVectorImpl<const ParmVarDecl *> &Targets,
+      SmallVectorImpl<const DeclRefExpr *> &TargetRefs,
+      SmallPtrSetImpl<const ValueDecl *> &SeenTargets) const {
+    auto AnalyzeStatement = [&](const Stmt *Child) -> LoopBodyAnalysis {
+      if (isa<IfStmt>(Child) || isa<ForStmt>(Child) || isa<WhileStmt>(Child) ||
+          isa<DoStmt>(Child) || isa<SwitchStmt>(Child))
+        return rejectLoopBody(LoopBodyAnalysis::Rejection::ControlFlow, Child);
+
+      const auto *Update = dyn_cast<BinaryOperator>(Child);
+      if (!Update)
+        return rejectLoopBody(
+            isa<Expr>(Child)
+                ? LoopBodyAnalysis::Rejection::SideEffectingStatement
+                : LoopBodyAnalysis::Rejection::UnsupportedStatement,
+            Child);
+      if (Update->getOpcode() != BO_Assign &&
+          Update->getOpcode() != BO_AddAssign &&
+          Update->getOpcode() != BO_SubAssign &&
+          Update->getOpcode() != BO_MulAssign &&
+          Update->getOpcode() != BO_DivAssign)
+        return rejectLoopBody(LoopBodyAnalysis::Rejection::UnsupportedUpdate,
+                              Child);
+
+      const auto *TargetRef =
+          dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
+      const auto *Target =
+          TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
+      if (!Target)
+        return rejectLoopBody(LoopBodyAnalysis::Rejection::IndirectTarget,
+                              Child);
+      if (Target->hasAttr<HLSLNoDiffAttr>())
+        return rejectLoopBody(LoopBodyAnalysis::Rejection::InactiveTarget,
+                              Child, Target);
+      if (!SeenTargets.insert(getCanonicalValueDecl(Target)).second)
+        return rejectLoopBody(LoopBodyAnalysis::Rejection::RepeatedTarget,
+                              Child, Target);
+      if (!Targets.empty() &&
+          !Ctx.hasSameType(Targets.front()->getType(), Target->getType()))
+        return rejectLoopBody(
+            LoopBodyAnalysis::Rejection::IncompatibleStateTypes, Child,
+            Target);
+
+      Updates.push_back(Update);
+      Targets.push_back(Target);
+      TargetRefs.push_back(TargetRef);
+      return {};
+    };
+
+    if (const auto *Compound = dyn_cast<CompoundStmt>(Body)) {
+      for (const Stmt *Child : Compound->body()) {
+        LoopBodyAnalysis Analysis = AnalyzeStatement(Child);
+        if (!Analysis)
+          return Analysis;
+      }
+      return {};
+    }
+    return AnalyzeStatement(Body);
+  }
+
   const ADExpr *createLoopUpdateExpr(
       const ADExpr *Expression,
       const DenseMap<const ValueDecl *, unsigned> &StateIndices,
@@ -802,33 +919,15 @@ private:
   bool buildGenericVersionedRuntimeFor(const ForStmt *FS,
                                        const VarDecl *Counter,
                                        const ADExpr *Count,
-                                       const CompoundStmt *Body) {
+                                       const Stmt *Body) {
     SmallVector<const BinaryOperator *, 4> Updates;
     SmallVector<const ParmVarDecl *, 4> Targets;
     SmallVector<const DeclRefExpr *, 4> TargetRefs;
     SmallPtrSet<const ValueDecl *, 4> SeenTargets;
-    for (const Stmt *Child : Body->body()) {
-      const auto *Update = dyn_cast<BinaryOperator>(Child);
-      if (!Update || (Update->getOpcode() != BO_Assign &&
-                      Update->getOpcode() != BO_AddAssign &&
-                      Update->getOpcode() != BO_SubAssign &&
-                      Update->getOpcode() != BO_MulAssign &&
-                      Update->getOpcode() != BO_DivAssign))
-        return false;
-      const auto *TargetRef =
-          dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
-      const auto *Target =
-          TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
-      if (!Target || Target->hasAttr<HLSLNoDiffAttr>() ||
-          !SeenTargets.insert(getCanonicalValueDecl(Target)).second)
-        return false;
-      if (!Targets.empty() &&
-          !Ctx.hasSameType(Targets.front()->getType(), Target->getType()))
-        return false;
-      Updates.push_back(Update);
-      Targets.push_back(Target);
-      TargetRefs.push_back(TargetRef);
-    }
+    LoopBodyAnalysis BodyAnalysis = analyzeActiveRuntimeLoopBody(
+        Body, Updates, Targets, TargetRefs, SeenTargets);
+    if (!BodyAnalysis)
+      return fail(describeLoopBodyRejection(BodyAnalysis));
 
     unsigned TapeSize = 0;
     const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
@@ -947,107 +1046,12 @@ private:
         !IncrementCounter || IncrementCounter->getDecl() != Counter)
       return fail("active runtime loop is not canonical");
 
-    const Stmt *Body = FS->getBody();
-    if (const auto *Compound = dyn_cast<CompoundStmt>(Body)) {
-      if (Compound->size() != 1) {
-        const ADExpr *Count = buildExpr(Condition->getRHS());
-        if (!Count)
-          return false;
-        if (Count->Value.Activity == ADActivity::Active)
-          return fail("active runtime loop count must be inactive");
-        return buildGenericVersionedRuntimeFor(FS, Counter, Count, Compound);
-      }
-      Body = *Compound->body_begin();
-    }
-    const auto *Update = dyn_cast<BinaryOperator>(Body);
-    if (!Update || (Update->getOpcode() != BO_Assign &&
-                    Update->getOpcode() != BO_AddAssign &&
-                    Update->getOpcode() != BO_SubAssign &&
-                    Update->getOpcode() != BO_MulAssign &&
-                    Update->getOpcode() != BO_DivAssign))
-      return fail("active runtime loop requires =, +=, -=, *=, or /= update");
-    const auto *TargetRef =
-        dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
-    const auto *Target =
-        TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
-    if (!Target || Target->hasAttr<HLSLNoDiffAttr>())
-      return fail("active runtime loop target is not an active parameter");
-
     const ADExpr *Count = buildExpr(Condition->getRHS());
-    const ADExpr *Factor = buildExpr(Update->getRHS());
-    if (!Count || !Factor)
+    if (!Count)
       return false;
     if (Count->Value.Activity == ADActivity::Active)
       return fail("active runtime loop count must be inactive");
-
-    unsigned TapeSize = 0;
-    const auto *BoundCall =
-        dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts());
-    if (BoundCall && BoundCall->getDirectCallee() &&
-        BoundCall->getDirectCallee()->getName() == "min")
-      for (const Expr *Argument : BoundCall->arguments())
-        if (const auto *Limit =
-                dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
-          TapeSize = Limit->getValue().getLimitedValue(1025);
-
-    const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
-    auto It = CurrentBindings.find(CanonicalTarget);
-    const ADBinding *Before = nullptr;
-    if (It == CurrentBindings.end()) {
-      ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRef);
-      Initial->SourceDecl = CanonicalTarget;
-      Initial->Value.SourceDecl = CanonicalTarget;
-      Initial->Value.Activity = ADActivity::Active;
-      Before = createBinding(Target, 0, Initial);
-    } else {
-      Before = It->second;
-    }
-    if (!Before->Value)
-      return fail("active runtime loop reads an uninitialized value");
-
-    ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
-    Result->SourceDecl = CanonicalTarget;
-    switch (Update->getOpcode()) {
-    case BO_Assign:
-      Result->BinaryOpcode = BO_Assign;
-      break;
-    case BO_AddAssign:
-      Result->BinaryOpcode = BO_Add;
-      break;
-    case BO_SubAssign:
-      Result->BinaryOpcode = BO_Sub;
-      break;
-    case BO_MulAssign:
-      Result->BinaryOpcode = BO_Mul;
-      break;
-    case BO_DivAssign:
-      Result->BinaryOpcode = BO_Div;
-      break;
-    default:
-      llvm_unreachable("validated active runtime loop update");
-    }
-    Result->Operands.push_back(createLocalRef(TargetRef, Before, false));
-    Result->Operands.push_back(Count);
-    Result->Operands.push_back(Factor);
-    Result->Value.Activity = ADActivity::Active;
-    Result->Value.PrimalType = Target->getType();
-
-    const ADBinding *After = createBinding(Target, Before->Version + 1, Result);
-    CurrentBindings[CanonicalTarget] = After;
-    ADStmt Statement(ADStmt::Kind::ActiveLoop, After, Result, FS);
-    Statement.Values.push_back(Result);
-    Statement.Loop =
-        createLoopPlan(FS, Counter, Count, Statement.Values, TapeSize);
-    if (!Statement.Loop)
-      return false;
-    bool NeedsTape = !Statement.Loop->TapeSlots.empty();
-    for (const ADLoopState &State : Statement.Loop->States)
-      NeedsTape |= State.NeedsPrimalTape;
-    if (NeedsTape && (TapeSize == 0 || TapeSize > 1024))
-      return fail("active runtime loop pullback requires a min(count, N) "
-                  "bound with N between 1 and 1024");
-    Plan.Statements.push_back(std::move(Statement));
-    return true;
+    return buildGenericVersionedRuntimeFor(FS, Counter, Count, FS->getBody());
   }
 
   bool buildStaticFor(const ForStmt *FS, bool ForceInactive) {
