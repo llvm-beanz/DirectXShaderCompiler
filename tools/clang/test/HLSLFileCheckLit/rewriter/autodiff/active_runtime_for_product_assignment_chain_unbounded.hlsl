@@ -3,7 +3,7 @@
 // Assignment-form products need both changing primal trajectories, so their
 // affine suffix does not remove the requirement for statically bounded tapes.
 
-// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': active nonlinear runtime chain requires a min(count, N) bound with N between 1 and 1024");
+// CHECK: _Static_assert(false, "auto-diff cannot generate backward-mode for 'f': active runtime loop pullback requires a min(count, N) bound with N between 1 and 1024");
 
 [[dxc::autodiff(bwd)]]
 float f(float x, float y, float z, [[dxc::no_diff]] uint count,

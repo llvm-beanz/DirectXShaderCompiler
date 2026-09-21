@@ -1291,9 +1291,15 @@ public:
 
   bool emitPlan(const hlsl::autodiff::ADFunctionPlan &Plan) {
     const hlsl::autodiff::ADExpr *Result = nullptr;
-    for (const hlsl::autodiff::ADStmt &S : Plan.Statements)
+    for (const hlsl::autodiff::ADStmt &S : Plan.Statements) {
       if (S.K == hlsl::autodiff::ADStmt::Kind::Return)
         Result = S.Value;
+      if (S.K == hlsl::autodiff::ADStmt::Kind::ActiveLoop) {
+        assert(S.Loop && "active loop has no structured loop plan");
+        for (const hlsl::autodiff::ADLoopState &State : S.Loop->States)
+          RuntimeLoopPlans[State.Result] = S.Loop;
+      }
+    }
     if (!Result || !supports(Result))
       return false;
 
@@ -1442,29 +1448,15 @@ private:
         if (!supports(Operand))
           return false;
       return true;
-    case Kind::RuntimeLoopResult:
-      if (!E->RuntimeLoopLinearGroup.empty()) {
-        for (const hlsl::autodiff::ADExpr *Result : E->RuntimeLoopLinearGroup)
-          if (!supports(Result->Operands[0]))
-            return false;
-        const hlsl::autodiff::ADExpr *Last = E->RuntimeLoopLinearGroup.back();
-        return Last->Operands[2]->Value.Activity == Activity::Inactive ||
-               Last->RuntimeLoopUsesPrimalTape;
-      }
-      if (E->RuntimeLoopCoupledPeer) {
-        const hlsl::autodiff::ADExpr *Primary =
-            E->RuntimeLoopCoupledPrimary ? E : E->RuntimeLoopCoupledPeer;
-        const hlsl::autodiff::ADExpr *Secondary =
-            E->RuntimeLoopCoupledPrimary ? E->RuntimeLoopCoupledPeer : E;
-        return Primary->Operands[1]->Value.Activity == Activity::Inactive &&
-               Secondary->Operands[2]->Value.Activity == Activity::Inactive &&
-               supports(Primary->Operands[0]) &&
-               supports(Secondary->Operands[0]);
-      }
-      return E->Operands[1]->Value.Activity == Activity::Inactive &&
-             (E->Operands[2]->Value.Activity == Activity::Inactive ||
-              E->RuntimeLoopUsesPrimalTape) &&
-             supports(E->Operands[0]);
+    case Kind::RuntimeLoopResult: {
+      auto LoopIt = RuntimeLoopPlans.find(E);
+      if (LoopIt == RuntimeLoopPlans.end())
+        return false;
+      for (const hlsl::autodiff::ADLoopState &State : LoopIt->second->States)
+        if (!supports(State.InitialValue))
+          return false;
+      return true;
+    }
     case Kind::AggregateConstruct:
     case Kind::Unary:
     case Kind::Binary:
@@ -2110,8 +2102,7 @@ private:
       unsigned LoopID = RuntimeLoopIDs.lookup(E);
       std::string Type = printType(E->Value.PrimalType, Policy);
       auto LoopIt = RuntimeLoopPlans.find(E);
-      if (LoopIt != RuntimeLoopPlans.end() &&
-          LoopIt->second->UsesGenericPullbacks) {
+        if (LoopIt != RuntimeLoopPlans.end()) {
         const hlsl::autodiff::ADLoopPlan &Loop = *LoopIt->second;
         SmallVector<std::string, 4> Adjoints;
         for (unsigned I = 0; I < Loop.States.size(); ++I) {
@@ -2144,266 +2135,7 @@ private:
           emitAdjoint(Loop.States[I].InitialValue, Adjoints[I]);
         return;
       }
-      if (!E->RuntimeLoopLinearGroup.empty()) {
-        SmallVector<std::string, 4> Adjoints;
-        for (unsigned I = 0; I < E->RuntimeLoopLinearGroup.size(); ++I) {
-          std::string Adjoint = "__dxc_ad_loop_" + Twine(LoopID).str() +
-                                "_state_" + Twine(I).str() + "_adjoint";
-          Adjoints.push_back(Adjoint);
-          OS << "    " << Type << " " << Adjoint << " = "
-             << (I == E->RuntimeLoopLinearGroupIndex
-                     ? Cotangent.str()
-                     : zero(E->Value.PrimalType))
-             << ";\n";
-        }
-        const hlsl::autodiff::ADExpr *Last = E->RuntimeLoopLinearGroup.back();
-        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
-        emitPrimal(E->Operands[1]);
-        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
-           << "        --" << E->LoopCounter->getName() << ";\n";
-        if (Last->RuntimeLoopUsesPrimalTape) {
-          unsigned LastLoopID = RuntimeLoopIDs.lookup(Last);
-          OS << "        " << Adjoints.back() << " *= (2 * __dxc_ad_loop_"
-             << LastLoopID << "_primal_tape[" << E->LoopCounter->getName()
-             << "]);\n";
-        } else if (Last->BinaryOpcode == BO_Mul ||
-                   Last->BinaryOpcode == BO_Div) {
-          OS << "        " << Adjoints.back()
-             << (Last->BinaryOpcode == BO_Mul ? " *= " : " /= ");
-          emitPrimal(Last->Operands[2]);
-          OS << ";\n";
-        }
-        for (unsigned I = E->RuntimeLoopLinearGroup.size() - 1; I > 0; --I) {
-          const hlsl::autodiff::ADExpr *Update =
-              E->RuntimeLoopLinearGroup[I - 1];
-          if (Update->RuntimeLoopProductUpdate) {
-            unsigned UpdateLoopID = RuntimeLoopIDs.lookup(Update);
-            unsigned PeerLoopID =
-                RuntimeLoopIDs.lookup(E->RuntimeLoopLinearGroup[I]);
-            auto EmitPower = [&](unsigned TapeLoopID, unsigned Power) {
-              for (unsigned Term = 0; Term < Power; ++Term) {
-                if (Term)
-                  OS << " * ";
-                OS << "__dxc_ad_loop_" << TapeLoopID << "_primal_tape["
-                   << E->LoopCounter->getName() << "]";
-              }
-            };
-            auto EmitMonomialPartial = [&](const hlsl::autodiff::ADExpr::
-                                               RuntimeLoopMonomial &Monomial,
-                                           bool WithRespectToPeer) {
-              if (Monomial.Coefficient) {
-                emitPrimal(Monomial.Coefficient);
-                OS << " * ";
-              }
-              using TargetFunction =
-                  hlsl::autodiff::ADExpr::RuntimeLoopMonomial::TargetFunction;
-              if (Monomial.Function != TargetFunction::Power) {
-                if (WithRespectToPeer && Monomial.PeerPower > 1)
-                  OS << Monomial.PeerPower << " * ";
-                std::string Target =
-                    "__dxc_ad_loop_" + Twine(UpdateLoopID).str() +
-                    "_primal_tape[" + E->LoopCounter->getName().str() + "]";
-                if (WithRespectToPeer) {
-                  StringRef Function;
-                  switch (Monomial.Function) {
-                  case TargetFunction::Sin:
-                    Function = "sin";
-                    break;
-                  case TargetFunction::Cos:
-                    Function = "cos";
-                    break;
-                  case TargetFunction::Exp:
-                    Function = "exp";
-                    break;
-                  case TargetFunction::Log:
-                    Function = "log";
-                    break;
-                  case TargetFunction::Sqrt:
-                    Function = "sqrt";
-                    break;
-                  case TargetFunction::Power:
-                    llvm_unreachable("handled polynomial target function");
-                  }
-                  OS << Function << "(" << Target << ")";
-                } else {
-                  switch (Monomial.Function) {
-                  case TargetFunction::Sin:
-                    OS << "cos(" << Target << ")";
-                    break;
-                  case TargetFunction::Cos:
-                    OS << "-sin(" << Target << ")";
-                    break;
-                  case TargetFunction::Exp:
-                    OS << "exp(" << Target << ")";
-                    break;
-                  case TargetFunction::Log:
-                    OS << "(1.0f / " << Target << ")";
-                    break;
-                  case TargetFunction::Sqrt:
-                    OS << "(0.5f / sqrt(" << Target << "))";
-                    break;
-                  case TargetFunction::Power:
-                    llvm_unreachable("handled polynomial target function");
-                  }
-                }
-                unsigned RemainingPeerPower =
-                    Monomial.PeerPower - (WithRespectToPeer ? 1 : 0);
-                if (RemainingPeerPower) {
-                  OS << " * ";
-                  EmitPower(PeerLoopID, RemainingPeerPower);
-                }
-                return;
-              }
-              unsigned DerivativePower =
-                  WithRespectToPeer ? Monomial.PeerPower : Monomial.TargetPower;
-              if (DerivativePower > 1)
-                OS << DerivativePower << " * ";
-              unsigned RemainingTargetPower =
-                  Monomial.TargetPower - (WithRespectToPeer ? 0 : 1);
-              unsigned RemainingPeerPower =
-                  Monomial.PeerPower - (WithRespectToPeer ? 1 : 0);
-              if (RemainingTargetPower)
-                EmitPower(UpdateLoopID, RemainingTargetPower);
-              if (RemainingTargetPower && RemainingPeerPower)
-                OS << " * ";
-              if (RemainingPeerPower)
-                EmitPower(PeerLoopID, RemainingPeerPower);
-            };
-            auto EmitPolynomialPartial = [&](bool WithRespectToPeer) {
-              for (unsigned TermIndex = 0;
-                   TermIndex < Update->RuntimeLoopMonomials.size();
-                   ++TermIndex) {
-                const auto &Monomial = Update->RuntimeLoopMonomials[TermIndex];
-                if (TermIndex)
-                  OS << (Monomial.Subtracts ? " - " : " + ");
-                EmitMonomialPartial(Monomial, WithRespectToPeer);
-              }
-            };
-            bool HasMultipleProducts = Update->RuntimeLoopMonomials.size() > 1;
-            OS << "        " << Adjoints[I] << " += ";
-            bool HasPeerSum =
-                HasMultipleProducts || Update->RuntimeLoopPeerLinearCoefficient;
-            if (HasPeerSum)
-              OS << "(";
-            EmitPolynomialPartial(/*WithRespectToPeer=*/true);
-            if (Update->RuntimeLoopPeerLinearCoefficient) {
-              OS << (Update->RuntimeLoopSubtractsPeerLinearCoefficient ? " - "
-                                                                       : " + ");
-              emitPrimal(Update->RuntimeLoopPeerLinearCoefficient);
-            }
-            if (HasPeerSum)
-              OS << ")";
-            OS << " * " << Adjoints[I - 1] << ";\n";
-            OS << "        " << Adjoints[I - 1] << " *= ";
-            bool HasTargetSum =
-                Update->RuntimeLoopMonomials.front().Coefficient ||
-                HasMultipleProducts || Update->RuntimeLoopLinearCoefficient;
-            if (HasTargetSum)
-              OS << "(";
-            EmitPolynomialPartial(/*WithRespectToPeer=*/false);
-            if (Update->RuntimeLoopLinearCoefficient) {
-              OS << (Update->RuntimeLoopSubtractsLinearCoefficient ? " - "
-                                                                   : " + ");
-              emitPrimal(Update->RuntimeLoopLinearCoefficient);
-            }
-            if (HasTargetSum)
-              OS << ")";
-            OS << ";\n";
-          } else {
-            OS << "        " << Adjoints[I]
-               << (Update->BinaryOpcode == BO_Sub ? " -= " : " += ")
-               << Adjoints[I - 1] << ";\n";
-          }
-        }
-        OS << "    }\n";
-        for (unsigned I = 0; I < E->RuntimeLoopLinearGroup.size(); ++I)
-          emitAdjoint(E->RuntimeLoopLinearGroup[I]->Operands[0], Adjoints[I]);
-        return;
-      }
-      if (E->RuntimeLoopCoupledPeer) {
-        const hlsl::autodiff::ADExpr *Primary =
-            E->RuntimeLoopCoupledPrimary ? E : E->RuntimeLoopCoupledPeer;
-        const hlsl::autodiff::ADExpr *Secondary =
-            E->RuntimeLoopCoupledPrimary ? E->RuntimeLoopCoupledPeer : E;
-        std::string PrimaryAdjoint =
-            "__dxc_ad_loop_" + Twine(LoopID).str() + "_primary_adjoint";
-        std::string SecondaryAdjoint =
-            "__dxc_ad_loop_" + Twine(LoopID).str() + "_secondary_adjoint";
-        OS << "    " << Type << " " << PrimaryAdjoint << " = "
-           << (E->RuntimeLoopCoupledPrimary ? Cotangent.str()
-                                            : zero(E->Value.PrimalType))
-           << ";\n";
-        OS << "    " << Type << " " << SecondaryAdjoint << " = "
-           << (E->RuntimeLoopCoupledPrimary ? zero(E->Value.PrimalType)
-                                            : Cotangent.str())
-           << ";\n";
-        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
-        emitPrimal(Primary->Operands[1]);
-        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
-           << "        --" << E->LoopCounter->getName() << ";\n";
-        if (Secondary->BinaryOpcode == BO_Mul ||
-            Secondary->BinaryOpcode == BO_Div) {
-          OS << "        " << SecondaryAdjoint
-             << (Secondary->BinaryOpcode == BO_Mul ? " *= " : " /= ");
-          emitPrimal(Secondary->Operands[2]);
-          OS << ";\n";
-        }
-        if (Primary->RuntimeLoopCoupledUsesPrimalTape) {
-          unsigned PrimaryLoopID = RuntimeLoopIDs.lookup(Primary);
-          unsigned SecondaryLoopID = RuntimeLoopIDs.lookup(Secondary);
-          OS << "        " << SecondaryAdjoint << " += __dxc_ad_loop_"
-             << PrimaryLoopID << "_primal_tape[" << E->LoopCounter->getName()
-             << "] * " << PrimaryAdjoint << ";\n";
-          OS << "        " << PrimaryAdjoint << " *= __dxc_ad_loop_"
-             << SecondaryLoopID << "_primal_tape[" << E->LoopCounter->getName()
-             << "];\n";
-        } else {
-          OS << "        " << SecondaryAdjoint
-             << (Primary->RuntimeLoopSubtractsCoupledPeer ? " -= " : " += ")
-             << PrimaryAdjoint << ";\n";
-        }
-        OS << "    }\n";
-        emitAdjoint(Primary->Operands[0], PrimaryAdjoint);
-        emitAdjoint(Secondary->Operands[0], SecondaryAdjoint);
-        return;
-      }
-      OS << "    " << Type << " __dxc_ad_loop_" << LoopID
-         << "_adjoint = " << Cotangent << ";\n";
-      if (E->RuntimeLoopUsesPrimalTape) {
-        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
-        emitPrimal(E->Operands[1]);
-        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
-           << "        --" << E->LoopCounter->getName() << ";\n"
-           << "        __dxc_ad_loop_" << LoopID << "_adjoint *= ("
-           << E->RuntimeLoopPolynomialDegree << " * ";
-        if (E->RuntimeLoopQuadraticCoefficient) {
-          emitPrimal(E->RuntimeLoopQuadraticCoefficient);
-          OS << " * ";
-        }
-        OS << "__dxc_ad_loop_" << LoopID << "_primal_tape["
-           << E->LoopCounter->getName() << "]";
-        for (unsigned Power = 2; Power < E->RuntimeLoopPolynomialDegree;
-             ++Power)
-          OS << " * __dxc_ad_loop_" << LoopID << "_primal_tape["
-             << E->LoopCounter->getName() << "]";
-        if (E->RuntimeLoopLinearCoefficient) {
-          OS << (E->RuntimeLoopSubtractsLinearCoefficient ? " - " : " + ");
-          emitPrimal(E->RuntimeLoopLinearCoefficient);
-        }
-        OS << ");\n    }\n";
-      } else if (E->BinaryOpcode == BO_Mul || E->BinaryOpcode == BO_Div) {
-        OS << "    for (uint " << E->LoopCounter->getName() << " = ";
-        emitPrimal(E->Operands[1]);
-        OS << "; " << E->LoopCounter->getName() << " > 0;) {\n"
-           << "        --" << E->LoopCounter->getName() << ";\n"
-           << "        __dxc_ad_loop_" << LoopID << "_adjoint "
-           << (E->BinaryOpcode == BO_Mul ? "*= " : "/= ");
-        emitPrimal(E->Operands[2]);
-        OS << ";\n    }\n";
-      }
-      emitAdjoint(E->Operands[0],
-                  "__dxc_ad_loop_" + Twine(LoopID).str() + "_adjoint");
-      return;
+      llvm_unreachable("validated runtime loop has no generic pullback");
     }
     case Kind::Unary:
       if (E->UnaryOpcode == UO_Minus)

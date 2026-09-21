@@ -124,6 +124,64 @@ private:
     return Result;
   }
 
+  struct LoopPullbackAnalysis {
+    enum class Rejection {
+      None,
+      ActiveValueOutsideLoopState,
+      NonVectorSubscript,
+      ActiveSubscriptIndex,
+      ActiveCondition,
+      UnsupportedCall,
+      UnsupportedBinaryOperator,
+      UnsupportedExpression,
+    };
+
+    Rejection RejectedBy = Rejection::None;
+    const ADExpr *Expression = nullptr;
+
+    explicit operator bool() const { return RejectedBy == Rejection::None; }
+  };
+
+  static LoopPullbackAnalysis rejectLoopPullback(
+      LoopPullbackAnalysis::Rejection Rejection, const ADExpr *Expression) {
+    return {Rejection, Expression};
+  }
+
+  std::string describeLoopPullbackRejection(
+      const LoopPullbackAnalysis &Analysis) const {
+    using Rejection = LoopPullbackAnalysis::Rejection;
+    switch (Analysis.RejectedBy) {
+    case Rejection::None:
+      llvm_unreachable("supported loop pullback has no rejection");
+    case Rejection::ActiveValueOutsideLoopState:
+      return "active runtime loop pullback references a value outside loop "
+             "state";
+    case Rejection::NonVectorSubscript:
+      return "active runtime loop pullback only supports vector subscripts";
+    case Rejection::ActiveSubscriptIndex:
+      return "active runtime loop pullback requires an inactive subscript "
+             "index";
+    case Rejection::ActiveCondition:
+      return "active runtime loop pullback requires an inactive condition";
+    case Rejection::UnsupportedCall: {
+      StringRef Name = Analysis.Expression->Callee
+                           ? Analysis.Expression->Callee->getName()
+                           : StringRef("<indirect>");
+      return "active runtime loop pullback does not support call '" +
+             Name.str() + "'";
+    }
+    case Rejection::UnsupportedBinaryOperator:
+      return "active runtime loop pullback does not support binary operator '" +
+             BinaryOperator::getOpcodeStr(Analysis.Expression->BinaryOpcode)
+                 .str() +
+             "'";
+    case Rejection::UnsupportedExpression:
+      return "active runtime loop pullback does not support this active "
+             "expression";
+    }
+    llvm_unreachable("unknown loop pullback rejection");
+  }
+
   const ADExpr *createLoopUpdateExpr(
       const ADExpr *Expression,
       const DenseMap<const ValueDecl *, unsigned> &StateIndices,
@@ -169,61 +227,78 @@ private:
     return Rewritten;
   }
 
-  bool analyzeGenericLoopPullback(
+  LoopPullbackAnalysis analyzeGenericLoopPullback(
       const ADExpr *Expression,
       SmallVectorImpl<ADLoopPullbackInput> *Inputs = nullptr,
       const SmallPtrSetImpl<const ValueDecl *> *StateDecls = nullptr,
       bool NeedsPrimal = false) const {
     if (Expression->Value.Activity == ADActivity::Inactive)
-      return true;
+      return {};
     switch (Expression->K) {
     case ADExpr::Kind::DeclRef:
     case ADExpr::Kind::LocalRef:
-      return StateDecls && Expression->SourceDecl &&
-             StateDecls->count(getCanonicalValueDecl(Expression->SourceDecl));
+      if (StateDecls && Expression->SourceDecl &&
+          StateDecls->count(getCanonicalValueDecl(Expression->SourceDecl)))
+        return {};
+      return rejectLoopPullback(
+          LoopPullbackAnalysis::Rejection::ActiveValueOutsideLoopState,
+          Expression);
     case ADExpr::Kind::LoopStateRef: {
       if (!Inputs)
-        return true;
+        return {};
       for (ADLoopPullbackInput &Input : *Inputs)
         if (Input.StateIndex == Expression->LoopStateIndex &&
             Input.Version == Expression->LoopStateVersion) {
           Input.NeedsPrimal |= NeedsPrimal;
-          return true;
+          return {};
         }
       Inputs->push_back({Expression->LoopStateIndex,
                          Expression->LoopStateVersion, NeedsPrimal});
-      return true;
+      return {};
     }
     case ADExpr::Kind::AggregateConstruct:
-      for (const ADExpr *Operand : Expression->Operands)
-        if (!analyzeGenericLoopPullback(Operand, Inputs, StateDecls,
-                                        NeedsPrimal))
-          return false;
-      return true;
+      for (const ADExpr *Operand : Expression->Operands) {
+        LoopPullbackAnalysis Analysis = analyzeGenericLoopPullback(
+            Operand, Inputs, StateDecls, NeedsPrimal);
+        if (!Analysis)
+          return Analysis;
+      }
+      return {};
     case ADExpr::Kind::Subscript:
-      return hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType) &&
-             Expression->Operands[1]->Value.Activity == ADActivity::Inactive &&
-             analyzeGenericLoopPullback(Expression->Operands[0], Inputs,
+      if (!hlsl::IsHLSLVecType(Expression->Operands[0]->Value.PrimalType))
+        return rejectLoopPullback(
+            LoopPullbackAnalysis::Rejection::NonVectorSubscript, Expression);
+      if (Expression->Operands[1]->Value.Activity == ADActivity::Active)
+        return rejectLoopPullback(
+            LoopPullbackAnalysis::Rejection::ActiveSubscriptIndex, Expression);
+      return analyzeGenericLoopPullback(Expression->Operands[0], Inputs,
                                         StateDecls, NeedsPrimal);
-    case ADExpr::Kind::Conditional:
-      return Expression->Operands[0]->Value.Activity == ADActivity::Inactive &&
-             analyzeGenericLoopPullback(Expression->Operands[1], Inputs,
-                                        StateDecls, NeedsPrimal) &&
-             analyzeGenericLoopPullback(Expression->Operands[2], Inputs,
+    case ADExpr::Kind::Conditional: {
+      if (Expression->Operands[0]->Value.Activity == ADActivity::Active)
+        return rejectLoopPullback(
+            LoopPullbackAnalysis::Rejection::ActiveCondition, Expression);
+      LoopPullbackAnalysis TrueAnalysis = analyzeGenericLoopPullback(
+          Expression->Operands[1], Inputs, StateDecls, NeedsPrimal);
+      if (!TrueAnalysis)
+        return TrueAnalysis;
+      return analyzeGenericLoopPullback(Expression->Operands[2], Inputs,
                                         StateDecls, NeedsPrimal);
+    }
     case ADExpr::Kind::Swizzle:
     case ADExpr::Kind::Unary:
     case ADExpr::Kind::Cast:
       return analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
                                         StateDecls, NeedsPrimal);
     case ADExpr::Kind::Call:
-      return !Expression->Receiver && Expression->Callee &&
-             Expression->Operands.size() == 1 &&
-             StringSwitch<bool>(Expression->Callee->getName())
-                 .Cases("sin", "cos", "exp", "log", "sqrt", true)
-                 .Default(false) &&
-             analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
-                                        StateDecls, true);
+      if (Expression->Receiver || !Expression->Callee ||
+        Expression->Operands.size() != 1 ||
+        !StringSwitch<bool>(Expression->Callee->getName())
+           .Cases("sin", "cos", "exp", "log", "sqrt", true)
+           .Default(false))
+      return rejectLoopPullback(
+        LoopPullbackAnalysis::Rejection::UnsupportedCall, Expression);
+      return analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
+                      StateDecls, true);
     case ADExpr::Kind::Binary: {
       switch (Expression->BinaryOpcode) {
       case BO_Add:
@@ -239,25 +314,32 @@ private:
           NeedsPrimal = true;
         break;
       default:
-        return false;
+        return rejectLoopPullback(
+            LoopPullbackAnalysis::Rejection::UnsupportedBinaryOperator,
+            Expression);
       }
-      return analyzeGenericLoopPullback(Expression->Operands[0], Inputs,
-                                        StateDecls, NeedsPrimal) &&
-             analyzeGenericLoopPullback(Expression->Operands[1], Inputs,
+      LoopPullbackAnalysis LeftAnalysis = analyzeGenericLoopPullback(
+          Expression->Operands[0], Inputs, StateDecls, NeedsPrimal);
+      if (!LeftAnalysis)
+        return LeftAnalysis;
+      return analyzeGenericLoopPullback(Expression->Operands[1], Inputs,
                                         StateDecls, NeedsPrimal);
     }
     default:
-      return false;
+      return rejectLoopPullback(
+          LoopPullbackAnalysis::Rejection::UnsupportedExpression, Expression);
     }
   }
 
   const ADLoopPlan *createLoopPlan(const ForStmt *FS, const VarDecl *Counter,
                                    const ADExpr *TripCount,
-                                   ArrayRef<const ADExpr *> Results) {
+                                   ArrayRef<const ADExpr *> Results,
+                                   unsigned TapeCapacity) {
     std::unique_ptr<ADLoopPlan> Loop(new ADLoopPlan());
     Loop->Source = FS;
     Loop->Counter = Counter;
     Loop->TripCount = TripCount;
+    Loop->TapeCapacity = TapeCapacity;
     DenseMap<const ValueDecl *, unsigned> StateIndices;
     for (unsigned I = 0; I < Results.size(); ++I) {
       const ADExpr *Result = Results[I];
@@ -266,14 +348,10 @@ private:
       State.PrimalType = Result->Value.PrimalType;
       State.InitialValue = Result->Operands[0];
       State.Result = Result;
-      State.NeedsPrimalTape = Result->RuntimeLoopUsesPrimalTape;
       Loop->States.push_back(State);
       StateIndices[getCanonicalValueDecl(State.SourceDecl)] = I;
-      if (Result->RuntimeLoopTapeSize > Loop->TapeCapacity)
-        Loop->TapeCapacity = Result->RuntimeLoopTapeSize;
     }
 
-    bool SupportsGenericPullbacks = true;
     SmallVector<unsigned, 4> Versions(Results.size(), 0);
     for (unsigned I = 0; I < Results.size(); ++I) {
       const ADExpr *Result = Results[I];
@@ -295,8 +373,12 @@ private:
         Update.Pullback.Value = FullUpdate;
       }
       Update.ResultVersion = ++Versions[I];
-      SupportsGenericPullbacks &= analyzeGenericLoopPullback(
+      LoopPullbackAnalysis Analysis = analyzeGenericLoopPullback(
           Update.Pullback.Value, &Update.Pullback.Inputs);
+      if (!Analysis) {
+        fail(describeLoopPullbackRejection(Analysis));
+        return nullptr;
+      }
       for (const ADLoopPullbackInput &Input : Update.Pullback.Inputs) {
         if (!Input.NeedsPrimal)
           continue;
@@ -315,7 +397,6 @@ private:
     }
     for (unsigned I = 0; I < Loop->States.size(); ++I)
       Loop->States[I].FinalVersion = Versions[I];
-    Loop->UsesGenericPullbacks = SupportsGenericPullbacks;
     const ADLoopPlan *Result = Loop.get();
     Plan.Loops.push_back(std::move(Loop));
     return Result;
@@ -718,109 +799,10 @@ private:
     return true;
   }
 
-  unsigned getTargetPower(const Expr *Expression,
-                          const ParmVarDecl *Target) const {
-    Expression = Expression->IgnoreParenImpCasts();
-    if (const auto *Ref = dyn_cast<DeclRefExpr>(Expression))
-      return Ref->getDecl() == Target ? 1 : 0;
-    const auto *Product = dyn_cast<BinaryOperator>(Expression);
-    if (!Product || Product->getOpcode() != BO_Mul)
-      return 0;
-    unsigned Left = getTargetPower(Product->getLHS(), Target);
-    unsigned Right = getTargetPower(Product->getRHS(), Target);
-    return Left && Right ? Left + Right : 0;
-  }
-
-  bool buildIndependentActiveRuntimeFor(const ForStmt *FS,
-                                        const VarDecl *Counter,
-                                        const ADExpr *Count,
-                                        const CompoundStmt *Body) {
-    SmallVector<const ADExpr *, 4> Results;
-    SmallPtrSet<const ValueDecl *, 4> Targets;
-    for (const Stmt *Child : Body->body()) {
-      const auto *Update = dyn_cast<BinaryOperator>(Child);
-      if (!Update || (Update->getOpcode() != BO_AddAssign &&
-                      Update->getOpcode() != BO_SubAssign &&
-                      Update->getOpcode() != BO_MulAssign &&
-                      Update->getOpcode() != BO_DivAssign))
-        return fail("active multi-carried runtime loop requires compound "
-                    "updates");
-      const auto *TargetRef =
-          dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
-      const auto *Target =
-          TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
-      if (!Target || Target->hasAttr<HLSLNoDiffAttr>())
-        return fail("active multi-carried runtime loop target is not active");
-      const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
-      if (!Targets.insert(CanonicalTarget).second)
-        return fail("active multi-carried runtime loop updates a target twice");
-
-      const ADExpr *Factor = buildExpr(Update->getRHS());
-      if (!Factor)
-        return false;
-      if (Factor->Value.Activity == ADActivity::Active)
-        return fail("active multi-carried runtime loop updates must be "
-                    "independent");
-
-      auto It = CurrentBindings.find(CanonicalTarget);
-      const ADBinding *Before = nullptr;
-      if (It == CurrentBindings.end()) {
-        ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRef);
-        Initial->SourceDecl = CanonicalTarget;
-        Initial->Value.SourceDecl = CanonicalTarget;
-        Initial->Value.Activity = ADActivity::Active;
-        Before = createBinding(Target, 0, Initial);
-      } else {
-        Before = It->second;
-      }
-      if (!Before->Value)
-        return fail(
-            "active multi-carried runtime loop reads an uninitialized value");
-
-      ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
-      Result->SourceDecl = CanonicalTarget;
-      Result->LoopCounter = Counter;
-      switch (Update->getOpcode()) {
-      case BO_AddAssign:
-        Result->BinaryOpcode = BO_Add;
-        break;
-      case BO_SubAssign:
-        Result->BinaryOpcode = BO_Sub;
-        break;
-      case BO_MulAssign:
-        Result->BinaryOpcode = BO_Mul;
-        break;
-      case BO_DivAssign:
-        Result->BinaryOpcode = BO_Div;
-        break;
-      default:
-        llvm_unreachable("validated independent runtime loop update");
-      }
-      Result->Operands.push_back(createLocalRef(TargetRef, Before, false));
-      Result->Operands.push_back(Count);
-      Result->Operands.push_back(Factor);
-      Result->Value.Activity = ADActivity::Active;
-      Result->Value.PrimalType = Target->getType();
-
-      const ADBinding *After =
-          createBinding(Target, Before->Version + 1, Result);
-      CurrentBindings[CanonicalTarget] = After;
-      Results.push_back(Result);
-    }
-    ADStmt Statement{ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS};
-    Statement.Values = Results;
-    Statement.Loop = createLoopPlan(FS, Counter, Count, Results);
-    Plan.Statements.push_back(std::move(Statement));
-    return true;
-  }
-
   bool buildGenericVersionedRuntimeFor(const ForStmt *FS,
                                        const VarDecl *Counter,
                                        const ADExpr *Count,
                                        const CompoundStmt *Body) {
-    if (Body->size() < 3)
-      return false;
-
     SmallVector<const BinaryOperator *, 4> Updates;
     SmallVector<const ParmVarDecl *, 4> Targets;
     SmallVector<const DeclRefExpr *, 4> TargetRefs;
@@ -848,14 +830,6 @@ private:
       TargetRefs.push_back(TargetRef);
     }
 
-    bool UsesUpdatedState = false;
-    for (unsigned I = 0; I < Updates.size(); ++I)
-      for (unsigned Previous = 0; Previous < I; ++Previous)
-        UsesUpdatedState |= referencesDecl(
-            Updates[I]->getRHS(), getCanonicalValueDecl(Targets[Previous]));
-    if (!UsesUpdatedState)
-      return false;
-
     unsigned TapeSize = 0;
     const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
     const auto *BoundCall =
@@ -868,9 +842,6 @@ private:
         if (const auto *Limit =
                 dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
           TapeSize = Limit->getValue().getLimitedValue(1025);
-    if (TapeSize == 0 || TapeSize > 1024)
-      return fail("active generic runtime loop requires a min(count, N) bound "
-                  "with N between 1 and 1024");
 
     SmallVector<const ADBinding *, 4> Before;
     for (unsigned I = 0; I < Targets.size(); ++I) {
@@ -897,15 +868,10 @@ private:
       Factors.push_back(Factor);
     }
 
-    for (const ADExpr *Factor : Factors)
-      if (!analyzeGenericLoopPullback(Factor, nullptr, &SeenTargets))
-        return false;
-
     SmallVector<const ADExpr *, 4> Results;
     for (unsigned I = 0; I < Targets.size(); ++I) {
       ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Updates[I]);
       Result->SourceDecl = getCanonicalValueDecl(Targets[I]);
-      Result->LoopCounter = Counter;
       switch (Updates[I]->getOpcode()) {
       case BO_Assign:
         Result->BinaryOpcode = BO_Assign;
@@ -931,8 +897,6 @@ private:
       Result->Operands.push_back(Factors[I]);
       Result->Value.Activity = ADActivity::Active;
       Result->Value.PrimalType = Targets[I]->getType();
-      Result->RuntimeLoopUsesPrimalTape = true;
-      Result->RuntimeLoopTapeSize = TapeSize;
       Results.push_back(Result);
     }
     for (unsigned I = 0; I < Results.size(); ++I) {
@@ -942,526 +906,16 @@ private:
     }
     ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS);
     Statement.Values = Results;
-    Statement.Loop = createLoopPlan(FS, Counter, Count, Results);
-    Plan.Statements.push_back(std::move(Statement));
-    return true;
-  }
-
-  bool buildActiveRuntimeChain(const ForStmt *FS, const VarDecl *Counter,
-                               const ADExpr *Count, const CompoundStmt *Body) {
-    if (Body->size() < 3)
+    Statement.Loop =
+      createLoopPlan(FS, Counter, Count, Statement.Values, TapeSize);
+    if (!Statement.Loop)
       return false;
-    SmallVector<const BinaryOperator *, 4> Updates;
-    SmallVector<const ParmVarDecl *, 4> Targets;
-    SmallVector<const DeclRefExpr *, 4> TargetRefs;
-    SmallPtrSet<const ValueDecl *, 4> SeenTargets;
-    for (const Stmt *Child : Body->body()) {
-      const auto *Update = dyn_cast<BinaryOperator>(Child);
-      if (!Update || (Update->getOpcode() != BO_Assign &&
-                      Update->getOpcode() != BO_AddAssign &&
-                      Update->getOpcode() != BO_SubAssign &&
-                      Update->getOpcode() != BO_MulAssign &&
-                      Update->getOpcode() != BO_DivAssign))
-        return false;
-      const auto *TargetRef =
-          dyn_cast<DeclRefExpr>(Update->getLHS()->IgnoreParenImpCasts());
-      const auto *Target =
-          TargetRef ? dyn_cast<ParmVarDecl>(TargetRef->getDecl()) : nullptr;
-      if (!Target || Target->hasAttr<HLSLNoDiffAttr>() ||
-          !SeenTargets.insert(getCanonicalValueDecl(Target)).second)
-        return false;
-      if (!Targets.empty() &&
-          !Ctx.hasSameType(Targets.front()->getType(), Target->getType()))
-        return false;
-      Updates.push_back(Update);
-      Targets.push_back(Target);
-      TargetRefs.push_back(TargetRef);
-    }
-
-    SmallVector<bool, 4> NeedsPrimalTape(Updates.size(), false);
-    SmallVector<bool, 4> IsProductUpdate(Updates.size(), false);
-    struct ParsedMonomial {
-      unsigned TargetPower;
-      unsigned PeerPower;
-      const Expr *Coefficient;
-      bool Subtracts;
-      ADExpr::RuntimeLoopMonomial::TargetFunction Function;
-    };
-    SmallVector<SmallVector<ParsedMonomial, 4>, 4> ProductMonomials(
-        Updates.size());
-    SmallVector<const Expr *, 4> ProductLinearCoefficients(Updates.size(),
-                                                           nullptr);
-    SmallVector<bool, 4> ProductSubtractsLinearCoefficient(Updates.size(),
-                                                           false);
-    SmallVector<const Expr *, 4> ProductPeerLinearCoefficients(Updates.size(),
-                                                               nullptr);
-    SmallVector<bool, 4> ProductSubtractsPeerLinearCoefficient(Updates.size(),
-                                                               false);
-    bool NeedsAnyPrimalTape = false;
-    for (unsigned I = 0; I + 1 < Updates.size(); ++I) {
-      const Expr *FactorExpr = Updates[I]->getRHS()->IgnoreParenImpCasts();
-      if (Updates[I]->getOpcode() == BO_Assign) {
-        if (const auto *Outer = dyn_cast<BinaryOperator>(FactorExpr)) {
-          if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
-              !referencesActiveValue(Outer->getRHS()))
-            FactorExpr = Outer->getLHS()->IgnoreParenImpCasts();
-        }
-        while (const auto *Polynomial = dyn_cast<BinaryOperator>(FactorExpr)) {
-          if (Polynomial->getOpcode() != BO_Add &&
-              Polynomial->getOpcode() != BO_Sub)
-            break;
-          const auto *Linear = dyn_cast<BinaryOperator>(
-              Polynomial->getRHS()->IgnoreParenImpCasts());
-          if (!Linear || Linear->getOpcode() != BO_Mul)
-            break;
-          const auto *Left =
-              dyn_cast<DeclRefExpr>(Linear->getLHS()->IgnoreParenImpCasts());
-          const auto *Right =
-              dyn_cast<DeclRefExpr>(Linear->getRHS()->IgnoreParenImpCasts());
-          const Expr *Coefficient = nullptr;
-          const ValueDecl *LinearTarget = nullptr;
-          if (Left && !referencesActiveValue(Linear->getRHS())) {
-            LinearTarget = Left->getDecl();
-            Coefficient = Linear->getRHS();
-          } else if (Right && !referencesActiveValue(Linear->getLHS())) {
-            LinearTarget = Right->getDecl();
-            Coefficient = Linear->getLHS();
-          }
-          bool Subtracts = Polynomial->getOpcode() == BO_Sub;
-          if (LinearTarget == Targets[I] && !ProductLinearCoefficients[I]) {
-            ProductLinearCoefficients[I] = Coefficient;
-            ProductSubtractsLinearCoefficient[I] = Subtracts;
-          } else if (LinearTarget == Targets[I + 1] &&
-                     !ProductPeerLinearCoefficients[I]) {
-            ProductPeerLinearCoefficients[I] = Coefficient;
-            ProductSubtractsPeerLinearCoefficient[I] = Subtracts;
-          } else {
-            break;
-          }
-          FactorExpr = Polynomial->getLHS()->IgnoreParenImpCasts();
-        }
-        auto MatchMonomial = [&](const Expr *Expression, unsigned &TargetPower,
-                                 unsigned &PeerPower, const Expr *&Coefficient,
-                                 ADExpr::RuntimeLoopMonomial::TargetFunction
-                                     &TargetFunction) {
-          auto MatchFactor = [&](const auto &Self, const Expr *Factor) -> bool {
-            Factor = Factor->IgnoreParenImpCasts();
-            if (const auto *Ref = dyn_cast<DeclRefExpr>(Factor)) {
-              if (Ref->getDecl() == Targets[I]) {
-                if (TargetFunction !=
-                    ADExpr::RuntimeLoopMonomial::TargetFunction::Power)
-                  return false;
-                ++TargetPower;
-                return true;
-              }
-              if (Ref->getDecl() == Targets[I + 1]) {
-                ++PeerPower;
-                return true;
-              }
-            }
-            if (const auto *Call = dyn_cast<CallExpr>(Factor)) {
-              const FunctionDecl *Callee = Call->getDirectCallee();
-              const auto *Argument =
-                  Call->getNumArgs() == 1
-                      ? dyn_cast<DeclRefExpr>(
-                            Call->getArg(0)->IgnoreParenImpCasts())
-                      : nullptr;
-              StringRef Name = Callee ? Callee->getName() : StringRef();
-              if ((Name == "sin" || Name == "cos" || Name == "exp" ||
-                   Name == "log" || Name == "sqrt") &&
-                  Argument && Argument->getDecl() == Targets[I] &&
-                  TargetPower == 0 &&
-                  TargetFunction ==
-                      ADExpr::RuntimeLoopMonomial::TargetFunction::Power) {
-                TargetPower = 1;
-                using Function = ADExpr::RuntimeLoopMonomial::TargetFunction;
-                TargetFunction = StringSwitch<Function>(Name)
-                                     .Case("sin", Function::Sin)
-                                     .Case("cos", Function::Cos)
-                                     .Case("exp", Function::Exp)
-                                     .Case("log", Function::Log)
-                                     .Case("sqrt", Function::Sqrt);
-                return true;
-              }
-            }
-            if (!referencesActiveValue(Factor)) {
-              if (Coefficient)
-                return false;
-              Coefficient = Factor;
-              return true;
-            }
-            const auto *Product = dyn_cast<BinaryOperator>(Factor);
-            return Product && Product->getOpcode() == BO_Mul &&
-                   Self(Self, Product->getLHS()) &&
-                   Self(Self, Product->getRHS());
-          };
-          return MatchFactor(MatchFactor, Expression) && TargetPower > 0 &&
-                 PeerPower > 0;
-        };
-        auto CollectMonomials = [&](const auto &Self, const Expr *Expression,
-                                    bool Subtracts) -> bool {
-          Expression = Expression->IgnoreParenImpCasts();
-          if (const auto *Sum = dyn_cast<BinaryOperator>(Expression)) {
-            if ((Sum->getOpcode() == BO_Add || Sum->getOpcode() == BO_Sub) &&
-                referencesActiveValue(Sum->getRHS()))
-              return Self(Self, Sum->getLHS(), Subtracts) &&
-                     Self(Self, Sum->getRHS(),
-                          Subtracts != (Sum->getOpcode() == BO_Sub));
-          }
-          unsigned TargetPower = 0;
-          unsigned PeerPower = 0;
-          const Expr *Coefficient = nullptr;
-          auto TargetFunction =
-              ADExpr::RuntimeLoopMonomial::TargetFunction::Power;
-          if (!MatchMonomial(Expression, TargetPower, PeerPower, Coefficient,
-                             TargetFunction))
-            return false;
-          ProductMonomials[I].push_back(
-              {TargetPower, PeerPower, Coefficient, Subtracts, TargetFunction});
-          return true;
-        };
-        if (!CollectMonomials(CollectMonomials, FactorExpr,
-                              /*Subtracts=*/false))
-          return false;
-        IsProductUpdate[I] = true;
-      } else {
-        if (Updates[I]->getOpcode() != BO_AddAssign &&
-            Updates[I]->getOpcode() != BO_SubAssign &&
-            Updates[I]->getOpcode() != BO_MulAssign)
-          return false;
-        const auto *Peer = dyn_cast<DeclRefExpr>(FactorExpr);
-        if (!Peer || Peer->getDecl() != Targets[I + 1])
-          return false;
-        IsProductUpdate[I] = Updates[I]->getOpcode() == BO_MulAssign;
-        if (IsProductUpdate[I])
-          ProductMonomials[I].push_back(
-              {1, 1, nullptr, false,
-               ADExpr::RuntimeLoopMonomial::TargetFunction::Power});
-      }
-      if (IsProductUpdate[I]) {
-        NeedsPrimalTape[I] = true;
-        NeedsPrimalTape[I + 1] = true;
-        NeedsAnyPrimalTape = true;
-      }
-    }
-    const ADExpr *LastFactor = buildExpr(Updates.back()->getRHS());
-    if (!LastFactor)
-      return false;
-    unsigned TapeSize = 0;
-    if (LastFactor->Value.Activity == ADActivity::Active) {
-      const auto *FactorRef = dyn_cast<DeclRefExpr>(
-          Updates.back()->getRHS()->IgnoreParenImpCasts());
-      if (Updates.back()->getOpcode() != BO_MulAssign || !FactorRef ||
-          FactorRef->getDecl() != Targets.back())
-        return false;
-      NeedsPrimalTape.back() = true;
-      NeedsAnyPrimalTape = true;
-    }
-    if (NeedsAnyPrimalTape && TapeSize == 0) {
-      const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
-      const auto *BoundCall =
-          Condition
-              ? dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts())
-              : nullptr;
-      if (BoundCall && BoundCall->getDirectCallee() &&
-          BoundCall->getDirectCallee()->getName() == "min")
-        for (const Expr *Argument : BoundCall->arguments())
-          if (const auto *Limit =
-                  dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
-            TapeSize = Limit->getValue().getLimitedValue(1025);
-      if (TapeSize == 0 || TapeSize > 1024)
-        return fail("active nonlinear runtime chain requires a min(count, N) "
-                    "bound with N between 1 and 1024");
-    }
-
-    SmallVector<const ADBinding *, 4> Before;
-    for (unsigned I = 0; I < Targets.size(); ++I) {
-      const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Targets[I]);
-      auto BindingIt = CurrentBindings.find(CanonicalTarget);
-      if (BindingIt != CurrentBindings.end()) {
-        if (!BindingIt->second->Value)
-          return fail("linear runtime chain reads an uninitialized value");
-        Before.push_back(BindingIt->second);
-        continue;
-      }
-      ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRefs[I]);
-      Initial->SourceDecl = CanonicalTarget;
-      Initial->Value.SourceDecl = CanonicalTarget;
-      Initial->Value.Activity = ADActivity::Active;
-      Before.push_back(createBinding(Targets[I], 0, Initial));
-    }
-
-    SmallVector<const ADExpr *, 4> Results;
-    for (unsigned I = 0; I < Targets.size(); ++I) {
-      ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Updates[I]);
-      Result->SourceDecl = getCanonicalValueDecl(Targets[I]);
-      Result->LoopCounter = Counter;
-      switch (Updates[I]->getOpcode()) {
-      case BO_Assign:
-        Result->BinaryOpcode = BO_Assign;
-        break;
-      case BO_AddAssign:
-        Result->BinaryOpcode = BO_Add;
-        break;
-      case BO_SubAssign:
-        Result->BinaryOpcode = BO_Sub;
-        break;
-      case BO_MulAssign:
-        Result->BinaryOpcode = BO_Mul;
-        break;
-      case BO_DivAssign:
-        Result->BinaryOpcode = BO_Div;
-        break;
-      default:
-        llvm_unreachable("validated linear runtime chain update");
-      }
-      const ADExpr *Factor = nullptr;
-      if (I + 1 == Targets.size())
-        Factor = LastFactor;
-      else if (Updates[I]->getOpcode() == BO_Assign)
-        Factor = buildExpr(Updates[I]->getRHS());
-      else
-        Factor = createLocalRef(Updates[I]->getRHS(), Before[I + 1], false);
-      if (!Factor)
-        return false;
-      Result->Operands.push_back(
-          createLocalRef(TargetRefs[I], Before[I], false));
-      Result->Operands.push_back(Count);
-      Result->Operands.push_back(Factor);
-      Result->Value.Activity = ADActivity::Active;
-      Result->Value.PrimalType = Targets[I]->getType();
-      Result->RuntimeLoopProductUpdate = IsProductUpdate[I];
-      for (const ParsedMonomial &Parsed : ProductMonomials[I]) {
-        ADExpr::RuntimeLoopMonomial Monomial;
-        Monomial.TargetPower = Parsed.TargetPower;
-        Monomial.PeerPower = Parsed.PeerPower;
-        Monomial.Subtracts = Parsed.Subtracts;
-        Monomial.Function = Parsed.Function;
-        if (Parsed.Coefficient) {
-          Monomial.Coefficient =
-              buildExpr(Parsed.Coefficient, /*ForceInactive=*/true);
-          if (!Monomial.Coefficient)
-            return false;
-        }
-        Result->RuntimeLoopMonomials.push_back(Monomial);
-      }
-      if (ProductLinearCoefficients[I]) {
-        Result->RuntimeLoopLinearCoefficient =
-            buildExpr(ProductLinearCoefficients[I], /*ForceInactive=*/true);
-        if (!Result->RuntimeLoopLinearCoefficient)
-          return false;
-        Result->RuntimeLoopSubtractsLinearCoefficient =
-            ProductSubtractsLinearCoefficient[I];
-      }
-      if (ProductPeerLinearCoefficients[I]) {
-        Result->RuntimeLoopPeerLinearCoefficient =
-            buildExpr(ProductPeerLinearCoefficients[I], /*ForceInactive=*/true);
-        if (!Result->RuntimeLoopPeerLinearCoefficient)
-          return false;
-        Result->RuntimeLoopSubtractsPeerLinearCoefficient =
-            ProductSubtractsPeerLinearCoefficient[I];
-      }
-      if (NeedsPrimalTape[I]) {
-        Result->RuntimeLoopUsesPrimalTape = true;
-        Result->RuntimeLoopTapeSize = TapeSize;
-      }
-      Results.push_back(Result);
-    }
-    for (unsigned I = 0; I < Results.size(); ++I) {
-      ADExpr *Result = const_cast<ADExpr *>(Results[I]);
-      Result->RuntimeLoopLinearGroup = Results;
-      Result->RuntimeLoopLinearGroupIndex = I;
-      const ADBinding *After =
-          createBinding(Targets[I], Before[I]->Version + 1, Result);
-      CurrentBindings[getCanonicalValueDecl(Targets[I])] = After;
-    }
-    ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, Results.front(), FS);
-    Statement.Values = Results;
-    Statement.Loop = createLoopPlan(FS, Counter, Count, Results);
-    Plan.Statements.push_back(std::move(Statement));
-    return true;
-  }
-
-  bool buildCoupledActiveRuntimeFor(const ForStmt *FS, const VarDecl *Counter,
-                                    const ADExpr *Count,
-                                    const CompoundStmt *Body) {
-    if (Body->size() != 2)
-      return false;
-    auto It = Body->body_begin();
-    const auto *FirstUpdate = dyn_cast<BinaryOperator>(*It++);
-    const auto *SecondUpdate = dyn_cast<BinaryOperator>(*It);
-    if (!FirstUpdate || !SecondUpdate ||
-        (FirstUpdate->getOpcode() != BO_Assign &&
-         FirstUpdate->getOpcode() != BO_AddAssign &&
-         FirstUpdate->getOpcode() != BO_SubAssign &&
-         FirstUpdate->getOpcode() != BO_MulAssign) ||
-        (SecondUpdate->getOpcode() != BO_AddAssign &&
-         SecondUpdate->getOpcode() != BO_SubAssign &&
-         SecondUpdate->getOpcode() != BO_MulAssign &&
-         SecondUpdate->getOpcode() != BO_DivAssign))
-      return false;
-
-    const auto *FirstTargetRef =
-        dyn_cast<DeclRefExpr>(FirstUpdate->getLHS()->IgnoreParenImpCasts());
-    const auto *SecondTargetRef =
-        dyn_cast<DeclRefExpr>(SecondUpdate->getLHS()->IgnoreParenImpCasts());
-    const auto *FirstTarget =
-        FirstTargetRef ? dyn_cast<ParmVarDecl>(FirstTargetRef->getDecl())
-                       : nullptr;
-    const auto *SecondTarget =
-        SecondTargetRef ? dyn_cast<ParmVarDecl>(SecondTargetRef->getDecl())
-                        : nullptr;
-    if (!FirstTarget || !SecondTarget || FirstTarget == SecondTarget ||
-        FirstTarget->hasAttr<HLSLNoDiffAttr>() ||
-        SecondTarget->hasAttr<HLSLNoDiffAttr>() ||
-        !Ctx.hasSameType(FirstTarget->getType(), SecondTarget->getType()))
-      return false;
-
-    const DeclRefExpr *PeerRef = nullptr;
-    bool AssignmentProduct = false;
-    if (FirstUpdate->getOpcode() == BO_Assign) {
-      const Expr *Core = FirstUpdate->getRHS()->IgnoreParenImpCasts();
-      if (const auto *Outer = dyn_cast<BinaryOperator>(Core)) {
-        if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
-            !referencesActiveValue(Outer->getRHS()))
-          Core = Outer->getLHS()->IgnoreParenImpCasts();
-      }
-      const auto *Product = dyn_cast<BinaryOperator>(Core);
-      if (!Product || Product->getOpcode() != BO_Mul)
-        return false;
-      const auto *Left =
-          dyn_cast<DeclRefExpr>(Product->getLHS()->IgnoreParenImpCasts());
-      const auto *Right =
-          dyn_cast<DeclRefExpr>(Product->getRHS()->IgnoreParenImpCasts());
-      if (Left && Right && Left->getDecl() == FirstTarget &&
-          Right->getDecl() == SecondTarget)
-        PeerRef = Right;
-      else if (Left && Right && Left->getDecl() == SecondTarget &&
-               Right->getDecl() == FirstTarget)
-        PeerRef = Left;
-      else
-        return false;
-      AssignmentProduct = true;
-    } else {
-      PeerRef =
-          dyn_cast<DeclRefExpr>(FirstUpdate->getRHS()->IgnoreParenImpCasts());
-      if (!PeerRef || PeerRef->getDecl() != SecondTarget)
-        return false;
-    }
-
-    const ADExpr *SecondFactor = buildExpr(SecondUpdate->getRHS());
-    if (!SecondFactor || SecondFactor->Value.Activity == ADActivity::Active)
-      return false;
-
-    bool UsesPrimalTape =
-        FirstUpdate->getOpcode() == BO_MulAssign || AssignmentProduct;
-    unsigned TapeSize = 0;
-    if (UsesPrimalTape) {
-      const auto *Condition = dyn_cast<BinaryOperator>(FS->getCond());
-      const auto *BoundCall =
-          Condition
-              ? dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts())
-              : nullptr;
-      if (BoundCall && BoundCall->getDirectCallee() &&
-          BoundCall->getDirectCallee()->getName() == "min")
-        for (const Expr *Argument : BoundCall->arguments())
-          if (const auto *Limit =
-                  dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
-            TapeSize = Limit->getValue().getLimitedValue(1025);
-      if (TapeSize == 0 || TapeSize > 1024)
-        return fail(
-            "active nonlinear coupled runtime loop requires a min(count, N) "
-            "bound with N between 1 and 1024");
-    }
-
-    auto BuildInitialBinding = [&](const ParmVarDecl *Target,
-                                   const DeclRefExpr *TargetRef) {
-      const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
-      auto BindingIt = CurrentBindings.find(CanonicalTarget);
-      if (BindingIt != CurrentBindings.end())
-        return BindingIt->second;
-      ADExpr *Initial = createExpr(ADExpr::Kind::DeclRef, TargetRef);
-      Initial->SourceDecl = CanonicalTarget;
-      Initial->Value.SourceDecl = CanonicalTarget;
-      Initial->Value.Activity = ADActivity::Active;
-      return createBinding(Target, 0, Initial);
-    };
-
-    const ADBinding *FirstBefore =
-        BuildInitialBinding(FirstTarget, FirstTargetRef);
-    const ADBinding *SecondBefore =
-        BuildInitialBinding(SecondTarget, SecondTargetRef);
-    if (!FirstBefore->Value || !SecondBefore->Value)
-      return fail("coupled runtime loop reads an uninitialized value");
-
-    auto CreateResult =
-        [&](const ParmVarDecl *Target, const DeclRefExpr *TargetRef,
-            const ADBinding *Before, const BinaryOperator *Update,
-            const ADExpr *Factor) {
-          ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
-          Result->SourceDecl = getCanonicalValueDecl(Target);
-          Result->LoopCounter = Counter;
-          switch (Update->getOpcode()) {
-          case BO_Assign:
-            Result->BinaryOpcode = BO_Assign;
-            break;
-          case BO_AddAssign:
-            Result->BinaryOpcode = BO_Add;
-            break;
-          case BO_SubAssign:
-            Result->BinaryOpcode = BO_Sub;
-            break;
-          case BO_MulAssign:
-            Result->BinaryOpcode = BO_Mul;
-            break;
-          case BO_DivAssign:
-            Result->BinaryOpcode = BO_Div;
-            break;
-          default:
-            llvm_unreachable("validated coupled runtime loop update");
-          }
-          Result->Operands.push_back(createLocalRef(TargetRef, Before, false));
-          Result->Operands.push_back(Count);
-          Result->Operands.push_back(Factor);
-          Result->Value.Activity = ADActivity::Active;
-          Result->Value.PrimalType = Target->getType();
-          return Result;
-        };
-
-    const ADExpr *Peer = AssignmentProduct
-                             ? buildExpr(FirstUpdate->getRHS())
-                             : createLocalRef(PeerRef, SecondBefore, false);
-    if (!Peer)
-      return false;
-    ADExpr *FirstResult = CreateResult(FirstTarget, FirstTargetRef, FirstBefore,
-                                       FirstUpdate, Peer);
-    ADExpr *SecondResult =
-        CreateResult(SecondTarget, SecondTargetRef, SecondBefore, SecondUpdate,
-                     SecondFactor);
-    FirstResult->RuntimeLoopCoupledPeer = SecondResult;
-    FirstResult->RuntimeLoopCoupledPrimary = true;
-    FirstResult->RuntimeLoopCoupledUsesPrimalTape = UsesPrimalTape;
-    FirstResult->RuntimeLoopSubtractsCoupledPeer =
-        FirstUpdate->getOpcode() == BO_SubAssign;
-    SecondResult->RuntimeLoopCoupledPeer = FirstResult;
-    SecondResult->RuntimeLoopCoupledUsesPrimalTape = UsesPrimalTape;
-    if (UsesPrimalTape) {
-      FirstResult->RuntimeLoopUsesPrimalTape = true;
-      FirstResult->RuntimeLoopTapeSize = TapeSize;
-      SecondResult->RuntimeLoopUsesPrimalTape = true;
-      SecondResult->RuntimeLoopTapeSize = TapeSize;
-    }
-
-    const ADBinding *FirstAfter =
-        createBinding(FirstTarget, FirstBefore->Version + 1, FirstResult);
-    const ADBinding *SecondAfter =
-        createBinding(SecondTarget, SecondBefore->Version + 1, SecondResult);
-    CurrentBindings[getCanonicalValueDecl(FirstTarget)] = FirstAfter;
-    CurrentBindings[getCanonicalValueDecl(SecondTarget)] = SecondAfter;
-    ADStmt Statement(ADStmt::Kind::ActiveLoop, nullptr, FirstResult, FS);
-    Statement.Values.push_back(FirstResult);
-    Statement.Values.push_back(SecondResult);
-    Statement.Loop = createLoopPlan(FS, Counter, Count, Statement.Values);
+    bool NeedsTape = !Statement.Loop->TapeSlots.empty();
+    for (const ADLoopState &State : Statement.Loop->States)
+      NeedsTape |= State.NeedsPrimalTape;
+    if (NeedsTape && (TapeSize == 0 || TapeSize > 1024))
+      return fail("active runtime loop pullback requires a min(count, N) "
+                  "bound with N between 1 and 1024");
     Plan.Statements.push_back(std::move(Statement));
     return true;
   }
@@ -1501,13 +955,7 @@ private:
           return false;
         if (Count->Value.Activity == ADActivity::Active)
           return fail("active runtime loop count must be inactive");
-        if (buildGenericVersionedRuntimeFor(FS, Counter, Count, Compound))
-          return true;
-        if (buildActiveRuntimeChain(FS, Counter, Count, Compound))
-          return true;
-        if (buildCoupledActiveRuntimeFor(FS, Counter, Count, Compound))
-          return true;
-        return buildIndependentActiveRuntimeFor(FS, Counter, Count, Compound);
+        return buildGenericVersionedRuntimeFor(FS, Counter, Count, Compound);
       }
       Body = *Compound->body_begin();
     }
@@ -1532,88 +980,15 @@ private:
     if (Count->Value.Activity == ADActivity::Active)
       return fail("active runtime loop count must be inactive");
 
-    bool UsesPrimalTape = false;
     unsigned TapeSize = 0;
-    const Expr *QuadraticCoefficientExpr = nullptr;
-    const Expr *LinearCoefficientExpr = nullptr;
-    bool SubtractsLinearCoefficient = false;
-    unsigned PolynomialDegree = 2;
-    if (Factor->Value.Activity == ADActivity::Active) {
-      const auto *FactorRef =
-          dyn_cast<DeclRefExpr>(Update->getRHS()->IgnoreParenImpCasts());
-      UsesPrimalTape = Update->getOpcode() == BO_MulAssign && FactorRef &&
-                       FactorRef->getDecl() == Target;
-      auto IsTargetRef = [Target](const Expr *Expression) {
-        const auto *Ref =
-            dyn_cast<DeclRefExpr>(Expression->IgnoreParenImpCasts());
-        return Ref && Ref->getDecl() == Target;
-      };
-      if (Update->getOpcode() == BO_Assign) {
-        const Expr *RHS = Update->getRHS()->IgnoreParenImpCasts();
-        const Expr *Core = RHS;
-        if (const auto *Outer = dyn_cast<BinaryOperator>(Core)) {
-          if ((Outer->getOpcode() == BO_Add || Outer->getOpcode() == BO_Sub) &&
-              !referencesActiveValue(Outer->getRHS()))
-            Core = Outer->getLHS()->IgnoreParenImpCasts();
-        }
-        auto MatchPolynomialTerm = [&](const Expr *Expression) {
-          unsigned Degree = getTargetPower(Expression, Target);
-          if (Degree >= 2) {
-            PolynomialDegree = Degree;
-            return true;
-          }
-          const auto *Product =
-              dyn_cast<BinaryOperator>(Expression->IgnoreParenImpCasts());
-          if (!Product || Product->getOpcode() != BO_Mul)
-            return false;
-          Degree = getTargetPower(Product->getLHS(), Target);
-          if (Degree >= 2 && !referencesActiveValue(Product->getRHS())) {
-            QuadraticCoefficientExpr = Product->getRHS();
-            PolynomialDegree = Degree;
-            return true;
-          }
-          Degree = getTargetPower(Product->getRHS(), Target);
-          if (Degree >= 2 && !referencesActiveValue(Product->getLHS())) {
-            QuadraticCoefficientExpr = Product->getLHS();
-            PolynomialDegree = Degree;
-            return true;
-          }
-          return false;
-        };
-        UsesPrimalTape = MatchPolynomialTerm(Core);
-        if (const auto *Polynomial = dyn_cast<BinaryOperator>(Core)) {
-          if ((Polynomial->getOpcode() == BO_Add ||
-               Polynomial->getOpcode() == BO_Sub) &&
-              MatchPolynomialTerm(Polynomial->getLHS())) {
-            const auto *Linear = dyn_cast<BinaryOperator>(
-                Polynomial->getRHS()->IgnoreParenImpCasts());
-            if (Linear && Linear->getOpcode() == BO_Mul) {
-              if (IsTargetRef(Linear->getLHS()) &&
-                  !referencesActiveValue(Linear->getRHS()))
-                LinearCoefficientExpr = Linear->getRHS();
-              else if (IsTargetRef(Linear->getRHS()) &&
-                       !referencesActiveValue(Linear->getLHS()))
-                LinearCoefficientExpr = Linear->getLHS();
-            }
-            SubtractsLinearCoefficient =
-                LinearCoefficientExpr && Polynomial->getOpcode() == BO_Sub;
-          }
-          UsesPrimalTape |= LinearCoefficientExpr != nullptr;
-        }
-      }
-      const auto *BoundCall =
-          dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts());
-      if (UsesPrimalTape && BoundCall && BoundCall->getDirectCallee() &&
-          BoundCall->getDirectCallee()->getName() == "min") {
-        for (const Expr *Argument : BoundCall->arguments())
-          if (const auto *Limit =
-                  dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
-            TapeSize = Limit->getValue().getLimitedValue(1025);
-      }
-      if (!UsesPrimalTape || TapeSize == 0 || TapeSize > 1024)
-        return fail("nonlinear active runtime loop requires a min(count, N) "
-                    "bound with N between 1 and 1024");
-    }
+    const auto *BoundCall =
+        dyn_cast<CallExpr>(Condition->getRHS()->IgnoreParenImpCasts());
+    if (BoundCall && BoundCall->getDirectCallee() &&
+        BoundCall->getDirectCallee()->getName() == "min")
+      for (const Expr *Argument : BoundCall->arguments())
+        if (const auto *Limit =
+                dyn_cast<IntegerLiteral>(Argument->IgnoreParenImpCasts()))
+          TapeSize = Limit->getValue().getLimitedValue(1025);
 
     const ValueDecl *CanonicalTarget = getCanonicalValueDecl(Target);
     auto It = CurrentBindings.find(CanonicalTarget);
@@ -1632,23 +1007,6 @@ private:
 
     ADExpr *Result = createExpr(ADExpr::Kind::RuntimeLoopResult, Update);
     Result->SourceDecl = CanonicalTarget;
-    Result->LoopCounter = Counter;
-    Result->RuntimeLoopTapeSize = TapeSize;
-    Result->RuntimeLoopUsesPrimalTape = UsesPrimalTape;
-    Result->RuntimeLoopPolynomialDegree = PolynomialDegree;
-    if (QuadraticCoefficientExpr) {
-      Result->RuntimeLoopQuadraticCoefficient =
-          buildExpr(QuadraticCoefficientExpr, /*ForceInactive=*/true);
-      if (!Result->RuntimeLoopQuadraticCoefficient)
-        return false;
-    }
-    if (LinearCoefficientExpr) {
-      Result->RuntimeLoopLinearCoefficient =
-          buildExpr(LinearCoefficientExpr, /*ForceInactive=*/true);
-      if (!Result->RuntimeLoopLinearCoefficient)
-        return false;
-    }
-    Result->RuntimeLoopSubtractsLinearCoefficient = SubtractsLinearCoefficient;
     switch (Update->getOpcode()) {
     case BO_Assign:
       Result->BinaryOpcode = BO_Assign;
@@ -1678,7 +1036,16 @@ private:
     CurrentBindings[CanonicalTarget] = After;
     ADStmt Statement(ADStmt::Kind::ActiveLoop, After, Result, FS);
     Statement.Values.push_back(Result);
-    Statement.Loop = createLoopPlan(FS, Counter, Count, Statement.Values);
+    Statement.Loop =
+        createLoopPlan(FS, Counter, Count, Statement.Values, TapeSize);
+    if (!Statement.Loop)
+      return false;
+    bool NeedsTape = !Statement.Loop->TapeSlots.empty();
+    for (const ADLoopState &State : Statement.Loop->States)
+      NeedsTape |= State.NeedsPrimalTape;
+    if (NeedsTape && (TapeSize == 0 || TapeSize > 1024))
+      return fail("active runtime loop pullback requires a min(count, N) "
+                  "bound with N between 1 and 1024");
     Plan.Statements.push_back(std::move(Statement));
     return true;
   }

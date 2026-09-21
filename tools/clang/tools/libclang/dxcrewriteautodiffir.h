@@ -37,16 +37,6 @@ struct ADValueInfo {
 };
 
 struct ADExpr {
-  struct RuntimeLoopMonomial {
-    enum class TargetFunction { Power, Sin, Cos, Exp, Log, Sqrt };
-
-    unsigned TargetPower = 0;
-    unsigned PeerPower = 0;
-    const ADExpr *Coefficient = nullptr;
-    bool Subtracts = false;
-    TargetFunction Function = TargetFunction::Power;
-  };
-
   enum class Kind {
     Literal,
     DeclRef,
@@ -75,25 +65,8 @@ struct ADExpr {
   const clang::ValueDecl *SourceDecl = nullptr;
   const ADBinding *Binding = nullptr;
   const clang::FunctionDecl *Callee = nullptr;
-  const clang::VarDecl *LoopCounter = nullptr;
   unsigned LoopStateIndex = 0;
   unsigned LoopStateVersion = 0;
-  unsigned RuntimeLoopTapeSize = 0;
-  bool RuntimeLoopUsesPrimalTape = false;
-  unsigned RuntimeLoopPolynomialDegree = 2;
-  const ADExpr *RuntimeLoopQuadraticCoefficient = nullptr;
-  const ADExpr *RuntimeLoopLinearCoefficient = nullptr;
-  bool RuntimeLoopSubtractsLinearCoefficient = false;
-  const ADExpr *RuntimeLoopCoupledPeer = nullptr;
-  bool RuntimeLoopCoupledPrimary = false;
-  bool RuntimeLoopCoupledUsesPrimalTape = false;
-  bool RuntimeLoopSubtractsCoupledPeer = false;
-  llvm::SmallVector<const ADExpr *, 4> RuntimeLoopLinearGroup;
-  unsigned RuntimeLoopLinearGroupIndex = 0;
-  bool RuntimeLoopProductUpdate = false;
-  llvm::SmallVector<RuntimeLoopMonomial, 4> RuntimeLoopMonomials;
-  const ADExpr *RuntimeLoopPeerLinearCoefficient = nullptr;
-  bool RuntimeLoopSubtractsPeerLinearCoefficient = false;
   const ADExpr *Receiver = nullptr;
   clang::UnaryOperatorKind UnaryOpcode = clang::UO_Plus;
   clang::BinaryOperatorKind BinaryOpcode = clang::BO_Add;
@@ -146,7 +119,6 @@ struct ADLoopPlan {
   const clang::VarDecl *Counter = nullptr;
   const ADExpr *TripCount = nullptr;
   unsigned TapeCapacity = 0;
-  bool UsesGenericPullbacks = false;
   llvm::SmallVector<ADLoopState, 4> States;
   llvm::SmallVector<ADLoopUpdate, 4> Updates;
   llvm::SmallVector<ADLoopTapeSlot, 4> TapeSlots;
