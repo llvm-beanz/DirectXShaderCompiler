@@ -1085,6 +1085,13 @@ private:
         Node->Value.Activity = ADActivity::Active;
       if (!ForceInactive && getADBackwardDerivative(Node->Callee))
         Node->Value.Activity = ADActivity::Active;
+      if (!ForceInactive)
+        for (const FunctionDecl *Redecl : Node->Callee->redecls())
+          if (const auto *Attr = Redecl->getAttr<HLSLAutoDiffAttr>())
+            if (Attr->hasBackward()) {
+              Node->Value.Activity = ADActivity::Active;
+              break;
+            }
       return Node;
     }
 

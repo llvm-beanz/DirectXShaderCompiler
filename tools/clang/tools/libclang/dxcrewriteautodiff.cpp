@@ -57,6 +57,19 @@ std::string printType(QualType Type, const PrintingPolicy &Policy) {
   return Result;
 }
 
+std::string printAutoDiffParameterType(const FunctionDecl *FD,
+                                       const ParmVarDecl *Parameter,
+                                       const PrintingPolicy &Policy) {
+  const auto *Method = dyn_cast<CXXMethodDecl>(FD);
+  const auto *Record =
+      Parameter->getType().getNonReferenceType()->getAs<RecordType>();
+  if (Method && Record &&
+      Record->getDecl()->getCanonicalDecl() ==
+          Method->getParent()->getCanonicalDecl())
+    return "::" + Method->getParent()->getQualifiedNameAsString();
+  return printType(Parameter->getType(), Policy);
+}
+
 unsigned getComponentCount(QualType Type) {
   if (hlsl::IsHLSLVecType(Type))
     return hlsl::GetHLSLVecSize(Type);
@@ -1595,6 +1608,13 @@ private:
         if (isa<CXXThisExpr>(E->Receiver->SourceExpr->IgnoreParenImpCasts())) {
           const auto *Method = cast<CXXMethodDecl>(E->Callee);
           Out << "::" << Method->getParent()->getName() << "::";
+        } else if (hlsl::IsHLSLResourceCarrierType(
+                       E->Receiver->Value.PrimalType)) {
+          const auto *Method = cast<CXXMethodDecl>(E->Callee);
+          Out << "((::" << Method->getParent()->getQualifiedNameAsString()
+              << ")(";
+          emitPrimal(E->Receiver, Out, LoopContext);
+          Out << ")).";
         } else {
           emitPrimal(E->Receiver, Out, LoopContext);
           Out << ".";
@@ -1681,6 +1701,24 @@ private:
     return Text;
   }
 
+  std::string adaptCotangent(StringRef Cotangent, QualType SourceType,
+                             QualType TargetType) {
+    unsigned SourceCount = getComponentCount(SourceType);
+    unsigned TargetCount = getComponentCount(TargetType);
+    if (SourceCount == TargetCount)
+      return Cotangent.str();
+    if (TargetCount == 1) {
+      std::string Sum;
+      std::string Parenthesized = "(" + Cotangent.str() + ")";
+      for (unsigned I = 0; I < SourceCount; ++I) {
+        std::string Term = component(Parenthesized, I, SourceType);
+        Sum = Sum.empty() ? Term : "(" + Sum + " + " + Term + ")";
+      }
+      return Sum;
+    }
+    return Cotangent.str();
+  }
+
   std::string zero(QualType Type) {
     return "(" + printType(Type, Policy) + ")0";
   }
@@ -1733,10 +1771,41 @@ private:
          << PrimalText(E->Operands[I]) << ");\n";
     }
 
+    std::string ReceiverVariable;
+    if (E->Receiver &&
+        !isa<CXXThisExpr>(
+            E->Receiver->SourceExpr->IgnoreParenImpCasts()) &&
+        hlsl::IsHLSLResourceCarrierType(E->Receiver->Value.PrimalType)) {
+      const auto *Method = cast<CXXMethodDecl>(E->Callee);
+      const CXXRecordDecl *Record = Method->getParent();
+      ReceiverVariable =
+          "__dxc_ad_call_" + Twine(CallID).str() + "_receiver";
+      OS << Indent << "::user::ad::bwd::"
+         << Record->getQualifiedNameAsString() << " " << ReceiverVariable
+         << ";\n";
+      for (const FieldDecl *Field : Record->fields())
+        if (Field->getIdentifier())
+          OS << Indent << ReceiverVariable << "." << Field->getName() << " = ("
+             << PrimalText(E->Receiver) << ")." << Field->getName() << ";\n";
+    }
+
     OS << Indent;
     if (E->Receiver) {
-      OS << PrimalText(E->Receiver) << ".";
-    } else if (!isa<CXXMethodDecl>(E->Callee)) {
+      if (isa<CXXThisExpr>(
+              E->Receiver->SourceExpr->IgnoreParenImpCasts())) {
+        OS << "this.";
+      } else if (!ReceiverVariable.empty()) {
+        OS << ReceiverVariable << ".";
+      } else {
+        const auto *Method = cast<CXXMethodDecl>(E->Callee);
+        OS << "((::user::ad::bwd::"
+            << Method->getParent()->getQualifiedNameAsString() << ")(" 
+           << PrimalText(E->Receiver) << ")).";
+      }
+    } else if (const auto *Method = dyn_cast<CXXMethodDecl>(E->Callee)) {
+      OS << "::user::ad::bwd::"
+         << Method->getParent()->getQualifiedNameAsString() << "::";
+    } else {
       SmallVector<StringRef, 4> ReversedNamespaces;
       for (const DeclContext *DC = E->Callee->getDeclContext(); DC;
            DC = DC->getParent()) {
@@ -1920,27 +1989,49 @@ private:
       EmitAdjoint(E->Operands.front(), "-(" + Cotangent.str() + ")");
       return true;
     case Rule::Add:
-      EmitAdjoint(E->Operands[0], Cotangent.str());
-      EmitAdjoint(E->Operands[1], Cotangent.str());
+      EmitAdjoint(E->Operands[0],
+                  adaptCotangent(Cotangent, E->Value.PrimalType,
+                                  E->Operands[0]->Value.PrimalType));
+      EmitAdjoint(E->Operands[1],
+                  adaptCotangent(Cotangent, E->Value.PrimalType,
+                                  E->Operands[1]->Value.PrimalType));
       return true;
     case Rule::Subtract:
-      EmitAdjoint(E->Operands[0], Cotangent.str());
-      EmitAdjoint(E->Operands[1], "-(" + Cotangent.str() + ")");
+      EmitAdjoint(E->Operands[0],
+                  adaptCotangent(Cotangent, E->Value.PrimalType,
+                                  E->Operands[0]->Value.PrimalType));
+      EmitAdjoint(E->Operands[1],
+                  adaptCotangent("-(" + Cotangent.str() + ")",
+                                  E->Value.PrimalType,
+                                  E->Operands[1]->Value.PrimalType));
       return true;
-    case Rule::Multiply:
-      EmitAdjoint(E->Operands[0], "(" + Cotangent.str() + " * " +
-                                      PrimalText(E->Operands[1]) + ")");
-      EmitAdjoint(E->Operands[1], "(" + Cotangent.str() + " * " +
-                                      PrimalText(E->Operands[0]) + ")");
+    case Rule::Multiply: {
+      std::string Left = "(" + Cotangent.str() + " * " +
+                         PrimalText(E->Operands[1]) + ")";
+      std::string Right = "(" + Cotangent.str() + " * " +
+                          PrimalText(E->Operands[0]) + ")";
+      EmitAdjoint(E->Operands[0],
+                  adaptCotangent(Left, E->Value.PrimalType,
+                                  E->Operands[0]->Value.PrimalType));
+      EmitAdjoint(E->Operands[1],
+                  adaptCotangent(Right, E->Value.PrimalType,
+                                  E->Operands[1]->Value.PrimalType));
       return true;
+    }
     case Rule::Divide: {
       std::string Numerator = PrimalText(E->Operands[0]);
       std::string Denominator = PrimalText(E->Operands[1]);
       EmitAdjoint(E->Operands[0],
-                  "(" + Cotangent.str() + " / " + Denominator + ")");
+                  adaptCotangent("(" + Cotangent.str() + " / " +
+                                      Denominator + ")",
+                                  E->Value.PrimalType,
+                                  E->Operands[0]->Value.PrimalType));
       EmitAdjoint(E->Operands[1],
-                  "(-(" + Cotangent.str() + ") * " + Numerator + " / (" +
-                      Denominator + " * " + Denominator + "))");
+                  adaptCotangent("(-(" + Cotangent.str() + ") * " +
+                                      Numerator + " / (" + Denominator +
+                                      " * " + Denominator + "))",
+                                  E->Value.PrimalType,
+                                  E->Operands[1]->Value.PrimalType));
       return true;
     }
     case Rule::Conditional: {
@@ -2212,7 +2303,7 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
       if (!First)
         OS << ", ";
       First = false;
-      std::string ParamType = printType(P->getType(), Policy);
+      std::string ParamType = printAutoDiffParameterType(FD, P, Policy);
       if (isInactiveParameter(P))
         OS << ParamType;
       else
@@ -2234,7 +2325,7 @@ void emitAutoDiffSignature(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
        << Context.Name;
   }
   for (const ParmVarDecl *P : FD->parameters()) {
-    std::string ParamType = printType(P->getType(), Policy);
+    std::string ParamType = printAutoDiffParameterType(FD, P, Policy);
     if (!First)
       OS << ", ";
     First = false;
@@ -2564,6 +2655,8 @@ void emitDirectCalleePrototypes(const FunctionDecl *FD,
   DirectAutoDiffCalleeCollector Collector;
   Collector.TraverseStmt(const_cast<Stmt *>(FD->getBody()));
   for (const FunctionDecl *Callee : Collector.Callees) {
+    if (isa<CXXMethodDecl>(Callee))
+      continue;
     const auto *Attr = getAutoDiffAttr(Callee);
     bool WantsMode =
         Mode == AutoDiffEmitter::Fwd ? Attr->hasForward() : Attr->hasBackward();
