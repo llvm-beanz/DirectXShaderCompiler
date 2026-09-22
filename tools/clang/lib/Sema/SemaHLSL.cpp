@@ -14973,6 +14973,40 @@ void hlsl::HandleDeclAttributeForHLSL(Sema &S, Decl *D, const AttributeList &A,
         A.getRange(), S.Context, M1, M2, A.getAttributeSpellingListIndex());
     break;
   }
+  case AttributeList::AT_HLSLBackwardDerivative: {
+    if (A.getNumArgs() != 1) {
+      S.Diag(A.getLoc(), diag::err_attribute_wrong_number_arguments)
+          << A.getName() << A.getRange();
+      return;
+    }
+    if (!A.isArgIdent(0)) {
+      S.Diag(A.getLoc(), diag::err_hlsl_autodiff_association_requires_function)
+          << A.getName();
+      return;
+    }
+    IdentifierInfo *DerivativeName = A.getArgAsIdent(0)->Ident;
+    declAttr = ::new (S.Context) HLSLBackwardDerivativeAttr(
+        A.getRange(), S.Context, DerivativeName,
+        A.getAttributeSpellingListIndex());
+    break;
+  }
+  case AttributeList::AT_HLSLPrimalSubstituteOf: {
+    if (A.getNumArgs() != 1) {
+      S.Diag(A.getLoc(), diag::err_attribute_wrong_number_arguments)
+          << A.getName() << A.getRange();
+      return;
+    }
+    if (!A.isArgIdent(0)) {
+      S.Diag(A.getLoc(), diag::err_hlsl_autodiff_association_requires_function)
+          << A.getName();
+      return;
+    }
+    IdentifierInfo *PrimalName = A.getArgAsIdent(0)->Ident;
+    declAttr = ::new (S.Context) HLSLPrimalSubstituteOfAttr(
+        A.getRange(), S.Context, PrimalName,
+        A.getAttributeSpellingListIndex());
+    break;
+  }
   case AttributeList::AT_NoInline:
     declAttr = ::new (S.Context) NoInlineAttr(
         A.getRange(), S.Context, A.getAttributeSpellingListIndex());
@@ -16587,6 +16621,24 @@ void hlsl::CustomPrintHLSLAttr(const clang::Attr *A, llvm::raw_ostream &Out,
     break;
   }
 
+  case clang::attr::HLSLBackwardDerivative: {
+    Attr *noconst = const_cast<Attr *>(A);
+    auto *ACast = static_cast<HLSLBackwardDerivativeAttr *>(noconst);
+    Indent(Indentation, Out);
+    Out << "[[dxc::backward_derivative("
+      << ACast->getDerivative()->getName() << ")]]\n";
+    break;
+  }
+
+  case clang::attr::HLSLPrimalSubstituteOf: {
+    Attr *noconst = const_cast<Attr *>(A);
+    auto *ACast = static_cast<HLSLPrimalSubstituteOfAttr *>(noconst);
+    Indent(Indentation, Out);
+    Out << "[[dxc::primal_substitute_of("
+        << ACast->getPrimal()->getName() << ")]]\n";
+    break;
+  }
+
   case clang::attr::HLSLMaxVertexCount: {
     Attr *noconst = const_cast<Attr *>(A);
     HLSLMaxVertexCountAttr *ACast =
@@ -16870,6 +16922,8 @@ bool hlsl::IsHLSLAttr(clang::attr::Kind AttrKind) {
   switch (AttrKind) {
   case clang::attr::HLSLAllowUAVCondition:
   case clang::attr::HLSLAutoDiff:
+  case clang::attr::HLSLBackwardDerivative:
+  case clang::attr::HLSLPrimalSubstituteOf:
   case clang::attr::HLSLBranch:
   case clang::attr::HLSLCall:
   case clang::attr::HLSLCentroid:

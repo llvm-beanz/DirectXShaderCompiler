@@ -951,6 +951,24 @@ def HLSLAutoDiff : InheritableAttr {
   }];
 }
 
+def HLSLBackwardDerivative : InheritableAttr {
+  // Associates a primal function with a user-written reverse-mode pullback.
+  let Spellings = [CXX11<"dxc", "backward_derivative", 2015>];
+  let Subjects = SubjectList<[Function], ErrorDiag, "ExpectedFunction">;
+  let Args = [IdentifierArgument<"Derivative">];
+  let LangOpts = [HLSL];
+  let Documentation = [Undocumented];
+}
+
+def HLSLPrimalSubstituteOf : InheritableAttr {
+  // Associates a differentiable implementation with an original primal.
+  let Spellings = [CXX11<"dxc", "primal_substitute_of", 2015>];
+  let Subjects = SubjectList<[Function], ErrorDiag, "ExpectedFunction">;
+  let Args = [IdentifierArgument<"Primal">];
+  let LangOpts = [HLSL];
+  let Documentation = [Undocumented];
+}
+
 def HLSLWaveSize : InheritableAttr {
   let Spellings = [CXX11<"", "wavesize", 2017>];
   let Args = [IntArgument<"Min">, DefaultIntArgument<"Max", 0>, DefaultIntArgument<"Preferred", 0>];

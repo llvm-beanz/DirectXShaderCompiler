@@ -95,6 +95,7 @@ enum class ADPullbackRule {
   Log,
   Sqrt,
   ComposedCall,
+  CustomCall,
 };
 
 struct ADPullbackRuleInfo {
@@ -103,6 +104,10 @@ struct ADPullbackRuleInfo {
 };
 
 ADPullbackRuleInfo getADPullbackRule(const ADExpr *Expression);
+const clang::FunctionDecl *
+getADBackwardDerivative(const clang::FunctionDecl *Primal);
+const clang::FunctionDecl *
+getADPrimalSubstitute(const clang::FunctionDecl *Primal);
 
 struct ADBinding {
   const clang::VarDecl *SourceDecl = nullptr;

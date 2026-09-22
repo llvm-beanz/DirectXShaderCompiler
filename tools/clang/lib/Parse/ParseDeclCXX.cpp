@@ -3747,6 +3747,8 @@ static bool hasCXXAttributeInHLSL(IdentifierInfo *ScopeName,
   if (ScopeName && ScopeName->getName() == "dxc") {
     return llvm::StringSwitch<bool>(AttrName->getName())
         .Case("autodiff", true)
+        .Case("backward_derivative", true)
+      .Case("primal_substitute_of", true)
         .Case("no_diff", true)
         .Default(false);
   }

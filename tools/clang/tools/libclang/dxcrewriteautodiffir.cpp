@@ -13,10 +13,12 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/HlslTypes.h"
 #include "clang/AST/Stmt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 #include <algorithm>
 #include <cassert>
@@ -27,6 +29,96 @@ using namespace llvm;
 namespace hlsl {
 namespace autodiff {
 
+static bool isADBackwardDerivativeMatch(const FunctionDecl *Primal,
+                                        const FunctionDecl *Derivative) {
+  if (Primal->getCanonicalDecl() == Derivative->getCanonicalDecl())
+    return false;
+  const auto *PrimalMethod = dyn_cast<CXXMethodDecl>(Primal);
+  const auto *DerivativeMethod = dyn_cast<CXXMethodDecl>(Derivative);
+  if ((PrimalMethod != nullptr) != (DerivativeMethod != nullptr) ||
+      (PrimalMethod &&
+       (PrimalMethod->getParent()->getCanonicalDecl() !=
+            DerivativeMethod->getParent()->getCanonicalDecl() ||
+        PrimalMethod->isStatic() != DerivativeMethod->isStatic())) ||
+      !Derivative->getReturnType()->isVoidType())
+    return false;
+
+  unsigned ActiveParameters = 0;
+  for (const ParmVarDecl *Parameter : Primal->parameters())
+    ActiveParameters += !Parameter->hasAttr<HLSLNoDiffAttr>();
+  if (Derivative->getNumParams() !=
+      Primal->getNumParams() + 1 + ActiveParameters)
+    return false;
+
+  ASTContext &Context = Primal->getASTContext();
+  for (unsigned I = 0; I < Primal->getNumParams(); ++I) {
+    const ParmVarDecl *Input = Derivative->getParamDecl(I);
+    if (!Context.hasSameType(Primal->getParamDecl(I)->getType(),
+                             Input->getType().getNonReferenceType()) ||
+        Input->hasAttr<HLSLOutAttr>())
+      return false;
+  }
+  unsigned SeedIndex = Primal->getNumParams();
+  const ParmVarDecl *Seed = Derivative->getParamDecl(SeedIndex);
+  if (!Context.hasSameType(Primal->getReturnType(),
+                           Seed->getType().getNonReferenceType()) ||
+      Seed->hasAttr<HLSLOutAttr>())
+    return false;
+
+  unsigned OutputIndex = SeedIndex + 1;
+  for (const ParmVarDecl *Parameter : Primal->parameters()) {
+    if (Parameter->hasAttr<HLSLNoDiffAttr>())
+      continue;
+    const ParmVarDecl *Output = Derivative->getParamDecl(OutputIndex++);
+    if (!Context.hasSameType(Parameter->getType(),
+                             Output->getType().getNonReferenceType()) ||
+        !Output->hasAttr<HLSLOutAttr>() || Output->hasAttr<HLSLInAttr>())
+      return false;
+  }
+  return true;
+}
+
+static unsigned getADParameterDirection(const ParmVarDecl *Parameter) {
+  bool IsOut = Parameter->hasAttr<HLSLOutAttr>();
+  bool IsIn = Parameter->hasAttr<HLSLInAttr>();
+  if (IsOut && IsIn)
+    return 2;
+  return IsOut ? 1 : 0;
+}
+
+static bool isADPrimalSubstituteMatch(const FunctionDecl *Primal,
+                                      const FunctionDecl *Substitute) {
+  if (Primal->getCanonicalDecl() == Substitute->getCanonicalDecl())
+    return false;
+  const auto *PrimalMethod = dyn_cast<CXXMethodDecl>(Primal);
+  const auto *SubstituteMethod = dyn_cast<CXXMethodDecl>(Substitute);
+  if ((PrimalMethod != nullptr) != (SubstituteMethod != nullptr) ||
+      (PrimalMethod &&
+       (PrimalMethod->getParent()->getCanonicalDecl() !=
+            SubstituteMethod->getParent()->getCanonicalDecl() ||
+        PrimalMethod->isStatic() != SubstituteMethod->isStatic())))
+    return false;
+
+  ASTContext &Context = Primal->getASTContext();
+  if (!Context.hasSameType(Primal->getReturnType(),
+                           Substitute->getReturnType()) ||
+      Primal->getNumParams() != Substitute->getNumParams())
+    return false;
+  for (unsigned I = 0; I < Primal->getNumParams(); ++I) {
+    const ParmVarDecl *PrimalParameter = Primal->getParamDecl(I);
+    const ParmVarDecl *SubstituteParameter = Substitute->getParamDecl(I);
+    if (!Context.hasSameType(
+            PrimalParameter->getType().getNonReferenceType(),
+            SubstituteParameter->getType().getNonReferenceType()) ||
+        getADParameterDirection(PrimalParameter) !=
+            getADParameterDirection(SubstituteParameter) ||
+        PrimalParameter->hasAttr<HLSLNoDiffAttr>() !=
+            SubstituteParameter->hasAttr<HLSLNoDiffAttr>())
+      return false;
+  }
+  return true;
+}
+
 ADExpr::ADExpr(Kind K, const Expr *SourceExpr)
     : K(K), Range(SourceExpr ? SourceExpr->getSourceRange() : SourceRange()),
       SourceExpr(SourceExpr) {
@@ -35,6 +127,55 @@ ADExpr::ADExpr(Kind K, const Expr *SourceExpr)
   Value.PrimalType = SourceExpr->getType();
   Value.ValueCategory = SourceExpr->isLValue() ? ADValueCategory::LValue
                                                : ADValueCategory::RValue;
+}
+
+const FunctionDecl *getADBackwardDerivative(const FunctionDecl *Primal) {
+  if (!Primal)
+    return nullptr;
+  for (const FunctionDecl *Redecl : Primal->redecls()) {
+    const auto *Attr = Redecl->getAttr<HLSLBackwardDerivativeAttr>();
+    if (!Attr)
+      continue;
+    const FunctionDecl *Derivative = nullptr;
+    SmallPtrSet<const FunctionDecl *, 4> SeenCandidates;
+    for (const NamedDecl *Candidate : Redecl->getDeclContext()->lookup(
+             DeclarationName(Attr->getDerivative())))
+      if (const auto *Function = dyn_cast<FunctionDecl>(Candidate)) {
+        if (!SeenCandidates.insert(Function->getCanonicalDecl()).second ||
+            !isADBackwardDerivativeMatch(Redecl, Function))
+          continue;
+        if (Derivative)
+          return nullptr;
+        Derivative = Function;
+      }
+    if (Derivative)
+      return Derivative->getCanonicalDecl();
+  }
+  return nullptr;
+}
+
+const FunctionDecl *getADPrimalSubstitute(const FunctionDecl *Primal) {
+  if (!Primal)
+    return nullptr;
+  Primal = Primal->getCanonicalDecl();
+  const FunctionDecl *Substitute = nullptr;
+  SmallPtrSet<const FunctionDecl *, 4> SeenCandidates;
+  for (const Decl *D : Primal->getDeclContext()->decls()) {
+    const auto *Candidate = dyn_cast<FunctionDecl>(D);
+    if (!Candidate ||
+        !SeenCandidates.insert(Candidate->getCanonicalDecl()).second)
+      continue;
+    for (const FunctionDecl *Redecl : Candidate->redecls()) {
+      const auto *Attr = Redecl->getAttr<HLSLPrimalSubstituteOfAttr>();
+      if (!Attr || Attr->getPrimal() != Primal->getIdentifier() ||
+          !isADPrimalSubstituteMatch(Primal, Redecl))
+        continue;
+      if (Substitute)
+        return nullptr;
+      Substitute = Redecl->getCanonicalDecl();
+    }
+  }
+  return Substitute;
 }
 
 ADPullbackRuleInfo getADPullbackRule(const ADExpr *Expression) {
@@ -98,6 +239,14 @@ ADPullbackRuleInfo getADPullbackRule(const ADExpr *Expression) {
     if (Expression->Receiver &&
         Expression->Receiver->Value.Activity == ADActivity::Active)
       return {};
+    if (getADBackwardDerivative(Expression->Callee)) {
+      uint64_t PrimalOperandMask = 0;
+      for (unsigned I = 0; I < Expression->Operands.size(); ++I)
+        if (!Expression->Callee->getParamDecl(I)->hasAttr<HLSLNoDiffAttr>() &&
+            Expression->Operands[I]->Value.Activity == ADActivity::Active)
+          PrimalOperandMask |= uint64_t(1) << I;
+      return {ADPullbackRule::CustomCall, PrimalOperandMask};
+    }
     bool HasBackward = false;
     for (const FunctionDecl *Redecl : Expression->Callee->redecls())
       if (const auto *Attr = Redecl->getAttr<HLSLAutoDiffAttr>())
@@ -494,6 +643,7 @@ private:
       return analyzeGenericLoopPullback(Expression->Operands.front(), Inputs,
                                         StateDecls, true);
     case ADPullbackRule::ComposedCall:
+    case ADPullbackRule::CustomCall:
       for (unsigned I = 0; I < Expression->Operands.size(); ++I) {
         LoopPullbackAnalysis Analysis = analyzeGenericLoopPullback(
             Expression->Operands[I], Inputs, StateDecls,
@@ -907,7 +1057,10 @@ private:
         return nullptr;
       }
       ADExpr *Node = createExpr(ADExpr::Kind::Call, E);
-      Node->Callee = Callee->getCanonicalDecl();
+      Callee = Callee->getCanonicalDecl();
+      Node->Callee = getADPrimalSubstitute(Callee);
+      if (!Node->Callee)
+        Node->Callee = Callee;
       if (const auto *MemberCall = dyn_cast<CXXMemberCallExpr>(CE)) {
         Node->Receiver =
             buildExpr(MemberCall->getImplicitObjectArgument(), ForceInactive);
@@ -924,6 +1077,8 @@ private:
                                            : combineActivity(Node->Operands);
       if (!ForceInactive && Node->Receiver &&
           Node->Receiver->Value.Activity == ADActivity::Active)
+        Node->Value.Activity = ADActivity::Active;
+      if (!ForceInactive && getADBackwardDerivative(Node->Callee))
         Node->Value.Activity = ADActivity::Active;
       return Node;
     }

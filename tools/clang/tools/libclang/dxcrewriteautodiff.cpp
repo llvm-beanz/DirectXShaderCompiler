@@ -1780,6 +1780,58 @@ private:
   }
 
   template <typename EmitAdjointFn, typename PrimalTextFn>
+  void emitCustomCallAdjoint(const hlsl::autodiff::ADExpr *E,
+                             StringRef Cotangent, StringRef Indent,
+                             EmitAdjointFn EmitAdjoint,
+                             PrimalTextFn PrimalText) {
+    const FunctionDecl *Derivative =
+        hlsl::autodiff::getADBackwardDerivative(E->Callee);
+    assert(Derivative && "custom pullback call has no associated derivative");
+    unsigned CallID = PullbackCallCount++;
+    SmallVector<std::string, 4> Cotangents(E->Operands.size());
+    for (unsigned I = 0; I < E->Operands.size(); ++I) {
+      if (isInactiveParameter(E->Callee->getParamDecl(I)) ||
+          E->Operands[I]->Value.Activity ==
+              hlsl::autodiff::ADActivity::Inactive)
+        continue;
+      Cotangents[I] = "__dxc_ad_custom_call_" + Twine(CallID).str() +
+                      "_arg_" + Twine(I).str() + "_adjoint";
+      OS << Indent << printType(E->Operands[I]->Value.PrimalType, Policy) << " "
+         << Cotangents[I] << " = "
+         << zero(E->Operands[I]->Value.PrimalType) << ";\n";
+    }
+
+    OS << Indent;
+    if (E->Receiver) {
+      OS << PrimalText(E->Receiver) << "." << Derivative->getName();
+    } else if (const auto *Method = dyn_cast<CXXMethodDecl>(Derivative)) {
+      OS << "::" << Method->getParent()->getName() << "::"
+         << Derivative->getName();
+    } else {
+      OS << "::" << Derivative->getQualifiedNameAsString();
+    }
+    OS << "(";
+    bool First = true;
+    for (const hlsl::autodiff::ADExpr *Operand : E->Operands) {
+      if (!First)
+        OS << ", ";
+      First = false;
+      OS << PrimalText(Operand);
+    }
+    if (!First)
+      OS << ", ";
+    OS << Cotangent;
+    for (const std::string &ArgumentCotangent : Cotangents)
+      if (!ArgumentCotangent.empty())
+        OS << ", " << ArgumentCotangent;
+    OS << ");\n";
+
+    for (unsigned I = 0; I < E->Operands.size(); ++I)
+      if (!Cotangents[I].empty())
+        EmitAdjoint(E->Operands[I], Cotangents[I]);
+  }
+
+  template <typename EmitAdjointFn, typename PrimalTextFn>
   bool emitTypedPullback(const hlsl::autodiff::ADExpr *E, StringRef Cotangent,
                          EmitAdjointFn EmitAdjoint,
                          PrimalTextFn PrimalText) {
@@ -1930,6 +1982,7 @@ private:
     case Rule::Unsupported:
     case Rule::Leaf:
     case Rule::ComposedCall:
+    case Rule::CustomCall:
       return false;
     }
     llvm_unreachable("unknown typed pullback rule");
@@ -1970,9 +2023,14 @@ private:
     auto PrimalText = [&](const hlsl::autodiff::ADExpr *Operand) {
       return genericLoopPrimalText(Operand, Loop, PrimalMode);
     };
-    if (hlsl::autodiff::getADPullbackRule(E).Rule ==
-        hlsl::autodiff::ADPullbackRule::ComposedCall) {
+    hlsl::autodiff::ADPullbackRule Rule =
+        hlsl::autodiff::getADPullbackRule(E).Rule;
+    if (Rule == hlsl::autodiff::ADPullbackRule::ComposedCall) {
       emitCallAdjoint(E, Cotangent, "        ", EmitAdjoint, PrimalText);
+      return;
+    }
+    if (Rule == hlsl::autodiff::ADPullbackRule::CustomCall) {
+      emitCustomCallAdjoint(E, Cotangent, "        ", EmitAdjoint, PrimalText);
       return;
     }
     if (emitTypedPullback(E, Cotangent, EmitAdjoint, PrimalText))
@@ -1997,6 +2055,19 @@ private:
       if (hlsl::autodiff::getADPullbackRule(E).Rule ==
           hlsl::autodiff::ADPullbackRule::ComposedCall) {
         emitCallAdjoint(
+            E, Cotangent, "    ",
+            [&](const hlsl::autodiff::ADExpr *Operand,
+                const std::string &OperandCotangent) {
+              emitAdjoint(Operand, OperandCotangent);
+            },
+            [&](const hlsl::autodiff::ADExpr *Operand) {
+              return primalText(Operand);
+            });
+        return;
+      }
+      if (hlsl::autodiff::getADPullbackRule(E).Rule ==
+          hlsl::autodiff::ADPullbackRule::CustomCall) {
+        emitCustomCallAdjoint(
             E, Cotangent, "    ",
             [&](const hlsl::autodiff::ADExpr *Operand,
                 const std::string &OperandCotangent) {
@@ -2216,6 +2287,9 @@ bool statementReachesBackwardCallCycle(
     return false;
   if (const auto *Call = dyn_cast<CallExpr>(S)) {
     const FunctionDecl *Callee = Call->getDirectCallee();
+    if (const FunctionDecl *Substitute =
+            hlsl::autodiff::getADPrimalSubstitute(Callee))
+      Callee = Substitute;
     const HLSLAutoDiffAttr *Attr = getAutoDiffAttr(Callee);
     if (Callee && Attr && Attr->hasBackward() &&
         hasBackwardCallCycle(Callee, Active, Complete))
@@ -2288,8 +2362,9 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
         if (Expr->Value.Activity == hlsl::autodiff::ADActivity::Active &&
             (Expr->K == hlsl::autodiff::ADExpr::Kind::Cast ||
              (Expr->K == hlsl::autodiff::ADExpr::Kind::Call && Expr->Callee &&
-              getAutoDiffAttr(Expr->Callee) &&
-              getAutoDiffAttr(Expr->Callee)->hasBackward()))) {
+              ((getAutoDiffAttr(Expr->Callee) &&
+                getAutoDiffAttr(Expr->Callee)->hasBackward()) ||
+               hlsl::autodiff::getADBackwardDerivative(Expr->Callee))))) {
           NeedsDirectReverse = true;
           break;
         }
@@ -2454,6 +2529,9 @@ public:
     if (!Callee)
       return true;
     Callee = Callee->getCanonicalDecl();
+    if (const FunctionDecl *Substitute =
+            hlsl::autodiff::getADPrimalSubstitute(Callee))
+      Callee = Substitute;
     if (getAutoDiffAttr(Callee) && Seen.insert(Callee).second)
       Callees.push_back(Callee);
     return true;
