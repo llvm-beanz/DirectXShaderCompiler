@@ -29,6 +29,11 @@ using namespace llvm;
 namespace hlsl {
 namespace autodiff {
 
+bool isADInactiveParameter(const ParmVarDecl *Parameter) {
+  return Parameter->hasAttr<HLSLNoDiffAttr>() ||
+         hlsl::IsHLSLResourceCarrierType(Parameter->getType());
+}
+
 static bool isADBackwardDerivativeMatch(const FunctionDecl *Primal,
                                         const FunctionDecl *Derivative) {
   if (Primal->getCanonicalDecl() == Derivative->getCanonicalDecl())
@@ -45,7 +50,7 @@ static bool isADBackwardDerivativeMatch(const FunctionDecl *Primal,
 
   unsigned ActiveParameters = 0;
   for (const ParmVarDecl *Parameter : Primal->parameters())
-    ActiveParameters += !Parameter->hasAttr<HLSLNoDiffAttr>();
+    ActiveParameters += !isADInactiveParameter(Parameter);
   if (Derivative->getNumParams() !=
       Primal->getNumParams() + 1 + ActiveParameters)
     return false;
@@ -67,7 +72,7 @@ static bool isADBackwardDerivativeMatch(const FunctionDecl *Primal,
 
   unsigned OutputIndex = SeedIndex + 1;
   for (const ParmVarDecl *Parameter : Primal->parameters()) {
-    if (Parameter->hasAttr<HLSLNoDiffAttr>())
+    if (isADInactiveParameter(Parameter))
       continue;
     const ParmVarDecl *Output = Derivative->getParamDecl(OutputIndex++);
     if (!Context.hasSameType(Parameter->getType(),
@@ -242,7 +247,7 @@ ADPullbackRuleInfo getADPullbackRule(const ADExpr *Expression) {
     if (getADBackwardDerivative(Expression->Callee)) {
       uint64_t PrimalOperandMask = 0;
       for (unsigned I = 0; I < Expression->Operands.size(); ++I)
-        if (!Expression->Callee->getParamDecl(I)->hasAttr<HLSLNoDiffAttr>() &&
+        if (!isADInactiveParameter(Expression->Callee->getParamDecl(I)) &&
             Expression->Operands[I]->Value.Activity == ADActivity::Active)
           PrimalOperandMask |= uint64_t(1) << I;
       return {ADPullbackRule::CustomCall, PrimalOperandMask};
@@ -837,7 +842,7 @@ private:
       Node->Value.SourceDecl = D;
       const auto *Parameter = dyn_cast<ParmVarDecl>(D);
       Node->Value.Activity =
-          !ForceInactive && Parameter && !Parameter->hasAttr<HLSLNoDiffAttr>()
+          !ForceInactive && Parameter && !isADInactiveParameter(Parameter)
               ? ADActivity::Active
               : ADActivity::Inactive;
       return Node;
@@ -1116,7 +1121,7 @@ private:
     if (const auto *DRE = dyn_cast<DeclRefExpr>(S)) {
       const ValueDecl *Decl = getCanonicalValueDecl(DRE->getDecl());
       if (const auto *Parameter = dyn_cast<ParmVarDecl>(Decl))
-        return !Parameter->hasAttr<HLSLNoDiffAttr>();
+        return !isADInactiveParameter(Parameter);
       auto It = CurrentBindings.find(Decl);
       return It != CurrentBindings.end() && It->second->Value &&
              It->second->Value->Value.Activity == ADActivity::Active;
@@ -1139,7 +1144,7 @@ private:
         if (!LHS)
           return false;
         const auto *Parameter = dyn_cast<ParmVarDecl>(LHS->getDecl());
-        if (!Parameter || !Parameter->hasAttr<HLSLNoDiffAttr>())
+        if (!Parameter || !isADInactiveParameter(Parameter))
           return false;
         Outputs.push_back({Parameter, LHS});
       }
@@ -1542,7 +1547,7 @@ private:
       InitialValue->SourceDecl = Target;
       InitialValue->Value.SourceDecl = Target;
       InitialValue->Value.Activity =
-          !ForceInactive && !Parameter->hasAttr<HLSLNoDiffAttr>()
+          !ForceInactive && !isADInactiveParameter(Parameter)
               ? ADActivity::Active
               : ADActivity::Inactive;
       CurrentBindings[Target] = createBinding(Parameter, 0, InitialValue);

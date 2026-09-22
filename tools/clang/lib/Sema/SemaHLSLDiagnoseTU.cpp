@@ -604,6 +604,11 @@ struct BackwardDerivativeMismatch {
   QualType ExpectedType;
 };
 
+bool isAutoDiffInactiveParameter(const ParmVarDecl *Parameter) {
+  return Parameter->hasAttr<HLSLNoDiffAttr>() ||
+         hlsl::IsHLSLResourceCarrierType(Parameter->getType());
+}
+
 BackwardDerivativeMismatch
 getBackwardDerivativeMismatch(ASTContext &Context, const FunctionDecl *Primal,
                               const FunctionDecl *Derivative) {
@@ -630,7 +635,7 @@ getBackwardDerivativeMismatch(ASTContext &Context, const FunctionDecl *Primal,
 
   unsigned ActiveParameters = 0;
   for (const ParmVarDecl *Parameter : Primal->parameters())
-    ActiveParameters += !Parameter->hasAttr<HLSLNoDiffAttr>();
+    ActiveParameters += !isAutoDiffInactiveParameter(Parameter);
   unsigned ExpectedParameters = Primal->getNumParams() + 1 + ActiveParameters;
   if (Derivative->getNumParams() != ExpectedParameters) {
     Mismatch.Kind = BackwardDerivativeMismatchKind::ParameterCount;
@@ -671,7 +676,7 @@ getBackwardDerivativeMismatch(ASTContext &Context, const FunctionDecl *Primal,
 
   unsigned OutputIndex = SeedIndex + 1;
   for (const ParmVarDecl *Parameter : Primal->parameters()) {
-    if (Parameter->hasAttr<HLSLNoDiffAttr>())
+    if (isAutoDiffInactiveParameter(Parameter))
       continue;
     const ParmVarDecl *Output = Derivative->getParamDecl(OutputIndex);
     if (!Context.hasSameType(Parameter->getType(),

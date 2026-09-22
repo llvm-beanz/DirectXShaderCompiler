@@ -37,7 +37,7 @@ using namespace llvm;
 namespace {
 
 bool isInactiveParameter(const ParmVarDecl *P) {
-  return P->hasAttr<HLSLNoDiffAttr>();
+  return hlsl::autodiff::isADInactiveParameter(P);
 }
 
 const HLSLAutoDiffAttr *getAutoDiffAttr(const FunctionDecl *FD) {
@@ -2378,6 +2378,20 @@ bool emitAutoDiffFunction(const FunctionDecl *FD, AutoDiffEmitter::Mode M,
         !HasTypedPlan &&
         (StringRef(PlanReason).startswith("active ") ||
          StringRef(PlanReason).startswith("nonlinear active runtime loop "));
+    if (M == AutoDiffEmitter::Bwd && HasTypedPlan)
+      for (const std::unique_ptr<hlsl::autodiff::ADExpr> &Expr :
+         Plan.Expressions)
+      if (Expr->K == hlsl::autodiff::ADExpr::Kind::Call && Expr->Receiver &&
+        Expr->Value.Activity == hlsl::autodiff::ADActivity::Active &&
+        hlsl::IsHLSLResourceType(Expr->Receiver->Value.PrimalType) &&
+        hlsl::autodiff::getADPullbackRule(Expr.get()).Rule ==
+          hlsl::autodiff::ADPullbackRule::Unsupported) {
+        HasTypedPlan = false;
+        HasTerminalPlanFailure = true;
+        PlanReason = "resource operation '" + Expr->Callee->getName().str() +
+               "' requires an associated custom backward derivative";
+        break;
+      }
     if (M == AutoDiffEmitter::Bwd && HasTypedPlan && hasBackwardCallCycle(FD)) {
       HasTypedPlan = false;
       HasTerminalPlanFailure = true;

@@ -104,6 +104,7 @@ struct ADPullbackRuleInfo {
 };
 
 ADPullbackRuleInfo getADPullbackRule(const ADExpr *Expression);
+bool isADInactiveParameter(const clang::ParmVarDecl *Parameter);
 const clang::FunctionDecl *
 getADBackwardDerivative(const clang::FunctionDecl *Primal);
 const clang::FunctionDecl *
