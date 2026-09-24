@@ -14,4 +14,4 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-Can you build a new system similar to Clang's uninitialized value analysis that tracks the uniformity of control flow and issues diagnostics if operations requiring uniform control flow are called from within branches that are provably non-uniform?
+Can you extend the HLSLUniformityAnalysis to also handle quad uniformity, and the quad/derivitive operations?
