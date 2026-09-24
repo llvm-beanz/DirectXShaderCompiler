@@ -44,6 +44,12 @@ line upon naming the release. Refer to previous for appropriate section names.
 - The `shared` and `uniform` keywords are removed in HLSL 202x, with
   compatibility warnings available for earlier language versions
   [#8482](https://github.com/microsoft/DirectXShaderCompiler/issues/8482).
+- Added a new control-flow uniformity analysis that warns when a call to an
+  operation requiring uniform control flow across the thread group (such as
+  `GroupMemoryBarrierWithGroupSync`) is reachable from a branch whose
+  condition may be non-uniform. The warning is part of the new
+  `-Whlsl-nonuniform-control-flow` diagnostic group, which is enabled by
+  default.
 
 #### Bug Fixes
 
