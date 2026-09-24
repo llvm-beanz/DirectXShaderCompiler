@@ -1346,14 +1346,18 @@ class HLSLUniformityDiagReporter : public HLSLUniformityHandler {
 public:
   HLSLUniformityDiagReporter(Sema &S) : S(S) {}
 
-  void handleNonUniformControlFlowUse(const CallExpr *Call,
-                                      const Expr *Condition) override {
+  void handleNonUniformControlFlowUse(
+      const CallExpr *Call, const Expr *Condition,
+      HLSLUniformityRequirement Requirement) override {
     const FunctionDecl *FD = Call->getDirectCallee();
-    S.Diag(Call->getExprLoc(), diag::warn_hlsl_nonuniform_control_flow)
+    bool IsQuad = Requirement == HLSLUniformityRequirement::Quad;
+    unsigned DiagID = IsQuad ? diag::warn_hlsl_nonuniform_quad_control_flow
+                             : diag::warn_hlsl_nonuniform_control_flow;
+    S.Diag(Call->getExprLoc(), DiagID)
         << (FD ? FD->getName() : "operation") << Call->getSourceRange();
     S.Diag(Condition->getExprLoc(),
            diag::note_hlsl_nonuniform_control_flow_branch)
-        << Condition->getSourceRange();
+        << (unsigned)IsQuad << Condition->getSourceRange();
   }
 };
 } // end anonymous namespace
@@ -2074,8 +2078,10 @@ AnalysisBasedWarnings::IssueWarnings(sema::AnalysisBasedWarnings::Policy P,
 
   // HLSL Change Begin - Run the control-flow uniformity analysis.
   if (S.getLangOpts().HLSL &&
-      !Diags.isIgnored(diag::warn_hlsl_nonuniform_control_flow,
-                       D->getLocStart())) {
+      (!Diags.isIgnored(diag::warn_hlsl_nonuniform_control_flow,
+                        D->getLocStart()) ||
+       !Diags.isIgnored(diag::warn_hlsl_nonuniform_quad_control_flow,
+                        D->getLocStart()))) {
     if (CFG *cfg = AC.getCFG()) {
       HLSLUniformityDiagReporter reporter(S);
       runHLSLUniformityAnalysis(*cast<DeclContext>(D), AC, reporter);

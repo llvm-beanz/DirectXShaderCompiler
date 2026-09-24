@@ -1603,9 +1603,13 @@ def warn_hlsl_nonuniform_control_flow : Warning<
   "call to %0, which requires uniform control flow across the thread group, "
   "occurs in a branch whose condition may be non-uniform">,
   InGroup<HLSLNonUniformControlFlow>;
+def warn_hlsl_nonuniform_quad_control_flow : Warning<
+  "call to %0, which requires uniform control flow across the current quad, "
+  "occurs in a branch whose condition may be non-uniform">,
+  InGroup<HLSLNonUniformQuadControlFlow>;
 def note_hlsl_nonuniform_control_flow_branch : Note<
   "control flow depends on this condition, which may evaluate differently "
-  "across the invocations of the thread group">;
+  "across the invocations of the %select{thread group|current quad}0">;
 // HLSL Change End - Add uniformity analysis for control flow.
 def warn_hlsl_groupshared_202x
     : Warning<"Support for groupshared parameter annotation not added until "
