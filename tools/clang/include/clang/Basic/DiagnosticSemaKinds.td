@@ -1597,6 +1597,16 @@ def warn_hlsl_sometimes_uninit_out_param : Warning<
   "its declaration is reached|"
   "%3 is called}2">,
   InGroup<HLSLParameterUsage>;
+// HLSL Change End - Generate warnings for uninitialized out params.
+// HLSL Change Begin - Add uniformity analysis for control flow.
+def warn_hlsl_nonuniform_control_flow : Warning<
+  "call to %0, which requires uniform control flow across the thread group, "
+  "occurs in a branch whose condition may be non-uniform">,
+  InGroup<HLSLNonUniformControlFlow>;
+def note_hlsl_nonuniform_control_flow_branch : Note<
+  "control flow depends on this condition, which may evaluate differently "
+  "across the invocations of the thread group">;
+// HLSL Change End - Add uniformity analysis for control flow.
 def warn_hlsl_groupshared_202x
     : Warning<"Support for groupshared parameter annotation not added until "
               "HLSL 202x">,

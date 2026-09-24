@@ -816,5 +816,6 @@ def HLSL2026Compat
                                      HLSL2026RemovedKeywords]>;
 
 def HLSLGroupshared202x : DiagGroup<"hlsl-groupshared-202x">;
+def HLSLNonUniformControlFlow : DiagGroup<"hlsl-nonuniform-control-flow">;
 def HLSL202xExtensions : DiagGroup<"hlsl-202x-extensions", [HLSLGroupshared202x]>;
 // HLSL Change Ends
