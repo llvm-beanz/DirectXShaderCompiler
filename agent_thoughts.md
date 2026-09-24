@@ -299,3 +299,174 @@ divergent region, which made the dominance/post-dominance mixup visible.
 - A finer-grained, field-sensitive taint model for struct-typed
   parameters, instead of the current coarse "any field tainted taints the
   whole struct" approximation.
+
+## Addendum: extending the analysis to quad uniformity
+
+A follow-up request asked for the analysis to also understand "quad
+uniformity" and the quad/derivative operations: `ddx`/`ddy` (and their
+`_coarse`/`_fine` variants) and the explicit `Quad*` intrinsics
+(`QuadReadAcrossX`, `QuadReadAcrossY`, `QuadReadAcrossDiagonal`,
+`QuadReadLaneAt`, `QuadAny`, `QuadAll`). Unlike
+`GroupMemoryBarrierWithGroupSync`, which requires every invocation of the
+*entire* thread group/wave to execute it together, these operations only
+require that the *four* invocations making up a single 2x2 "quad" execute
+them together; it is perfectly fine for the decision to differ between
+different quads. A value that is uniform across the whole group is
+trivially uniform within any single quad, but the converse does not hold,
+so this is a strictly weaker (and therefore distinct) requirement that
+needed its own tracking rather than being folded into the existing
+group-uniformity bit.
+
+### Design: a second, scope-parameterized dataflow
+
+Rather than inventing a wholly separate analysis, the existing
+"taint"/divergent-region machinery was generalized to be parameterized by
+a new `HLSLUniformityRequirement` enum (`Group` or `Quad`), and the driver
+now runs the *same* dataflow and divergent-branch identification code
+twice, once per scope, producing two independent `BlockOut` bitvector
+sets and two independent `DivergentBranches` lists. This was a deliberate
+simplicity/precision tradeoff: a fully unified "lattice of scopes" design
+(e.g. tracking a per-variable "coarsest scope at which this value is
+uniform" rather than two separate booleans) would avoid doing the
+chaotic-iteration fixpoint work twice, but for the expected small size of
+HLSL CFGs this is not a performance concern, and duplicating the
+scope-parameterized functions (`isExprNonUniform`, `transferStmt`,
+`analyzeScope`) is far simpler to reason about and review than a lattice
+abstraction would have been.
+
+The scope-sensitive pieces are:
+
+- `producesGroupUniformResult`: unchanged from before (the wave
+  broadcast/reduction intrinsics). Since group-uniform trivially implies
+  quad-uniform, these ops are treated as uniform at *both* scopes.
+- `producesQuadUniformResult`: the new list of `Quad*`
+  broadcast/reduction intrinsics. Their result is uniform *within* a
+  quad by construction (all four lanes read/compute the same value), but
+  is **not** treated as uniform at group scope, because the value
+  legitimately differs from one quad to the next (e.g.
+  `QuadReadAcrossX(x)` broadcasts `x`'s value from one specific lane of
+  the current quad, which generally differs between quads). This
+  distinction is exactly what lets the analysis correctly warn when a
+  `Quad*` result is used to guard a `GroupMemoryBarrierWithGroupSync`
+  (still unsafe: the branch can differ from quad to quad) while *not*
+  warning when the same `Quad*` result guards a `ddx`/`ddy` (safe: all
+  four lanes of any given quad agree on the branch).
+- `alwaysProducesNonUniformResult`: unchanged, and applied identically at
+  both scopes. Per-lane-identity intrinsics like `WaveGetLaneIndex`
+  generally differ even between the four lanes of a single quad (a
+  quad's four lanes are simply four particular wave lanes with different
+  indices), so there was no principled way to treat these as "quad-safe
+  but group-unsafe" -- they are conservatively non-uniform everywhere.
+- Non-uniform *source* semantics (`SV_Position`, `SV_DispatchThreadID`,
+  etc.) are also used unchanged as taint sources for both scopes: e.g.
+  `SV_Position` legitimately varies between the four pixels of a quad
+  (they are adjacent but distinct screen positions), so it is correctly a
+  quad-non-uniform source too, not just a group-non-uniform one.
+
+`requiresUniformControlFlow` now returns
+`Optional<HLSLUniformityRequirement>` instead of `bool`: barriers
+(`GroupMemoryBarrierWithGroupSync` et al. and `Barrier()` with
+`GROUP_SYNC`) require `Group`; `ddx`/`ddy` and the `Quad*` intrinsics
+require `Quad`. The driver's per-block reporting loop computes the
+innermost divergent branch under *both* scopes once per block, and then,
+for each call site found in that block, picks whichever of the two
+precomputed answers matches that specific call's own requirement -- so a
+single block can correctly report a barrier against a group-divergent
+branch and a `ddx` against a (possibly different, more/less nested) quad-
+divergent branch in the same pass.
+
+The diagnostic-facing `HLSLUniformityHandler::handleNonUniformControlFlowUse`
+callback gained a third parameter carrying the `HLSLUniformityRequirement`,
+and `Sema`'s reporter (`HLSLUniformityDiagReporter`) uses it to select
+between two new, separately-grouped diagnostics
+(`warn_hlsl_nonuniform_control_flow` for `Group`,
+`warn_hlsl_nonuniform_quad_control_flow` for `Quad`) with wording that
+says "thread group" vs. "current quad" respectively; the underlying note
+diagnostic was parameterized the same way. `-Whlsl-nonuniform-quad-
+control-flow` is a new diagnostic group, made a sub-group of the existing
+`-Whlsl-nonuniform-control-flow` (so disabling the parent group disables
+both, matching the pre-existing convention used elsewhere in this
+diagnostics file, e.g. `HLSL2026Compat`).
+
+### Two latent bugs found while extending the analysis
+
+Manual verification of the quad extension surfaced two bugs in the
+*original* group-only implementation that had gone unnoticed because the
+existing test suite never happened to exercise the affected code paths.
+Both are fixed as part of this change, since they directly undermine the
+correctness of the very taint-propagation code being extended (a
+"uniform result" intrinsic's result, once stored into a local variable,
+was not reliably recognized as uniform -- which is precisely the pattern
+used by the new `Quad*`-broadcast-to-a-variable test case):
+
+1. **`SmallBitVector` has no `set(unsigned Idx, bool Value)` overload.**
+   The pre-existing code wrote `Env.set(*Idx, SomeBool)` in three places
+   (assignment, `DeclStmt` initialization, increment/decrement) intending
+   to set-or-clear a single bit. `llvm::SmallBitVector` does not declare
+   that overload; instead, `bool` implicitly converts to `unsigned`, and
+   the call silently resolves to the *unrelated* range-set overload
+   `set(unsigned I, unsigned E)` ("set all bits in `[I, E)`"). When the
+   intended value was `false`/`0` and `Idx > 0` (the overwhelmingly
+   common case), this passes `I > E` to a function documented and
+   asserted (in debug builds only) to require `I <= E`; in a release
+   (assertions-disabled) build this silently computes a nonsensical,
+   effectively-wrapped-around bitmask and corrupts far more bits than
+   intended. This was discovered by writing a minimal repro
+   (`v = WaveReadLaneFirst(dtid.x); if (v < 10) { GroupMemoryBarrierWith
+   GroupSync(); }`, which should never warn since `WaveReadLaneFirst`'s
+   result is group-uniform by definition) and observing a false-positive
+   warning; targeted `llvm::errs()` tracing of each block's taint-bit
+   count confirmed the stored bitvector had more bits set than the
+   number of tracked variables should allow for that program. Confirmed
+   present on the pre-quad-uniformity code too (via `git stash`), so it
+   predates this change and was not introduced by it. Fixed by
+   introducing a small `setTaintBit(Env, Idx, Value)` helper that uses
+   the correct single-bit `set(unsigned)`/`reset(unsigned)` overloads,
+   and replacing all three call sites.
+2. **Double-counting calls that straddle a temporary-object `CFGStmt`.**
+   Clang's `CFG` builder sometimes emits a `CFGStmt` for a temporary-
+   binding sub-expression (e.g. the `float4(...)` constructor call inside
+   `result = float4(ddx(pos.x), ddy(pos.y), 0, 0);`) *in addition to* the
+   `CFGStmt` for the enclosing full expression/statement. The pre-
+   existing `findRequiresUniformCalls`, which recursively walks each
+   block's `CFGStmt`s looking for barrier-like calls, had no way to know
+   these two `CFGStmt`s overlapped, and so visited (and reported) the
+   same `CallExpr` twice for any "requires-uniform-control-flow" call
+   that appears as a sub-expression rather than a standalone statement --
+   which barriers always are in practice, but `ddx`/`ddy` commonly are
+   not. This was caught by noticing the new quad-uniformity test's
+   manual `dxc` invocation printed each `ddx`/`ddy` warning twice; fixed
+   by deduplicating on `CallExpr` pointer identity via a
+   `SmallPtrSet<const CallExpr *, 8>` shared across all of a block's
+   `CFGStmt`s.
+
+### Testing
+
+- `tools/clang/test/SemaHLSL/nonuniform-quad-control-flow.hlsl` is a new
+  `-verify` test mirroring the structure of the existing
+  `nonuniform-control-flow.hlsl`, covering: true positives for `ddx`/
+  `ddy` guarded by an `SV_Position`-based branch; true negatives for a
+  cbuffer-uniform branch, no branch at all, a `WaveActiveAllTrue` guard
+  (group-uniform implies quad-uniform), and `Quad*` broadcasts
+  (`QuadReadAcrossX` stored to a local, and `QuadAny` used directly) used
+  to guard a quad-scope operation; and a true positive confirming a
+  `Quad*` broadcast is *not* sufficient to guard a group-scope barrier,
+  which specifically exercises that the two scopes are tracked
+  independently rather than being conflated.
+- The full `SemaHLSL` lit suite (284 tests, now including both
+  uniformity test files) was re-run via `llvm-lit` and passes with zero
+  regressions.
+- Manually re-checked, via direct `bin/dxc` invocations (since, as noted
+  above, plain-CLI warning output for this build/environment requires
+  care to observe), that: `WaveReadLaneFirst`/`QuadReadAcrossX` results
+  stored into a local variable and then branched on no longer produce
+  false-positive warnings (bug #1 above); a `ddx`+`ddy` pair inside a
+  single compound-expression statement produces exactly one warning each,
+  not two (bug #2 above); and that a handful of pre-existing
+  `HLSLFileCheck` samples exercising `ddx`/`ddy` inside real,
+  non-synthetic pixel-shader control flow (`POM_PS.hlsl`,
+  `RenderVarianceScenePS.hlsl`, the SM6.6 compute/mesh/amplification
+  derivatives test) still compile successfully and produce only their
+  pre-existing, unrelated warnings (implicit vector truncation), not any
+  new spurious quad-uniformity warnings.
+
