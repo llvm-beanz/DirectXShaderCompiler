@@ -26,6 +26,7 @@
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Analysis/Analyses/CFGReachabilityAnalysis.h"
 #include "clang/Analysis/Analyses/Consumed.h"
+#include "clang/Analysis/Analyses/HLSLUniformityAnalysis.h" // HLSL Change
 #include "clang/Analysis/Analyses/ReachableCode.h"
 #include "clang/Analysis/Analyses/ThreadSafety.h"
 #include "clang/Analysis/Analyses/UninitializedValues.h"
@@ -1337,6 +1338,27 @@ static void diagnoseRepeatedUseOfWeak(Sema &S,
   }
 }
 
+// HLSL Change Begin - Add uniformity analysis for control flow.
+namespace {
+class HLSLUniformityDiagReporter : public HLSLUniformityHandler {
+  Sema &S;
+
+public:
+  HLSLUniformityDiagReporter(Sema &S) : S(S) {}
+
+  void handleNonUniformControlFlowUse(const CallExpr *Call,
+                                      const Expr *Condition) override {
+    const FunctionDecl *FD = Call->getDirectCallee();
+    S.Diag(Call->getExprLoc(), diag::warn_hlsl_nonuniform_control_flow)
+        << (FD ? FD->getName() : "operation") << Call->getSourceRange();
+    S.Diag(Condition->getExprLoc(),
+           diag::note_hlsl_nonuniform_control_flow_branch)
+        << Condition->getSourceRange();
+  }
+};
+} // end anonymous namespace
+// HLSL Change End - Add uniformity analysis for control flow.
+
 namespace {
 class UninitValsDiagReporter : public UninitVariablesHandler {
   Sema &S;
@@ -2049,6 +2071,17 @@ AnalysisBasedWarnings::IssueWarnings(sema::AnalysisBasedWarnings::Policy P,
       }
     }
   }
+
+  // HLSL Change Begin - Run the control-flow uniformity analysis.
+  if (S.getLangOpts().HLSL &&
+      !Diags.isIgnored(diag::warn_hlsl_nonuniform_control_flow,
+                       D->getLocStart())) {
+    if (CFG *cfg = AC.getCFG()) {
+      HLSLUniformityDiagReporter reporter(S);
+      runHLSLUniformityAnalysis(*cast<DeclContext>(D), AC, reporter);
+    }
+  }
+  // HLSL Change End - Run the control-flow uniformity analysis.
 
   bool FallThroughDiagFull =
       !Diags.isIgnored(diag::warn_unannotated_fallthrough, D->getLocStart());
