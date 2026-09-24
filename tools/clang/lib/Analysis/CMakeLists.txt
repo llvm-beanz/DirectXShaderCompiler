@@ -20,6 +20,7 @@ add_clang_library(clangAnalysis
   Consumed.cpp
   CodeInjector.cpp
   Dominators.cpp
+  HLSLUniformityAnalysis.cpp
   LiveVariables.cpp
   ObjCNoReturn.cpp
   PostOrderCFGView.cpp
