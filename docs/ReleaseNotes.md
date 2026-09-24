@@ -50,6 +50,15 @@ line upon naming the release. Refer to previous for appropriate section names.
   condition may be non-uniform. The warning is part of the new
   `-Whlsl-nonuniform-control-flow` diagnostic group, which is enabled by
   default.
+- Extended the control-flow uniformity analysis to also cover quad
+  uniformity: derivative operations (`ddx`/`ddy` and their `_coarse`/`_fine`
+  variants) and the explicit `Quad*` intrinsics (`QuadReadAcrossX`,
+  `QuadReadAcrossY`, `QuadReadAcrossDiagonal`, `QuadReadLaneAt`, `QuadAny`,
+  `QuadAll`) only require uniform control flow across the four invocations of
+  a single 2x2 quad, rather than the whole thread group. Such calls now
+  produce a separate warning, part of the new
+  `-Whlsl-nonuniform-quad-control-flow` diagnostic group (a sub-group of
+  `-Whlsl-nonuniform-control-flow`, enabled by default).
 
 #### Bug Fixes
 
