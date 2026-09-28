@@ -80,6 +80,11 @@
       "GetRenderTargetSampleCount",
       "GetRenderTargetSamplePosition"
     ],
-    "DirectX Legacy": ["D3DCOLOR.*", "tex(1|2||3)D.*", "texCUBE.*", "f16tof32", "f32tof16"]
+    "DirectX Legacy": ["D3DCOLOR.*", "tex(1|2||3)D.*", "texCUBE.*", "f16tof32", "f32tof16"],
+    "Mathematics" : ["abs", "ceil", "clamp", "exp", "exp2", "floor", "fma", "fmod", "frac", "frexp", "ldexp", "lerp", "log", "log10", "log2", "mad", "max", "min", "pow", "rcp", "round", "rsqrt", "sign", "smoothstep", "sqrt", "step", "trunc"],
+    "Floating Point" : ["isfinite", "isinf", "isnan", "modf", "saturate"],
+    "Trigonometry" : ["acos", "asin", "atan", "atan2", "cos", "cosh", "degrees", "radians", "sin", "sinh", "tan", "tanh", "dot"],
+    "Logic Operations" : ["and", "or", "select", "any", "all"],
+    "Bitwise Operations" : ["reversebits", "countbits", "firstbithigh", "firstbitlow"]
   }
 }
