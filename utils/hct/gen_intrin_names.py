@@ -234,6 +234,38 @@ LICOMPTYPE_TO_TYPES = {
     "LICOMPTYPE_VOID": [],
 }
 
+TYPE_ORDER = {
+    type_name: index for index, type_name in enumerate([
+        "float16_t",
+        "float",
+        "double",
+        "int16_t",
+        "uint16_t",
+        "int",
+        "uint",
+        "int64_t",
+        "uint64_t",
+    ])
+}
+
+MINIMUM_PRECISION_TYPES = {
+    "half",
+    "min10float",
+    "min16float",
+    "min12int",
+    "min16int",
+    "min16uint",
+}
+
+
+def _get_concrete_types(licomptype):
+    """Return printable concrete types in canonical overload order."""
+    types = [
+        type_name for type_name in LICOMPTYPE_TO_TYPES.get(licomptype, [])
+        if type_name not in MINIMUM_PRECISION_TYPES
+    ]
+    return sorted(types, key=lambda type_name: TYPE_ORDER.get(type_name, len(TYPE_ORDER)))
+
 
 def namespace_to_scope(ns_name):
     """Convert a namespace name to an HLSL scope prefix.
@@ -364,7 +396,23 @@ def _get_base_type(type_str):
     return m.group(1) if m else None
 
 
-def _render_params(param_info, idx_to_lc, lc_to_type):
+def _layout(type_str):
+    match = re.search(r"<([^<>]*)>", type_str.split(" ", 1)[-1]
+                      if type_str.startswith("$match<") else type_str)
+    return match.group(1).replace("@", ",").replace(" ", "") if match else None
+
+
+def _vector_type(type_name, layout):
+    if layout is None or layout == "":
+        return type_name
+    if layout.isdigit():
+        return f"vector<{type_name}, {layout}>"
+    if layout in ("N", "c", "r", "c2", "r2"):
+        return f"vector<{type_name}, N>"
+    return type_name
+
+
+def _render_params(param_info, idx_to_lc, lc_to_type, layouts=None):
     """Render parameter list as a list of 'type name' strings.
 
     A 'ref' qualifier is rendered as a C++ reference (appended '&' on the
@@ -374,11 +422,13 @@ def _render_params(param_info, idx_to_lc, lc_to_type):
         lc = idx_to_lc.get(idx)
         return lc_to_type.get(lc, "T") if lc else "T"
     parts = []
-    for (idx, dqual, name, _lc, _tref) in param_info:
+    for (idx, dqual, name, _lc, _tref, _type_str, _match_idx) in param_info:
         if name == "...":
             parts.append("...")
             continue
         t = concrete(idx)
+        if layouts is not None:
+            t = _vector_type(t, layouts.get(idx))
         quals = dqual.split() if dqual else []
         if "ref" in quals:
             quals = [q for q in quals if q != "ref"]
@@ -415,7 +465,8 @@ def expand_overloads(scope, func_name, is_static, ret_type_str, params):
     """
 
     # --- Step 1: build param_info list ---
-    # Entries: [1-based-idx, display_qual, name, licomptype_or_None, typeref_or_None]
+    # Entries: [1-based-idx, display_qual, name, licomptype_or_None,
+    #           typeref_or_None, type_str, layout_match_idx]
     # typeref: None  = free param (uses its own LICOMPTYPE)
     #          N > 0 = follows param N via $typeN
     #          -1    = $classT / $funcT (class/function template type)
@@ -426,21 +477,23 @@ def expand_overloads(scope, func_name, is_static, ret_type_str, params):
         type_str = p["type_str"]
 
         if p["variadic"]:
-            param_info.append([i, "", "...", None, None])
+            param_info.append([i, "", "...", None, None, type_str, None])
             continue
 
         m_ref = _TYPEREF_RE.match(type_str)
         if m_ref:
-            param_info.append([i, dqual, name, None, int(m_ref.group(1))])
+            param_info.append([i, dqual, name, None, int(m_ref.group(1)), type_str, None])
             continue
 
         if type_str in ("$classT", "$funcT", "$funcT2"):
-            param_info.append([i, dqual, name, None, -1])
+            param_info.append([i, dqual, name, None, -1, type_str, None])
             continue
 
         base = _get_base_type(type_str)
         lc   = BASE_TYPE_TO_LICOMPTYPE.get(base) if base else None
-        param_info.append([i, dqual, name, lc, None])
+        match = re.search(r"\$match<(-?\d+)@?\s*-?\d+>", " ".join(p["quals"]))
+        param_info.append([i, dqual, name, lc, None, type_str,
+                           int(match.group(1)) if match else None])
 
     # --- Step 2: resolve every param's effective LICOMPTYPE ---
     def resolve_lc(start):
@@ -469,27 +522,63 @@ def expand_overloads(scope, func_name, is_static, ret_type_str, params):
         if tref is not None or lc is None:
             continue
         if lc not in lc_types:
-            types = LICOMPTYPE_TO_TYPES.get(lc, [])
+            types = _get_concrete_types(lc)
             lc_types[lc] = types if types else [lc.replace("LICOMPTYPE_", "").lower()]
             free_lcs.append(lc)
 
-    # --- Step 4: cartesian product and render ---
-    if not free_lcs:
-        params_r = _render_params(param_info, idx_to_lc, {})
-        ret = _resolve_ret(ret_type_str, idx_to_lc, {})
-        yield (_render_sig(scope, func_name, params_r, ret),
-               scope, func_name, is_static, params_r, ret)
-        return
+    # A flexible layout permits both scalar and vector overloads; <c> and
+    # fixed-width layouts require vectors. Matrix layouts are left unchanged.
+    def param_layout(entry, vector, seen=None):
+        idx, _qual, _name, _lc, tref, type_str, match_idx = entry
+        seen = set() if seen is None else seen
+        if idx in seen:
+            return None
+        seen.add(idx)
+        if tref is not None:
+            target = next((e for e in param_info if e[0] == tref), None)
+            return param_layout(target, vector, seen) if target else None
+        layout = _layout(type_str)
+        if match_idx and match_idx > 0:
+            target = next((e for e in param_info if e[0] == match_idx), None)
+            return param_layout(target, vector, seen) if target else None
+        if layout is not None and "," in layout:
+            return None
+        if layout == "":
+            return "N" if vector else None
+        return layout
+
+    input_layouts = [_layout(e[5]) for e in param_info if e[4] is None]
+    flexible = any(layout == "" or layout in ("c", "r") for layout in input_layouts)
+    vector_only = any(layout in ("c", "r") or (layout and layout.isdigit())
+                      for layout in input_layouts)
+    modes = (True,) if vector_only and not flexible else ((False, True) if flexible else (False,))
+    if vector_only and flexible:
+        modes = (True,)
 
     seen_sigs = set()
-    for combo in itertools.product(*[lc_types[lc] for lc in free_lcs]):
-        lc_to_type = dict(zip(free_lcs, combo))
-        params_r = _render_params(param_info, idx_to_lc, lc_to_type)
-        ret = _resolve_ret(ret_type_str, idx_to_lc, lc_to_type)
-        sig_key = _render_sig(scope, func_name, params_r, ret)
-        if sig_key not in seen_sigs:
-            seen_sigs.add(sig_key)
-            yield (sig_key, scope, func_name, is_static, params_r, ret)
+    for vector in modes:
+        for combo in itertools.product(*[lc_types[lc] for lc in free_lcs]):
+            lc_to_type = dict(zip(free_lcs, combo))
+            layouts = {e[0]: param_layout(e, vector) for e in param_info} if vector else None
+            params_r = _render_params(param_info, idx_to_lc, lc_to_type, layouts)
+            ret = _resolve_ret(ret_type_str, idx_to_lc, lc_to_type)
+            if vector:
+                ret_layout = _layout(ret_type_str)
+                ref = _TYPEREF_RE.match(ret_type_str)
+                match = re.match(r"\$match<(-?\d+)[@,]", ret_type_str)
+                if ref:
+                    ret_layout = layouts.get(int(ref.group(1)))
+                elif match and int(match.group(1)) > 0:
+                    ret_layout = layouts.get(int(match.group(1)))
+                elif match and int(match.group(1)) == 0:
+                    ret_layout = "N" if any(layout == "N" for layout in layouts.values()) else ret_layout
+                elif ret_layout == "" and any(layout == "N" for layout in layouts.values()):
+                    ret_layout = "N"
+                ret = _vector_type(ret, ret_layout)
+            sig_key = _render_sig(scope, func_name, params_r, ret)
+            if sig_key not in seen_sigs:
+                seen_sigs.add(sig_key)
+                yield (sig_key, scope, func_name, is_static, params_r, ret)
 
 
 def _resolve_ret(ret_type_str, idx_to_lc, lc_to_type):
@@ -525,7 +614,7 @@ def _resolve_ret(ret_type_str, idx_to_lc, lc_to_type):
                 if lc:
                     if lc in lc_to_type:
                         return lc_to_type[lc]
-                    types = LICOMPTYPE_TO_TYPES.get(lc, [])
+                    types = _get_concrete_types(lc)
                     return types[0] if types else "void"
             return "T"
         # y > 0: component from param y
@@ -541,7 +630,7 @@ def _resolve_ret(ret_type_str, idx_to_lc, lc_to_type):
         if lc:
             if lc in lc_to_type:
                 return lc_to_type[lc]
-            types = LICOMPTYPE_TO_TYPES.get(lc, [])
+            types = _get_concrete_types(lc)
             return types[0] if types else "void"
 
     return "void"
@@ -564,6 +653,7 @@ def parse(filepath):
 
     current_ns = None
     seen_global: set = set()
+    records = []
 
     with open(filepath, encoding="utf-8") as f:
         for line in f:
@@ -610,7 +700,20 @@ def parse(filepath):
                         scope_val, func_name, is_static, ret_type_str, params):
                     if sig_key not in seen_global:
                         seen_global.add(sig_key)
-                        yield (scope_val, fn, is_static_val, params_r, ret)
+                        records.append((scope_val, fn, is_static_val, params_r, ret))
+
+    groups = {}
+    for rec in records:
+        groups.setdefault(rec[:2], []).append(rec)
+    for group in groups.values():
+        def overload_key(rec):
+            text = " ".join([*rec[3], rec[4]])
+            match = re.search(r"vector<(\w+),", text)
+            vector = match is not None
+            if not match:
+                match = re.search(r"\b(" + "|".join(TYPE_ORDER) + r")\b", text)
+            return (vector, TYPE_ORDER.get(match.group(1), len(TYPE_ORDER)) if match else len(TYPE_ORDER))
+        yield from sorted(group, key=overload_key)
 
 
 # ---------------------------------------------------------------------------
@@ -736,15 +839,23 @@ def _render_class_block(class_name, methods):
     lines.append(f"class {class_name} {{")
     for (fn, is_static, params_r, ret) in methods:
         static_str = "static " if is_static else ""
+        if _has_vector_template(params_r, ret):
+            lines.append("  template<uint N>")
         lines.append(f"  {static_str}{ret} {fn}({', '.join(params_r)});")
     lines.append("};")
     return "\n".join(lines)
 
 
+def _has_vector_template(params_r, ret):
+    return any("vector<" in text and re.search(r", N>", text)
+               for text in [ret, *params_r])
+
+
 def _render_proto(fn, is_static, params_r, ret):
     """Render a single function/method prototype as a C++ pseudo-code statement."""
     static_str = "static " if is_static else ""
-    return f"{static_str}{ret} {fn}({', '.join(params_r)});"
+    template = "template<uint N> " if _has_vector_template(params_r, ret) else ""
+    return f"{template}{static_str}{ret} {fn}({', '.join(params_r)});"
 
 
 def _format_output(records, class_matchers=None, class_cat_order=None,
@@ -812,8 +923,8 @@ def _format_output(records, class_matchers=None, class_cat_order=None,
 
             def render_funcs(funcs):
                 return "\n".join(
-                    f"{ret} {fn}({', '.join(params_r)});"
-                    for (fn, _is_static, params_r, ret) in funcs)
+                    _render_proto(fn, is_static, params_r, ret)
+                    for (fn, is_static, params_r, ret) in funcs)
 
             for cat in func_cat_order:
                 if cat in cat_to_funcs:
@@ -825,8 +936,8 @@ def _format_output(records, class_matchers=None, class_cat_order=None,
                 block_parts.append(render_funcs(cat_to_funcs[None]))
         elif all_free_funcs:
             func_lines = [
-                f"{ret} {fn}({', '.join(params_r)});"
-                for (fn, _is_static, params_r, ret) in all_free_funcs]
+                _render_proto(fn, is_static, params_r, ret)
+                for (fn, is_static, params_r, ret) in all_free_funcs]
             block_parts.append("\n".join(func_lines))
 
         block = "\n\n".join(block_parts)
