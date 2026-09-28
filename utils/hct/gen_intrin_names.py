@@ -538,7 +538,7 @@ def expand_overloads(scope, func_name, is_static, ret_type_str, params):
             target = next((e for e in param_info if e[0] == tref), None)
             return param_layout(target, vector, seen) if target else None
         layout = _layout(type_str)
-        if match_idx and match_idx > 0:
+        if match_idx and match_idx > 0 and match_idx != idx:
             target = next((e for e in param_info if e[0] == match_idx), None)
             return param_layout(target, vector, seen) if target else None
         if layout is not None and "," in layout:
@@ -549,32 +549,28 @@ def expand_overloads(scope, func_name, is_static, ret_type_str, params):
 
     input_layouts = [_layout(e[5]) for e in param_info if e[4] is None]
     flexible = any(layout == "" or layout in ("c", "r") for layout in input_layouts)
-    vector_only = any(layout in ("c", "r") or (layout and layout.isdigit())
-                      for layout in input_layouts)
-    modes = (True,) if vector_only and not flexible else ((False, True) if flexible else (False,))
-    if vector_only and flexible:
-        modes = (True,)
+    vector_only = any(layout in ("c", "r") for layout in input_layouts)
+    modes = (True,) if vector_only else ((False, True) if flexible else (False,))
 
     seen_sigs = set()
     for vector in modes:
         for combo in itertools.product(*[lc_types[lc] for lc in free_lcs]):
             lc_to_type = dict(zip(free_lcs, combo))
-            layouts = {e[0]: param_layout(e, vector) for e in param_info} if vector else None
+            layouts = {e[0]: param_layout(e, vector) for e in param_info}
             params_r = _render_params(param_info, idx_to_lc, lc_to_type, layouts)
             ret = _resolve_ret(ret_type_str, idx_to_lc, lc_to_type)
-            if vector:
-                ret_layout = _layout(ret_type_str)
-                ref = _TYPEREF_RE.match(ret_type_str)
-                match = re.match(r"\$match<(-?\d+)[@,]", ret_type_str)
-                if ref:
-                    ret_layout = layouts.get(int(ref.group(1)))
-                elif match and int(match.group(1)) > 0:
-                    ret_layout = layouts.get(int(match.group(1)))
-                elif match and int(match.group(1)) == 0:
-                    ret_layout = "N" if any(layout == "N" for layout in layouts.values()) else ret_layout
-                elif ret_layout == "" and any(layout == "N" for layout in layouts.values()):
-                    ret_layout = "N"
-                ret = _vector_type(ret, ret_layout)
+            ret_layout = _layout(ret_type_str)
+            ref = _TYPEREF_RE.match(ret_type_str)
+            match = re.match(r"\$match<(-?\d+)[@,]", ret_type_str)
+            if ref:
+                ret_layout = layouts.get(int(ref.group(1)))
+            elif match and int(match.group(1)) > 0:
+                ret_layout = layouts.get(int(match.group(1)))
+            elif match and int(match.group(1)) == 0:
+                ret_layout = "N" if vector and any(layout == "N" for layout in layouts.values()) else ret_layout
+            elif ret_layout == "" and vector and any(layout == "N" for layout in layouts.values()):
+                ret_layout = "N"
+            ret = _vector_type(ret, ret_layout)
             sig_key = _render_sig(scope, func_name, params_r, ret)
             if sig_key not in seen_sigs:
                 seen_sigs.add(sig_key)
@@ -706,12 +702,19 @@ def parse(filepath):
     for rec in records:
         groups.setdefault(rec[:2], []).append(rec)
     for group in groups.values():
+        has_flexible_vector = any(
+            re.search(r"vector<\w+, N>", " ".join([*rec[3], rec[4]]))
+            for rec in group
+        )
+
         def overload_key(rec):
             text = " ".join([*rec[3], rec[4]])
-            match = re.search(r"vector<(\w+),", text)
-            vector = match is not None
+            vector = ("vector<" in text and not has_flexible_vector
+                      or bool(re.search(r"vector<\w+, N>", text)))
+            match = re.search(r"vector<(\w+),", " ".join(rec[3]))
             if not match:
-                match = re.search(r"\b(" + "|".join(TYPE_ORDER) + r")\b", text)
+                match = re.search(r"\b(" + "|".join(TYPE_ORDER) + r")\b",
+                                  " ".join(rec[3]))
             return (vector, TYPE_ORDER.get(match.group(1), len(TYPE_ORDER)) if match else len(TYPE_ORDER))
         yield from sorted(group, key=overload_key)
 
