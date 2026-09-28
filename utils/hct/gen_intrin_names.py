@@ -4,6 +4,8 @@
 #
 # Parse gen_intrin_main.txt and print all HLSL intrinsic function signatures
 # with all allowed parameter type permutations to stdout.
+# Flexible scalar/vector layouts emit scalar overloads followed by vector
+# overloads templated on their size.
 #
 # Usage: python3 gen_intrin_names.py [path/to/gen_intrin_main.txt]
 
