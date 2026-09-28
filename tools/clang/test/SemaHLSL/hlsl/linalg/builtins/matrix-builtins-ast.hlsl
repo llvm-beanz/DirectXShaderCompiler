@@ -19,12 +19,13 @@ void main() {
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
   __builtin_LinAlg_CopyConvertMatrix(mat2, mat1, true);
 
-// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_FillMatrix 'void (__builtin_LinAlgMatrix & {{.*}}, unsigned int)' extern
+// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_FillMatrix 'void (__builtin_LinAlgMatrix & {{.*}}, bool, unsigned int)' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} ret '__builtin_LinAlgMatrix &&__restrict {{.*}}'
+// CHECK-NEXT: ParmVarDecl {{.*}} isInputSigned 'bool'
 // CHECK-NEXT: ParmVarDecl {{.*}} value 'unsigned int'
 // CHECK-NEXT: HLSLIntrinsicAttr {{.*}} Implicit "op" "" 402
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
-  __builtin_LinAlg_FillMatrix(mat1, 15);
+  __builtin_LinAlg_FillMatrix(mat1, true, 15);
 
 // CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixAccumulate 'void (__builtin_LinAlgMatrix {{.*}}, __builtin_LinAlgMatrix {{.*}}, __builtin_LinAlgMatrix {{.*}})' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} matrixC '__builtin_LinAlgMatrix {{.*}}'
@@ -45,9 +46,9 @@ void main() {
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
   __builtin_LinAlg_MatrixAccumulateToDescriptor(mat1, Buf, 1, 2, 3, 4);
 
-// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixAccumulateToMemory 'void (__builtin_LinAlgMatrix {{.*}}, float const __attribute__((address_space(3))) (&)[64], unsigned int, unsigned int, unsigned int)' extern
+// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixAccumulateToMemory 'void (__builtin_LinAlgMatrix {{.*}}, float __attribute__((address_space(3))) (&)[64], unsigned int, unsigned int, unsigned int)' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} matrix '__builtin_LinAlgMatrix {{.*}}'
-// CHECK-NEXT: ParmVarDecl {{.*}} memory 'float const __attribute__((address_space(3))) (&)[64]'
+// CHECK-NEXT: ParmVarDecl {{.*}} memory 'float __attribute__((address_space(3))) (&)[64]'
 // CHECK-NEXT: ParmVarDecl {{.*}} offset 'unsigned int'
 // CHECK-NEXT: ParmVarDecl {{.*}} stride 'unsigned int'
 // CHECK-NEXT: ParmVarDecl {{.*}} layout 'unsigned int'
@@ -97,9 +98,9 @@ void main() {
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
   __builtin_LinAlg_MatrixLoadFromDescriptor(mat1, Buf, 0, 0, 0, 4);
 
-// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixLoadFromMemory 'void (__builtin_LinAlgMatrix {{.*}}, float const __attribute__((address_space(3))) (&)[64], unsigned int, unsigned int, unsigned int)' extern
+// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixLoadFromMemory 'void (__builtin_LinAlgMatrix {{.*}}, float __attribute__((address_space(3))) (&)[64], unsigned int, unsigned int, unsigned int)' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} ret '__builtin_LinAlgMatrix {{.*}}'
-// CHECK-NEXT: ParmVarDecl {{.*}} memory 'float const __attribute__((address_space(3))) (&)[64]'
+// CHECK-NEXT: ParmVarDecl {{.*}} memory 'float __attribute__((address_space(3))) (&)[64]'
 // CHECK-NEXT: ParmVarDecl {{.*}} offset 'unsigned int'
 // CHECK-NEXT: ParmVarDecl {{.*}} stride 'unsigned int'
 // CHECK-NEXT: ParmVarDecl {{.*}} layout 'unsigned int'
@@ -124,15 +125,16 @@ void main() {
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
   __builtin_LinAlg_MatrixMatrixMultiplyAccumulate(mat1, mat2, mat3, mat1);
 
-// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixOuterProduct 'void (__builtin_LinAlgMatrix {{.*}}, vector<int, 4>, vector<int, 4>)' extern
+// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixOuterProduct 'void (__builtin_LinAlgMatrix {{.*}}, bool, vector<int, 4>, vector<int, 4>)' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} ret '__builtin_LinAlgMatrix {{.*}}'
+// CHECK-NEXT: ParmVarDecl {{.*}} isInputSigned 'bool'
 // CHECK-NEXT: ParmVarDecl {{.*}} vecA 'vector<int, 4>':'vector<int, 4>'
 // CHECK-NEXT: ParmVarDecl {{.*}} vecB 'vector<int, 4>':'vector<int, 4>'
 // CHECK-NEXT: HLSLIntrinsicAttr {{.*}} Implicit "op" "" 417
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
   int4 vecA = {1,2,3,4};
   int4 vecB = {1,2,3,4};
-  __builtin_LinAlg_MatrixOuterProduct(mat1, vecA, vecB);
+  __builtin_LinAlg_MatrixOuterProduct(mat1, true, vecA, vecB);
 
 // CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixQueryAccumulatorLayout 'unsigned int ()' extern
 // CHECK-NEXT: HLSLIntrinsicAttr {{.*}} Implicit "op" "" 414
@@ -159,9 +161,9 @@ void main() {
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
   __builtin_LinAlg_MatrixStoreToDescriptor(mat1, Buf, 1, 2, 3, 4);
 
-// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixStoreToMemory 'void (__builtin_LinAlgMatrix {{.*}}, float const __attribute__((address_space(3))) (&)[64], unsigned int, unsigned int, unsigned int)' extern
+// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixStoreToMemory 'void (__builtin_LinAlgMatrix {{.*}}, float __attribute__((address_space(3))) (&)[64], unsigned int, unsigned int, unsigned int)' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} matrix '__builtin_LinAlgMatrix {{.*}}'
-// CHECK-NEXT: ParmVarDecl {{.*}} memory 'float const __attribute__((address_space(3))) (&)[64]'
+// CHECK-NEXT: ParmVarDecl {{.*}} memory 'float __attribute__((address_space(3))) (&)[64]'
 // CHECK-NEXT: ParmVarDecl {{.*}} offset 'unsigned int'
 // CHECK-NEXT: ParmVarDecl {{.*}} stride 'unsigned int'
 // CHECK-NEXT: ParmVarDecl {{.*}} layout 'unsigned int'
@@ -182,19 +184,18 @@ void main() {
   float4 result;
   __builtin_LinAlg_MatrixVectorMultiply(result, mat1, true, vec, 1);
 
-// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixVectorMultiplyAdd 'void (vector<float, 4> &, __builtin_LinAlgMatrix {{.*}}, vector<float, 4>, unsigned int, vector<float, 4>, unsigned int)' extern
+// CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_MatrixVectorMultiplyAdd 'void (vector<float, 4> &, __builtin_LinAlgMatrix {{.*}}, vector<float, 4>, unsigned int, vector<float, 4>)' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} ret 'vector<float, 4> &&__restrict'
 // CHECK-NEXT: ParmVarDecl {{.*}} mat '__builtin_LinAlgMatrix {{.*}}'
 // CHECK-NEXT: ParmVarDecl {{.*}} isOutputSigned 'bool'
 // CHECK-NEXT: ParmVarDecl {{.*}} input 'vector<float, 4>':'vector<float, 4>'
 // CHECK-NEXT: ParmVarDecl {{.*}} inputInterp 'unsigned int'
 // CHECK-NEXT: ParmVarDecl {{.*}} bias 'vector<float, 4>':'vector<float, 4>'
-// CHECK-NEXT: ParmVarDecl {{.*}} biasInterp 'unsigned int'
 // CHECK-NEXT: HLSLIntrinsicAttr {{.*}} Implicit "op" "" 419
 // CHECK-NEXT: AvailabilityAttr {{.*}} Implicit  6.10 0 0 ""
   float4 input = {1,2,3,4};
   float4 bias = {5,6,7,8};
-  __builtin_LinAlg_MatrixVectorMultiplyAdd(result, mat1, true, input, 1, bias, 2);
+  __builtin_LinAlg_MatrixVectorMultiplyAdd(result, mat1, true, input, 1, bias);
 
 // CHECK: FunctionDecl {{.*}} implicit used __builtin_LinAlg_Convert 'void (vector<int, 4> &, vector<float, 4>, unsigned int, unsigned int)' extern
 // CHECK-NEXT: ParmVarDecl {{.*}} ret 'vector<int, 4> &&__restrict'

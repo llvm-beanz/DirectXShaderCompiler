@@ -665,6 +665,8 @@ llvm::StringRef ComponentTypeToString(DXIL::ComponentType CT) {
     return "F8_E4M3FN";
   case DXIL::ComponentType::F8_E5M2:
     return "F8_E5M2";
+  case DXIL::ComponentType::BFloat16:
+    return "BFloat16";
   default:
     return "Unknown ComponentType";
   }
@@ -693,6 +695,72 @@ llvm::StringRef MatrixUseToString(DXIL::MatrixUse MU) {
     return "Accumulator";
   default:
     return "Unknown MatrixUse";
+  }
+}
+
+llvm::StringRef MatrixLayoutToString(DXIL::MatrixLayout ML) {
+  switch (ML) {
+  case DXIL::MatrixLayout::ColumnMajor:
+    return "ColumnMajor";
+  case DXIL::MatrixLayout::RowMajor:
+    return "RowMajor";
+  case DXIL::MatrixLayout::MulOptimal:
+    return "MulOptimal";
+  case DXIL::MatrixLayout::MulOptimalTranspose:
+    return "MulOptimalTranspose";
+  case DXIL::MatrixLayout::OuterProductOptimal:
+    return "OuterProductOptimal";
+  case DXIL::MatrixLayout::OuterProductOptimalTranspose:
+    return "OuterProductOptimalTranspose";
+  default:
+    return "Unknown MatrixUse";
+  }
+}
+
+std::string TypeToString(llvm::Type *Ty) {
+  std::string S;
+  llvm::raw_string_ostream OS(S);
+  Ty->print(OS);
+  return OS.str();
+}
+
+bool IsComponentTypeSameNativeType(DXIL::ComponentType CT, llvm::Type *Ty) {
+  switch (CT) {
+  case DXIL::ComponentType::I16:
+  case DXIL::ComponentType::U16:
+    return Ty->isIntegerTy(16);
+  case DXIL::ComponentType::I32:
+  case DXIL::ComponentType::U32:
+    return Ty->isIntegerTy(32);
+  case DXIL::ComponentType::I64:
+  case DXIL::ComponentType::U64:
+    return Ty->isIntegerTy(64);
+  case DXIL::ComponentType::F16:
+    return Ty->isHalfTy();
+  case DXIL::ComponentType::F32:
+    return Ty->isFloatTy();
+  case DXIL::ComponentType::F64:
+    return Ty->isDoubleTy();
+  // All other CTs cannot be represented in a native type
+  default:
+    return false;
+  }
+}
+
+bool IsComponentTypeNative(DXIL::ComponentType CT) {
+  switch (CT) {
+  case DXIL::ComponentType::I16:
+  case DXIL::ComponentType::U16:
+  case DXIL::ComponentType::I32:
+  case DXIL::ComponentType::U32:
+  case DXIL::ComponentType::I64:
+  case DXIL::ComponentType::U64:
+  case DXIL::ComponentType::F16:
+  case DXIL::ComponentType::F32:
+  case DXIL::ComponentType::F64:
+    return true;
+  default:
+    return false;
   }
 }
 

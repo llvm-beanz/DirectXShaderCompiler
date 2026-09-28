@@ -753,17 +753,7 @@ clang::RecordDecl *GetRecordDeclFromNodeObjectType(clang::QualType ObjectTy) {
 }
 
 bool IsHLSLRayQueryType(clang::QualType type) {
-  type = type.getCanonicalType();
-  if (const RecordType *RT = dyn_cast<RecordType>(type)) {
-    if (const ClassTemplateSpecializationDecl *templateDecl =
-            dyn_cast<ClassTemplateSpecializationDecl>(
-                RT->getAsCXXRecordDecl())) {
-      StringRef name = templateDecl->getName();
-      if (name == "RayQuery")
-        return true;
-    }
-  }
-  return false;
+  return nullptr != getAttr<HLSLRayQueryObjectAttr>(type);
 }
 
 #ifdef ENABLE_SPIRV_CODEGEN
@@ -989,6 +979,26 @@ HLSLScalarType MakeUnsigned(HLSLScalarType T) {
     break;
   }
   return T;
+}
+
+bool IsTypeDeducibleWithAuto(QualType type) {
+  if (type.isNull())
+    return false;
+
+  if (hlsl::IsStringType(type) || hlsl::IsStringLiteralType(type))
+    return false;
+
+  if (const CXXRecordDecl *recordDecl =
+          GetStructuralForm(type)->getAsCXXRecordDecl()) {
+    if (!recordDecl->hasAttr<HLSLNonAutoDeducibleAttr>())
+      if (const CXXRecordDecl *pattern =
+              recordDecl->getTemplateInstantiationPattern())
+        recordDecl = pattern;
+    if (recordDecl->hasAttr<HLSLNonAutoDeducibleAttr>())
+      return false;
+  }
+
+  return true;
 }
 
 } // namespace hlsl
