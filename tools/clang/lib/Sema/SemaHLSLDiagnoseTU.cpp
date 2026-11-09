@@ -513,6 +513,13 @@ public:
 
   void DiagnoseAvailability(AvailabilityAttr *AAttr, NamedDecl *ND,
                             SourceLocation Loc) {
+    if (AAttr->getUnavailable() &&
+        AAttr->getPlatform()->getName() == "library") {
+      if (SM->IsLib())
+        sema->Diag(Loc, diag::err_unavailable_message)
+            << ND << AAttr->getMessage();
+      return;
+    }
     VersionTuple AAttrVT = AAttr->getIntroduced();
     if (!CheckSMVersion(AAttrVT)) {
       if (isa<FunctionDecl>(ND)) {

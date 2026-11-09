@@ -119,6 +119,9 @@ public:
   TEST_METHOD(DxcUtils_CreateReflection)
   TEST_METHOD(CheckReflectionQueryInterface)
   TEST_METHOD(CompileWhenOKThenIncludesFeatureInfo)
+  TEST_METHOD(CompileWhenOKThenIncludesStringTable)
+  TEST_METHOD(CompileWhenStringsDifferThenHashesDiffer)
+  TEST_METHOD(AssembleWhenStringTableMetadataInvalidThenFails)
   TEST_METHOD(CompileWhenOKThenIncludesSignatures)
   TEST_METHOD(CompileWhenSigSquareThenIncludeSplit)
   TEST_METHOD(DisassemblyWhenMissingThenFails)
@@ -2841,6 +2844,128 @@ TEST_F(DxilContainerTest, CompileWhenOKThenIncludesFeatureInfo) {
   VERIFY_ARE_NOT_EQUAL(hlsl::end(pHeader), pPartIter);
   VERIFY_ARE_EQUAL(sizeof(uint64_t), (*pPartIter)->PartSize);
   VERIFY_ARE_EQUAL(0U, *(const uint64_t *)hlsl::GetDxilPartData(*pPartIter));
+}
+
+TEST_F(DxilContainerTest, CompileWhenOKThenIncludesStringTable) {
+  const char program[] =
+      "RWByteAddressBuffer Output : register(u0);\n"
+      "[numthreads(1, 1, 1)] void main() {\n"
+      "  Output.Store(0, dx::__builtin_hlsl_string_to_offset(\"hello\"));\n"
+      "  Output.Store(4, dx::__builtin_hlsl_string_to_offset(\"hello\"));\n"
+      "  Output.Store(8, dx::__builtin_hlsl_string_to_offset(\"\"));\n"
+      "}\n";
+  CComPtr<IDxcCompiler> pCompiler;
+  CComPtr<IDxcBlobEncoding> pSource;
+  VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
+  CreateBlobFromText(program, &pSource);
+
+  for (const wchar_t *optimization : {L"-O3", L"-Od"}) {
+    const wchar_t *args[] = {L"-HV", L"202x", optimization};
+    CComPtr<IDxcOperationResult> pResult;
+    VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"hlsl.hlsl", L"main",
+                                        L"cs_6_0", args, _countof(args),
+                                        nullptr, 0, nullptr, &pResult));
+    HRESULT status;
+    VERIFY_SUCCEEDED(pResult->GetStatus(&status));
+    VERIFY_SUCCEEDED(status);
+    CComPtr<IDxcBlob> pProgram;
+    VERIFY_SUCCEEDED(pResult->GetResult(&pProgram));
+
+    auto *pHeader = hlsl::IsDxilContainerLike(pProgram->GetBufferPointer(),
+                                              pProgram->GetBufferSize());
+    VERIFY_IS_NOT_NULL(pHeader);
+    auto part = std::find_if(hlsl::begin(pHeader), hlsl::end(pHeader),
+                             hlsl::DxilPartIsType(hlsl::DFCC_StringTable));
+    VERIFY_ARE_NOT_EQUAL(hlsl::end(pHeader), part);
+    const char expected[] = "\0hello\0";
+    VERIFY_ARE_EQUAL(sizeof(expected), size_t((*part)->PartSize));
+    VERIFY_ARE_EQUAL(
+        0, memcmp(hlsl::GetDxilPartData(*part), expected, sizeof(expected)));
+
+    CComPtr<IDxcBlobEncoding> pDisassembly;
+    VERIFY_SUCCEEDED(pCompiler->Disassemble(pProgram, &pDisassembly));
+    CComPtr<IDxcBlob> pReassembled;
+    AssembleToProgram(
+        static_cast<const char *>(pDisassembly->GetBufferPointer()),
+        &pReassembled);
+    auto *pReassembledHeader = hlsl::IsDxilContainerLike(
+        pReassembled->GetBufferPointer(), pReassembled->GetBufferSize());
+    VERIFY_IS_NOT_NULL(pReassembledHeader);
+    auto reassembledPart = std::find_if(
+        hlsl::begin(pReassembledHeader), hlsl::end(pReassembledHeader),
+        hlsl::DxilPartIsType(hlsl::DFCC_StringTable));
+    VERIFY_ARE_NOT_EQUAL(hlsl::end(pReassembledHeader), reassembledPart);
+    VERIFY_ARE_EQUAL(sizeof(expected), size_t((*reassembledPart)->PartSize));
+    VERIFY_ARE_EQUAL(0, memcmp(hlsl::GetDxilPartData(*reassembledPart),
+                               expected, sizeof(expected)));
+  }
+}
+
+TEST_F(DxilContainerTest, CompileWhenStringsDifferThenHashesDiffer) {
+  const wchar_t *args[] = {L"-HV", L"202x"};
+  hlsl::DxilShaderHash hashes[2];
+  unsigned index = 0;
+  for (const char *text : {"first", "other"}) {
+    std::string program =
+        "RWByteAddressBuffer Output : register(u0);\n"
+        "[numthreads(1, 1, 1)] void main() {\n"
+        "Output.Store(0, dx::__builtin_hlsl_string_to_offset(\"";
+    program += text;
+    program += "\")); }\n";
+    CComPtr<IDxcBlob> pProgram;
+    CompileToProgram(program.c_str(), L"main", L"cs_6_0", args, _countof(args),
+                     &pProgram);
+    auto *pHeader = hlsl::IsDxilContainerLike(pProgram->GetBufferPointer(),
+                                              pProgram->GetBufferSize());
+    VERIFY_IS_NOT_NULL(pHeader);
+    auto part = std::find_if(hlsl::begin(pHeader), hlsl::end(pHeader),
+                             hlsl::DxilPartIsType(hlsl::DFCC_ShaderHash));
+    VERIFY_ARE_NOT_EQUAL(hlsl::end(pHeader), part);
+    VERIFY_ARE_EQUAL(sizeof(hashes[index]), size_t((*part)->PartSize));
+    memcpy(&hashes[index++], hlsl::GetDxilPartData(*part),
+           sizeof(hlsl::DxilShaderHash));
+  }
+  VERIFY_ARE_NOT_EQUAL(0, memcmp(&hashes[0], &hashes[1], sizeof(hashes[0])));
+}
+
+TEST_F(DxilContainerTest, AssembleWhenStringTableMetadataInvalidThenFails) {
+  const char program[] =
+      "RWByteAddressBuffer Output : register(u0);\n"
+      "[numthreads(1, 1, 1)] void main() {\n"
+      "Output.Store(0, dx::__builtin_hlsl_string_to_offset(\"hello\")); }\n";
+  const wchar_t *args[] = {L"-HV", L"202x"};
+  CComPtr<IDxcBlob> pProgram;
+  CompileToProgram(program, L"main", L"cs_6_0", args, _countof(args),
+                   &pProgram);
+  CComPtr<IDxcCompiler> pCompiler;
+  VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
+  CComPtr<IDxcBlobEncoding> pDisassembly;
+  VERIFY_SUCCEEDED(pCompiler->Disassemble(pProgram, &pDisassembly));
+  const std::string disassembly(
+      static_cast<const char *>(pDisassembly->GetBufferPointer()),
+      pDisassembly->GetBufferSize());
+  const size_t table = disassembly.find("!dx.strtab = ");
+  VERIFY_ARE_NOT_EQUAL(std::string::npos, table);
+  const size_t lineEnd = disassembly.find('\n', table);
+  VERIFY_ARE_NOT_EQUAL(std::string::npos, lineEnd);
+
+  CComPtr<IDxcAssembler> pAssembler;
+  VERIFY_SUCCEEDED(
+      m_dllSupport.CreateInstance(CLSID_DxcAssembler, &pAssembler));
+  for (const char *metadata :
+       {"!dx.strtab = !{}\n", "!dx.strtab = !{!9999}\n!9999 = !{}\n",
+        "!dx.strtab = !{!9999}\n!9999 = !{i32 0}\n",
+        "!dx.strtab = !{!9999}\n!9999 = !{!\"bad\"}\n"}) {
+    std::string invalid = disassembly;
+    invalid.replace(table, lineEnd - table + 1, metadata);
+    CComPtr<IDxcBlobEncoding> pSource;
+    CreateBlobFromText(invalid.c_str(), &pSource);
+    CComPtr<IDxcOperationResult> pResult;
+    VERIFY_SUCCEEDED(pAssembler->AssembleToContainer(pSource, &pResult));
+    HRESULT status;
+    VERIFY_SUCCEEDED(pResult->GetStatus(&status));
+    VERIFY_FAILED(status);
+  }
 }
 
 TEST_F(DxilContainerTest, DisassemblyWhenBCInvalidThenFails) {

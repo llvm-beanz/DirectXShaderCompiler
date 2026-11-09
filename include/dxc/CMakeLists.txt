@@ -24,7 +24,8 @@ set(DXC_PUBLIC_HEADERS
     ${CMAKE_CURRENT_BINARY_DIR}/config.h
     ${CMAKE_CURRENT_SOURCE_DIR}/dxcapi.h
     ${CMAKE_CURRENT_SOURCE_DIR}/dxcerrors.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/dxcisense.h)
+    ${CMAKE_CURRENT_SOURCE_DIR}/dxcisense.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shader_printf.h)
 
 if (NOT WIN32)
   set(DXC_PLATFORM_PUBLIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/WinAdapter.h)

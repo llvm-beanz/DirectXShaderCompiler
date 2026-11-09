@@ -7221,6 +7221,19 @@ Value *TranslateLinAlgVectorAccumulateToDescriptor(
                             {OpArg, ResHandle, Offset, Align, Vector});
 }
 
+Value *TranslateStringToOffset(CallInst *CI, IntrinsicOp, OP::OpCode,
+                               HLOperationLowerHelper &,
+                               HLObjectOperationLowerHelper *,
+                               bool &Translated) {
+  Module *M = CI->getModule();
+  IRBuilder<> Builder(CI);
+
+  Value *StrPtr = CI->getArgOperand(HLOperandIndex::kUnaryOpSrc0Idx);
+  Value *StrToOffset =
+      Intrinsic::getDeclaration(M, Intrinsic::string_to_offset);
+  return Builder.CreateCall(StrToOffset, {StrPtr});
+}
+
 } // namespace
 
 // Lower table.
@@ -8018,6 +8031,8 @@ constexpr IntrinsicLower gLowerTable[] = {
     {IntrinsicOp::IOP_Dx__builtin_LinAlg_VectorAccumulateToDescriptor,
      TranslateLinAlgVectorAccumulateToDescriptor,
      DXIL::OpCode::LinAlgVectorAccumulateToDescriptor},
+    {IntrinsicOp::IOP_Dx__builtin_hlsl_string_to_offset,
+     TranslateStringToOffset, DXIL::OpCode::NumOpCodes},
 };
 constexpr size_t NumLowerTableEntries =
     sizeof(gLowerTable) / sizeof(gLowerTable[0]);

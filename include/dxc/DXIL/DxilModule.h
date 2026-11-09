@@ -332,6 +332,11 @@ public:
   DxilSubobjects *ReleaseSubobjects();
   void ResetSubobjects(DxilSubobjects *subobjects);
 
+  void SetStringTable(llvm::StringRef StrTab);
+  llvm::StringRef GetStringTable() const {
+    return llvm::StringRef(m_StrTab.data(), m_StrTab.size());
+  }
+
 private:
   // Signatures.
   std::vector<uint8_t> m_SerializedRootSignature;
@@ -396,6 +401,8 @@ private:
   // m_bMetadataErrors is true if non-fatal metadata errors were encountered.
   // Validator will fail in this case, but should not block module load.
   bool m_bMetadataErrors = false;
+
+  std::vector<char> m_StrTab;
 
   // DXIL metadata serialization/deserialization.
   llvm::MDTuple *EmitDxilResources();

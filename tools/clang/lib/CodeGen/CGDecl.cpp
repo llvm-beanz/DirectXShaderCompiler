@@ -20,6 +20,7 @@
 #include "clang/AST/CharUnits.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/HlslTypes.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
@@ -1773,7 +1774,8 @@ void CodeGenFunction::EmitParmDecl(const VarDecl &D, llvm::Value *Arg,
     }
   } else {
     // HLSL Change Starts
-    if (getLangOpts().HLSL && Arg->getType()->isPointerTy()) {
+    if (getLangOpts().HLSL && Arg->getType()->isPointerTy() &&
+        !hlsl::IsStringType(Ty)) {
       // HLSL doesn't have pointer.
       // Only case pointer type will generated is this pointer for methods.
       // Don't store this pointer, just use the parameter directly.

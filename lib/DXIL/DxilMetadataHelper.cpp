@@ -117,8 +117,9 @@ const char DxilMDHelper::kDxilSourceArgsOldMDName[] = "llvm.dbg.args";
 
 // This is reflection-only metadata
 const char DxilMDHelper::kDxilCountersMDName[] = "dx.counters";
+const char DxilMDHelper::kDxilStringTableMDName[] = "dx.strtab";
 
-static std::array<const char *, 9> DxilMDNames = {{
+static std::array<const char *, 10> DxilMDNames = {{
     DxilMDHelper::kDxilVersionMDName,
     DxilMDHelper::kDxilShaderModelMDName,
     DxilMDHelper::kDxilEntryPointsMDName,
@@ -128,6 +129,7 @@ static std::array<const char *, 9> DxilMDNames = {{
     DxilMDHelper::kDxilViewIdStateMDName,
     DxilMDHelper::kDxilDxrPayloadAnnotationsMDName,
     DxilMDHelper::kDxilTargetTypesMDName,
+    DxilMDHelper::kDxilStringTableMDName,
 }};
 
 DxilMDHelper::DxilMDHelper(Module *pModule,
@@ -3059,6 +3061,31 @@ void DxilMDHelper::LoadDxilCounters(DxilCounters &counters) const {
                     counters);
     }
   }
+}
+
+void DxilMDHelper::EmitStringTable(llvm::StringRef StrTab) {
+  if (StrTab.empty())
+    return;
+  NamedMDNode *StrTabMD =
+      m_pModule->getOrInsertNamedMetadata(kDxilStringTableMDName);
+  StrTabMD->dropAllReferences();
+  Metadata *MD[] = {MDString::get(m_pModule->getContext(), StrTab)};
+  StrTabMD->addOperand(MDNode::get(m_pModule->getContext(), MD));
+}
+
+void DxilMDHelper::LoadStringTable(std::vector<char> &StrTab) const {
+  StrTab.clear();
+  NamedMDNode *StrTabMD = m_pModule->getNamedMetadata(kDxilStringTableMDName);
+  if (!StrTabMD)
+    return;
+  IFTBOOL(StrTabMD->getNumOperands() == 1, DXC_E_INCORRECT_DXIL_METADATA);
+  MDNode *MD = StrTabMD->getOperand(0);
+  IFTBOOL(MD->getNumOperands() == 1, DXC_E_INCORRECT_DXIL_METADATA);
+  StringRef StrTabRef = StringMDToStringRef(MD->getOperand(0));
+  IFTBOOL(!StrTabRef.empty() && StrTabRef.size() % 4 == 0 &&
+              StrTabRef.front() == '\0' && StrTabRef.back() == '\0',
+          DXC_E_INCORRECT_DXIL_METADATA);
+  StrTab.insert(StrTab.end(), StrTabRef.begin(), StrTabRef.end());
 }
 
 //

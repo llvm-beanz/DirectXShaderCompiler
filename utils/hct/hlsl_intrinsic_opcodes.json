@@ -1,6 +1,6 @@
 {
   "IntrinsicOpCodes": {
-    "Num_Intrinsics": 424,
+    "Num_Intrinsics": 425,
     "IOP_AcceptHitAndEndSearch": 0,
     "IOP_AddUint64": 1,
     "IOP_AllMemoryBarrier": 2,
@@ -424,6 +424,7 @@
     "IOP_DebugBreak": 420,
     "IOP_DxIsDebuggingEnabled": 421,
     "IOP_Dx__builtin_LinAlg_Convert": 422,
-    "IOP_Dx__builtin_LinAlg_VectorAccumulateToDescriptor": 423
+    "IOP_Dx__builtin_LinAlg_VectorAccumulateToDescriptor": 423,
+    "IOP_Dx__builtin_hlsl_string_to_offset": 424
   }
 }

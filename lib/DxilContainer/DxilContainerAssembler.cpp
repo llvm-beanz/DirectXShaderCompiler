@@ -2861,6 +2861,15 @@ void hlsl::SerializeDxilContainerForModule(
         WriteProgramPart(pModule->GetShaderModel(), pProgramStream, pStream);
       });
 
+  llvm::StringRef StrTab = pModule->GetStringTable();
+  if (!StrTab.empty())
+    writer.AddPart(
+        hlsl::DFCC_StringTable, (uint32_t)StrTab.size(),
+        [StrTab](AbstractMemoryStream *pStream) {
+          ULONG cbWritten;
+          IFT(pStream->Write(StrTab.data(), StrTab.size(), &cbWritten));
+        });
+
   // Private data part should be added last when assembling the container
   // becasue there is no garuntee of aligned size
   if (pPrivateData) {

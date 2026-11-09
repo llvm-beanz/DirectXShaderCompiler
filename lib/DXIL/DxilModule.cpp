@@ -1297,6 +1297,16 @@ void DxilModule::ResetSubobjects(DxilSubobjects *subobjects) {
   m_pSubobjects.reset(subobjects);
 }
 
+void DxilModule::SetStringTable(StringRef StrTab) {
+  assert(m_StrTab.empty() && "String table can only be set once.");
+  m_StrTab.insert(m_StrTab.end(), StrTab.begin(), StrTab.end());
+  if (m_StrTab.size() % 4 != 0) {
+    // Pad to 4-byte alignment.
+    size_t padding = 4 - (m_StrTab.size() % 4);
+    m_StrTab.insert(m_StrTab.end(), padding, 0);
+  }
+}
+
 bool DxilModule::StripSubobjectsFromMetadata() {
   NamedMDNode *pSubobjectsNamedMD =
       GetModule()->getNamedMetadata(DxilMDHelper::kDxilSubobjectsMDName);
@@ -1412,6 +1422,7 @@ void DxilModule::ClearDxilMetadata(Module &M) {
         name == DxilMDHelper::kDxilViewIdStateMDName ||
         name == DxilMDHelper::kDxilSubobjectsMDName ||
         name == DxilMDHelper::kDxilCountersMDName ||
+        name == DxilMDHelper::kDxilStringTableMDName ||
         name.startswith(DxilMDHelper::kDxilTypeSystemHelperVariablePrefix)) {
       nodes.push_back(&b);
     }
@@ -1422,6 +1433,7 @@ void DxilModule::ClearDxilMetadata(Module &M) {
 }
 
 void DxilModule::EmitDxilMetadata() {
+  m_pMDHelper->EmitStringTable(GetStringTable());
   m_pMDHelper->EmitDxilVersion(m_DxilMajor, m_DxilMinor);
   m_pMDHelper->EmitValidatorVersion(m_ValMajor, m_ValMinor);
   m_pMDHelper->EmitDxilShaderModel(m_pSM);
@@ -1517,6 +1529,7 @@ bool DxilModule::HasMetadataErrors() { return m_bMetadataErrors; }
 
 void DxilModule::LoadDxilMetadata() {
   m_bMetadataErrors = false;
+  m_pMDHelper->LoadStringTable(m_StrTab);
   m_pMDHelper->LoadValidatorVersion(m_ValMajor, m_ValMinor);
   const ShaderModel *loadedSM;
   m_pMDHelper->LoadDxilShaderModel(loadedSM);

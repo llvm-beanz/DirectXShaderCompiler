@@ -4157,6 +4157,12 @@ void CGMSHLSLRuntime::FlattenValToInitList(CodeGenFunction &CGF,
   CGBuilderTy &Builder = CGF.Builder;
   llvm::Type *valTy = val->getType();
 
+  if (hlsl::IsStringType(Ty) && valTy == CGF.ConvertType(Ty)) {
+    elts.emplace_back(val);
+    eltTys.emplace_back(Ty);
+    return;
+  }
+
   if (valTy->isPointerTy()) {
     llvm::Type *valEltTy = valTy->getPointerElementType();
     if (valEltTy->isVectorTy() || valEltTy->isSingleValueType()) {
@@ -4347,6 +4353,9 @@ static void AddMissingCastOpsInInitList(SmallVector<Value *, 4> &elts,
       for (FieldDecl *field : RD->fields())
         AddMissingCastOpsInInitList(elts, eltTys, idx, field->getType(), CGF);
     }
+  } else if (IsStringType(Ty)) {
+    DXASSERT_NOMSG(IsStringType(eltTys[idx]));
+    idx++;
   } else {
     // Basic type.
     elts[idx] = ConvertScalarOrVector(CGF, elts[idx], eltTys[idx], Ty);
@@ -4743,8 +4752,8 @@ static void FlatConstToList(CodeGenTypes &Types, bool bDefaultRowMajor,
                       EltVals, EltQualTys);
     }
   } else {
-    // At this point, we should have scalars in their memory representation
-    DXASSERT_NOMSG(QualTy->isBuiltinType());
+    // Scalar leaves, including string pointers, are in memory representation.
+    DXASSERT_NOMSG(QualTy->isBuiltinType() || hlsl::IsStringType(QualTy));
     EltVals.emplace_back(C);
     EltQualTys.emplace_back(QualTy);
   }
@@ -4922,10 +4931,15 @@ static Constant *BuildConstInitializer(CodeGenTypes &Types,
     return BuildConstStruct(Types, bDefaultRowMajor, QualTy, EltVals,
                             EltQualTys, EltIdx);
   } else {
-    DXASSERT_NOMSG(QualTy->isBuiltinType());
+    DXASSERT_NOMSG(QualTy->isBuiltinType() || hlsl::IsStringType(QualTy));
     Constant *EltVal = EltVals[EltIdx];
     QualType EltQualTy = EltQualTys[EltIdx];
     EltIdx++;
+
+    if (hlsl::IsStringType(QualTy)) {
+      DXASSERT_NOMSG(hlsl::IsStringType(EltQualTy));
+      return EltVal;
+    }
 
     // Initializer constants are in their memory representation.
     if (EltQualTy == QualTy && MemRepr)

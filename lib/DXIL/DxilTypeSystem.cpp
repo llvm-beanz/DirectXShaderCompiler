@@ -393,6 +393,18 @@ DxilTypeSystem::AddStructAnnotation(const StructType *pStructType,
   return pA;
 }
 
+static bool ContainsString(const Type *Ty) {
+  if (Ty->isPointerTy())
+    return Ty->getPointerElementType()->isIntegerTy(8);
+  if (auto *AT = dyn_cast<ArrayType>(Ty))
+    return ContainsString(AT->getElementType());
+  if (auto *ST = dyn_cast<StructType>(Ty))
+    for (Type *Element : ST->elements())
+      if (ContainsString(Element))
+        return true;
+  return false;
+}
+
 void DxilTypeSystem::FinishStructAnnotation(DxilStructAnnotation &SA) {
   const llvm::StructType *ST = SA.GetStructType();
   DXASSERT(SA.GetNumFields() == ST->getNumElements(),
@@ -411,8 +423,8 @@ void DxilTypeSystem::FinishStructAnnotation(DxilStructAnnotation &SA) {
       SA.SetContainsTargetTypes();
   }
 
-  // Mark if empty
-  if (SA.GetCBufferSize() == 0)
+  // String fields occupy no cbuffer storage, but must survive scalar replacement.
+  if (SA.GetCBufferSize() == 0 && !ContainsString(ST))
     SA.MarkEmptyStruct();
 }
 

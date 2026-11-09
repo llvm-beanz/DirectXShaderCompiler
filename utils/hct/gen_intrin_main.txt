@@ -23,6 +23,8 @@
 // variadic functions assume <qual> of "in" for any arguments that are not
 // explicitly specified.
 //
+// The no_lib attribute marks an intrinsic unavailable in library profiles.
+//
 // <type> is where most of the work goes.  <type> lets you
 // specify particular types and layouts for arguments and
 // also lets you indicate which types must share characteristics
@@ -1142,6 +1144,7 @@ namespace DxHitObjectMethods {
 } namespace
 
 namespace DxIntrinsics {
+uint [[no_lib]] __builtin_hlsl_string_to_offset(in string Str);
 bool [[min_sm=6.10]] IsDebuggingEnabled();
 void [[min_sm=6.9]] MaybeReorderThread(in DxHitObject HitObject);
 void [[min_sm=6.9]] MaybeReorderThread(in uint CoherenceHint, in uint NumCoherenceHintBitsFromLSB);

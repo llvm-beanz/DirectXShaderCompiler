@@ -7461,6 +7461,12 @@ class db_dxil(object):
             "Mutate resource to handle",
             [],
         )
+        add_pass(
+            "dxil-string-lowering",
+            "DXILStringLoweringModule",
+            "String Lowering",
+            []
+        )
 
         category_lib = "llvm"
         add_pass(
@@ -9450,6 +9456,7 @@ class db_hlsl_intrinsic(object):
         static_member,
         class_prefix,
         mutable_method,
+        no_lib,
     ):
         self.name = name  # Function name
         self.idx = idx  # Unique number within namespace
@@ -9504,6 +9511,7 @@ class db_hlsl_intrinsic(object):
             )
         self.static_member = static_member  # HLSL static member function
         self.mutable_method = mutable_method  # Mutates the object; not callable on const
+        self.no_lib = no_lib
         self.key = (
             ("%3d" % ns_idx)
             + "!"
@@ -9907,6 +9915,7 @@ class db_hlsl(object):
             argmemonly = False  # Only reads memory through pointer arguments
             static_member = False  # Static member function
             mutable_method = False  # Mutates the object; not callable on const
+            no_lib = False
             is_wave = False
             class_prefix = False  # Insert class name as enum_prefix
             # Is wave-sensitive
@@ -9943,6 +9952,9 @@ class db_hlsl(object):
                     continue
                 if a == "class_prefix":
                     class_prefix = True
+                    continue
+                if a == "no_lib":
+                    no_lib = True
                     continue
 
                 assign = a.split("=")
@@ -10009,6 +10021,7 @@ class db_hlsl(object):
                 static_member,
                 class_prefix,
                 mutable_method,
+                no_lib,
             )
 
         current_namespace = None
@@ -10061,6 +10074,7 @@ class db_hlsl(object):
                     static_member,
                     class_prefix,
                     mutable_method,
+                    no_lib,
                 ) = process_attr(attr)
                 # Add an entry for this intrinsic.
                 if bracket_cleanup_re.search(opts):
@@ -10106,6 +10120,7 @@ class db_hlsl(object):
                         static_member,
                         class_prefix,
                         mutable_method,
+                        no_lib,
                     )
                 )
                 num_entries += 1

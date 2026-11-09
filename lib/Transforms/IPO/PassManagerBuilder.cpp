@@ -379,6 +379,7 @@ void PassManagerBuilder::populateModulePassManager(
       MPM.add(createDxilEraseDeadRegionPass());
       MPM.add(createDxilNoOptSimplifyInstructionsPass());
       MPM.add(createGlobalOptimizerPass());
+      MPM.add(createDXILStringLoweringModulePass());
       MPM.add(createMultiDimArrayToOneDimArrayPass());
       MPM.add(createDeadCodeEliminationPass());
       MPM.add(createGlobalDCEPass());
@@ -690,6 +691,7 @@ void PassManagerBuilder::populateModulePassManager(
 
   // HLSL Change Begins.
   if (!HLSLHighLevel) {
+    MPM.add(createDXILStringLoweringModulePass());
     MPM.add(createDxilEraseDeadRegionPass());
     MPM.add(createDxilConvergentClearPass());
     MPM.add(createDeadCodeEliminationPass()); // DCE needed after clearing convergence

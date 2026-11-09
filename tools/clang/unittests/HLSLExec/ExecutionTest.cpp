@@ -44,6 +44,7 @@
 #include "dxc/Test/HlslTestUtils.h"
 #include "dxc/Support/FileIOHelper.h"
 #include "dxc/Support/Unicode.h"
+#include "dxc/shader_printf.h"
 
 //
 // d3d12.h and dxgi1_4.h are included in the Windows 10 SDK
@@ -206,6 +207,7 @@ public:
   TEST_METHOD(Int64Test);
   TEST_METHOD(LifetimeIntrinsicTest)
   TEST_METHOD(WaveIntrinsicsTest);
+  TEST_METHOD(PrintfTest);
   TEST_METHOD(WaveIntrinsicsDDITest);
   TEST_METHOD(WaveIntrinsicsInPSTest);
   TEST_METHOD(WaveSizeTest);
@@ -2059,6 +2061,226 @@ TEST_F(ExecutionTest, SignTest) {
   VERIFY_ARE_EQUAL(values[5], (uint32_t)1);
   VERIFY_ARE_EQUAL(values[6], (uint32_t)1);
   VERIFY_ARE_EQUAL(values[7], (uint32_t)1);
+}
+
+TEST_F(ExecutionTest, PrintfTest) {
+  WEX::TestExecution::SetVerifyOutput VerifySettings(
+      WEX::TestExecution::VerifyOutputSettings::LogOnlyFailures);
+
+  if (useDxbc()) {
+    WEX::Logging::Log::Comment(L"Shader printf requires DXIL.");
+    WEX::Logging::Log::Result(WEX::Logging::TestResults::Skipped);
+    return;
+  }
+
+  CComPtr<ID3D12Device> Device;
+  if (!createDevice(&Device, D3D_SHADER_MODEL_6_0))
+    return;
+  if (!doesDeviceSupportWaveOps(Device)) {
+    WEX::Logging::Log::Comment(L"Shader printf requires wave operations.");
+    WEX::Logging::Log::Result(WEX::Logging::TestResults::Skipped);
+    return;
+  }
+
+  D3D12_FEATURE_DATA_D3D12_OPTIONS1 WaveOptions = {};
+  VERIFY_SUCCEEDED(Device->CheckFeatureSupport(
+      D3D12_FEATURE_D3D12_OPTIONS1, &WaveOptions, sizeof(WaveOptions)));
+  const UINT ThreadsPerGroup = 256;
+  const UINT GroupCount = 6;
+  const UINT ThreadCount = ThreadsPerGroup * GroupCount;
+  VERIFY_IS_LESS_THAN(WaveOptions.WaveLaneCountMax, ThreadsPerGroup);
+
+  CComPtr<IStream> Stream;
+  readHlslDataIntoNewStream(L"ShaderOpArith.xml", &Stream, m_support);
+  auto ShaderOpSet = std::make_shared<st::ShaderOpSet>();
+  st::ParseShaderOpSetFromStream(Stream, ShaderOpSet.get());
+  const char *const Formats[] = {
+      "uniform g=%u t=%u lane=%u width=%u d=%d f=%f x=%x %%\n",
+      "group g=%u t=%u\n",
+      "even g=%u t=%u\n",
+      "odd g=%u t=%u\n",
+      "dynamic even g=%u t=%u\n",
+      "dynamic odd g=%u t=%u\n",
+      "no arguments\n"};
+
+  for (LPCWSTR Optimization : {L"-Od", L"-O3"}) {
+    LogCommentFmt(L"Testing shader printf with %s.", Optimization);
+    CComPtr<ID3DBlob> Shader;
+    const auto Test = st::RunShaderOpTestAfterParse(
+        Device, m_support, "PrintfTest", nullptr,
+        [&](LPCSTR Name, LPCSTR Text, IDxcBlob **Blob, st::ShaderOp *) {
+          VERIFY_ARE_EQUAL(0, strcmp(Name, "CS"));
+          LPCWSTR Options[] = {L"-HV", L"202x", Optimization};
+          CompileFromText(Text, L"main", L"cs_6_0", &Shader, Options,
+                          _countof(Options));
+          VERIFY_SUCCEEDED(Shader->QueryInterface(IID_PPV_ARGS(Blob)));
+        },
+        ShaderOpSet);
+
+    CComPtr<IDxcBlob> ShaderBlob;
+    VERIFY_SUCCEEDED(Shader->QueryInterface(IID_PPV_ARGS(&ShaderBlob)));
+    CComPtr<IDxcContainerReflection> Reflection;
+    VERIFY_SUCCEEDED(
+        m_support.CreateInstance(CLSID_DxcContainerReflection, &Reflection));
+    VERIFY_SUCCEEDED(Reflection->Load(ShaderBlob));
+    UINT32 StringTableIndex;
+    VERIFY_SUCCEEDED(Reflection->FindFirstPartKind(
+        DXC_FOURCC('S', 'T', 'A', 'B'), &StringTableIndex));
+    CComPtr<IDxcBlob> StringTable;
+    VERIFY_SUCCEEDED(
+        Reflection->GetPartContent(StringTableIndex, &StringTable));
+    const char *Strings =
+        static_cast<const char *>(StringTable->GetBufferPointer());
+
+    MappedData Data;
+    Test->Test->GetReadBackData("DebugOutput", &Data);
+    VERIFY_IS_GREATER_THAN_OR_EQUAL(Data.size(), UINT(sizeof(UINT)));
+    const auto *Bytes = static_cast<const BYTE *>(Data.data());
+    const auto ReadWord = [&](UINT Offset) {
+      VERIFY_IS_LESS_THAN_OR_EQUAL(Offset, Data.size() - UINT(sizeof(UINT)));
+      UINT Value;
+      memcpy(&Value, Bytes + Offset, sizeof(Value));
+      return Value;
+    };
+    const UINT ByteCount = ReadWord(0);
+    VERIFY_IS_GREATER_THAN(ByteCount, 4u);
+    VERIFY_IS_LESS_THAN_OR_EQUAL(ByteCount, Data.size());
+    VERIFY_ARE_EQUAL(0u, ByteCount % 4);
+
+    std::vector<std::array<UINT, 6>> MessageCounts(ThreadCount);
+    std::vector<std::array<UINT, 6>> RecordLaneCounts(ThreadCount);
+    std::vector<UINT> LaneIndices(ThreadCount);
+    std::vector<UINT> WaveSizes(ThreadCount);
+    std::array<UINT, GroupCount> UniformRecords = {};
+    UINT NoArgumentCount = 0;
+    UINT Position = 4;
+    while (Position < ByteCount) {
+      VERIFY_IS_GREATER_THAN_OR_EQUAL(ByteCount - Position, 8u);
+      const UINT LaneCount = ReadWord(Position);
+      const UINT LaneSize = ReadWord(Position + 4);
+      Position += 8;
+      VERIFY_IS_GREATER_THAN(LaneCount, 0u);
+      VERIFY_IS_LESS_THAN_OR_EQUAL(LaneCount, WaveOptions.WaveLaneCountMax);
+      VERIFY_IS_GREATER_THAN_OR_EQUAL(LaneSize, 4u);
+      VERIFY_ARE_EQUAL(0u, LaneSize % 4);
+      VERIFY_IS_LESS_THAN_OR_EQUAL(LaneSize,
+                                   (ByteCount - Position) / LaneCount);
+      const UINT ArgumentSize = LaneSize - 4;
+      UINT RecordGroup = 0;
+      for (UINT Lane = 0; Lane < LaneCount; ++Lane) {
+        const UINT StringOffset = ReadWord(Position);
+        Position += 4;
+        VERIFY_IS_LESS_THAN(StringOffset, StringTable->GetBufferSize());
+        const char *Format = Strings + StringOffset;
+        const auto *Terminator = static_cast<const char *>(
+            memchr(Format, '\0', StringTable->GetBufferSize() - StringOffset));
+        VERIFY_IS_NOT_NULL(Terminator);
+        const std::string FormatString(Format, Terminator);
+        size_t Kind = 0;
+        while (Kind < _countof(Formats) && FormatString != Formats[Kind])
+          ++Kind;
+        VERIFY_IS_LESS_THAN(Kind, _countof(Formats));
+        const UINT ExpectedArgumentSize = Kind == 0 ? 28u : Kind == 6 ? 0u : 8u;
+        VERIFY_ARE_EQUAL(ExpectedArgumentSize, ArgumentSize);
+        if (Kind == 6) {
+          VERIFY_ARE_EQUAL(1u, LaneCount);
+          ++NoArgumentCount;
+          continue;
+        }
+        const UINT Group = ReadWord(Position);
+        const UINT Thread = ReadWord(Position + 4);
+        VERIFY_IS_LESS_THAN(Group, GroupCount);
+        if (Lane == 0) {
+          RecordGroup = Group;
+          if (Kind == 0)
+            ++UniformRecords[Group];
+        }
+        VERIFY_ARE_EQUAL(RecordGroup, Group);
+        VERIFY_IS_LESS_THAN(Thread, ThreadsPerGroup);
+        const UINT Index = Group * ThreadsPerGroup + Thread;
+        ++MessageCounts[Index][Kind];
+        RecordLaneCounts[Index][Kind] = LaneCount;
+        if (Kind == 0) {
+          LaneIndices[Index] = ReadWord(Position + 8);
+          WaveSizes[Index] = ReadWord(Position + 12);
+          VERIFY_ARE_EQUAL(Lane, LaneIndices[Index]);
+          VERIFY_ARE_EQUAL(LaneCount, WaveSizes[Index]);
+          VERIFY_IS_GREATER_THAN_OR_EQUAL(LaneCount,
+                                          WaveOptions.WaveLaneCountMin);
+          VERIFY_ARE_EQUAL(0u - Index - 1u, ReadWord(Position + 16));
+          const float FloatValue = static_cast<float>(Index) + 0.5f;
+          UINT FloatBits;
+          memcpy(&FloatBits, &FloatValue, sizeof(FloatBits));
+          VERIFY_ARE_EQUAL(FloatBits, ReadWord(Position + 20));
+          VERIFY_ARE_EQUAL(Index, ReadWord(Position + 24));
+        }
+        Position += ArgumentSize;
+      }
+    }
+    VERIFY_ARE_EQUAL(ByteCount, Position);
+    VERIFY_ARE_EQUAL(GroupCount, NoArgumentCount);
+    for (UINT Count : UniformRecords)
+      VERIFY_IS_GREATER_THAN_OR_EQUAL(Count, 2u);
+    for (UINT Offset = ByteCount; Offset < Data.size(); ++Offset)
+      VERIFY_ARE_EQUAL(BYTE(0), Bytes[Offset]);
+
+    std::multiset<std::string> ExpectedLines;
+    for (UINT Index = 0; Index < ThreadCount; ++Index) {
+      const UINT Group = Index / ThreadsPerGroup;
+      const UINT Thread = Index % ThreadsPerGroup;
+      const UINT BranchKind = (LaneIndices[Index] & 1u) == 0 ? 2u : 3u;
+      for (UINT Kind = 0; Kind < 6; ++Kind) {
+        const UINT ExpectedCount =
+            Kind == 0 || (Kind == 1 && (Group & 1u) == 0) ||
+                    Kind == BranchKind || Kind == BranchKind + 2
+                ? 1u
+                : 0u;
+        VERIFY_ARE_EQUAL(ExpectedCount, MessageCounts[Index][Kind]);
+        if (ExpectedCount != 0)
+          VERIFY_ARE_EQUAL(Kind < 2 || Kind >= 4 ? WaveSizes[Index]
+                                                 : WaveSizes[Index] / 2,
+                           RecordLaneCounts[Index][Kind]);
+      }
+      std::ostringstream Line;
+      Line.imbue(std::locale::classic());
+      Line << "uniform g=" << Group << " t=" << Thread
+           << " lane=" << LaneIndices[Index] << " width=" << WaveSizes[Index]
+           << " d=" << -static_cast<int>(Index) - 1 << " f=" << std::scientific
+           << std::setprecision(6) << (static_cast<float>(Index) + 0.5f)
+           << " x=0x" << std::hex << std::setw(6) << std::setfill('0') << Index
+           << " %";
+      ExpectedLines.insert(Line.str());
+      const std::string Suffix =
+          "g=" + std::to_string(Group) + " t=" + std::to_string(Thread);
+      if ((Group & 1u) == 0)
+        ExpectedLines.insert("group " + Suffix);
+      ExpectedLines.insert((BranchKind == 2 ? "even " : "odd ") + Suffix);
+      ExpectedLines.insert(
+          (BranchKind == 2 ? "dynamic even " : "dynamic odd ") + Suffix);
+    }
+    for (UINT Group = 0; Group < GroupCount; ++Group)
+      ExpectedLines.insert("no arguments");
+
+    std::ostringstream Output;
+    const auto Error = dxc::PrintDebugStream(Data.data(), Data.size(),
+                                             Shader->GetBufferPointer(),
+                                             Shader->GetBufferSize(), Output);
+    if (Error)
+      LogErrorFmt(L"Shader printf decoding failed: %S",
+                  Error.message().c_str());
+    VERIFY_IS_FALSE(static_cast<bool>(Error));
+    const std::string OutputText = Output.str();
+    VERIFY_IS_FALSE(OutputText.empty());
+    VERIFY_ARE_EQUAL('\n', OutputText.back());
+    std::istringstream Lines(OutputText);
+    std::multiset<std::string> ActualLines;
+    std::string Line;
+    while (std::getline(Lines, Line))
+      ActualLines.insert(Line);
+    VERIFY_ARE_EQUAL(ExpectedLines.size(), ActualLines.size());
+    // Atomic reservations order waves and groups nondeterministically.
+    VERIFY_IS_TRUE(ExpectedLines == ActualLines);
+  }
 }
 
 TEST_F(ExecutionTest, WaveIntrinsicsDDITest) {

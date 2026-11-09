@@ -97,6 +97,7 @@ public:
 
   // DxilCounters
   static const char kDxilCountersMDName[];
+  static const char kDxilStringTableMDName[];
   // !{!"<counter>", i32 <count>, !"<counter>", i32 <count>, ...}
 
   // Entry points.
@@ -581,6 +582,9 @@ public:
   // Instruction Counters
   void EmitDxilCounters(const DxilCounters &counters);
   void LoadDxilCounters(DxilCounters &counters) const;
+
+  void EmitStringTable(llvm::StringRef StrTab);
+  void LoadStringTable(std::vector<char> &StrTab) const;
 
   // Shader specific.
 private:

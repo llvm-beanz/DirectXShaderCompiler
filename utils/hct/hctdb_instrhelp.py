@@ -1136,6 +1136,8 @@ def get_hlsl_intrinsics():
             flags.append("INTRIN_FLAG_STATIC_MEMBER")
         if i.mutable_method:
             flags.append("INTRIN_FLAG_MUTABLE_METHOD")
+        if i.no_lib:
+            flags.append("INTRIN_FLAG_NO_LIBRARY")
         if flags:
             flags = " | ".join(flags)
         else:

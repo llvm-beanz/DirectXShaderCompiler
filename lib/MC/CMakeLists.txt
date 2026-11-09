@@ -1,5 +1,6 @@
-add_llvm_library(LLVMMC
-  ConstantPools.cpp
+# HLSL Change Begin - Strip MC down to minimal set
+
+set(HLSL_IGNORE_SOURCES ConstantPools.cpp
   ELFObjectWriter.cpp
   MCAsmBackend.cpp
   MCAsmInfo.cpp
@@ -43,15 +44,18 @@ add_llvm_library(LLVMMC
   MCWin64EH.cpp
   MCWinEH.cpp
   MachObjectWriter.cpp
-  StringTableBuilder.cpp
   SubtargetFeature.cpp
   WinCOFFObjectWriter.cpp
   WinCOFFStreamer.cpp
-  YAML.cpp
+  YAML.cpp)
+
+add_llvm_library(LLVMMC
+  StringTableBuilder.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/MC
   )
+# HLSL Change End
 
 add_subdirectory(MCParser)
 add_subdirectory(MCDisassembler)
